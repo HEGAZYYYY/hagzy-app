@@ -1,0 +1,79 @@
+name: Build Hagzy Mobile Apps (iOS & Android)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iPhone App (IPA)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS Release (Unsigned)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com \
+            --dart-define=HAGZY_SEED_NADER_SALON=true
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -qr Hagzy.ipa Payload
+          rm -rf Payload
+
+      - name: Upload iPhone IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hagzy-iPhone-IPA
+          path: Hagzy.ipa
+          retention-days: 14
+
+  build-android:
+    name: Build Android App (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: |
+          flutter build apk --release \
+            --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com \
+            --dart-define=HAGZY_SEED_NADER_SALON=true
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hagzy-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
