@@ -1,0 +1,106 @@
+[
+  {
+    "id": "nader-el-khawaga-kafr-el-sheikh",
+    "name": "Nader El Khawaga",
+    "location": "Kafr El Sheikh",
+    "type": "salon",
+    "ownerPhone": "01024129393",
+    "depositPercent": 30,
+    "imageUrl": "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1000&q=80",
+    "items": [
+      {
+        "id": "nader-el-khawaga-chair-1",
+        "name": "Barber Chair 1",
+        "kind": "Barber / chair",
+        "hourlyRate": 150.0,
+        "multiRate": 0.0
+      },
+      {
+        "id": "nader-el-khawaga-chair-2",
+        "name": "Barber Chair 2 (VIP)",
+        "kind": "Barber / chair",
+        "hourlyRate": 200.0,
+        "multiRate": 0.0
+      }
+    ],
+    "services": [
+      {
+        "id": "nader-haircut",
+        "name": "Haircut",
+        "minutes": 30,
+        "price": 150.0
+      },
+      {
+        "id": "nader-beard-trim",
+        "name": "Beard trim",
+        "minutes": 20,
+        "price": 100.0
+      },
+      {
+        "id": "nader-haircut-beard",
+        "name": "Haircut + beard",
+        "minutes": 45,
+        "price": 220.0
+      },
+      {
+        "id": "nader-kids-haircut",
+        "name": "Kids haircut",
+        "minutes": 25,
+        "price": 100.0
+      }
+    ]
+  },
+  {
+    "id": "smash-padel-tagamoa",
+    "name": "Smash Padel Club",
+    "location": "Cairo",
+    "type": "sports",
+    "ownerPhone": "01012345678",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=1000&q=80",
+    "items": [
+      {
+        "id": "smash-court-1",
+        "name": "Court 1 (Panoramic)",
+        "kind": "Padel court",
+        "hourlyRate": 450.0,
+        "multiRate": 0.0
+      },
+      {
+        "id": "smash-court-2",
+        "name": "Court 2 (Standard)",
+        "kind": "Padel court",
+        "hourlyRate": 400.0,
+        "multiRate": 0.0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "bunker-lounge-maadi",
+    "name": "The Bunker VIP Lounge",
+    "location": "Cairo",
+    "type": "lounge",
+    "ownerPhone": "01098765432",
+    "depositPercent": 20,
+    "imageUrl": "https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=1000&q=80",
+    "items": [
+      {
+        "id": "bunker-ps5-vip",
+        "name": "PS5 VIP Suite (85-inch 4K)",
+        "kind": "PS5 room",
+        "hourlyRate": 180.0,
+        "multiRate": 240.0
+      },
+      {
+        "id": "bunker-billiards-1",
+        "name": "Championship Billiards Table",
+        "kind": "Billiards table",
+        "hourlyRate": 140.0,
+        "multiRate": 0.0
+      }
+    ],
+    "services": []
+  }
+]
+
