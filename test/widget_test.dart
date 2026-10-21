@@ -571,5 +571,84 @@ void main() {
     expect(find.text('Revenue & Analytics'), findsOneWidget);
     expect(find.text('400.00 EGP'), findsWidgets);
   });
+
+  testWidgets('Customer can view Directions, Add to Calendar, and Book Again',
+      (tester) async {
+    final venue = Venue(
+      id: 'venue-convenience-test',
+      name: 'Giza Sports Hub',
+      location: 'Sheikh Zayed',
+      type: VenueType.sports,
+      depositPercent: 25,
+      items: [
+        VenueItem(
+          id: 'court-gh-1',
+          name: 'Court Alpha',
+          kind: 'Padel court',
+          hourlyRate: 350,
+        ),
+      ],
+    );
+    final booking = Booking(
+      id: 'book-conv-1',
+      venueId: venue.id,
+      itemId: 'court-gh-1',
+      customer: 'Kareem Tarek',
+      startsAt: DateTime.now().add(const Duration(hours: 3)),
+      durationMinutes: 60,
+      price: 350,
+      dueNow: 87.5,
+      status: 'pending_payment',
+      paymentStatus: 'unpaid',
+      holdExpiresAt: DateTime.now().add(const Duration(minutes: 15)),
+    );
+
+    SharedPreferences.setMockInitialValues({
+      'hagzy_app_data_v1': jsonEncode({
+        'venues': [venue.toJson()],
+        'bookings': [booking.toJson()],
+      }),
+    });
+
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // 1. "Book Again" strip is visible on Explore because there is an active booking
+    expect(find.text('Book Again'), findsOneWidget);
+    expect(find.text('Your favorite regular spots'), findsOneWidget);
+
+    // 2. Switch to My Bookings
+    await tester.tap(find.text('My Bookings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Giza Sports Hub'), findsOneWidget);
+    expect(find.text('QR Check-In Pass'), findsOneWidget);
+    expect(find.text('Directions'), findsWidgets);
+    expect(find.text('Add to Calendar'), findsOneWidget);
+    expect(find.text('Book Again'), findsOneWidget);
+
+    // 3. Open Add to Calendar modal
+    await tester.tap(find.text('Add to Calendar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Google Calendar'), findsOneWidget);
+    expect(find.textContaining('Apple Calendar'), findsOneWidget);
+
+    // Close modal by tapping outside
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+
+    // 4. Tap Book Again to return to Explore with venue pre-selected
+    await tester.tap(find.text('Book Again'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Your Booking'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Your Booking'), findsOneWidget);
+    expect(find.text('Choose Your Space'), findsOneWidget);
+  });
 }
 

@@ -13,6 +13,7 @@ class BookTab extends StatefulWidget {
     required this.bookings,
     required this.arabic,
     required this.onBook,
+    this.initialVenueId,
     this.onAddVenue,
     this.onAddReview,
   });
@@ -21,6 +22,7 @@ class BookTab extends StatefulWidget {
   final List<Booking> bookings;
   final bool arabic;
   final void Function(Venue venue, VenueItem item, DateTime startsAt) onBook;
+  final String? initialVenueId;
   final ValueChanged<VenueType?>? onAddVenue;
   final Future<void> Function(
       Venue venue, String author, double rating, String comment)? onAddReview;
@@ -48,6 +50,46 @@ class _BookTabState extends State<BookTab> {
   final GlobalKey _timeStepKey = GlobalKey();
   final GlobalKey _quoteStepKey = GlobalKey();
   final Map<String, GlobalKey> _venueCardKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomerPreferences();
+    if (widget.initialVenueId != null) {
+      _venueId = widget.initialVenueId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final key = _venueCardKeys[_venueId];
+        if (key?.currentContext != null) {
+          Scrollable.ensureVisible(
+            key!.currentContext!,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(BookTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialVenueId != null &&
+        widget.initialVenueId != oldWidget.initialVenueId) {
+      setState(() {
+        _venueId = widget.initialVenueId;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final key = _venueCardKeys[_venueId];
+        if (key?.currentContext != null) {
+          Scrollable.ensureVisible(
+            key!.currentContext!,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -116,12 +158,6 @@ class _BookTabState extends State<BookTab> {
         );
       }
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCustomerPreferences();
   }
 
   Future<void> _loadCustomerPreferences() async {
@@ -380,6 +416,114 @@ class _BookTabState extends State<BookTab> {
             arabic: widget.arabic,
           ),
         ),
+        if (widget.venues.any((v) => widget.bookings.any((b) => b.venueId == v.id && !b.cancelled))) ...[
+          const SizedBox(height: 20),
+          SectionHeading(
+            title: localized(widget.arabic, 'Book Again', 'احجز مرة أخرى'),
+            subtitle: localized(widget.arabic,
+                'Your favorite regular spots', 'أماكنك المعتادة بضغطة واحدة'),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 98,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.venues
+                  .where((v) => widget.bookings
+                      .any((b) => b.venueId == v.id && !b.cancelled))
+                  .length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final v = widget.venues
+                    .where((v) => widget.bookings
+                        .any((b) => b.venueId == v.id && !b.cancelled))
+                    .toList()[index];
+                final isCurrent = _venueId == v.id;
+                return PressableScale(
+                  scaleDown: 0.96,
+                  onTap: () => _selectVenue(v),
+                  child: Container(
+                    width: 220,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: kPanel,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: isCurrent ? kGreen : kBorder,
+                        width: isCurrent ? 1.5 : 1,
+                      ),
+                      boxShadow: HagzyTheme.softShadow,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: HagzyTheme.brandGradient,
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child:
+                              Icon(v.type.icon, color: Colors.white, size: 21),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                v.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13.5,
+                                  color: kInk,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                v.location.isEmpty
+                                    ? localized(widget.arabic, 'Egypt', 'مصر')
+                                    : v.location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: kMuted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.bolt_rounded,
+                                      size: 13, color: kGreen),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    localized(
+                                        widget.arabic, 'Book Now', 'احجز الآن'),
+                                    style: const TextStyle(
+                                      color: kGreen,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         SectionHeading(
           title: localized(
@@ -2188,6 +2332,42 @@ class VenueBrowseCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () async {
+                              final rawUrl = venue.googleMapsUrl.trim();
+                              final uri = rawUrl.isNotEmpty
+                                  ? Uri.parse(rawUrl)
+                                  : Uri.https('www.google.com', '/maps/search/', {
+                                      'api': '1',
+                                      'query': '${venue.name} ${venue.location} Egypt'.trim(),
+                                    });
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 3),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.directions_outlined,
+                                      size: 14, color: kGreen),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    localized(
+                                        arabic, 'Directions', 'الاتجاهات'),
+                                    style: const TextStyle(
+                                      color: kGreen,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 3),

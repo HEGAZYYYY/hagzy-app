@@ -67,6 +67,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   String? _adminToken;
   String _mode = 'landing';
   int _tab = 0;
+  String? _targetVenueId;
   String _language = 'EN';
   bool _showSplash = !WidgetsBinding.instance.runtimeType
       .toString()
@@ -3126,6 +3127,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             venues: _venues,
                                             bookings: _bookings,
                                             arabic: arabic,
+                                            initialVenueId: _targetVenueId,
                                             onBook: (venue, item, startsAt) =>
                                                 _createBooking(
                                               venue: venue,
@@ -3144,6 +3146,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               booking.dueNow ?? booking.price,
                                             ),
                                             onCancelBooking: _cancelBooking,
+                                            onBookAgain: (venueId) => setState(() {
+                                              _tab = 0;
+                                              _targetVenueId = venueId;
+                                            }),
                                             api: _api,
                                             apiConfigured: _api.isConfigured,
                                           ))
@@ -3152,6 +3158,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             venues: _venues,
                                             bookings: _bookings,
                                             arabic: arabic,
+                                            initialVenueId: _targetVenueId,
                                             onBook: (venue, item, startsAt) =>
                                                 _createBooking(
                                               venue: venue,
@@ -3174,6 +3181,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               booking.dueNow ?? booking.price,
                                             ),
                                             onCancelBooking: _cancelBooking,
+                                            onBookAgain: (venueId) => setState(() {
+                                              _tab = 0;
+                                              _targetVenueId = venueId;
+                                            }),
                                             api: _api,
                                             apiConfigured: _api.isConfigured,
                                           ),
