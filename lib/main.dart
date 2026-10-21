@@ -2928,10 +2928,10 @@ class _HagzyHomeState extends State<HagzyHome> {
     final isCustomer = _mode == 'customer';
     final isPreview = _mode == 'adminPreview';
     final titles = isCustomer
-        ? const ['Explore', 'My Bookings']
+        ? const ['', '']
         : const [
-            'Explore',
-            'My Bookings',
+            '',
+            '',
             'Manage Venues',
             'Payment Settings'
           ];
@@ -2941,7 +2941,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     final bookingLabel = bookingCount == 1 ? 'booking' : 'bookings';
     final arabic = _language == 'AR';
     final appTitles = arabic
-        ? const ['استكشف', 'حجوزاتي', 'إدارة الأماكن', 'إعدادات الدفع']
+        ? const ['', '', 'إدارة الأماكن', 'إعدادات الدفع']
         : titles;
     final mainApp = Localizations.override(
       context: context,
@@ -2970,37 +2970,24 @@ class _HagzyHomeState extends State<HagzyHome> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                arabic ? 'حجزي' : 'Hagzy',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 19,
-                                  letterSpacing: -0.5,
-                                  color: kInk,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: kGreen,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ],
-                          ),
                           Text(
-                            appTitles[_tab],
+                            arabic ? 'حجزي' : 'Hagzy',
                             style: const TextStyle(
-                              fontSize: 11.5,
-                              color: kMuted,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 19,
+                              letterSpacing: -0.5,
+                              color: kInk,
                             ),
                           ),
+                          if (!isCustomer && appTitles[_tab].isNotEmpty)
+                            Text(
+                              appTitles[_tab],
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: kMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                         ],
                       ),
                       const Spacer(),
