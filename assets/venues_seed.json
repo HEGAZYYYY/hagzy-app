@@ -7,6 +7,19 @@
     "ownerPhone": "01024129393",
     "depositPercent": 30,
     "imageUrl": "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1000&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Nader+El+Khawaga+Kafr+El+Sheikh",
+    "description": "Premier men's grooming & barbershop in Kafr El Sheikh offering precision haircuts, beard styling, and VIP chair service.",
+    "instaPayAddress": "nader.salon@instapay",
+    "vodafoneCashNumber": "01024129393",
+    "openHour": 10,
+    "closeHour": 22,
+    "rating": 4.9,
+    "amenities": ["AC", "Wi-Fi", "VIP Chair", "Kids Friendly"],
     "items": [
       {
         "id": "nader-el-khawaga-chair-1",
@@ -58,6 +71,19 @@
     "ownerPhone": "01012345678",
     "depositPercent": 25,
     "imageUrl": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=1000&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Smash+Padel+Club+New+Cairo",
+    "description": "Championship panoramic padel courts in New Cairo with LED floodlights, pro racket rentals, and specialty coffee lounge.",
+    "instaPayAddress": "smash.padel@instapay",
+    "vodafoneCashNumber": "01012345678",
+    "openHour": 10,
+    "closeHour": 22,
+    "rating": 4.9,
+    "amenities": ["Parking", "Café", "Locker Room", "Racket Rental"],
     "items": [
       {
         "id": "smash-court-1",
@@ -84,6 +110,19 @@
     "ownerPhone": "01098765432",
     "depositPercent": 20,
     "imageUrl": "https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=1000&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Maadi+Gaming+Lounge+Cairo",
+    "description": "Soundproof PS5 VIP suites with 85-inch 4K OLED screens, tournament billiards tables, and full snack & drink service.",
+    "instaPayAddress": "bunker.lounge@instapay",
+    "vodafoneCashNumber": "01098765432",
+    "openHour": 10,
+    "closeHour": 22,
+    "rating": 4.9,
+    "amenities": ["85\" 4K TV", "AC", "Snacks & Drinks", "High-Speed Wi-Fi"],
     "items": [
       {
         "id": "bunker-ps5-vip",
@@ -103,4 +142,3 @@
     "services": []
   }
 ]
-

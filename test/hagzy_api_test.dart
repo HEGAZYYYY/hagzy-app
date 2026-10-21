@@ -77,4 +77,112 @@ void main() {
     expect(billingData['phone_number'], '+201012345678');
     expect(billingData.containsKey('email'), isFalse);
   });
+
+  test('submitPaymentProof and confirmBooking send expected requests', () async {
+    final requests = <http.Request>[];
+    final api = HagzyApi(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path.endsWith('/payment-proof')) {
+          return http.Response(
+            jsonEncode({
+              'booking': {
+                'id': 'booking-1',
+                'venueId': 'venue-1',
+                'itemId': 'court-1',
+                'customer': 'Ali',
+                'startsAt': DateTime.now().toIso8601String(),
+                'durationMinutes': 60,
+                'price': 400,
+                'status': 'pending_payment',
+                'paymentStatus': 'pending',
+                'paymentMethod': 'instapay',
+                'paymentReference': 'IPN-998877',
+              }
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'booking': {
+              'id': 'booking-1',
+              'venueId': 'venue-1',
+              'itemId': 'court-1',
+              'customer': 'Ali',
+              'startsAt': DateTime.now().toIso8601String(),
+              'durationMinutes': 60,
+              'price': 400,
+              'status': 'confirmed',
+              'paymentStatus': 'paid',
+            }
+          }),
+          200,
+        );
+      }),
+    );
+    addTearDown(api.close);
+
+    final proofResult = await api.submitPaymentProof(
+      'booking-1',
+      method: 'instapay',
+      reference: 'IPN-998877',
+    );
+    expect(proofResult['paymentMethod'], 'instapay');
+    expect(proofResult['paymentReference'], 'IPN-998877');
+
+    final confirmResult = await api.confirmBooking('admin-jwt', 'booking-1');
+    expect(confirmResult['status'], 'confirmed');
+    expect(requests.last.headers['authorization'], 'Bearer admin-jwt');
+  });
+
+  test('createFawryCheckout and sendChatbotMessage send expected requests',
+      () async {
+    final requests = <http.Request>[];
+    final api = HagzyApi(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path.endsWith('/fawry-reference')) {
+          return http.Response(
+            jsonEncode({
+              'referenceNumber': '9481029384',
+              'serviceCode': '78890',
+              'amount': 125.0,
+            }),
+            200,
+          );
+        }
+        if (request.url.path.endsWith('/chatbot/message')) {
+          return http.Response(
+            jsonEncode({
+              'reply': 'Your Fawry reference is 9481029384.',
+            }),
+            200,
+          );
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    addTearDown(api.close);
+
+    final fawry = await api.createFawryCheckout(
+      'booking-1',
+      customerName: 'Ali Hassan',
+      phone: '+201012345678',
+    );
+    expect(fawry['referenceNumber'], '9481029384');
+    expect(fawry['serviceCode'], '78890');
+    final fawryBody = jsonDecode(requests.first.body) as Map<String, dynamic>;
+    expect(fawryBody['customerName'], 'Ali Hassan');
+    expect(fawryBody['phone'], '+201012345678');
+
+    final reply = await api.sendChatbotMessage(
+      'fawry code',
+      bookingId: 'booking-1',
+      phone: '+201012345678',
+    );
+    expect(reply['reply'], 'Your Fawry reference is 9481029384.');
+  });
 }

@@ -59,6 +59,57 @@ class HagzyApi {
         token: token);
   }
 
+  Future<Map<String, dynamic>> confirmBooking(
+    String token,
+    String bookingId,
+  ) async {
+    final result = await _send(
+      'POST',
+      '/api/admin/bookings/${Uri.encodeComponent(bookingId)}/confirm',
+      token: token,
+    );
+    return result['booking'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitPaymentProof(
+    String bookingId, {
+    required String method,
+    required String reference,
+  }) async {
+    final result = await _send(
+      'POST',
+      '/api/bookings/${Uri.encodeComponent(bookingId)}/payment-proof',
+      body: {
+        'method': method,
+        'reference': reference.trim(),
+      },
+    );
+    return result['booking'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitVenueReview(
+    String venueId, {
+    required String author,
+    required double rating,
+    String comment = '',
+    String? phone,
+    String? bookingId,
+  }) async {
+    final result = await _send(
+      'POST',
+      '/api/venues/${Uri.encodeComponent(venueId)}/reviews',
+      body: {
+        'author': author.trim(),
+        'rating': rating,
+        'comment': comment.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (bookingId != null && bookingId.trim().isNotEmpty)
+          'bookingId': bookingId.trim(),
+      },
+    );
+    return result;
+  }
+
   Future<String> createPaymobCheckout(
     String bookingId, {
     required String firstName,
@@ -90,16 +141,82 @@ class HagzyApi {
     return result['checkoutUrl'] as String;
   }
 
+  /// Requests a 6-digit OTP for customer phone verification.
+  Future<Map<String, dynamic>> requestCustomerOtp(String phone) async => _send(
+        'POST',
+        '/api/auth/customer-otp/request',
+        body: {'phone': phone.trim()},
+      );
+
+  /// Verifies a customer OTP code and returns a signed customer session token.
+  Future<Map<String, dynamic>> verifyCustomerOtp(
+    String phone,
+    String code,
+  ) async =>
+      _send(
+        'POST',
+        '/api/auth/customer-otp/verify',
+        body: {
+          'phone': phone.trim(),
+          'code': code.trim(),
+        },
+      );
+
+  /// Creates a FawryPay reference number for a pending booking deposit.
+  Future<Map<String, dynamic>> createFawryCheckout(
+    String bookingId, {
+    required String customerName,
+    required String phone,
+  }) async {
+    return _send(
+      'POST',
+      '/api/bookings/${Uri.encodeComponent(bookingId)}/fawry-reference',
+      body: {
+        'customerName': customerName.trim(),
+        'phone': phone.trim(),
+      },
+    );
+  }
+
+  /// Sends a message to the Hagzy WhatsApp / Assistant Chatbot endpoint.
+  Future<Map<String, dynamic>> sendChatbotMessage(
+    String message, {
+    String? bookingId,
+    String? phone,
+    String? customerToken,
+    String language = 'EN',
+  }) async {
+    return _send(
+      'POST',
+      '/api/chatbot/message',
+      token: customerToken,
+      body: {
+        'message': message.trim(),
+        if (bookingId != null && bookingId.isNotEmpty) 'bookingId': bookingId,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        'language': language,
+      },
+    );
+  }
+
   /// Polls a single booking's current status (public endpoint, no token needed).
   Future<Map<String, dynamic>> bookingStatus(String bookingId) async {
-    final result = await _send('GET', '/api/bookings/${Uri.encodeComponent(bookingId)}');
+    final result =
+        await _send('GET', '/api/bookings/${Uri.encodeComponent(bookingId)}');
     return result['booking'] as Map<String, dynamic>;
   }
 
-  /// Looks up active bookings by customer phone number (cross-device history).
-  Future<List<dynamic>> bookingsByPhone(String phone) async {
+  /// Looks up active bookings by customer phone number (requires verified customer OTP token).
+  Future<List<dynamic>> bookingsByPhone(
+    String phone, {
+    String? customerToken,
+  }) async {
     final encodedPhone = Uri.encodeQueryComponent(phone.trim());
-    final result = await _send('GET', '/api/bookings?phone=$encodedPhone');
+    final result = await _send(
+      'GET',
+      '/api/bookings?phone=$encodedPhone',
+      token: customerToken,
+    );
     return result['bookings'] as List<dynamic>;
   }
 

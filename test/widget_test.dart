@@ -479,5 +479,97 @@ void main() {
     expect(find.text('Your Booking'), findsNothing);
     expect(find.text('View Times'), findsOneWidget);
   });
+
+  testWidgets(
+      'customer can submit InstaPay proof and owner can confirm deposit and view analytics',
+      (tester) async {
+    final venue = Venue(
+      id: 'venue-instapay-test',
+      name: 'Cairo Padel Arena',
+      location: 'Cairo',
+      type: VenueType.sports,
+      depositPercent: 25,
+      instaPayAddress: 'arena@instapay',
+      amenities: const ['Parking', 'Café'],
+      items: [
+        VenueItem(
+          id: 'arena-court-1',
+          name: 'Center Court',
+          kind: 'Padel court',
+          hourlyRate: 400,
+        ),
+      ],
+    );
+    final hold = Booking(
+      id: 'hold-instapay-1',
+      venueId: venue.id,
+      itemId: 'arena-court-1',
+      customer: 'Omar Hassan',
+      phone: '01099887766',
+      startsAt: DateTime.now().add(const Duration(hours: 3)),
+      durationMinutes: 60,
+      price: 400,
+      dueNow: 100,
+      status: 'pending_payment',
+      paymentStatus: 'unpaid',
+      holdExpiresAt: DateTime.now().add(const Duration(minutes: 15)),
+    );
+    SharedPreferences.setMockInitialValues({
+      'hagzy_app_data_v1': jsonEncode({
+        'venues': [venue.toJson()],
+        'bookings': [hold.toJson()],
+      }),
+    });
+
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // Open My Bookings and submit InstaPay transfer reference
+    await tester.tap(find.text('My Bookings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cairo Padel Arena'), findsOneWidget);
+    await tester.tap(find.textContaining('Pay Deposit'));
+    await tester.pumpAndSettle();
+    expect(find.text('InstaPay'), findsOneWidget);
+    expect(find.text('Vodafone Cash'), findsOneWidget);
+
+    await tester.tap(find.text('InstaPay'));
+    await tester.pumpAndSettle();
+    expect(find.text('arena@instapay'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).first, 'IPN-776655');
+    await tester.tap(find.text('Submit Reference'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Payment proof submitted (INSTAPAY: IPN-776655)'),
+      findsOneWidget,
+    );
+
+    // Switch to Owner Preview to verify & confirm deposit and inspect Analytics
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const HagzyApp(adminMode: true));
+    await tester.pumpAndSettle();
+    await enterAdminPreview(tester);
+    await tester.tap(find.text('Manage Venues'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('POS timeline').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Omar Hassan'), findsOneWidget);
+    expect(find.text('Verify & Confirm Deposit'), findsOneWidget);
+    await tester.ensureVisible(find.text('Verify & Confirm Deposit'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verify & Confirm Deposit'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Confirmed by venue'), findsOneWidget);
+
+    // Open Analytics section
+    await tester.tap(find.textContaining('Analytics'));
+    await tester.pumpAndSettle();
+    expect(find.text('Revenue & Analytics'), findsOneWidget);
+    expect(find.text('400.00 EGP'), findsWidgets);
+  });
 }
 
