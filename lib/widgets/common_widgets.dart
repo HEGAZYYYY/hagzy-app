@@ -429,8 +429,8 @@ class FloatingDock extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Container(
-              height: 60,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              height: 58,
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: kPanel,
                 borderRadius: BorderRadius.circular(999),
@@ -445,12 +445,13 @@ class FloatingDock extends StatelessWidget {
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: List.generate(localizedItems.length, (index) {
                   final selected = selectedIndex == index;
                   final showBadge = index == 1 && badgeCount > 0;
                   return Expanded(
                     child: PressableScale(
-                      scaleDown: 0.94,
+                      scaleDown: 0.96,
                       onTap: () => onDestinationSelected(index),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(999),
@@ -458,13 +459,14 @@ class FloatingDock extends StatelessWidget {
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           curve: Curves.easeOutCubic,
+                          alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            gradient: selected ? HagzyTheme.brandGradient : null,
+                            color: selected ? kGreen : Colors.transparent,
                             borderRadius: BorderRadius.circular(999),
                             boxShadow: selected
                                 ? [
                                     BoxShadow(
-                                      color: kGreen.withValues(alpha: 0.28),
+                                      color: kGreen.withValues(alpha: 0.35),
                                       blurRadius: 10,
                                       offset: const Offset(0, 3),
                                     ),
@@ -490,14 +492,18 @@ class FloatingDock extends StatelessWidget {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 5, vertical: 1),
                                         decoration: BoxDecoration(
-                                          color: kGreenLight,
+                                          color: selected
+                                              ? Colors.white
+                                              : kGreen,
                                           borderRadius:
                                               BorderRadius.circular(999),
                                         ),
                                         child: Text(
                                           '$badgeCount',
-                                          style: const TextStyle(
-                                            color: Colors.white,
+                                          style: TextStyle(
+                                            color: selected
+                                                ? kGreen
+                                                : Colors.white,
                                             fontSize: 9,
                                             fontWeight: FontWeight.w900,
                                           ),
@@ -514,7 +520,7 @@ class FloatingDock extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: selected ? Colors.white : kMuted,
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: selected
                                         ? FontWeight.w800
                                         : FontWeight.w700,
@@ -918,14 +924,18 @@ class HagzyLogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mark = SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _HagzyLogoPainter(inverted: inverted)),
+    final radius = 11.0 * (size / 40.0);
+    final mark = ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: SizedBox.square(
+        dimension: size,
+        child: CustomPaint(painter: _HagzyLogoPainter(inverted: inverted)),
+      ),
     );
     if (!withGlow) return mark;
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * 0.28),
+        borderRadius: BorderRadius.circular(radius),
         boxShadow: [
           BoxShadow(
             color: (inverted ? Colors.black : const Color(0xFF059669))
@@ -952,7 +962,7 @@ class _HagzyLogoPainter extends CustomPainter {
     final paint = Paint()..isAntiAlias = true;
     final rect = Offset.zero & size;
 
-    // 1. Sleek squircle background
+    // 1. Sleek squircle background (zero white corners!)
     if (inverted) {
       paint.color = Colors.white;
     } else {
@@ -966,17 +976,7 @@ class _HagzyLogoPainter extends CustomPainter {
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(11 * scale));
     canvas.drawRRect(rrect, paint);
 
-    // 2. Subtle specular inner rim border
-    paint
-      ..shader = null
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8 * scale
-      ..color = inverted
-          ? const Color(0xFF059669).withValues(alpha: 0.14)
-          : Colors.white.withValues(alpha: 0.22);
-    canvas.drawRRect(rrect, paint);
-
-    // 3. Bold, bespoke architectural "H" monogram with dynamic stadium arch
+    // 2. Bold, bespoke architectural "H" monogram with dynamic stadium arch
     final glyphPaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke

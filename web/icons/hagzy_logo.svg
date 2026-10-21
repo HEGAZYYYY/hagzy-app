@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <defs>
-    <linearGradient id="hagzy" x1="28" y1="24" x2="228" y2="232" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5639B8"/>
-      <stop offset="1" stop-color="#9478F2"/>
+    <linearGradient id="hagzy" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#047857"/>
+      <stop offset="1" stop-color="#059669"/>
     </linearGradient>
   </defs>
-  <rect x="8" y="8" width="240" height="240" rx="68" fill="url(#hagzy)"/>
-  <path d="M72 83a12 12 0 0 1 12-12h88a12 12 0 0 1 12 12v105a12 12 0 0 1-12 12H84a12 12 0 0 1-12-12V83Z" fill="none" stroke="#fff" stroke-width="13"/>
-  <path d="M98 60v29m60-29v29M74 107h108" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round"/>
-  <path d="m101 151 19 19 38-41" fill="none" stroke="#fff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="194" cy="61" r="16" fill="#FFB56B"/>
+  <rect width="256" height="256" fill="url(#hagzy)"/>
+  <path d="M 80 70.4 L 80 185.6" stroke="#FFFFFF" stroke-width="24.32" stroke-linecap="round"/>
+  <path d="M 176 70.4 L 176 185.6" stroke="#FFFFFF" stroke-width="24.32" stroke-linecap="round"/>
+  <path d="M 80 134.4 Q 128 92.8 176 134.4" stroke="#FFFFFF" stroke-width="24.32" stroke-linecap="round" fill="none"/>
 </svg>
