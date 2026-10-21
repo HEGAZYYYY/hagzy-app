@@ -1908,7 +1908,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   ),
                   enabled: true,
                   accentColor: kGreen,
-                  badgeText: localized(arabic, 'CARD / WALLET', 'بطاقة بنكية'),
+                  badgeText: localized(arabic, 'CARD / WALLET', 'بطاقة / محفظة'),
                   onTap: () => Navigator.pop(context, 'paymob'),
                 ),
                 const SizedBox(height: 8),
@@ -1974,8 +1974,12 @@ class _HagzyHomeState extends State<HagzyHome> {
         ),
       ),
     );
-    if (method == 'paymob') {
-      await _startPaymobCheckout(booking);
+    if (method == 'paymob_card') {
+      await _startPaymobCheckout(booking, paymentMethod: 'card');
+    } else if (method == 'paymob_wallet') {
+      await _startPaymobCheckout(booking, paymentMethod: 'wallet');
+    } else if (method == 'paymob') {
+      await _startPaymobCheckout(booking, paymentMethod: 'card');
     } else if (method == 'fawry') {
       await _startFawryCheckout(booking, dueNow);
     } else if (method == 'instapay') {
@@ -2385,7 +2389,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     });
   }
 
-  Future<void> _startPaymobCheckout(Booking booking) async {
+  Future<void> _startPaymobCheckout(Booking booking, {String paymentMethod = 'card'}) async {
     final arabic = _language == 'AR';
     final defaultGatewayUrl =
         (Uri.base.scheme == 'http' || Uri.base.scheme == 'https') &&
@@ -2415,6 +2419,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         lastName: lastName,
         email: booking.email,
         phone: booking.phone,
+        paymentMethod: paymentMethod,
       );
       if (checkoutUrl.isEmpty) {
         throw StateError('Paymob did not return a checkout URL.');
@@ -2427,16 +2432,16 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (!launched) throw StateError('Could not open Paymob checkout.');
       _message(localized(
         arabic,
-        'Opened Paymob Unified Checkout for Booking #${targetBookingId.substring(0, targetBookingId.length > 8 ? 8 : targetBookingId.length)}. Your reservation will confirm automatically once the Paymob webhook verifies payment.',
-        'تم فتح صفحة دفع Paymob الموحدة. سيتأكد الحجز تلقائياً فور إتمام الدفع.',
+        'Opened Paymob Checkout for Booking #${targetBookingId.substring(0, targetBookingId.length > 8 ? 8 : targetBookingId.length)}. Complete payment to confirm your booking.',
+        'تم فتح صفحة دفع Paymob. يرجى إتمام الدفع لتأكيد الحجز.',
       ));
 
       var pollCount = 0;
       _paymentPollingTimer?.cancel();
       _paymentPollingTimer =
-          Timer.periodic(const Duration(seconds: 4), (timer) async {
+          Timer.periodic(const Duration(seconds: 2), (timer) async {
         pollCount++;
-        if (pollCount > 75) {
+        if (pollCount > 150) {
           timer.cancel();
           return;
         }

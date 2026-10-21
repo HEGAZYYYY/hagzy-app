@@ -116,11 +116,13 @@ class HagzyApi {
     required String lastName,
     String? email,
     required String phone,
+    String paymentMethod = 'card',
   }) async {
     final result = await _send(
       'POST',
       '/api/bookings/${Uri.encodeComponent(bookingId)}/paymob-intention',
       body: {
+        'paymentMethod': paymentMethod,
         'billingData': {
           'first_name': firstName,
           'last_name': lastName,
