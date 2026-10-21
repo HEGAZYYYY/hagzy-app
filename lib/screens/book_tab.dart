@@ -2201,7 +2201,7 @@ class VenueBrowseCard extends StatelessWidget {
                               selected
                                   ? localized(arabic, 'Close', 'إغلاق')
                                   : localized(
-                                      arabic, 'View Times', 'عرض الأوقات'),
+                                      arabic, 'Book', 'احجز'),
                               style:
                                   const TextStyle(fontWeight: FontWeight.w800),
                             ),
@@ -2563,9 +2563,8 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
             const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: widget.onBookNow,
-              icon: const Icon(Icons.calendar_today_rounded, size: 17),
-              label: Text(localized(arabic, 'Select & View Available Times',
-                  'اختر المكان واعرض الأوقات')),
+              icon: const Icon(Icons.bookmark_add_rounded, size: 17),
+              label: Text(localized(arabic, 'Book Now', 'احجز الآن')),
             ),
           ],
         ),

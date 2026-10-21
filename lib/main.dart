@@ -2179,6 +2179,8 @@ class _HagzyHomeState extends State<HagzyHome> {
       '${localized(arabic, 'Phone', 'الهاتف')}: ${booking.phone}',
       if (venue != null)
         '${localized(arabic, 'Venue', 'المكان')}: ${venue.name}',
+      if (venue != null && venue.googleMapsUrl.isNotEmpty)
+        '${localized(arabic, 'Location', 'الموقع')}: ${venue.googleMapsUrl}',
       '${localized(arabic, 'Date and Time', 'التاريخ والوقت')}: ${formatDateTime(booking.startsAt)}',
       '${localized(arabic, 'Deposit Due', 'العربون المستحق')}: ${formatMoney(booking.dueNow ?? booking.price)} ${localized(arabic, 'EGP', 'جنيه')}',
       localized(

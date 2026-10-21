@@ -440,7 +440,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Smash Club'), findsOneWidget);
-    expect(find.text('View Times'), findsOneWidget);
+    expect(find.text('Book'), findsOneWidget);
     expect(find.text('Your Booking'), findsNothing);
 
     // Tap venue card to open
@@ -460,12 +460,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Your Booking'), findsNothing);
-    expect(find.text('View Times'), findsOneWidget);
+    expect(find.text('Book'), findsOneWidget);
 
     // Tap View Times button directly -> opens
-    await tester.ensureVisible(find.text('View Times'));
+    await tester.ensureVisible(find.text('Book'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('View Times'));
+    await tester.tap(find.text('Book'));
     await tester.pumpAndSettle();
 
     expect(find.text('Your Booking'), findsOneWidget);
@@ -477,7 +477,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Your Booking'), findsNothing);
-    expect(find.text('View Times'), findsOneWidget);
+    expect(find.text('Book'), findsOneWidget);
   });
 
   testWidgets(
