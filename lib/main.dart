@@ -3097,90 +3097,112 @@ class _HagzyHomeState extends State<HagzyHome> {
                               ],
                             ),
                           Expanded(
-                            child: isCustomer
-                                ? IndexedStack(
-                                    index: _tab,
-                                    children: [
-                                      BookTab(
-                                        venues: _venues,
-                                        bookings: _bookings,
-                                        arabic: arabic,
-                                        onBook: (venue, item, startsAt) =>
-                                            _createBooking(
-                                          venue: venue,
-                                          item: item,
-                                          initialStart: startsAt,
-                                        ),
-                                        onAddReview: _addReview,
-                                      ),
-                                      MyBookingsTab(
-                                        venues: _venues,
-                                        bookings: _bookings,
-                                        arabic: arabic,
-                                        onChoosePayment: (booking) =>
-                                            _showPaymentMethods(
-                                          booking,
-                                          booking.dueNow ?? booking.price,
-                                        ),
-                                        onCancelBooking: _cancelBooking,
-                                        api: _api,
-                                        apiConfigured: _api.isConfigured,
-                                      ),
-                                    ],
-                                  )
-                                : switch (_tab) {
-                                    0 => BookTab(
-                                        venues: _venues,
-                                        bookings: _bookings,
-                                        arabic: arabic,
-                                        onBook: (venue, item, startsAt) =>
-                                            _createBooking(
-                                          venue: venue,
-                                          item: item,
-                                          initialStart: startsAt,
-                                        ),
-                                        onAddVenue: (type) => _addVenue(
-                                          initialType: type ?? VenueType.sports,
-                                        ),
-                                        onAddReview: _addReview,
-                                      ),
-                                    1 => MyBookingsTab(
-                                        venues: _venues,
-                                        bookings: _customerBookings,
-                                        arabic: arabic,
-                                        onChoosePayment: (booking) =>
-                                            _showPaymentMethods(
-                                          booking,
-                                          booking.dueNow ?? booking.price,
-                                        ),
-                                        onCancelBooking: _cancelBooking,
-                                        api: _api,
-                                        apiConfigured: _api.isConfigured,
-                                      ),
-                                    2 => AdminManageWorkspace(
-                                        venues: _venues,
-                                        bookings: _bookings,
-                                        onAddVenue: _addVenue,
-                                        onEditVenue: _editVenue,
-                                        onAddItem: _addItem,
-                                        onAddService: _addService,
-                                        onRemoveService: _removeService,
-                                        onDelete: _deleteVenue,
-                                        onRemoveItem: _removeItem,
-                                        onWalkIn: (venue, item) =>
-                                            _createBooking(
-                                          venue: venue,
-                                          item: item,
-                                          walkIn: true,
-                                        ),
-                                        onCancel: _cancelBooking,
-                                        onConfirm: _confirmBooking,
-                                      ),
-                                    _ => PaymentTab(
-                                        apiConfigured: _api.isConfigured,
-                                        localPreview: isPreview,
-                                      ),
-                                  },
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 260),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                opacity: CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOutCubic,
+                                ),
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, 0.02),
+                                    end: Offset.zero,
+                                  ).animate(CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                  )),
+                                  child: child,
+                                ),
+                              ),
+                              child: KeyedSubtree(
+                                key: ValueKey<int>(_tab),
+                                child: isCustomer
+                                    ? (_tab == 0
+                                        ? BookTab(
+                                            venues: _venues,
+                                            bookings: _bookings,
+                                            arabic: arabic,
+                                            onBook: (venue, item, startsAt) =>
+                                                _createBooking(
+                                              venue: venue,
+                                              item: item,
+                                              initialStart: startsAt,
+                                            ),
+                                            onAddReview: _addReview,
+                                          )
+                                        : MyBookingsTab(
+                                            venues: _venues,
+                                            bookings: _bookings,
+                                            arabic: arabic,
+                                            onChoosePayment: (booking) =>
+                                                _showPaymentMethods(
+                                              booking,
+                                              booking.dueNow ?? booking.price,
+                                            ),
+                                            onCancelBooking: _cancelBooking,
+                                            api: _api,
+                                            apiConfigured: _api.isConfigured,
+                                          ))
+                                    : switch (_tab) {
+                                        0 => BookTab(
+                                            venues: _venues,
+                                            bookings: _bookings,
+                                            arabic: arabic,
+                                            onBook: (venue, item, startsAt) =>
+                                                _createBooking(
+                                              venue: venue,
+                                              item: item,
+                                              initialStart: startsAt,
+                                            ),
+                                            onAddVenue: (type) => _addVenue(
+                                              initialType:
+                                                  type ?? VenueType.sports,
+                                            ),
+                                            onAddReview: _addReview,
+                                          ),
+                                        1 => MyBookingsTab(
+                                            venues: _venues,
+                                            bookings: _customerBookings,
+                                            arabic: arabic,
+                                            onChoosePayment: (booking) =>
+                                                _showPaymentMethods(
+                                              booking,
+                                              booking.dueNow ?? booking.price,
+                                            ),
+                                            onCancelBooking: _cancelBooking,
+                                            api: _api,
+                                            apiConfigured: _api.isConfigured,
+                                          ),
+                                        2 => AdminManageWorkspace(
+                                            venues: _venues,
+                                            bookings: _bookings,
+                                            onAddVenue: _addVenue,
+                                            onEditVenue: _editVenue,
+                                            onAddItem: _addItem,
+                                            onAddService: _addService,
+                                            onRemoveService: _removeService,
+                                            onDelete: _deleteVenue,
+                                            onRemoveItem: _removeItem,
+                                            onWalkIn: (venue, item) =>
+                                                _createBooking(
+                                              venue: venue,
+                                              item: item,
+                                              walkIn: true,
+                                            ),
+                                            onCancel: _cancelBooking,
+                                            onConfirm: _confirmBooking,
+                                          ),
+                                        _ => PaymentTab(
+                                            apiConfigured: _api.isConfigured,
+                                            localPreview: isPreview,
+                                          ),
+                                      },
+                              ),
+                            ),
                           ),
                         ],
                       ),

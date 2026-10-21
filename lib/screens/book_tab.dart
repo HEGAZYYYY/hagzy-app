@@ -515,209 +515,149 @@ class _BookTabState extends State<BookTab> {
                   ),
                 ),
               ),
-              if (selected && venue != null) ...[
-                Container(
-                  key: _bookingSectionKey,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: kPanel,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: kGreen.withValues(alpha: 0.28),
-                      width: 1.5,
-                    ),
-                    boxShadow: HagzyTheme.softShadow,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Breadfast / Talabat-style Top Tray Header
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: (selected && venue != null)
+                    ? Container(
+                        key: _bookingSectionKey,
+                        margin: const EdgeInsets.only(bottom: 18),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              kGreen.withValues(alpha: 0.08),
-                              kGreenLight.withValues(alpha: 0.05),
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
+                          color: kPanel,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: kGreen.withValues(alpha: 0.28),
+                            width: 1.5,
                           ),
-                          border: const Border(
-                            bottom: BorderSide(color: kBorder),
-                          ),
+                          boxShadow: HagzyTheme.softShadow,
                         ),
-                        child: Row(
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Breadfast / Talabat-style Top Tray Header
                             Container(
-                              width: 40,
-                              height: 40,
+                              padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
                               decoration: BoxDecoration(
-                                gradient: HagzyTheme.brandGradient,
-                                borderRadius: BorderRadius.circular(13),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    kGreen.withValues(alpha: 0.08),
+                                    kGreenLight.withValues(alpha: 0.05),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                border: const Border(
+                                  bottom: BorderSide(color: kBorder),
+                                ),
                               ),
-                              child: Icon(
-                                venue.type.icon,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Row(
                                 children: [
-                                  Text(
-                                    localized(
-                                        widget.arabic, 'Your Booking', 'حجزك'),
-                                    style: const TextStyle(
-                                      fontSize: 16.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: kInk,
-                                      letterSpacing: -0.3,
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      gradient: HagzyTheme.brandGradient,
+                                      borderRadius: BorderRadius.circular(13),
+                                    ),
+                                    child: Icon(
+                                      venue.type.icon,
+                                      size: 20,
+                                      color: Colors.white,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${venue.name}${venue.location.isEmpty ? '' : ' · ${venue.location}'}',
-                                    style: const TextStyle(
-                                      color: kMuted,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          localized(widget.arabic,
+                                              'Your Booking', 'حجزك'),
+                                          style: const TextStyle(
+                                            fontSize: 16.5,
+                                            fontWeight: FontWeight.w900,
+                                            color: kInk,
+                                            letterSpacing: -0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${venue.name}${venue.location.isEmpty ? '' : ' · ${venue.location}'}',
+                                          style: const TextStyle(
+                                            color: kMuted,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PressableScale(
+                                    scaleDown: 0.92,
+                                    onTap: () {
+                                      setState(() {
+                                        _venueId = null;
+                                        _itemId = null;
+                                        _selectedStart = null;
+                                      });
+                                      _scrollController.animateTo(
+                                        0,
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                        curve: Curves.easeOutCubic,
+                                      );
+                                    },
+                                    child: TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        backgroundColor: kPanel,
+                                        foregroundColor: kInk,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                          side:
+                                              const BorderSide(color: kBorder),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _venueId = null;
+                                          _itemId = null;
+                                          _selectedStart = null;
+                                        });
+                                        _scrollController.animateTo(
+                                          0,
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeOutCubic,
+                                        );
+                                      },
+                                      icon: const Icon(Icons.close_rounded,
+                                          size: 15),
+                                      label: Text(
+                                        localized(
+                                            widget.arabic, 'Close', 'إغلاق'),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            TextButton.icon(
-                              style: TextButton.styleFrom(
-                                backgroundColor: kPanel,
-                                foregroundColor: kInk,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
-                                  side: const BorderSide(color: kBorder),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _venueId = null;
-                                  _itemId = null;
-                                  _selectedStart = null;
-                                });
-                                _scrollController.animateTo(
-                                  0,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOutCubic,
-                                );
-                              },
-                              icon: const Icon(Icons.close_rounded, size: 15),
-                              label: Text(
-                                localized(widget.arabic, 'Close', 'إغلاق'),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      // Section 1: Space / Option Selector
-                      Padding(
-                        key: _spaceStepKey,
-                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: kGreen.withValues(alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    localized(widget.arabic, 'STEP 1', 'خطوة ١'),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: kGreen,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    localized(widget.arabic,
-                                        'Choose Your Space', 'اختر المساحة'),
-                                    style: const TextStyle(
-                                      fontSize: 15.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: kInk,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            if (venue.items.isEmpty)
-                              Text(
-                                localized(
-                                    widget.arabic,
-                                    'This venue has no bookable spaces yet.',
-                                    'لا توجد مساحات متاحة للحجز حالياً.'),
-                                style: const TextStyle(color: kMuted),
-                              )
-                            else
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: venue.items.map((val) {
-                                  final sel = val.id == item?.id;
-                                  return CustomPill(
-                                    icon: sel
-                                        ? Icons.check_circle_rounded
-                                        : venue.type.icon,
-                                    selected: sel,
-                                    label:
-                                        '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/15m', '/١٥ د') : localized(widget.arabic, '/h', '/س')}',
-                                    onTap: () => _selectSpace(val.id),
-                                  );
-                                }).toList(),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      if (item != null) ...[
-                        const Divider(height: 1),
-                        // Section 2: Date & Time Picker
-                        Padding(
-                          key: _timeStepKey,
-                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-                          child: Builder(
-                            builder: (context) {
-                              final allSlots =
-                                  _timesFor(venue, item, estimatedMinutes);
-                              final morningSlots = allSlots
-                                  .where((s) => s.start.hour < 13)
-                                  .toList();
-                              final afternoonSlots = allSlots
-                                  .where((s) =>
-                                      s.start.hour >= 13 && s.start.hour < 17)
-                                  .toList();
-                              final eveningSlots = allSlots
-                                  .where((s) => s.start.hour >= 17)
-                                  .toList();
-                              return Column(
+                            // Section 1: Space / Option Selector
+                            Padding(
+                              key: _spaceStepKey,
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
@@ -726,18 +666,17 @@ class _BookTabState extends State<BookTab> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: kGreenLight
-                                              .withValues(alpha: 0.12),
+                                          color: kGreen.withValues(alpha: 0.10),
                                           borderRadius:
                                               BorderRadius.circular(999),
                                         ),
                                         child: Text(
-                                          localized(
-                                              widget.arabic, 'STEP 2', 'خطوة ٢'),
+                                          localized(widget.arabic, 'STEP 1',
+                                              'خطوة ١'),
                                           style: const TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.w900,
-                                            color: kGreenLight,
+                                            color: kGreen,
                                             letterSpacing: 0.5,
                                           ),
                                         ),
@@ -745,10 +684,8 @@ class _BookTabState extends State<BookTab> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          localized(
-                                              widget.arabic,
-                                              'Pick an Available Time',
-                                              'اختر وقتاً متاحاً'),
+                                          localized(widget.arabic,
+                                              'Choose Your Space', 'اختر المساحة'),
                                           style: const TextStyle(
                                             fontSize: 15.5,
                                             fontWeight: FontWeight.w900,
@@ -757,115 +694,267 @@ class _BookTabState extends State<BookTab> {
                                           ),
                                         ),
                                       ),
-                                      InkWell(
-                                        borderRadius:
-                                            BorderRadius.circular(999),
-                                        onTap: () async {
-                                          final selectedDate =
-                                              await showDatePicker(
-                                            context: context,
-                                            initialDate:
-                                                _date.isBefore(DateTime.now())
-                                                    ? DateTime.now()
-                                                    : _date,
-                                            firstDate: DateTime.now(),
-                                            lastDate: DateTime.now().add(
-                                                const Duration(days: 180)),
-                                          );
-                                          if (selectedDate != null) {
-                                            setState(() {
-                                              _date = selectedDate;
-                                              _selectedStart = null;
-                                            });
-                                          }
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 11, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: kPage,
-                                            borderRadius:
-                                                BorderRadius.circular(999),
-                                            border: Border.all(color: kBorder),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                  Icons.calendar_month_rounded,
-                                                  size: 15,
-                                                  color: kGreen),
-                                              const SizedBox(width: 5),
-                                              Text(
-                                                '${_date.day}/${_date.month}/${_date.year}',
-                                                style: const TextStyle(
-                                                    fontSize: 11.5,
-                                                    fontWeight:
-                                                        FontWeight.w800),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
                                     ],
                                   ),
-                                  const SizedBox(height: 14),
-                                  _buildDateStrip(widget.arabic),
-                                  const SizedBox(height: 16),
-                                  _buildTimeSlotGroup(
-                                    title: localized(
-                                        widget.arabic,
-                                        'Morning (10 AM - 1 PM)',
-                                        'الصباح (١٠ ص - ١ م)'),
-                                    icon: Icons.wb_sunny_rounded,
-                                    slots: morningSlots,
-                                    arabic: widget.arabic,
-                                  ),
-                                  _buildTimeSlotGroup(
-                                    title: localized(
-                                        widget.arabic,
-                                        'Afternoon (1 PM - 5 PM)',
-                                        'بعد الظهر (١ م - ٥ م)'),
-                                    icon: Icons.wb_twilight_rounded,
-                                    slots: afternoonSlots,
-                                    arabic: widget.arabic,
-                                  ),
-                                  _buildTimeSlotGroup(
-                                    title: localized(
-                                        widget.arabic,
-                                        'Evening & Night (5 PM - 10 PM)',
-                                        'المساء والليل (٥ م - ١٠ م)'),
-                                    icon: Icons.nightlight_round,
-                                    slots: eveningSlots,
-                                    arabic: widget.arabic,
-                                  ),
+                                  const SizedBox(height: 12),
+                                  if (venue.items.isEmpty)
+                                    Text(
+                                      localized(
+                                          widget.arabic,
+                                          'This venue has no bookable spaces yet.',
+                                          'لا توجد مساحات متاحة للحجز حالياً.'),
+                                      style: const TextStyle(color: kMuted),
+                                    )
+                                  else
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: venue.items.map((val) {
+                                        final sel = val.id == item?.id;
+                                        return CustomPill(
+                                          icon: sel
+                                              ? Icons.check_circle_rounded
+                                              : venue.type.icon,
+                                          selected: sel,
+                                          label:
+                                              '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/15m', '/١٥ د') : localized(widget.arabic, '/h', '/س')}',
+                                          onTap: () => _selectSpace(val.id),
+                                        );
+                                      }).toList(),
+                                    ),
                                 ],
-                              );
-                            },
-                          ),
+                              ),
+                            ),
+
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: item != null
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        const Divider(height: 1),
+                                        // Section 2: Date & Time Picker
+                                        Padding(
+                                          key: _timeStepKey,
+                                          padding: const EdgeInsets.fromLTRB(
+                                              20, 18, 20, 10),
+                                          child: Builder(
+                                            builder: (context) {
+                                              final allSlots = _timesFor(
+                                                  venue, item, estimatedMinutes);
+                                              final morningSlots = allSlots
+                                                  .where((s) => s.start.hour < 13)
+                                                  .toList();
+                                              final afternoonSlots = allSlots
+                                                  .where((s) =>
+                                                      s.start.hour >= 13 &&
+                                                      s.start.hour < 17)
+                                                  .toList();
+                                              final eveningSlots = allSlots
+                                                  .where(
+                                                      (s) => s.start.hour >= 17)
+                                                  .toList();
+                                              return Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 3),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: kGreenLight
+                                                              .withValues(
+                                                                  alpha: 0.12),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(
+                                                                      999),
+                                                        ),
+                                                        child: Text(
+                                                          localized(
+                                                              widget.arabic,
+                                                              'STEP 2',
+                                                              'خطوة ٢'),
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                            color: kGreenLight,
+                                                            letterSpacing: 0.5,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          localized(
+                                                              widget.arabic,
+                                                              'Pick an Available Time',
+                                                              'اختر وقتاً متاحاً'),
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 15.5,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                            color: kInk,
+                                                            letterSpacing: -0.2,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      InkWell(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(999),
+                                                        onTap: () async {
+                                                          final selectedDate =
+                                                              await showDatePicker(
+                                                            context: context,
+                                                            initialDate: _date
+                                                                    .isBefore(
+                                                                        DateTime
+                                                                            .now())
+                                                                ? DateTime
+                                                                    .now()
+                                                                : _date,
+                                                            firstDate:
+                                                                DateTime.now(),
+                                                            lastDate: DateTime
+                                                                    .now()
+                                                                .add(
+                                                                    const Duration(
+                                                                        days:
+                                                                            180)),
+                                                          );
+                                                          if (selectedDate !=
+                                                              null) {
+                                                            setState(() {
+                                                              _date =
+                                                                  selectedDate;
+                                                              _selectedStart =
+                                                                  null;
+                                                            });
+                                                          }
+                                                        },
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal:
+                                                                      11,
+                                                                  vertical: 6),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: kPage,
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        999),
+                                                            border: Border.all(
+                                                                color: kBorder),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              const Icon(
+                                                                  Icons
+                                                                      .calendar_month_rounded,
+                                                                  size: 15,
+                                                                  color:
+                                                                      kGreen),
+                                                              const SizedBox(
+                                                                  width: 5),
+                                                              Text(
+                                                                '${_date.day}/${_date.month}/${_date.year}',
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontSize:
+                                                                      11.5,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w800,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 14),
+                                                  _buildDateStrip(widget.arabic),
+                                                  const SizedBox(height: 16),
+                                                  _buildTimeSlotGroup(
+                                                    title: localized(
+                                                        widget.arabic,
+                                                        'Morning (10 AM - 1 PM)',
+                                                        'الصباح (١٠ ص - ١ م)'),
+                                                    icon: Icons.wb_sunny_rounded,
+                                                    slots: morningSlots,
+                                                    arabic: widget.arabic,
+                                                  ),
+                                                  _buildTimeSlotGroup(
+                                                    title: localized(
+                                                        widget.arabic,
+                                                        'Afternoon (1 PM - 5 PM)',
+                                                        'بعد الظهر (١ م - ٥ م)'),
+                                                    icon: Icons
+                                                        .wb_twilight_rounded,
+                                                    slots: afternoonSlots,
+                                                    arabic: widget.arabic,
+                                                  ),
+                                                  _buildTimeSlotGroup(
+                                                    title: localized(
+                                                        widget.arabic,
+                                                        'Evening & Night (5 PM - 10 PM)',
+                                                        'المساء والليل (٥ م - ١٠ م)'),
+                                                    icon: Icons
+                                                        .nightlight_round,
+                                                    slots: eveningSlots,
+                                                    arabic: widget.arabic,
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        const Divider(height: 1),
+                                        // Section 3: Breadfast / Talabat Cart-Style Checkout Bar
+                                        Padding(
+                                          key: _quoteStepKey,
+                                          padding: const EdgeInsets.all(18),
+                                          child: ReservationQuote(
+                                            venue: venue,
+                                            item: item,
+                                            arabic: widget.arabic,
+                                            estimatedMinutes: estimatedMinutes,
+                                            selectedStart: _selectedStart,
+                                            onReserve: _selectedStart == null
+                                                ? null
+                                                : () => widget.onBook(venue,
+                                                    item, _selectedStart!),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
                         ),
-                        const Divider(height: 1),
-                        // Section 3: Breadfast / Talabat Cart-Style Checkout Bar
-                        Padding(
-                          key: _quoteStepKey,
-                          padding: const EdgeInsets.all(18),
-                          child: ReservationQuote(
-                            venue: venue,
-                            item: item,
-                            arabic: widget.arabic,
-                            estimatedMinutes: estimatedMinutes,
-                            selectedStart: _selectedStart,
-                            onReserve: _selectedStart == null
-                                ? null
-                                : () =>
-                                    widget.onBook(venue, item, _selectedStart!),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ];
           }),
       ],
@@ -998,66 +1087,75 @@ class _BookTabState extends State<BookTab> {
           return Padding(
             padding:
                 EdgeInsets.only(right: arabic ? 0 : 8, left: arabic ? 8 : 0),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+            child: PressableScale(
+              scaleDown: 0.93,
               onTap: () {
                 setState(() {
                   _date = d;
                   _selectedStart = null;
                 });
               },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 68,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: isSelected ? HagzyTheme.brandGradient : null,
-                  color: isSelected ? null : kPage,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isSelected ? kGreen : kBorder,
-                    width: isSelected ? 1.5 : 1,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  setState(() {
+                    _date = d;
+                    _selectedStart = null;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 68,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: isSelected ? HagzyTheme.brandGradient : null,
+                    color: isSelected ? null : kPage,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isSelected ? kGreen : kBorder,
+                      width: isSelected ? 1.5 : 1,
+                    ),
                   ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _dayLabel(d, arabic),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        height: 1.1,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                        color: isSelected ? Colors.white70 : kMuted,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _dayLabel(d, arabic),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                          color: isSelected ? Colors.white70 : kMuted,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${d.day}',
-                      style: TextStyle(
-                        fontSize: 17,
-                        height: 1.15,
-                        fontWeight: FontWeight.w900,
-                        color: isSelected ? Colors.white : kInk,
+                      const SizedBox(height: 2),
+                      Text(
+                        '${d.day}',
+                        style: TextStyle(
+                          fontSize: 17,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                          color: isSelected ? Colors.white : kInk,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      _monthLabel(d.month, arabic),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        height: 1.1,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white70 : kMuted,
+                      const SizedBox(height: 1),
+                      Text(
+                        _monthLabel(d.month, arabic),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.1,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? Colors.white70 : kMuted,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1175,71 +1273,76 @@ class ReservationQuote extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (selectedStart != null) ...[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: HagzyTheme.obsidianGradient,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: selectedStart != null
+                ? Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: HagzyTheme.coralGradient,
-                      borderRadius: BorderRadius.circular(13),
+                      gradient: HagzyTheme.obsidianGradient,
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Icon(Icons.event_available_rounded,
-                        color: Colors.white, size: 21),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          item.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            gradient: HagzyTheme.coralGradient,
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: const Icon(Icons.event_available_rounded,
+                              color: Colors.white, size: 21),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                formatDateTime(selectedStart!),
+                                style: const TextStyle(
+                                  color: Color(0xFFA7F3D0),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          formatDateTime(selectedStart!),
-                          style: const TextStyle(
-                            color: Color(0xFFA7F3D0),
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '$estimatedMinutes min',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '$estimatedMinutes min',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
+                  )
+                : const SizedBox.shrink(),
+          ),
           Row(
             children: [
               Expanded(
@@ -1319,23 +1422,27 @@ class ReservationQuote extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: kGreenLight,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
+          PressableScale(
+            scaleDown: 0.97,
+            onTap: onReserve,
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: kGreenLight,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
-              ),
-              onPressed: onReserve,
-              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-              label: Text(
-                localized(arabic, 'Reserve & pay deposit', 'احجز وادفع العربون'),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w900, fontSize: 14.5),
+                onPressed: onReserve,
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: Text(
+                  localized(arabic, 'Reserve & pay deposit', 'احجز وادفع العربون'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900, fontSize: 14.5),
+                ),
               ),
             ),
           ),
@@ -1812,7 +1919,7 @@ class VenueBrowseCard extends StatelessWidget {
     final reviewCount = venue.reviews.length;
     return PressableScale(
       onTap: onTap,
-      scaleDown: 0.99,
+      scaleDown: 0.98,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
@@ -2175,35 +2282,39 @@ class VenueBrowseCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                           ],
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: selected
-                                  ? const Color(0xFFEF4444)
-                                      .withValues(alpha: 0.12)
-                                  : kGreen,
-                              foregroundColor: selected
-                                  ? const Color(0xFFEF4444)
-                                  : Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999)),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 10),
-                              elevation: 0,
-                            ),
-                            onPressed: onTap,
-                            icon: Icon(
-                              selected
-                                  ? Icons.close_rounded
-                                  : Icons.calendar_today_rounded,
-                              size: 15,
-                            ),
-                            label: Text(
-                              selected
-                                  ? localized(arabic, 'Close', 'إغلاق')
-                                  : localized(
-                                      arabic, 'Book', 'احجز'),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w800),
+                          PressableScale(
+                            scaleDown: 0.94,
+                            onTap: onTap,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: selected
+                                    ? const Color(0xFFEF4444)
+                                        .withValues(alpha: 0.12)
+                                    : kGreen,
+                                foregroundColor: selected
+                                    ? const Color(0xFFEF4444)
+                                    : Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                                elevation: 0,
+                              ),
+                              onPressed: onTap,
+                              icon: Icon(
+                                selected
+                                    ? Icons.close_rounded
+                                    : Icons.calendar_today_rounded,
+                                size: 15,
+                              ),
+                              label: Text(
+                                selected
+                                    ? localized(arabic, 'Close', 'إغلاق')
+                                    : localized(
+                                        arabic, 'Book', 'احجز'),
+                                style:
+                                    const TextStyle(fontWeight: FontWeight.w800),
+                              ),
                             ),
                           ),
                         ],

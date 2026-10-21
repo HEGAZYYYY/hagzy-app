@@ -552,15 +552,20 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               ? Row(
                                   children: [
                                     Expanded(
-                                      child: FilledButton.icon(
-                                        onPressed: () =>
+                                      child: PressableScale(
+                                        scaleDown: 0.97,
+                                        onTap: () =>
                                             widget.onChoosePayment(booking),
-                                        icon: const Icon(Icons
-                                            .account_balance_wallet_outlined),
-                                        label: Text(localized(
-                                            arabic,
-                                            'Pay Deposit · ${formatMoney(booking.dueNow ?? booking.price)} EGP',
-                                            'ادفع العربون · ${formatMoney(booking.dueNow ?? booking.price)} جنيه')),
+                                        child: FilledButton.icon(
+                                          onPressed: () =>
+                                              widget.onChoosePayment(booking),
+                                          icon: const Icon(Icons
+                                              .account_balance_wallet_outlined),
+                                          label: Text(localized(
+                                              arabic,
+                                              'Pay Deposit · ${formatMoney(booking.dueNow ?? booking.price)} EGP',
+                                              'ادفع العربون · ${formatMoney(booking.dueNow ?? booking.price)} جنيه')),
+                                        ),
                                       ),
                                     ),
                                     if (widget.onCancelBooking != null) ...[

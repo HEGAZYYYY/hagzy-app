@@ -335,26 +335,30 @@ class LanguageOption extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        borderRadius: BorderRadius.circular(999),
+  Widget build(BuildContext context) => PressableScale(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-          decoration: BoxDecoration(
-            gradient: selected ? HagzyTheme.brandGradient : null,
-            color: selected ? null : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : kMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
+        scaleDown: 0.92,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+            decoration: BoxDecoration(
+              gradient: selected ? HagzyTheme.brandGradient : null,
+              color: selected ? null : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : kMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ),
@@ -435,76 +439,80 @@ class FloatingDock extends StatelessWidget {
                   final selected = selectedIndex == index;
                   final showBadge = index == 1 && badgeCount > 0;
                   return Expanded(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(999),
+                    child: PressableScale(
+                      scaleDown: 0.94,
                       onTap: () => onDestinationSelected(index),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        decoration: BoxDecoration(
-                          gradient: selected ? HagzyTheme.brandGradient : null,
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: selected
-                              ? [
-                                  BoxShadow(
-                                    color: kGreen.withValues(alpha: 0.28),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => onDestinationSelected(index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          decoration: BoxDecoration(
+                            gradient: selected ? HagzyTheme.brandGradient : null,
+                            borderRadius: BorderRadius.circular(999),
+                            boxShadow: selected
+                                ? [
+                                    BoxShadow(
+                                      color: kGreen.withValues(alpha: 0.28),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Icon(
+                                    localizedItems[index].$1,
+                                    size: 19,
+                                    color: selected ? Colors.white : kMuted,
                                   ),
-                                ]
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Icon(
-                                  localizedItems[index].$1,
-                                  size: 19,
-                                  color: selected ? Colors.white : kMuted,
-                                ),
-                                if (showBadge)
-                                  Positioned(
-                                    right: -7,
-                                    top: -5,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: kGreenLight,
-                                        borderRadius:
-                                            BorderRadius.circular(999),
-                                      ),
-                                      child: Text(
-                                        '$badgeCount',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
+                                  if (showBadge)
+                                    Positioned(
+                                      right: -7,
+                                      top: -5,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: kGreenLight,
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          '$badgeCount',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                          ),
                                         ),
                                       ),
                                     ),
+                                ],
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  localizedItems[index].$2,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: selected ? Colors.white : kMuted,
+                                    fontSize: 12,
+                                    fontWeight: selected
+                                        ? FontWeight.w800
+                                        : FontWeight.w700,
                                   ),
-                              ],
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                localizedItems[index].$2,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: selected ? Colors.white : kMuted,
-                                  fontSize: 12,
-                                  fontWeight: selected
-                                      ? FontWeight.w800
-                                      : FontWeight.w700,
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
