@@ -1916,7 +1916,7 @@ class CustomerHero extends StatelessWidget {
       child: Container(
         key: ValueKey(type),
         height: 158,
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -1936,19 +1936,15 @@ class CustomerHero extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            Positioned(
-              right: arabic ? null : -12,
-              left: arabic ? -12 : null,
-              top: -12,
-              bottom: -12,
-              width: MediaQuery.sizeOf(context).width * .52,
+            Positioned.fill(
               child: Image.network(
                 _image,
                 fit: BoxFit.cover,
                 cacheWidth: 640,
                 alignment: Alignment.center,
                 errorBuilder: (context, error, stackTrace) => Align(
-                  alignment: Alignment.centerRight,
+                  alignment:
+                      arabic ? Alignment.centerLeft : Alignment.centerRight,
                   child: Icon(content.$2,
                       size: 132, color: Colors.white.withValues(alpha: .16)),
                 ),
@@ -1961,85 +1957,89 @@ class CustomerHero extends StatelessWidget {
                     begin:
                         arabic ? Alignment.centerRight : Alignment.centerLeft,
                     end: arabic ? Alignment.centerLeft : Alignment.centerRight,
-                    stops: const [0, .48, 1],
+                    stops: const [0, .50, 1],
                     colors: [
-                      content.$1.first,
-                      content.$1.first.withValues(alpha: .92),
-                      content.$1.last.withValues(alpha: .15),
+                      content.$1.first.withValues(alpha: .96),
+                      content.$1.first.withValues(alpha: .84),
+                      content.$1.last.withValues(alpha: .30),
                     ],
                   ),
                 ),
               ),
             ),
-            Align(
-              alignment: arabic ? Alignment.centerRight : Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment:
-                    arabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.16)),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Align(
+                alignment:
+                    arabic ? Alignment.centerRight : Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment:
+                      arabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.16)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          LivePulseDot(color: content.$5, size: 6),
+                          const SizedBox(width: 6),
+                          Text(
+                            content.$3,
+                            style: TextStyle(
+                              color: content.$5,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: MediaQuery.sizeOf(context).width * .64,
+                      child: Text(
+                        content.$4,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 21,
+                          height: 1.16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        LivePulseDot(color: content.$5, size: 6),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.verified_rounded,
+                            size: 14, color: kGreenLight),
+                        const SizedBox(width: 5),
                         Text(
-                          content.$3,
+                          arabic
+                              ? '$venueCount ${venueCount == 1 ? 'مكان قريب' : 'أماكن قريبة'} · حجز فوري'
+                              : '$venueCount ${venueCount == 1 ? 'place' : 'places'} nearby · Instant hold',
                           style: TextStyle(
-                            color: content.$5,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.1,
+                            color: Colors.white.withValues(alpha: 0.82),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: MediaQuery.sizeOf(context).width * .64,
-                    child: Text(
-                      content.$4,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 21,
-                        height: 1.16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.6,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.verified_rounded,
-                          size: 14, color: kGreenLight),
-                      const SizedBox(width: 5),
-                      Text(
-                        arabic
-                            ? '$venueCount ${venueCount == 1 ? 'مكان قريب' : 'أماكن قريبة'} · حجز فوري'
-                            : '$venueCount ${venueCount == 1 ? 'place' : 'places'} nearby · Instant hold',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -2139,7 +2139,7 @@ class VenueBrowseCard extends StatelessWidget {
                 Container(
                   height: 162,
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -2178,138 +2178,147 @@ class VenueBrowseCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: kInk.withValues(alpha: 0.78),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.16)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Stack(
                             children: [
-                              Icon(venue.type.icon,
-                                  size: 12, color: Colors.white),
-                              const SizedBox(width: 5),
-                              Text(
-                                switch (venue.type) {
-                                  VenueType.sports => localized(
-                                      arabic, 'SPORTS & COURTS', 'رياضة وملاعب'),
-                                  VenueType.salon => localized(
-                                      arabic, 'HAIR & BEAUTY', 'عناية وجمال'),
-                                  VenueType.lounge => localized(
-                                      arabic, 'GAMES & TABLES', 'ألعاب وطاولات'),
-                                },
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9.5,
-                                    letterSpacing: .7,
-                                    fontWeight: FontWeight.w800),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: Material(
-                          color: Colors.white.withValues(alpha: 0.94),
-                          shape: const CircleBorder(),
-                          elevation: 2,
-                          shadowColor: Colors.black26,
-                          child: IconButton(
-                            tooltip: favorite
-                                ? localized(arabic, 'Remove from Saved',
-                                    'إزالة من المفضلة')
-                                : localized(arabic, 'Save Venue', 'أضف للمفضلة'),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: onFavorite,
-                            icon: Icon(
-                              favorite ? Icons.favorite : Icons.favorite_border,
-                              color: favorite
-                                  ? const Color(0xFFE11D48)
-                                  : kInk,
-                              size: 19,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.95),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    hasReviews
-                                        ? Icons.star_rounded
-                                        : Icons.fiber_new_rounded,
-                                    size: 14,
-                                    color: hasReviews
-                                        ? const Color(0xFFF59E0B)
-                                        : kGreen,
+                              Align(
+                                alignment: Alignment.topLeft,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: kInk.withValues(alpha: 0.78),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.16)),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    hasReviews
-                                        ? localized(
-                                            arabic,
-                                            '$ratingStr ($reviewCount) · Verified',
-                                            '$ratingStr ($reviewCount) · مكان معتمد')
-                                        : localized(
-                                            arabic, 'New Venue', 'مكان جديد'),
-                                    style: const TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: kInk,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(venue.type.icon,
+                                          size: 12, color: Colors.white),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        switch (venue.type) {
+                                          VenueType.sports => localized(
+                                              arabic, 'SPORTS & COURTS', 'رياضة وملاعب'),
+                                          VenueType.salon => localized(
+                                              arabic, 'HAIR & BEAUTY', 'عناية وجمال'),
+                                          VenueType.lounge => localized(
+                                              arabic, 'GAMES & TABLES', 'ألعاب وطاولات'),
+                                        },
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9.5,
+                                            letterSpacing: .7,
+                                            fontWeight: FontWeight.w800),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Align(
+                                alignment: Alignment.topRight,
+                                child: Material(
+                                  color: Colors.white.withValues(alpha: 0.94),
+                                  shape: const CircleBorder(),
+                                  elevation: 2,
+                                  shadowColor: Colors.black26,
+                                  child: IconButton(
+                                    tooltip: favorite
+                                        ? localized(arabic, 'Remove from Saved',
+                                            'إزالة من المفضلة')
+                                        : localized(arabic, 'Save Venue', 'أضف للمفضلة'),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: onFavorite,
+                                    icon: Icon(
+                                      favorite ? Icons.favorite : Icons.favorite_border,
+                                      color: favorite
+                                          ? const Color(0xFFE11D48)
+                                          : kInk,
+                                      size: 19,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                            if (venue.instaPayAddress.isNotEmpty ||
-                                venue.vodafoneCashNumber.isNotEmpty) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 9, vertical: 4),
-                                decoration: BoxDecoration(
-                                  gradient: HagzyTheme.brandGradient,
-                                  borderRadius: BorderRadius.circular(999),
                                 ),
+                              ),
+                              Align(
+                                alignment: Alignment.bottomLeft,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.bolt_rounded,
-                                        size: 12, color: Colors.white),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      localized(arabic, 'Instant Transfer',
-                                          'تحويل فوري'),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 9, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.95),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            hasReviews
+                                                ? Icons.star_rounded
+                                                : Icons.fiber_new_rounded,
+                                            size: 14,
+                                            color: hasReviews
+                                                ? const Color(0xFFF59E0B)
+                                                : kGreen,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            hasReviews
+                                                ? localized(
+                                                    arabic,
+                                                    '$ratingStr ($reviewCount) · Verified',
+                                                    '$ratingStr ($reviewCount) · مكان معتمد')
+                                                : localized(
+                                                    arabic, 'New Venue', 'مكان جديد'),
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: kInk,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
+                                    if (venue.instaPayAddress.isNotEmpty ||
+                                        venue.vodafoneCashNumber.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 9, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          gradient: HagzyTheme.brandGradient,
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.bolt_rounded,
+                                                size: 12, color: Colors.white),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              localized(arabic, 'Instant Transfer',
+                                                  'تحويل فوري'),
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ],

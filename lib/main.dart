@@ -2643,7 +2643,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                   children: [
                     // WhatsApp-style Header
                     Container(
-                      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: const BoxDecoration(
                         gradient: HagzyTheme.obsidianGradient,
                       ),
@@ -2653,40 +2654,54 @@ class _HagzyHomeState extends State<HagzyHome> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
+                              color: const Color(0xFF25D366)
+                                  .withValues(alpha: 0.18),
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFF25D366)
+                                    .withValues(alpha: 0.45),
+                                width: 1.2,
+                              ),
                             ),
                             child: const Icon(Icons.smart_toy_outlined,
-                                color: Colors.white, size: 20),
+                                color: Color(0xFF25D366), size: 20),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   localized(arabic, 'Hagzy WhatsApp Bot',
                                       'بوت حجزي الذكي · واتساب'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 15,
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                                 Row(
                                   children: [
                                     const LivePulseDot(
-                                        color: Color(0xFFA7F3D0), size: 6),
+                                        color: Color(0xFF25D366), size: 6),
                                     const SizedBox(width: 5),
-                                    Text(
-                                      localized(
-                                          arabic,
-                                          'Online · Instant Booking & Payment Help',
-                                          'متصل الآن · مساعدة فورية للحجز والدفع'),
-                                      style: TextStyle(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.82),
-                                        fontSize: 11,
+                                    Flexible(
+                                      child: Text(
+                                        localized(
+                                            arabic,
+                                            'Online · 24/7 Assistant',
+                                            'متصل الآن · مساعد فوري'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.80),
+                                          fontSize: 11,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -2694,28 +2709,48 @@ class _HagzyHomeState extends State<HagzyHome> {
                               ],
                             ),
                           ),
-                          if (activeBooking != null)
-                            TextButton.icon(
-                              onPressed: () =>
-                                  Navigator.pop(ctx, 'external_wa'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                backgroundColor:
-                                    Colors.white.withValues(alpha: 0.14),
-                                visualDensity: VisualDensity.compact,
+                          const SizedBox(width: 8),
+                          // WhatsApp App Action Pill
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: () => Navigator.pop(ctx, 'external_wa'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF25D366)
+                                    .withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: const Color(0xFF25D366)
+                                      .withValues(alpha: 0.38),
+                                ),
                               ),
-                              icon: const Icon(Icons.open_in_new_rounded,
-                                  size: 14, color: Colors.white),
-                              label: Text(
-                                localized(arabic, 'WhatsApp App', 'تطبيق واتساب'),
-                                style: const TextStyle(
-                                    fontSize: 11, fontWeight: FontWeight.w800),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.open_in_new_rounded,
+                                      size: 13, color: Color(0xFF25D366)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    localized(arabic, 'WhatsApp', 'واتساب'),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                          const SizedBox(width: 6),
                           IconButton(
+                            tooltip: localized(arabic, 'Close', 'إغلاق'),
                             onPressed: () => Navigator.pop(ctx),
                             icon: const Icon(Icons.close_rounded,
-                                color: Colors.white, size: 18),
+                                color: Colors.white, size: 20),
+                            visualDensity: VisualDensity.compact,
                           ),
                         ],
                       ),
@@ -2866,8 +2901,15 @@ class _HagzyHomeState extends State<HagzyHome> {
       ),
     );
 
-    if (nextAction == 'external_wa' && activeBooking != null) {
-      await _openWhatsAppBookingChat(activeBooking);
+    if (nextAction == 'external_wa') {
+      if (activeBooking != null) {
+        await _openWhatsAppBookingChat(activeBooking);
+      } else {
+        final uri = Uri.parse('https://wa.me/$kWhatsappBusinessNumber');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
     } else if (nextAction == 'fawry' && activeBooking != null) {
       await _startFawryCheckout(
           activeBooking, activeBooking.dueNow ?? activeBooking.price);
