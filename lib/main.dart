@@ -2387,24 +2387,30 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _startPaymobCheckout(Booking booking) async {
     final arabic = _language == 'AR';
-    if (!_api.isConfigured) {
-      _message(
-        localized(
-          arabic,
-          'Paymob Unified Checkout requires a connected Hagzy server (--dart-define=HAGZY_API_URL=http://localhost:3000) so payment is verified by webhook.',
-          'يتطلب الدفع عبر Paymob الاتصال بخادم حجزي للتحقق من الدفع.',
-        ),
-        error: true,
-      );
-      return;
-    }
+    final defaultGatewayUrl =
+        (Uri.base.scheme == 'http' || Uri.base.scheme == 'https') &&
+                Uri.base.host.isNotEmpty &&
+                Uri.base.port != 5176
+            ? '${Uri.base.scheme}://${Uri.base.host}${Uri.base.hasPort ? ':${Uri.base.port}' : ''}'
+            : 'http://localhost:3000';
+    final gatewayApi =
+        _api.isConfigured ? _api : HagzyApi(baseUrl: defaultGatewayUrl);
     final parts = booking.customer.trim().split(RegExp(r'\s+'));
     final firstName = parts.first.isNotEmpty ? parts.first : 'Customer';
     final lastName = parts.length > 1 ? parts.skip(1).join(' ') : 'Hagzy';
 
     try {
-      final checkoutUrl = await _api.createPaymobCheckout(
-        booking.id,
+      var targetBookingId = booking.id;
+      if (!_api.isConfigured) {
+        final created = await gatewayApi.createBooking({
+          ...booking.toJson(),
+          'walkIn': false,
+        });
+        targetBookingId = (created['id'] as String?) ?? booking.id;
+      }
+
+      final checkoutUrl = await gatewayApi.createPaymobCheckout(
+        targetBookingId,
         firstName: firstName,
         lastName: lastName,
         email: booking.email,
@@ -2421,7 +2427,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (!launched) throw StateError('Could not open Paymob checkout.');
       _message(localized(
         arabic,
-        'Opened Paymob Unified Checkout for Booking #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length)}. Your reservation will confirm automatically once the Paymob webhook verifies payment.',
+        'Opened Paymob Unified Checkout for Booking #${targetBookingId.substring(0, targetBookingId.length > 8 ? 8 : targetBookingId.length)}. Your reservation will confirm automatically once the Paymob webhook verifies payment.',
         'تم فتح صفحة دفع Paymob الموحدة. سيتأكد الحجز تلقائياً فور إتمام الدفع.',
       ));
 
@@ -2435,7 +2441,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           return;
         }
         try {
-          final remote = await _api.bookingStatus(booking.id);
+          final remote = await gatewayApi.bookingStatus(targetBookingId);
           final updated = Booking.fromJson(remote);
           if (updated.isConfirmed) {
             timer.cancel();
