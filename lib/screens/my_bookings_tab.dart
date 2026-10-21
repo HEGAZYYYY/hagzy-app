@@ -619,22 +619,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
-                            OutlinedButton.icon(
-                              onPressed: () =>
-                                  _inviteSquadOnWhatsApp(booking, venue, space),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                              icon: const Icon(Icons.share_outlined,
-                                  size: 16, color: kGreen),
-                              label: Text(
-                                localized(arabic, 'Invite Squad',
-                                    'دعوة الأصدقاء'),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -647,31 +631,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         }),
       ],
     );
-  }
-
-  Future<void> _inviteSquadOnWhatsApp(
-      Booking booking, Venue? venue, VenueItem? space) async {
-    final arabic = widget.arabic;
-    final perPlayer = booking.splitCount > 1
-        ? booking.price / booking.splitCount
-        : booking.price;
-    final mapsLink = venue != null && venue.googleMapsUrl.isNotEmpty
-        ? venue.googleMapsUrl
-        : 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${venue?.name ?? ''} ${venue?.location ?? ''} Egypt')}';
-    final lines = [
-      localized(
-        arabic,
-        'Hey squad! I booked ${venue?.name ?? 'our spot'} on Hagzy:',
-        'يا شباب! حجزت لنا في ${venue?.name ?? 'المكان'} عبر تطبيق حجزي:',
-      ),
-      '📍 ${venue?.name ?? booking.venueId} (${space?.name ?? booking.itemId})',
-      '🗓 ${formatDateTime(booking.startsAt)} (${booking.durationMinutes} min)',
-      if (booking.splitCount > 1)
-        '💳 ${localized(arabic, 'Each share', 'حصة الفرد')}: ${formatMoney(perPlayer)} EGP (${booking.splitCount} ${localized(arabic, 'players', 'أشخاص')})',
-      '🗺 $mapsLink',
-    ];
-    final uri = Uri.https('wa.me', '/', {'text': lines.join('\n')});
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _showQrPassModal(
