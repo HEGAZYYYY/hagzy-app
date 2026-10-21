@@ -572,7 +572,7 @@ void main() {
     expect(find.text('400.00 EGP'), findsWidgets);
   });
 
-  testWidgets('Customer can view Directions, Add to Calendar, and Book Again',
+  testWidgets('Customer can view Directions and Book Again (calendar removed)',
       (tester) async {
     final venue = Venue(
       id: 'venue-convenience-test',
@@ -613,9 +613,16 @@ void main() {
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
-    // 1. "Book Again" strip is visible on Explore because there is an active booking
+    // 1. "Book Again" carousel is visible on Explore because there is an active booking
     expect(find.text('Book Again'), findsOneWidget);
     expect(find.text('Your favorite regular spots'), findsOneWidget);
+
+    // Tap the carousel card to open the booking drawer directly
+    await tester.tap(find.text('Book Now').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your Booking'), findsOneWidget);
+    expect(find.text('Choose Your Space'), findsOneWidget);
 
     // 2. Switch to My Bookings
     await tester.tap(find.text('My Bookings'));
@@ -624,21 +631,13 @@ void main() {
     expect(find.text('Giza Sports Hub'), findsOneWidget);
     expect(find.text('QR Check-In Pass'), findsOneWidget);
     expect(find.text('Directions'), findsWidgets);
-    expect(find.text('Add to Calendar'), findsOneWidget);
+    // Calendar is completely removed as requested
+    expect(find.text('Add to Calendar'), findsNothing);
+    expect(find.text('Calendar'), findsNothing);
+    expect(find.text('Google Calendar'), findsNothing);
     expect(find.text('Book Again'), findsOneWidget);
 
-    // 3. Open Add to Calendar modal
-    await tester.tap(find.text('Add to Calendar'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Google Calendar'), findsOneWidget);
-    expect(find.textContaining('Apple Calendar'), findsOneWidget);
-
-    // Close modal by tapping outside
-    await tester.tapAt(const Offset(20, 20));
-    await tester.pumpAndSettle();
-
-    // 4. Tap Book Again to return to Explore with venue pre-selected
+    // 3. Tap Book Again from My Bookings to return to Explore with venue pre-selected
     await tester.tap(find.text('Book Again'));
     await tester.pumpAndSettle();
 

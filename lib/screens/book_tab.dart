@@ -44,6 +44,7 @@ class _BookTabState extends State<BookTab> {
       ? DateTime.now().add(const Duration(days: 1))
       : DateTime.now();
   DateTime? _selectedStart;
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _bookingSectionKey = GlobalKey();
   final GlobalKey _spaceStepKey = GlobalKey();
@@ -56,15 +57,13 @@ class _BookTabState extends State<BookTab> {
     super.initState();
     _loadCustomerPreferences();
     if (widget.initialVenueId != null) {
-      _venueId = widget.initialVenueId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final key = _venueCardKeys[_venueId];
-        if (key?.currentContext != null) {
-          Scrollable.ensureVisible(
-            key!.currentContext!,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-          );
+        if (!mounted) return;
+        final initialVenue = upsertNaderSalon(widget.venues)
+            .where((v) => v.id == widget.initialVenueId)
+            .firstOrNull;
+        if (initialVenue != null) {
+          _selectVenue(initialVenue, toggleIfSame: false);
         }
       });
     }
@@ -74,31 +73,64 @@ class _BookTabState extends State<BookTab> {
   void didUpdateWidget(BookTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialVenueId != null &&
-        widget.initialVenueId != oldWidget.initialVenueId) {
-      setState(() {
-        _venueId = widget.initialVenueId;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final key = _venueCardKeys[_venueId];
-        if (key?.currentContext != null) {
-          Scrollable.ensureVisible(
-            key!.currentContext!,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-          );
-        }
-      });
+        (widget.initialVenueId != oldWidget.initialVenueId ||
+            _venueId != widget.initialVenueId)) {
+      final targetVenue = upsertNaderSalon(widget.venues)
+          .where((v) => v.id == widget.initialVenueId)
+          .firstOrNull;
+      if (targetVenue != null) {
+        _selectVenue(targetVenue, toggleIfSame: false);
+      }
     }
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _selectVenue(Venue value) {
-    if (_venueId == value.id) {
+  void _scrollToVenue(String venueId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final ctx = _venueCardKeys[venueId]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+          alignment: 0.05,
+        );
+        return;
+      }
+      if (_scrollController.hasClients) {
+        final matching = _getMatchingVenues();
+        final index = matching.indexWhere((v) => v.id == venueId);
+        final targetOffset = 520.0 + (index >= 0 ? index * 320.0 : 0.0);
+        final maxScroll = _scrollController.position.maxScrollExtent;
+        final clamped = targetOffset.clamp(0.0, maxScroll);
+        await _scrollController.animateTo(
+          clamped,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+        if (!mounted) return;
+        final ctxAfter = _venueCardKeys[venueId]?.currentContext;
+        if (ctxAfter != null) {
+          Scrollable.ensureVisible(
+            ctxAfter,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            alignment: 0.05,
+          );
+        }
+      }
+    });
+  }
+
+  void _selectVenue(Venue value, {bool toggleIfSame = true}) {
+    if (toggleIfSame && _venueId == value.id) {
       setState(() {
         _venueId = null;
         _itemId = null;
@@ -107,22 +139,24 @@ class _BookTabState extends State<BookTab> {
       return;
     }
     setState(() {
+      if (_type != null && _type != value.type) {
+        _type = null;
+      }
+      if (_query.isNotEmpty) {
+        _query = '';
+        _searchController.clear();
+      }
+      if (_favoritesOnly && !_favoriteIds.contains(value.id)) {
+        _favoritesOnly = false;
+      }
+      if (!_locationMatchesArea(value.location)) {
+        _area = kAllEgyptAreas;
+      }
       _venueId = value.id;
       _itemId = value.items.firstOrNull?.id;
       _selectedStart = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final ctx = _venueCardKeys[value.id]?.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          alignment: 0.0,
-        );
-      }
-    });
+    _scrollToVenue(value.id);
   }
 
   void _selectSpace(String itemId) {
@@ -344,9 +378,8 @@ class _BookTabState extends State<BookTab> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final matchingVenues = upsertNaderSalon(widget.venues).where((venue) {
+  List<Venue> _getMatchingVenues() {
+    final list = upsertNaderSalon(widget.venues).where((venue) {
       final matchesCategory = _type == null || venue.type == _type;
       final matchesSearch =
           '${venue.name} ${venue.location} ${venue.description}'
@@ -361,6 +394,12 @@ class _BookTabState extends State<BookTab> {
         if (!_sortByPrice) return a.name.compareTo(b.name);
         return _startingPrice(a).compareTo(_startingPrice(b));
       });
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final matchingVenues = _getMatchingVenues();
     final venue =
         matchingVenues.where((value) => value.id == _venueId).firstOrNull;
     final item =
@@ -382,6 +421,7 @@ class _BookTabState extends State<BookTab> {
         ),
         const SizedBox(height: 12),
         TextField(
+          controller: _searchController,
           decoration: InputDecoration(
             hintText: localized(
                 widget.arabic,
@@ -391,7 +431,10 @@ class _BookTabState extends State<BookTab> {
             suffixIcon: _query.isEmpty
                 ? null
                 : IconButton(
-                    onPressed: () => setState(() => _query = ''),
+                    onPressed: () => setState(() {
+                      _query = '';
+                      _searchController.clear();
+                    }),
                     icon: const Icon(Icons.close),
                   ),
             filled: true,
@@ -441,11 +484,9 @@ class _BookTabState extends State<BookTab> {
                 final isCurrent = _venueId == v.id;
                 return PressableScale(
                   scaleDown: 0.96,
-                  onTap: () => _selectVenue(v),
-                  child: Container(
+                  onTap: () => _selectVenue(v, toggleIfSame: false),
+                  child: Ink(
                     width: 220,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: kPanel,
                       borderRadius: BorderRadius.circular(18),
@@ -455,68 +496,76 @@ class _BookTabState extends State<BookTab> {
                       ),
                       boxShadow: HagzyTheme.softShadow,
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            gradient: HagzyTheme.brandGradient,
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                          child:
-                              Icon(v.type.icon, color: Colors.white, size: 21),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                v.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13.5,
-                                  color: kInk,
-                                ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => _selectVenue(v, toggleIfSame: false),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: HagzyTheme.brandGradient,
+                                borderRadius: BorderRadius.circular(13),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                v.location.isEmpty
-                                    ? localized(widget.arabic, 'Egypt', 'مصر')
-                                    : v.location,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: kMuted,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
+                              child:
+                                  Icon(v.type.icon, color: Colors.white, size: 21),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.bolt_rounded,
-                                      size: 13, color: kGreen),
-                                  const SizedBox(width: 2),
                                   Text(
-                                    localized(
-                                        widget.arabic, 'Book Now', 'احجز الآن'),
+                                    v.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      color: kGreen,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13.5,
+                                      color: kInk,
                                     ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    v.location.isEmpty
+                                        ? localized(widget.arabic, 'Egypt', 'مصر')
+                                        : v.location,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: kMuted,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.bolt_rounded,
+                                          size: 13, color: kGreen),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        localized(
+                                            widget.arabic, 'Book Now', 'احجز الآن'),
+                                        style: const TextStyle(
+                                          color: kGreen,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 );

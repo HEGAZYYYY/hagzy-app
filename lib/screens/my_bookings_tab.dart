@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -637,22 +635,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
-                            OutlinedButton.icon(
-                              onPressed: () =>
-                                  _showAddToCalendarModal(booking, venue, space),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                              icon: const Icon(Icons.event_available_outlined,
-                                  size: 16, color: kGreen),
-                              label: Text(
-                                localized(
-                                    arabic, 'Add to Calendar', 'أضف للتقويم'),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
                             if (widget.onBookAgain != null && venue != null)
                               OutlinedButton.icon(
                                 onPressed: () => widget.onBookAgain!(venue.id),
@@ -793,48 +775,25 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _openMaps(venue);
-                        },
-                        icon: const Icon(Icons.directions_outlined,
-                            size: 15, color: kGreen),
-                        label: Text(
-                          localized(arabic, 'Directions', 'الاتجاهات'),
-                          style: const TextStyle(fontSize: 11.5),
-                        ),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _showAddToCalendarModal(booking, venue, space);
-                        },
-                        icon: const Icon(Icons.event_available_outlined,
-                            size: 15, color: kGreen),
-                        label: Text(
-                          localized(arabic, 'Calendar', 'التقويم'),
-                          style: const TextStyle(fontSize: 11.5),
-                        ),
-                      ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _openMaps(venue);
+                    },
+                    icon: const Icon(Icons.directions_outlined,
+                        size: 15, color: kGreen),
+                    label: Text(
+                      localized(arabic, 'Directions', 'الاتجاهات'),
+                      style: const TextStyle(fontSize: 11.5),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -854,219 +813,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             'query': '${venue.name} ${venue.location} Egypt'.trim(),
           });
     await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> _showAddToCalendarModal(
-      Booking booking, Venue? venue, VenueItem? space) async {
-    final arabic = widget.arabic;
-    final title = '${venue?.name ?? 'Booking'} · Hagzy';
-    final location = '${venue?.name ?? ''}, ${venue?.location ?? ''}'.trim();
-    final desc =
-        'Hagzy Reservation\nVenue: ${venue?.name ?? ''}\nSpace: ${space?.name ?? ''}\nDuration: ${booking.durationMinutes} min\nPrice: ${formatMoney(booking.price)} EGP\nBooking ID: ${booking.id}';
-
-    final startUtc = booking.startsAt.toUtc();
-    final endUtc =
-        booking.startsAt.add(Duration(minutes: booking.durationMinutes)).toUtc();
-    String pad(int n) => n.toString().padLeft(2, '0');
-    final startStr =
-        '${startUtc.year}${pad(startUtc.month)}${pad(startUtc.day)}T${pad(startUtc.hour)}${pad(startUtc.minute)}${pad(startUtc.second)}Z';
-    final endStr =
-        '${endUtc.year}${pad(endUtc.month)}${pad(endUtc.day)}T${pad(endUtc.hour)}${pad(endUtc.minute)}${pad(endUtc.second)}Z';
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: kPanel,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: kBorder,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: HagzyTheme.brandGradient,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.event_available_rounded,
-                        color: Colors.white, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          localized(arabic, 'Add to Calendar', 'أضف للتقويم'),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${formatDateTime(booking.startsAt)} · ${booking.durationMinutes} min',
-                          style: const TextStyle(
-                            color: kMuted,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: kPage,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.storefront_rounded,
-                            size: 16, color: kGreen),
-                        const SizedBox(width: 8),
-                        Text(
-                          venue?.name ?? 'Hagzy Reservation',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800, fontSize: 13.5),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined,
-                            size: 16, color: kMuted),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            location.isEmpty ? 'Egypt' : location,
-                            style: const TextStyle(
-                                color: kMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: kGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final gCalUrl = Uri.parse(
-                    'https://calendar.google.com/calendar/render?action=TEMPLATE'
-                    '&text=${Uri.encodeComponent(title)}'
-                    '&dates=$startStr/$endStr'
-                    '&details=${Uri.encodeComponent(desc)}'
-                    '&location=${Uri.encodeComponent(location)}',
-                  );
-                  await launchUrl(gCalUrl,
-                      mode: LaunchMode.externalApplication);
-                },
-                icon: const Icon(Icons.calendar_month_rounded, size: 19),
-                label: Text(
-                  localized(arabic, 'Google Calendar',
-                      'تقويم جوجل (Google Calendar)'),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final nowUtc = DateTime.now().toUtc();
-                  final nowStr =
-                      '${nowUtc.year}${pad(nowUtc.month)}${pad(nowUtc.day)}T${pad(nowUtc.hour)}${pad(nowUtc.minute)}${pad(nowUtc.second)}Z';
-                  final icsContent =
-                      'BEGIN:VCALENDAR\r\n'
-                      'VERSION:2.0\r\n'
-                      'PRODID:-//Hagzy//Reservation//EN\r\n'
-                      'CALSCALE:GREGORIAN\r\n'
-                      'METHOD:PUBLISH\r\n'
-                      'BEGIN:VEVENT\r\n'
-                      'UID:${booking.id}-$nowStr@hagzy.com\r\n'
-                      'DTSTAMP:$nowStr\r\n'
-                      'DTSTART:$startStr\r\n'
-                      'DTEND:$endStr\r\n'
-                      'SUMMARY:$title\r\n'
-                      'DESCRIPTION:$desc\r\n'
-                      'LOCATION:$location\r\n'
-                      'STATUS:CONFIRMED\r\n'
-                      'BEGIN:VALARM\r\n'
-                      'TRIGGER:-PT1H\r\n'
-                      'ACTION:DISPLAY\r\n'
-                      'DESCRIPTION:Reminder: $title\r\n'
-                      'END:VALARM\r\n'
-                      'END:VEVENT\r\n'
-                      'END:VCALENDAR\r\n';
-                  final dataUri = Uri.dataFromString(
-                    icsContent,
-                    mimeType: 'text/calendar',
-                    encoding: utf8,
-                  );
-                  await launchUrl(dataUri,
-                      mode: LaunchMode.externalApplication);
-                },
-                icon:
-                    const Icon(Icons.download_rounded, size: 19, color: kGreen),
-                label: Text(
-                  localized(arabic, 'Apple Calendar / iCal (.ics)',
-                      'تقويم آبل / تحميل ملف (.ics)'),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, color: kInk),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

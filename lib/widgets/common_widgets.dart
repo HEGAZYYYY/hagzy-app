@@ -75,20 +75,30 @@ class _PressableScaleState extends State<PressableScale> {
   bool _pressed = false;
 
   @override
-  Widget build(BuildContext context) => Listener(
-        onPointerDown:
-            widget.onTap != null ? (_) => setState(() => _pressed = true) : null,
-        onPointerUp:
-            widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
-        onPointerCancel:
-            widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
-        child: AnimatedScale(
-          scale: _pressed ? widget.scaleDown : 1.0,
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOutCubic,
-          child: widget.child,
-        ),
-      );
+  Widget build(BuildContext context) {
+    final content = AnimatedScale(
+      scale: _pressed ? widget.scaleDown : 1.0,
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOutCubic,
+      child: widget.child,
+    );
+
+    return Listener(
+      onPointerDown:
+          widget.onTap != null ? (_) => setState(() => _pressed = true) : null,
+      onPointerUp:
+          widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
+      onPointerCancel:
+          widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
+      child: widget.onTap != null
+          ? GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: widget.onTap,
+              child: content,
+            )
+          : content,
+    );
+  }
 }
 
 /// Breathing live indicator dot that animates in real app runs and stays static in tests.
