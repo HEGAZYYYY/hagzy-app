@@ -117,7 +117,7 @@ class _BookTabState extends State<BookTab> {
         );
         if (!mounted) return;
         final ctxAfter = _venueCardKeys[venueId]?.currentContext;
-        if (ctxAfter != null) {
+        if (ctxAfter != null && ctxAfter.mounted) {
           Scrollable.ensureVisible(
             ctxAfter,
             duration: const Duration(milliseconds: 250),

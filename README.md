@@ -15,8 +15,7 @@ and a searchable selector for all 27 Egyptian governorates.
 
 ## Run a local preview
 
-```powershell
-cd C:\Hagzy\hagzy_app
+```bash
 flutter pub get
 flutter run
 ```
@@ -54,9 +53,8 @@ Do not distribute a preview build as the production owner app.
 
 ## Connect shared venue and reservation data
 
-The Express/PostgreSQL API is in `C:\src\hagzy-backend`. Configure and start it
-using [its README](../../src/hagzy-backend/README.md), then run Flutter with the
-API URL:
+The Express/PostgreSQL API is in the [hagzy-backend repository](https://github.com/HEXXXXY/hagzy-backend). Configure and start it
+using its README, then run Flutter with the API URL:
 
 ```powershell
 flutter run --dart-define=HAGZY_API_URL=http://localhost:3000
