@@ -1,9 +1,13 @@
-name: Build Hagzy Mobile Apps (iOS & Android)
+name: Build & Release Hagzy Mobile Apps (iOS & Android)
 
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-ios:
@@ -77,3 +81,53 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 14
 
+  publish-release:
+    name: Publish GitHub Release (Downloads)
+    needs: [build-ios, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download iOS IPA Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Hagzy-iPhone-IPA
+          path: ./release-assets
+
+      - name: Download Android APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Hagzy-Android-APK
+          path: ./release-assets
+
+      - name: Prepare Release Assets
+        run: |
+          cd release-assets
+          cp app-release.apk Hagzy.apk || true
+          ls -la
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "Hagzy v1.0.0 · Mobile Apps (iOS & Android)"
+          body: |
+            ## ⚡ Hagzy (حجزي) — Smart Instant Bookings in Egypt
+
+            Official production release builds for iOS and Android.
+
+            ### 📱 Direct Downloads
+            | Platform | File | Size | How to Install |
+            | :--- | :--- | :--- | :--- |
+            | **🍎 iPhone / iPad** | [`Hagzy.ipa`](https://github.com/HEXXXXY/hagzy-app/releases/download/v1.0.0/Hagzy.ipa) | ~7.8 MB | Install in 1 min with [Sideloadly](https://sideloadly.io/) or [AltStore](https://altstore.io/) |
+            | **🤖 Android** | [`Hagzy.apk`](https://github.com/HEXXXXY/hagzy-app/releases/download/v1.0.0/Hagzy.apk) | ~25.5 MB | Direct 1-tap download & install |
+            | **🌐 Web App** | [Open Web App](https://hagzy-api.onrender.com) | — | Instant access in any browser |
+
+            ### ✨ Key Features
+            - 🇪🇬 **Egypt Multi-Vertical**: Padel, Football, Barbershops, and Gaming Lounges across all 27 governorates.
+            - 💳 **Paymob Egypt Sandbox**: Direct test card & mobile wallet checkout.
+            - 🤖 **WhatsApp AI Concierge**: Built-in booking assistant and customer support.
+            - 🌐 **Bilingual (Arabic & English)**: Native RTL layout & Cairo typography.
+          files: |
+            release-assets/Hagzy.ipa
+            release-assets/Hagzy.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
