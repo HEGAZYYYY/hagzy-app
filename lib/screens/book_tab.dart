@@ -60,6 +60,13 @@ class _BookTabState extends State<BookTab> {
   void initState() {
     super.initState();
     _loadCustomerPreferences();
+    if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _autoAssignGpsAreaDirectly(silentIfDenied: true);
+        }
+      });
+    }
     if (widget.initialVenueId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -298,10 +305,12 @@ class _BookTabState extends State<BookTab> {
     }
   }
 
-  Future<void> _autoAssignGpsAreaDirectly() async {
+  Future<void> _autoAssignGpsAreaDirectly({bool silentIfDenied = false}) async {
     if (_isAutoAssigningGps) return;
     if (WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
-      await _assignArea('Cairo', viaGps: true);
+      if (!silentIfDenied) {
+        await _assignArea('Cairo', viaGps: true);
+      }
       return;
     }
     setState(() => _isAutoAssigningGps = true);
@@ -310,15 +319,17 @@ class _BookTabState extends State<BookTab> {
       if (!serviceEnabled) {
         if (mounted) {
           setState(() => _isAutoAssigningGps = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.arabic
-                  ? 'يرجى تفعيل خدمات الموقع (GPS) في جهازك أولاً'
-                  : 'Please enable Location Services (GPS) on your device.'),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          if (!silentIfDenied) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(widget.arabic
+                    ? 'يرجى تفعيل خدمات الموقع (GPS) في جهازك أولاً'
+                    : 'Please enable Location Services (GPS) on your device.'),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
         }
         return;
       }
@@ -328,15 +339,17 @@ class _BookTabState extends State<BookTab> {
         if (permission == LocationPermission.denied) {
           if (mounted) {
             setState(() => _isAutoAssigningGps = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(widget.arabic
-                    ? 'تم رفض إذن الوصول للموقع'
-                    : 'Location permission was denied.'),
-                backgroundColor: Colors.redAccent,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            if (!silentIfDenied) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(widget.arabic
+                      ? 'تم رفض إذن الوصول للموقع'
+                      : 'Location permission was denied.'),
+                  backgroundColor: Colors.redAccent,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
           }
           return;
         }
@@ -344,15 +357,17 @@ class _BookTabState extends State<BookTab> {
       if (permission == LocationPermission.deniedForever) {
         if (mounted) {
           setState(() => _isAutoAssigningGps = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.arabic
-                  ? 'إذن الموقع محظور، يرجى تفعيله من إعدادات الجهاز'
-                  : 'Location permission is permanently denied in settings.'),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          if (!silentIfDenied) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(widget.arabic
+                    ? 'إذن الموقع محظور، يرجى تفعيله من إعدادات الجهاز'
+                    : 'Location permission is permanently denied in settings.'),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
         }
         return;
       }
@@ -372,15 +387,17 @@ class _BookTabState extends State<BookTab> {
     } catch (e) {
       if (mounted) {
         setState(() => _isAutoAssigningGps = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.arabic
-                ? 'تعذر الوصول إلى موقعك الحالي، يرجى المحاولة لاحقاً'
-                : 'Could not detect your current GPS location.'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (!silentIfDenied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(widget.arabic
+                  ? 'تعذر الوصول إلى موقعك الحالي، يرجى المحاولة لاحقاً'
+                  : 'Could not detect your current GPS location.'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -766,7 +783,7 @@ class _BookTabState extends State<BookTab> {
           area: governorateName(_area, widget.arabic),
           arabic: widget.arabic,
           onTap: _chooseArea,
-          onGpsTap: _autoAssignGpsAreaDirectly,
+          onGpsTap: () => _autoAssignGpsAreaDirectly(silentIfDenied: false),
           isLocating: _isAutoAssigningGps,
         ),
         const SizedBox(height: 12),
