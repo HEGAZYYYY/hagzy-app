@@ -394,12 +394,14 @@ class FloatingDock extends StatelessWidget {
         ? const [
             (Icons.explore_rounded, 'Explore'),
             (Icons.calendar_month_rounded, 'My Bookings'),
+            (Icons.person_rounded, 'Profile'),
           ]
         : const [
             (Icons.explore_rounded, 'Explore'),
             (Icons.calendar_month_rounded, 'My Bookings'),
             (Icons.storefront_rounded, 'Manage Venues'),
             (Icons.account_balance_wallet_rounded, 'Payment Settings'),
+            (Icons.person_rounded, 'Profile'),
           ];
     final localizedItems = items
         .map((item) => (
@@ -407,6 +409,7 @@ class FloatingDock extends StatelessWidget {
               switch (item.$2) {
                 'Explore' => localized(arabic, 'Explore', 'استكشف'),
                 'My Bookings' => localized(arabic, 'My Bookings', 'حجوزاتي'),
+                'Profile' => localized(arabic, 'Profile', 'حسابي'),
                 'Manage Venues' =>
                   localized(arabic, 'Manage Venues', 'إدارة الأماكن'),
                 'Payment Settings' =>

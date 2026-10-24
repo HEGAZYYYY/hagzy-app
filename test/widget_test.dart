@@ -765,5 +765,89 @@ void main() {
 
     expect(find.textContaining('Auto-assigned area via GPS'), findsOneWidget);
   });
+
+  testWidgets(
+      'customer can navigate to profile section and sign in with email or phone',
+      (tester) async {
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // 1. Navigate to Profile tab via FloatingDock
+    final profileTab = find.text('Profile');
+    expect(profileTab, findsOneWidget);
+    await tester.tap(profileTab);
+    await tester.pumpAndSettle();
+
+    // Verify Profile section welcome & form
+    expect(find.text('Welcome to Hagzy'), findsOneWidget);
+    expect(find.text('Sign in with Email or Phone'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Phone Number'), findsOneWidget);
+
+    // 2. Sign in with Email
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Full Name (optional)'),
+        'Mohamed Hegazy');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Email Address'),
+        'hegazy@example.com');
+    await tester.tap(find.text('Sign In Now'));
+    await tester.pumpAndSettle();
+
+    // Verify user is now signed in with profile card
+    expect(find.text('Mohamed Hegazy'), findsOneWidget);
+    expect(find.text('hegazy@example.com'), findsWidgets);
+
+    // 3. Sign out
+    await tester.scrollUntilVisible(
+      find.text('Sign Out'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Sign Out'), findsOneWidget);
+    await tester.tap(find.text('Sign Out'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out of Hagzy?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Out'));
+    await tester.pumpAndSettle();
+
+    // 4. Scroll back up and sign in with Phone Number
+    final phoneToggle = find.text('Phone Number');
+    await tester.scrollUntilVisible(
+      phoneToggle,
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(phoneToggle, findsOneWidget);
+    await tester.tap(phoneToggle);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Full Name (optional)'),
+        'Captain Hegazy');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Phone Number'),
+        '01012345678');
+
+    final signInBtn = find.text('Sign In Now');
+    await tester.ensureVisible(signInBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(signInBtn);
+    await tester.pumpAndSettle();
+
+    // Scroll up to view the signed-in profile card
+    final captainName = find.text('Captain Hegazy');
+    await tester.scrollUntilVisible(
+      captainName,
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+
+    expect(captainName, findsOneWidget);
+    expect(find.text('01012345678'), findsWidgets);
+  });
 }
 

@@ -164,6 +164,22 @@ class HagzyApi {
         },
       );
 
+  /// Signs in a customer with an email address or phone number.
+  Future<Map<String, dynamic>> customerSignIn({
+    String? name,
+    String? email,
+    String? phone,
+  }) async =>
+      _send(
+        'POST',
+        '/api/auth/customer-login',
+        body: {
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        },
+      );
+
   /// Creates a FawryPay reference number for a pending booking deposit.
   Future<Map<String, dynamic>> createFawryCheckout(
     String bookingId, {

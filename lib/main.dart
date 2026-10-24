@@ -12,6 +12,7 @@ import 'models/models.dart';
 import 'screens/admin_workspace.dart';
 import 'screens/book_tab.dart';
 import 'screens/my_bookings_tab.dart';
+import 'screens/profile_tab.dart';
 import 'theme/hagzy_theme.dart';
 import 'widgets/common_widgets.dart';
 
@@ -60,6 +61,10 @@ class _HagzyHomeState extends State<HagzyHome> {
   List<Booking> _customerBookings = [];
   String _savedCustomerName = '';
   String _savedCustomerPhone = '';
+  String _savedCustomerEmail = '';
+  bool _customerSignedIn = false;
+  String _currentArea = 'Cairo';
+  double _walletBalance = HagzyWallet.defaultWelcomeBalance;
   bool _working = false;
   String? _loadError;
   String? _apiError;
@@ -116,8 +121,15 @@ class _HagzyHomeState extends State<HagzyHome> {
           final profile = jsonDecode(profileRaw) as Map<String, dynamic>;
           _savedCustomerName = profile['name'] as String? ?? '';
           _savedCustomerPhone = profile['phone'] as String? ?? '';
+          _savedCustomerEmail = profile['email'] as String? ?? '';
+          _customerSignedIn = profile['isSignedIn'] as bool? ??
+              (_savedCustomerPhone.isNotEmpty ||
+                  _savedCustomerEmail.isNotEmpty);
         } catch (_) {}
       }
+      _currentArea = prefs.getString('hagzy_customer_area') ?? 'Cairo';
+      _walletBalance = prefs.getDouble(HagzyWallet.keyWallet) ??
+          HagzyWallet.defaultWelcomeBalance;
       final raw = prefs.getString(kStorageKey);
       if (raw != null) {
         final data = jsonDecode(raw) as Map<String, dynamic>;
@@ -1769,16 +1781,12 @@ class _HagzyHomeState extends State<HagzyHome> {
     if (!walkIn) {
       _savedCustomerName = booking.customer;
       _savedCustomerPhone = booking.phone;
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-          kCustomerProfileStorageKey,
-          jsonEncode({
-            'name': _savedCustomerName,
-            'phone': _savedCustomerPhone,
-          }),
-        );
-      } catch (_) {}
+      await _saveCustomerProfile(
+        name: _savedCustomerName,
+        email: _savedCustomerEmail,
+        phone: _savedCustomerPhone,
+        isSignedIn: _customerSignedIn || _savedCustomerPhone.isNotEmpty,
+      );
     }
     var savedBooking = booking;
     var dueNow = booking.dueNow ?? booking.price;
@@ -3252,6 +3260,63 @@ class _HagzyHomeState extends State<HagzyHome> {
     });
   }
 
+  Future<void> _saveCustomerProfile({
+    required String name,
+    required String email,
+    required String phone,
+    bool isSignedIn = true,
+  }) async {
+    setState(() {
+      _savedCustomerName = name;
+      _savedCustomerEmail = email;
+      _savedCustomerPhone = phone;
+      _customerSignedIn = isSignedIn;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCustomerProfileStorageKey,
+        jsonEncode({
+          'name': _savedCustomerName,
+          'email': _savedCustomerEmail,
+          'phone': _savedCustomerPhone,
+          'isSignedIn': _customerSignedIn,
+        }),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _handleCustomerSignIn({
+    required String name,
+    required String email,
+    required String phone,
+  }) async {
+    if (_api.isConfigured) {
+      try {
+        await _api.customerSignIn(name: name, email: email, phone: phone);
+      } catch (_) {}
+    }
+    await _saveCustomerProfile(
+      name: name,
+      email: email,
+      phone: phone,
+      isSignedIn: true,
+    );
+  }
+
+  Future<void> _handleCustomerSignOut() async {
+    setState(() {
+      _savedCustomerName = '';
+      _savedCustomerEmail = '';
+      _savedCustomerPhone = '';
+      _customerSignedIn = false;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(kCustomerProfileStorageKey);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadError != null) {
@@ -3269,12 +3334,13 @@ class _HagzyHomeState extends State<HagzyHome> {
     final isCustomer = _mode == 'customer';
     final isPreview = _mode == 'adminPreview';
     final titles = isCustomer
-        ? const ['', '']
+        ? const ['', '', 'Profile']
         : const [
             '',
             '',
             'Manage Venues',
-            'Payment Settings'
+            'Payment Settings',
+            'Profile',
           ];
     final venueLabel = _venues.length == 1 ? 'venue' : 'venues';
     final bookingCount =
@@ -3282,7 +3348,9 @@ class _HagzyHomeState extends State<HagzyHome> {
     final bookingLabel = bookingCount == 1 ? 'booking' : 'bookings';
     final arabic = _language == 'AR';
     final appTitles = arabic
-        ? const ['', '', 'إدارة الأماكن', 'إعدادات الدفع']
+        ? (isCustomer
+            ? const ['', '', 'حسابي']
+            : const ['', '', 'إدارة الأماكن', 'إعدادات الدفع', 'حسابي'])
         : titles;
     final mainApp = Localizations.override(
       context: context,
@@ -3320,7 +3388,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                               color: kInk,
                             ),
                           ),
-                          if (!isCustomer && appTitles[_tab].isNotEmpty)
+                          if (!isCustomer &&
+                              _tab < appTitles.length &&
+                              appTitles[_tab].isNotEmpty)
                             Text(
                               appTitles[_tab],
                               style: const TextStyle(
@@ -3368,6 +3438,39 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ],
                           ),
                         ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: localized(
+                          arabic,
+                          _customerSignedIn ? 'My Profile' : 'Sign In',
+                          _customerSignedIn ? 'الملف الشخصي' : 'تسجيل الدخول',
+                        ),
+                        onPressed: () =>
+                            setState(() => _tab = isCustomer ? 2 : 4),
+                        style: IconButton.styleFrom(
+                          backgroundColor: _tab == (isCustomer ? 2 : 4)
+                              ? kGreen
+                              : kSurfaceTint,
+                          foregroundColor: _tab == (isCustomer ? 2 : 4)
+                              ? Colors.white
+                              : kInk,
+                        ),
+                        icon: _customerSignedIn && _savedCustomerName.isNotEmpty
+                            ? Text(
+                                _savedCustomerName
+                                    .trim()
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  color: _tab == (isCustomer ? 2 : 4)
+                                      ? Colors.white
+                                      : kGreen,
+                                ),
+                              )
+                            : const Icon(Icons.person_rounded, size: 20),
+                      ),
                       const SizedBox(width: 10),
                       if (!isCustomer && MediaQuery.sizeOf(context).width >= 840)
                         Container(
@@ -3462,8 +3565,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                               child: KeyedSubtree(
                                 key: ValueKey<int>(_tab),
                                 child: isCustomer
-                                    ? (_tab == 0
-                                        ? BookTab(
+                                    ? switch (_tab) {
+                                        0 => BookTab(
                                             venues: _venues,
                                             bookings: _bookings,
                                             arabic: arabic,
@@ -3475,8 +3578,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               initialStart: startsAt,
                                             ),
                                             onAddReview: _addReview,
-                                          )
-                                        : MyBookingsTab(
+                                          ),
+                                        1 => MyBookingsTab(
                                             venues: _venues,
                                             bookings: _bookings,
                                             arabic: arabic,
@@ -3492,7 +3595,28 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             }),
                                             api: _api,
                                             apiConfigured: _api.isConfigured,
-                                          ))
+                                          ),
+                                        _ => CustomerProfileTab(
+                                            arabic: arabic,
+                                            customerName: _savedCustomerName,
+                                            customerEmail: _savedCustomerEmail,
+                                            customerPhone: _savedCustomerPhone,
+                                            isSignedIn: _customerSignedIn,
+                                            bookingCount: _customerBookings.length,
+                                            walletBalance: _walletBalance,
+                                            currentArea: _currentArea,
+                                            api: _api,
+                                            apiConfigured: _api.isConfigured,
+                                            onSignIn: _handleCustomerSignIn,
+                                            onSignOut: _handleCustomerSignOut,
+                                            onUpdateProfile: _handleCustomerSignIn,
+                                            onChangeLanguage: () =>
+                                                _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
+                                            onViewBookings: () => setState(() => _tab = 1),
+                                            onSelectArea: () => setState(() => _tab = 0),
+                                            onAutoAssignGps: () => setState(() => _tab = 0),
+                                          ),
+                                      }
                                     : switch (_tab) {
                                         0 => BookTab(
                                             venues: _venues,
@@ -3555,9 +3679,29 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onCancel: _cancelBooking,
                                             onConfirm: _confirmBooking,
                                           ),
-                                        _ => PaymentTab(
+                                        3 => PaymentTab(
                                             apiConfigured: _api.isConfigured,
                                             localPreview: isPreview,
+                                          ),
+                                        _ => CustomerProfileTab(
+                                            arabic: arabic,
+                                            customerName: _savedCustomerName,
+                                            customerEmail: _savedCustomerEmail,
+                                            customerPhone: _savedCustomerPhone,
+                                            isSignedIn: _customerSignedIn,
+                                            bookingCount: _customerBookings.length,
+                                            walletBalance: _walletBalance,
+                                            currentArea: _currentArea,
+                                            api: _api,
+                                            apiConfigured: _api.isConfigured,
+                                            onSignIn: _handleCustomerSignIn,
+                                            onSignOut: _handleCustomerSignOut,
+                                            onUpdateProfile: _handleCustomerSignIn,
+                                            onChangeLanguage: () =>
+                                                _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
+                                            onViewBookings: () => setState(() => _tab = 1),
+                                            onSelectArea: () => setState(() => _tab = 0),
+                                            onAutoAssignGps: () => setState(() => _tab = 0),
                                           ),
                                       },
                               ),
