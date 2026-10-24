@@ -1010,5 +1010,63 @@ void main() {
     // Now Cairo Sports Hub appears
     expect(find.text('Cairo Sports Hub'), findsOneWidget);
   });
+
+  testWidgets('customer can remove items from Book Again carousel and undo', (tester) async {
+    final v1 = Venue(
+      id: 'venue-ba-1',
+      name: 'Kafr Padel Club',
+      location: 'Kafr El Sheikh',
+      type: VenueType.sports,
+      depositPercent: 25,
+      items: [
+        VenueItem(id: 'i1', name: 'Court 1', kind: 'Padel court', hourlyRate: 300),
+      ],
+    );
+    final b1 = Booking(
+      id: 'b-ba-1',
+      venueId: v1.id,
+      itemId: 'i1',
+      customer: 'Captain Hegazy',
+      startsAt: DateTime.now().add(const Duration(days: 1)),
+      durationMinutes: 60,
+      price: 300,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+    );
+
+    SharedPreferences.setMockInitialValues({
+      'hagzy_app_data_v1': jsonEncode({
+        'venues': [v1.toJson()],
+        'bookings': [b1.toJson()],
+      }),
+      'hagzy_customer_area': 'Kafr El Sheikh',
+    });
+
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // Verify Book Again is shown
+    expect(find.text('Book Again'), findsOneWidget);
+    expect(find.text('Kafr Padel Club'), findsWidgets);
+
+    // Verify the remove button tooltip is present
+    final removeFinder = find.byTooltip('Remove from Book Again');
+    expect(removeFinder, findsOneWidget);
+
+    // Tap remove
+    await tester.tap(removeFinder);
+    await tester.pumpAndSettle();
+
+    // Verify Book Again section is now hidden since all venues are dismissed
+    expect(find.text('Book Again'), findsNothing);
+    expect(find.textContaining('Removed "Kafr Padel Club" from Book Again'), findsOneWidget);
+
+    // Tap Undo
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+
+    // Verify Book Again is restored
+    expect(find.text('Book Again'), findsOneWidget);
+  });
 }
 

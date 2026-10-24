@@ -41,6 +41,7 @@ class _BookTabState extends State<BookTab> {
   String _query = '';
   String _area = kAllEgyptAreas;
   Set<String> _favoriteIds = {};
+  Set<String> _dismissedBookAgainVenueIds = {};
   bool _favoritesOnly = false;
   bool _sortByPrice = false;
   bool _showMapView = false;
@@ -214,6 +215,10 @@ class _BookTabState extends State<BookTab> {
           (prefs.getStringList(kFavoriteStorageKey) ?? const <String>[])
               .toSet();
       _area = prefs.getString('hagzy_customer_area') ?? kAllEgyptAreas;
+      _dismissedBookAgainVenueIds =
+          (prefs.getStringList('hagzy_dismissed_book_again_venues') ??
+                  const <String>[])
+              .toSet();
     });
   }
 
@@ -231,6 +236,91 @@ class _BookTabState extends State<BookTab> {
     } catch (error) {
       _showPreferenceError(error);
     }
+  }
+
+  Future<void> _removeBookAgainVenue(Venue venue) async {
+    final next = {..._dismissedBookAgainVenueIds, venue.id};
+    setState(() => _dismissedBookAgainVenueIds = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        'hagzy_dismissed_book_again_venues',
+        next.toList(),
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          localized(
+            widget.arabic,
+            'Removed "${venue.name}" from Book Again',
+            'تمت إزالة "${venue.name}" من احجز مرة أخرى',
+          ),
+        ),
+        action: SnackBarAction(
+          label: localized(widget.arabic, 'Undo', 'تراجع'),
+          onPressed: () => _restoreBookAgainVenue(venue.id),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _restoreBookAgainVenue(String venueId) async {
+    final next = {..._dismissedBookAgainVenueIds}..remove(venueId);
+    setState(() => _dismissedBookAgainVenueIds = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        'hagzy_dismissed_book_again_venues',
+        next.toList(),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _clearAllBookAgainVenues(List<Venue> venues) async {
+    final idsToRemove = venues.map((v) => v.id).toSet();
+    final next = {..._dismissedBookAgainVenueIds, ...idsToRemove};
+    setState(() => _dismissedBookAgainVenueIds = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        'hagzy_dismissed_book_again_venues',
+        next.toList(),
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          localized(
+            widget.arabic,
+            'Cleared all spots from Book Again',
+            'تم مسح كل الأماكن من احجز مرة أخرى',
+          ),
+        ),
+        action: SnackBarAction(
+          label: localized(widget.arabic, 'Undo', 'تراجع'),
+          onPressed: () {
+            final restored = {..._dismissedBookAgainVenueIds}
+              ..removeAll(idsToRemove);
+            setState(() => _dismissedBookAgainVenueIds = restored);
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.setStringList(
+                'hagzy_dismissed_book_again_venues',
+                restored.toList(),
+              );
+            });
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _openVenueDetails(Venue venue) async {
@@ -772,6 +862,11 @@ class _BookTabState extends State<BookTab> {
   @override
   Widget build(BuildContext context) {
     final matchingVenues = _getMatchingVenues();
+    final bookAgainVenues = widget.venues
+        .where((v) =>
+            !_dismissedBookAgainVenueIds.contains(v.id) &&
+            widget.bookings.any((b) => b.venueId == v.id && !b.cancelled))
+        .toList();
     final venue =
         matchingVenues.where((value) => value.id == _venueId).firstOrNull;
     final item =
@@ -833,28 +928,38 @@ class _BookTabState extends State<BookTab> {
             arabic: widget.arabic,
           ),
         ),
-        if (widget.venues.any((v) => widget.bookings.any((b) => b.venueId == v.id && !b.cancelled))) ...[
+        if (bookAgainVenues.isNotEmpty) ...[
           const SizedBox(height: 20),
           SectionHeading(
             title: localized(widget.arabic, 'Book Again', 'احجز مرة أخرى'),
             subtitle: localized(widget.arabic,
                 'Your favorite regular spots', 'أماكنك المعتادة بضغطة واحدة'),
+            trailing: bookAgainVenues.length > 1
+                ? TextButton(
+                    onPressed: () => _clearAllBookAgainVenues(bookAgainVenues),
+                    style: TextButton.styleFrom(
+                      foregroundColor: kMuted,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                    ),
+                    child: Text(
+                      localized(widget.arabic, 'Clear All', 'مسح الكل'),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(height: 10),
           SizedBox(
             height: 98,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: widget.venues
-                  .where((v) => widget.bookings
-                      .any((b) => b.venueId == v.id && !b.cancelled))
-                  .length,
+              itemCount: bookAgainVenues.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
-                final v = widget.venues
-                    .where((v) => widget.bookings
-                        .any((b) => b.venueId == v.id && !b.cancelled))
-                    .toList()[index];
+                final v = bookAgainVenues[index];
                 final isCurrent = _venueId == v.id;
                 return PressableScale(
                   scaleDown: 0.96,
@@ -870,76 +975,114 @@ class _BookTabState extends State<BookTab> {
                       ),
                       boxShadow: HagzyTheme.softShadow,
                     ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(18),
-                      onTap: () => _selectVenue(v, toggleIfSame: false),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                gradient: HagzyTheme.brandGradient,
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                              child:
-                                  Icon(v.type.icon, color: Colors.white, size: 21),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    v.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 13.5,
-                                      color: kInk,
-                                    ),
+                    child: Stack(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => _selectVenue(v, toggleIfSame: false),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: HagzyTheme.brandGradient,
+                                    borderRadius: BorderRadius.circular(13),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    v.location.isEmpty
-                                        ? localized(widget.arabic, 'Egypt', 'مصر')
-                                        : v.location,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: kMuted,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
+                                  child: Icon(v.type.icon,
+                                      color: Colors.white, size: 21),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
                                     children: [
-                                      const Icon(Icons.bolt_rounded,
-                                          size: 13, color: kGreen),
-                                      const SizedBox(width: 2),
                                       Text(
-                                        localized(
-                                            widget.arabic, 'Book Now', 'احجز الآن'),
+                                        v.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
-                                          color: kGreen,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 13.5,
+                                          color: kInk,
                                         ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        v.location.isEmpty
+                                            ? localized(
+                                                widget.arabic, 'Egypt', 'مصر')
+                                            : v.location,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: kMuted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.bolt_rounded,
+                                              size: 13, color: kGreen),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            localized(widget.arabic, 'Book Now',
+                                                'احجز الآن'),
+                                            style: const TextStyle(
+                                              color: kGreen,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned.directional(
+                          textDirection: widget.arabic
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          top: 6,
+                          end: 6,
+                          child: Tooltip(
+                            message: localized(
+                              widget.arabic,
+                              'Remove from Book Again',
+                              'إزالة من احجز مرة أخرى',
+                            ),
+                            child: InkWell(
+                              onTap: () => _removeBookAgainVenue(v),
+                              borderRadius: BorderRadius.circular(999),
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: kInk.withValues(alpha: 0.06),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  size: 13,
+                                  color: kMuted,
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 );
