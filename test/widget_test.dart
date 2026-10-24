@@ -341,6 +341,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -150));
+    await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Add New Venue'));
     await tester.pumpAndSettle();
     expect(find.text('Add a venue'), findsOneWidget);
@@ -881,6 +883,82 @@ void main() {
 
     expect(captainName, findsOneWidget);
     expect(find.text('01012345678'), findsWidgets);
+  });
+
+  test('subcategories taxonomy and detection for grooming, sports, and entertainment', () {
+    expect(kAllSubCategories.map((s) => s.id), containsAll([
+      'barbers',
+      'salons',
+      'padel',
+      'soccer',
+      'playstation',
+      'billiards',
+      'table_tennis',
+      'escape_rooms',
+    ]));
+
+    // Auto-detection test on prototype venues
+    final nader = naderSalonSample();
+    expect(nader.effectiveSubCategories, contains('barbers'));
+
+    final sportsVenue = Venue(
+      id: 'test-soccer',
+      name: 'Champions Turf',
+      location: 'Cairo',
+      type: VenueType.sports,
+      items: [
+        VenueItem(id: 'pitch-1', name: 'AstroTurf 5-a-side Football Pitch', kind: 'Soccer pitch', hourlyRate: 300),
+      ],
+    );
+    expect(sportsVenue.effectiveSubCategories, contains('soccer'));
+
+    final loungeVenue = Venue(
+      id: 'test-escape',
+      name: 'Mystery Escape Rooms',
+      location: 'Cairo',
+      type: VenueType.lounge,
+      items: [
+        VenueItem(id: 'escape-1', name: "Pharaoh's Tomb Escape Room", kind: 'Escape room', hourlyRate: 250),
+      ],
+    );
+    expect(loungeVenue.effectiveSubCategories, contains('escape_rooms'));
+  });
+
+  testWidgets('customer can filter by subcategory pills with active banner and clear', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'hagzy_app_data_v1': jsonEncode({
+        'venues': defaultPrototypeVenues().map((v) => v.toJson()).toList(),
+        'bookings': [],
+      }),
+    });
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    final barberFinder = find.text('Barbers');
+    await tester.scrollUntilVisible(
+      barberFinder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // Verify subcategory pill appears
+    expect(barberFinder, findsWidgets);
+
+    // Tap Barbers subcategory pill
+    await tester.tap(barberFinder.first);
+    await tester.pumpAndSettle();
+
+    // Verify active filter banner appears with places count and clear option
+    expect(find.textContaining('Barbers:'), findsOneWidget);
+    expect(find.text('Clear'), findsOneWidget);
+
+    // Clear filter
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+
+    // Verify active filter banner is cleared
+    expect(find.textContaining('Barbers:'), findsNothing);
   });
 }
 

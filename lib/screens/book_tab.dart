@@ -35,6 +35,7 @@ class BookTab extends StatefulWidget {
 
 class _BookTabState extends State<BookTab> {
   VenueType? _type;
+  String? _subCategory;
   String? _venueId;
   String? _itemId;
   String _query = '';
@@ -746,14 +747,20 @@ class _BookTabState extends State<BookTab> {
   List<Venue> _getMatchingVenues() {
     final list = upsertNaderSalon(widget.venues).where((venue) {
       final matchesCategory = _type == null || venue.type == _type;
+      final matchesSubCategory = _subCategory == null ||
+          venue.effectiveSubCategories.contains(_subCategory);
       final matchesSearch =
-          '${venue.name} ${venue.location} ${venue.description}'
+          '${venue.name} ${venue.location} ${venue.description} ${venue.effectiveSubCategories.join(' ')}'
               .toLowerCase()
               .contains(_query.toLowerCase());
       final matchesFavorite =
           !_favoritesOnly || _favoriteIds.contains(venue.id);
       final matchesArea = _locationMatchesArea(venue.location);
-      return matchesCategory && matchesSearch && matchesFavorite && matchesArea;
+      return matchesCategory &&
+          matchesSubCategory &&
+          matchesSearch &&
+          matchesFavorite &&
+          matchesArea;
     }).toList()
       ..sort((a, b) {
         if (!_sortByPrice) return a.name.compareTo(b.name);
@@ -1010,6 +1017,8 @@ class _BookTabState extends State<BookTab> {
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        _buildSubCategoryFilterRow(matchingVenues),
         const SizedBox(height: 18),
         Row(
           children: [
@@ -1212,6 +1221,9 @@ class _BookTabState extends State<BookTab> {
         ),
     };
 
+    final activeSubDef =
+        _subCategory != null ? findSubCategoryDef(_subCategory!) : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1225,13 +1237,56 @@ class _BookTabState extends State<BookTab> {
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ),
+                if (activeSubDef != null) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '›',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: color.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(activeSubDef.emoji,
+                            style: const TextStyle(fontSize: 11)),
+                        const SizedBox(width: 4),
+                        Text(
+                          activeSubDef.title(widget.arabic),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           InkWell(
@@ -1252,6 +1307,149 @@ class _BookTabState extends State<BookTab> {
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.close_rounded, size: 14, color: color),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubCategoryFilterRow(List<Venue> matchingVenues) {
+    final subList = subCategoriesForParent(_type);
+    final allVenuesInArea = upsertNaderSalon(widget.venues)
+        .where((v) =>
+            (_type == null || v.type == _type) &&
+            _locationMatchesArea(v.location))
+        .toList();
+
+    final allLabel = switch (_type) {
+      VenueType.salon =>
+        localized(widget.arabic, 'All Grooming', 'كل الحلاقة والعناية'),
+      VenueType.sports =>
+        localized(widget.arabic, 'All Sports', 'كل الملاعب والرياضة'),
+      VenueType.lounge =>
+        localized(widget.arabic, 'All Entertainment', 'كل الترفيه والألعاب'),
+      null => localized(widget.arabic, 'All', 'الكل'),
+    };
+
+    final defaultAccent = switch (_type) {
+      VenueType.salon => const Color(0xFF6366F1),
+      VenueType.lounge => const Color(0xFF8B5CF6),
+      VenueType.sports => kGreen,
+      null => kGreen,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            children: [
+              _SubCategoryVisualPill(
+                label: allLabel,
+                emoji: '✨',
+                icon: Icons.auto_awesome_rounded,
+                isSelected: _subCategory == null,
+                count: allVenuesInArea.length,
+                arabic: widget.arabic,
+                accentColor: defaultAccent,
+                onTap: () => _selectSubCategory(null),
+              ),
+              const SizedBox(width: 8),
+              ...subList.map((s) {
+                final count = allVenuesInArea
+                    .where((v) => v.effectiveSubCategories.contains(s.id))
+                    .length;
+                final isSelected = _subCategory == s.id;
+                final accentColor = switch (s.parentType) {
+                  VenueType.salon => const Color(0xFF6366F1),
+                  VenueType.lounge => const Color(0xFF8B5CF6),
+                  VenueType.sports => kGreen,
+                };
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _SubCategoryVisualPill(
+                    label: s.title(widget.arabic),
+                    emoji: s.emoji,
+                    icon: s.icon,
+                    isSelected: isSelected,
+                    count: count,
+                    arabic: widget.arabic,
+                    accentColor: accentColor,
+                    onTap: () => _selectSubCategory(s.id),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        if (_subCategory != null) ...[
+          const SizedBox(height: 10),
+          _buildActiveSubCategoryBanner(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildActiveSubCategoryBanner() {
+    final def = findSubCategoryDef(_subCategory!);
+    if (def == null) return const SizedBox.shrink();
+
+    final accentColor = switch (def.parentType) {
+      VenueType.salon => const Color(0xFF6366F1),
+      VenueType.lounge => const Color(0xFF8B5CF6),
+      VenueType.sports => kGreen,
+    };
+
+    final matchingCount = _getMatchingVenues().length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.28),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(def.emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${def.title(widget.arabic)}: ${localized(widget.arabic, '$matchingCount ${matchingCount == 1 ? 'place' : 'places'} available', '$matchingCount ${matchingCount == 1 ? 'مكان متاح' : 'أماكن متاحة'}')}',
+              style: TextStyle(
+                color: accentColor,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () => _selectSubCategory(null),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    localized(widget.arabic, 'Clear', 'إلغاء الفلتر'),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: accentColor,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Icon(Icons.close_rounded, size: 14, color: accentColor),
                 ],
               ),
             ),
@@ -1849,6 +2047,26 @@ class _BookTabState extends State<BookTab> {
   void _selectCategory(VenueType? type) {
     setState(() {
       _type = type;
+      _subCategory = null;
+      _venueId = null;
+      _itemId = null;
+      _selectedStart = null;
+    });
+  }
+
+  void _selectSubCategory(String? subId) {
+    setState(() {
+      if (_subCategory == subId) {
+        _subCategory = null;
+      } else {
+        _subCategory = subId;
+        if (subId != null) {
+          final def = findSubCategoryDef(subId);
+          if (def != null && _type != null && _type != def.parentType) {
+            _type = def.parentType;
+          }
+        }
+      }
       _venueId = null;
       _itemId = null;
       _selectedStart = null;
@@ -3157,6 +3375,45 @@ class VenueBrowseCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (venue.effectiveSubCategories.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: venue.effectiveSubCategories.map((subId) {
+                            final def = findSubCategoryDef(subId);
+                            if (def == null) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: _accent.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _accent.withValues(alpha: 0.22),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(def.emoji,
+                                      style: const TextStyle(fontSize: 11)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    def.title(arabic),
+                                    style: TextStyle(
+                                      color: _accent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                       if (venue.amenities.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Wrap(
@@ -3920,4 +4177,98 @@ class _CategorySectionHeader extends StatelessWidget {
     );
   }
 }
+
+class _SubCategoryVisualPill extends StatelessWidget {
+  const _SubCategoryVisualPill({
+    required this.label,
+    required this.emoji,
+    required this.icon,
+    required this.isSelected,
+    required this.count,
+    required this.arabic,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final String emoji;
+  final IconData icon;
+  final bool isSelected;
+  final int count;
+  final bool arabic;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      scaleDown: 0.94,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? accentColor : kPanel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? accentColor
+                : (count > 0 ? kBorder : kBorder.withValues(alpha: 0.5)),
+            width: isSelected ? 1.5 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.32),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : HagzyTheme.softShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              emoji,
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                color: isSelected ? Colors.white : kInk,
+                letterSpacing: -0.1,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.24)
+                      : accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: isSelected ? Colors.white : accentColor,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
