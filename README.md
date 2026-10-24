@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HEXXXXY/hagzy-app/releases/latest"><img src="https://img.shields.io/badge/Release-v1.0.0-059669?style=for-the-badge&logo=github" alt="Latest Release" /></a>
+  <a href="https://github.com/HEGAZYYYY/hagzy-app/releases/tag/v1.0.0"><img src="https://img.shields.io/badge/Release-v1.0.0-059669?style=for-the-badge&logo=github" alt="Latest Release" /></a>
   <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter" alt="Flutter" /></a>
-  <a href="https://github.com/HEXXXXY/hagzy-app/releases/latest"><img src="https://img.shields.io/badge/iOS-IPA%20Available-000000?style=for-the-badge&logo=apple" alt="iOS IPA" /></a>
-  <a href="https://github.com/HEXXXXY/hagzy-app/releases/latest"><img src="https://img.shields.io/badge/Android-APK%20Available-3DDC84?style=for-the-badge&logo=android" alt="Android APK" /></a>
+  <a href="https://github.com/HEGAZYYYY/hagzy-app/releases/download/v1.0.0/Hagzy.ipa"><img src="https://img.shields.io/badge/iOS-IPA%20Download-000000?style=for-the-badge&logo=apple" alt="iOS IPA" /></a>
+  <a href="https://github.com/HEGAZYYYY/hagzy-app/releases/download/v1.0.0/Hagzy.apk"><img src="https://img.shields.io/badge/Android-APK%20Download-3DDC84?style=for-the-badge&logo=android" alt="Android APK" /></a>
   <a href="https://hagzy-api.onrender.com"><img src="https://img.shields.io/badge/Web-Live%20App-059669?style=for-the-badge&logo=googlechrome" alt="Web App" /></a>
 </p>
 
@@ -35,23 +35,23 @@ Finding and booking football pitches, padel courts, barbershops, or private gami
 
 ## 📱 Download & Install
 
-Download the pre-compiled, production-ready apps directly:
+Download the verified production-ready mobile apps directly:
 
 | Platform | Download Link | File Size | Recommended Installation |
 | :--- | :--- | :--- | :--- |
-| **🍎 iPhone / iPad** | [**Download `Hagzy.ipa`**](https://github.com/HEXXXXY/hagzy-app/releases/download/v1.0.0/Hagzy.ipa) | `~7.8 MB` | **1-minute install** using [Sideloadly](https://sideloadly.io/) or [AltStore](https://altstore.io/) (No jailbreak needed) |
-| **🤖 Android** | [**Download `Hagzy.apk`**](https://github.com/HEXXXXY/hagzy-app/releases/download/v1.0.0/Hagzy.apk) | `~25.5 MB` | **Direct 1-tap install** on any Android device |
+| **🍎 iPhone / iPad** | [**Download `Hagzy.ipa`**](https://github.com/HEGAZYYYY/hagzy-app/releases/download/v1.0.0/Hagzy.ipa) | `~7.8 MB` | **1-minute install** using [Sideloadly](https://sideloadly.io/) or [AltStore](https://altstore.io/) (No jailbreak needed) |
+| **🤖 Android** | [**Download `Hagzy.apk`**](https://github.com/HEGAZYYYY/hagzy-app/releases/download/v1.0.0/Hagzy.apk) | `~55 MB` | **Direct 1-tap install** on any Android device |
 | **🌐 Web Application** | [**Launch Web Client**](https://hagzy-api.onrender.com) | — | Instant access in any mobile or desktop web browser |
 
 > [!TIP]
-> All build artifacts and previous versions are also archived under [**GitHub Releases**](https://github.com/HEXXXXY/hagzy-app/releases) and [**GitHub Actions**](https://github.com/HEXXXXY/hagzy-app/actions).
+> All build artifacts, releases, and previous versions are also viewable under [**GitHub Releases**](https://github.com/HEGAZYYYY/hagzy-app/releases) and [**GitHub Actions**](https://github.com/HEGAZYYYY/hagzy-app/actions).
 
 ### 🍎 How to Install on iPhone (iOS)
 
 1. **Via Sideloadly (Easiest on Windows & Mac — 1 minute)**:
    - Download free [Sideloadly](https://sideloadly.io/).
    - Connect your iPhone to your PC with a USB cable.
-   - Drag & drop [`Hagzy.ipa`](https://github.com/HEXXXXY/hagzy-app/releases/download/v1.0.0/Hagzy.ipa) into Sideloadly.
+   - Drag & drop [`Hagzy.ipa`](https://github.com/HEGAZYYYY/hagzy-app/releases/download/v1.0.0/Hagzy.ipa) into Sideloadly.
    - Enter your Apple ID and click **Start**.
    - On your iPhone, go to **Settings → General → VPN & Device Management**, tap your Apple ID and tap **Trust**.
    - The Hagzy app is ready on your home screen!
@@ -99,7 +99,7 @@ Download the pre-compiled, production-ready apps directly:
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/HEXXXXY/hagzy-app.git
+git clone https://github.com/HEGAZYYYY/hagzy-app.git
 cd hagzy-app
 flutter pub get
 ```
@@ -119,7 +119,7 @@ flutter run --dart-define=HAGZY_ADMIN_APP=true
 ```
 
 ### 4. Connect to Backend API
-To sync reservations with the [Hagzy Backend API](https://github.com/HEXXXXY/hagzy-backend):
+To sync reservations with the [Hagzy Backend API](https://github.com/HEGAZYYYY/hagzy-backend):
 ```bash
 flutter run --dart-define=HAGZY_API_URL=http://localhost:3000
 ```
@@ -142,8 +142,8 @@ flutter analyze
 
 ## 🤝 Repositories & Architecture
 
-* **Flutter Mobile & Web Client**: [HEXXXXY/hagzy-app](https://github.com/HEXXXXY/hagzy-app)
-* **Backend API & PostgreSQL Store**: [HEXXXXY/hagzy-backend](https://github.com/HEXXXXY/hagzy-backend)
+* **Flutter Mobile & Web Client**: [HEGAZYYYY/hagzy-app](https://github.com/HEGAZYYYY/hagzy-app)
+* **Backend API & PostgreSQL Store**: [HEGAZYYYY/hagzy-backend](https://github.com/HEGAZYYYY/hagzy-backend)
 
 ---
 
