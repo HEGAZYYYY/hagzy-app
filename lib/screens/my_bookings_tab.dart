@@ -36,26 +36,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   bool _lookingUp = false;
   String? _lookupError;
 
-  Future<void> _shareOnWhatsApp(
-      Booking booking, Venue? venue, VenueItem? space) async {
-    final venueName = venue?.name ?? 'Hagzy Venue';
-    final itemName = space?.name ?? '';
-    final dateStr = formatDateTime(booking.startsAt);
-    final mapsLink = venue?.googleMapsUrl.isNotEmpty == true
-        ? venue!.googleMapsUrl
-        : 'https://maps.google.com/?q=${Uri.encodeComponent(venueName)}';
-    final staffInfo = booking.staffMember.isNotEmpty
-        ? '\n${widget.arabic ? "المصفف" : "Specialist"}: ${booking.staffMember}'
-        : '';
-    final text = widget.arabic
-        ? '🎾 حجزنا في حجزي (Hagzy)!\nالمكان: $venueName ${itemName.isNotEmpty ? "($itemName)" : ""}$staffInfo\nالميعاد: $dateStr\nالاتجاهات: $mapsLink\nرقم الحجز: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length)}\nيلا جهزوا نفسكم! 🔥'
-        : '🎾 Our Hagzy Booking!\nVenue: $venueName ${itemName.isNotEmpty ? "($itemName)" : ""}$staffInfo\nTime: $dateStr\nDirections: $mapsLink\nBooking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length)}\nSee you all there! 🔥';
-    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   Future<void> _topUpWalletDialog(double currentBalance) async {
     final arabic = widget.arabic;
     double amount = 100.0;
@@ -811,22 +791,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               label: Text(
                                 localized(arabic, 'QR Check-In Pass',
                                     'بطاقة الدخول QR'),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: () =>
-                                  _shareOnWhatsApp(booking, venue, space),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                              icon: const Icon(Icons.share_rounded,
-                                  size: 16, color: Color(0xFF25D366)),
-                              label: Text(
-                                localized(
-                                    arabic, 'Share on WhatsApp', 'دعوة واتساب'),
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
