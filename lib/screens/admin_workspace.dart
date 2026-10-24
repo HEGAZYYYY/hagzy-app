@@ -18,6 +18,7 @@ class AdminManageWorkspace extends StatefulWidget {
     required this.onDelete,
     required this.onRemoveItem,
     required this.onWalkIn,
+    this.onBlockSlot,
     required this.onCancel,
     required this.onConfirm,
   });
@@ -32,6 +33,7 @@ class AdminManageWorkspace extends StatefulWidget {
   final ValueChanged<Venue> onDelete;
   final void Function(Venue venue, VenueItem item) onRemoveItem;
   final void Function(Venue venue, VenueItem item) onWalkIn;
+  final void Function(Venue venue, VenueItem item, DateTime start, int duration, String reason)? onBlockSlot;
   final ValueChanged<Booking> onCancel;
   final ValueChanged<Booking> onConfirm;
 
@@ -93,6 +95,7 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                 venues: widget.venues,
                 bookings: widget.bookings,
                 onWalkIn: widget.onWalkIn,
+                onBlockSlot: widget.onBlockSlot,
                 onCancel: widget.onCancel,
                 onConfirm: widget.onConfirm,
               ),
@@ -287,6 +290,7 @@ class PosTab extends StatefulWidget {
     required this.venues,
     required this.bookings,
     required this.onWalkIn,
+    this.onBlockSlot,
     required this.onCancel,
     required this.onConfirm,
   });
@@ -294,6 +298,7 @@ class PosTab extends StatefulWidget {
   final List<Venue> venues;
   final List<Booking> bookings;
   final void Function(Venue venue, VenueItem item) onWalkIn;
+  final void Function(Venue venue, VenueItem item, DateTime start, int duration, String reason)? onBlockSlot;
   final ValueChanged<Booking> onCancel;
   final ValueChanged<Booking> onConfirm;
 
@@ -313,6 +318,130 @@ class _PosTabState extends State<PosTab> {
           'Hello ${booking.customer}, regarding your Hagzy reservation on ${formatDateTime(booking.startsAt)}.',
     });
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openBlockSlotDialog(Venue venue, VenueItem item) async {
+    const reasons = [
+      'Maintenance / صيانة دورية',
+      'Private Tournament / بطولة خاصة',
+      'Walk-in Customer / حجز مباشر أو تليفوني',
+      'VIP Closure / مغلق لحجز خاص',
+    ];
+    var chosenReason = reasons.first;
+    var duration = 60;
+    var date = DateTime.now();
+    var time = TimeOfDay.now();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.lock_clock_outlined, color: Color(0xFFD97706)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Block Slot · ${item.name}',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                    'Prevent online customers from reserving this time slot:',
+                    style: TextStyle(fontSize: 12, color: kMuted)),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: chosenReason,
+                  decoration: const InputDecoration(
+                    labelText: 'Block Reason / سبب الإغلاق',
+                    filled: true,
+                    fillColor: kPage,
+                  ),
+                  items: reasons
+                      .map((r) => DropdownMenuItem(
+                          value: r,
+                          child:
+                              Text(r, style: const TextStyle(fontSize: 12.5))))
+                      .toList(),
+                  onChanged: (v) =>
+                      setDlgState(() => chosenReason = v ?? reasons.first),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event, color: kGreen),
+                  title: Text(
+                    '${date.day}/${date.month}/${date.year} · ${time.format(ctx)}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13),
+                  ),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final chosenD = await showDatePicker(
+                        context: ctx,
+                        initialDate: date,
+                        firstDate:
+                            DateTime.now().subtract(const Duration(days: 1)),
+                        lastDate: DateTime.now().add(const Duration(days: 90)),
+                      );
+                      if (chosenD != null) {
+                        setDlgState(() => date = chosenD);
+                        if (!ctx.mounted) return;
+                        final chosenT = await showTimePicker(
+                            context: ctx, initialTime: time);
+                        if (chosenT != null) setDlgState(() => time = chosenT);
+                      }
+                    },
+                    child: const Text('Change'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text('Duration:',
+                    style: TextStyle(fontSize: 12, color: kMuted)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: [60, 90, 120, 180, 240].map((d) {
+                    final label = d < 60 ? '${d}m' : '${d ~/ 60}h';
+                    return ChoiceChip(
+                      label: Text(label),
+                      selected: duration == d,
+                      onSelected: (_) => setDlgState(() => duration = d),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Lock Slot'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && widget.onBlockSlot != null) {
+      final start =
+          DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      widget.onBlockSlot!(venue, item, start, duration, chosenReason);
+    }
   }
 
   @override
@@ -351,7 +480,7 @@ class _PosTabState extends State<PosTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Walk-in customer',
+                  const Text('Walk-in & Slot Blocker',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   ...widget.venues.expand((venue) => venue.items.map(
@@ -359,10 +488,23 @@ class _PosTabState extends State<PosTab> {
                           contentPadding: EdgeInsets.zero,
                           title: Text('${venue.name} · ${item.name}'),
                           subtitle: Text(item.kind),
-                          trailing: IconButton.filledTonal(
-                            tooltip: 'Add walk-in',
-                            onPressed: () => widget.onWalkIn(venue, item),
-                            icon: const Icon(Icons.person_add_alt_1),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton.outlined(
+                                tooltip: 'Block slot / تقفيل موعد',
+                                onPressed: () =>
+                                    _openBlockSlotDialog(venue, item),
+                                icon: const Icon(Icons.lock_clock_outlined,
+                                    size: 18, color: Color(0xFFD97706)),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton.filledTonal(
+                                tooltip: 'Add walk-in',
+                                onPressed: () => widget.onWalkIn(venue, item),
+                                icon: const Icon(Icons.person_add_alt_1),
+                              ),
+                            ],
                           ),
                         ),
                       )),
@@ -422,6 +564,47 @@ class _PosTabState extends State<PosTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (booking.isBlocked)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFF59E0B)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.lock_rounded,
+                              size: 15, color: Color(0xFFB45309)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'LOCKED / موعد مغلق: ${booking.blockReason.isNotEmpty ? booking.blockReason : booking.customer}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFB45309),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            onPressed: () => widget.onCancel(booking),
+                            child: const Text('Unblock / فتح الموعد',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFB45309))),
+                          ),
+                        ],
+                      ),
+                    ),
                   ListTile(
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

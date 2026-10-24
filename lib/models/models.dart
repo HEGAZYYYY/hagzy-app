@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/hagzy_theme.dart';
 
 const egyptGovernorates = <(String, String)>[
@@ -31,6 +32,44 @@ const egyptGovernorates = <(String, String)>[
   ('North Sinai', 'شمال سيناء'),
   ('Sohag', 'سوهاج'),
 ];
+
+const Map<String, (double, double)> kEgyptGovernorateCoordinates = {
+  'Cairo': (30.0444, 31.2357),
+  'Giza': (29.9870, 31.2118),
+  'Alexandria': (31.2001, 29.9187),
+  'Dakahlia': (31.0409, 31.3785),
+  'Red Sea': (27.2579, 33.8116),
+  'Beheira': (31.0364, 30.4689),
+  'Fayoum': (29.3084, 30.8428),
+  'Gharbia': (30.7865, 31.0004),
+  'Ismailia': (30.5965, 32.2715),
+  'Menoufia': (30.5972, 30.9876),
+  'Minya': (28.0871, 30.7618),
+  'Qalyubia': (30.2884, 31.2168),
+  'New Valley': (25.4514, 30.5471),
+  'Suez': (29.9668, 32.5498),
+  'Aswan': (24.0889, 32.8998),
+  'Assiut': (27.1783, 31.1859),
+  'Beni Suef': (29.0661, 31.0994),
+  'Port Said': (31.2653, 32.3019),
+  'Damietta': (31.4175, 31.8144),
+  'Sharkia': (30.5765, 31.5041),
+  'South Sinai': (27.9158, 34.3299),
+  'Kafr El Sheikh': (31.1107, 30.9388),
+  'Matrouh': (31.3543, 27.2373),
+  'Luxor': (25.6872, 32.6396),
+  'Qena': (26.1551, 32.7160),
+  'North Sinai': (31.1316, 33.7984),
+  'Sohag': (26.5591, 31.6957),
+};
+
+double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+  const p = 0.017453292519943295;
+  final a = 0.5 -
+      cos((lat2 - lat1) * p) / 2 +
+      cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+  return 12742 * asin(sqrt(a));
+}
 
 String localized(bool arabic, String english, String arabicText) =>
     arabic ? arabicText : english;
@@ -151,6 +190,104 @@ class VenueReview {
       );
 }
 
+class PromoOffer {
+  const PromoOffer({
+    required this.code,
+    required this.englishDescription,
+    required this.arabicDescription,
+    required this.discountType,
+    required this.value,
+    this.minSpend = 0,
+    this.maxDiscount = 9999,
+    this.allowedCategory,
+  });
+
+  final String code;
+  final String englishDescription;
+  final String arabicDescription;
+  final String discountType; // 'percent' or 'fixed'
+  final double value;
+  final double minSpend;
+  final double maxDiscount;
+  final VenueType? allowedCategory;
+
+  double calculateDiscount(double subtotal, VenueType venueType) {
+    if (allowedCategory != null && allowedCategory != venueType) return 0;
+    if (subtotal < minSpend) return 0;
+    double d = 0;
+    if (discountType == 'percent') {
+      d = subtotal * (value / 100);
+    } else {
+      d = value;
+    }
+    if (d > maxDiscount) d = maxDiscount;
+    if (d > subtotal) d = subtotal;
+    return d;
+  }
+}
+
+const List<PromoOffer> kAvailablePromos = [
+  PromoOffer(
+    code: 'HAGZY50',
+    englishDescription: '50 EGP off on bookings above 150 EGP',
+    arabicDescription: 'خصم ٥٠ ج على الحجوزات أكثر من ١٥٠ ج',
+    discountType: 'fixed',
+    value: 50,
+    minSpend: 150,
+  ),
+  PromoOffer(
+    code: 'HAGZY20',
+    englishDescription: '20% off up to 100 EGP',
+    arabicDescription: 'خصم ٢٠٪ بحد أقصى ١٠٠ ج',
+    discountType: 'percent',
+    value: 20,
+    maxDiscount: 100,
+  ),
+  PromoOffer(
+    code: 'WELCOME',
+    englishDescription: '25% off first booking (up to 120 EGP)',
+    arabicDescription: 'خصم ٢٥٪ ترحيبي (حتى ١٢٠ ج)',
+    discountType: 'percent',
+    value: 25,
+    maxDiscount: 120,
+  ),
+  PromoOffer(
+    code: 'PADEL100',
+    englishDescription: '100 EGP off sports & padel (min 350 EGP)',
+    arabicDescription: 'خصم ١٠٠ ج لملاعب البادل والكرة (حجوزات ٣٥٠+ ج)',
+    discountType: 'fixed',
+    value: 100,
+    minSpend: 350,
+    allowedCategory: VenueType.sports,
+  ),
+];
+
+class HagzyWallet {
+  static const String keyWallet = 'hagzy_customer_wallet_balance';
+  static const double defaultWelcomeBalance = 150.0;
+
+  static Future<double> getBalance() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(keyWallet) ?? defaultWelcomeBalance;
+  }
+
+  static Future<double> addFunds(double amount) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getDouble(keyWallet) ?? defaultWelcomeBalance;
+    final updated = current + amount;
+    await prefs.setDouble(keyWallet, updated);
+    return updated;
+  }
+
+  static Future<double> deductFunds(double amount) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getDouble(keyWallet) ?? defaultWelcomeBalance;
+    final updated = (current - amount).clamp(0.0, double.infinity);
+    await prefs.setDouble(keyWallet, updated);
+    return updated;
+  }
+}
+
 class Venue {
   Venue({
     required this.id,
@@ -167,6 +304,9 @@ class Venue {
     this.openHour = 10,
     this.closeHour = 22,
     this.rating = 4.9,
+    this.latitude,
+    this.longitude,
+    List<String>? staffMembers,
     List<String>? galleryUrls,
     List<String>? amenities,
     List<VenueReview>? reviews,
@@ -176,7 +316,8 @@ class Venue {
         amenities = amenities ?? [],
         reviews = reviews ?? [],
         items = items ?? [],
-        services = services ?? [];
+        services = services ?? [],
+        staffMembers = staffMembers ?? [];
 
   final String id;
   final String name;
@@ -192,11 +333,20 @@ class Venue {
   final int openHour;
   final int closeHour;
   final double rating;
+  final double? latitude;
+  final double? longitude;
+  final List<String> staffMembers;
   final List<String> galleryUrls;
   final List<String> amenities;
   final List<VenueReview> reviews;
   final List<VenueItem> items;
   final List<SalonService> services;
+
+  double get effectiveLatitude =>
+      latitude ?? kEgyptGovernorateCoordinates[location]?.$1 ?? 30.0444;
+
+  double get effectiveLongitude =>
+      longitude ?? kEgyptGovernorateCoordinates[location]?.$2 ?? 31.2357;
 
   Venue copyWith({
     String? id,
@@ -213,6 +363,9 @@ class Venue {
     int? openHour,
     int? closeHour,
     double? rating,
+    double? latitude,
+    double? longitude,
+    List<String>? staffMembers,
     List<String>? galleryUrls,
     List<String>? amenities,
     List<VenueReview>? reviews,
@@ -234,6 +387,9 @@ class Venue {
         openHour: openHour ?? this.openHour,
         closeHour: closeHour ?? this.closeHour,
         rating: rating ?? this.rating,
+        latitude: latitude ?? this.latitude,
+        longitude: longitude ?? this.longitude,
+        staffMembers: staffMembers ?? this.staffMembers,
         galleryUrls: galleryUrls ?? this.galleryUrls,
         amenities: amenities ?? this.amenities,
         reviews: reviews ?? this.reviews,
@@ -257,6 +413,9 @@ class Venue {
         'openHour': openHour,
         'closeHour': closeHour,
         'rating': rating,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (staffMembers.isNotEmpty) 'staffMembers': staffMembers,
         if (galleryUrls.isNotEmpty) 'galleryUrls': galleryUrls,
         if (amenities.isNotEmpty) 'amenities': amenities,
         if (reviews.isNotEmpty)
@@ -280,6 +439,10 @@ class Venue {
         openHour: (json['openHour'] as num?)?.toInt() ?? 10,
         closeHour: (json['closeHour'] as num?)?.toInt() ?? 22,
         rating: (json['rating'] as num?)?.toDouble() ?? 4.9,
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
+        staffMembers:
+            (json['staffMembers'] as List<dynamic>? ?? []).cast<String>(),
         galleryUrls:
             (json['galleryUrls'] as List<dynamic>? ?? []).cast<String>(),
         amenities:
@@ -319,6 +482,8 @@ class Booking {
     this.paymentReference = '',
     this.promoCode = '',
     this.discountAmount = 0,
+    this.staffMember = '',
+    this.blockReason = '',
   });
 
   final String id;
@@ -342,8 +507,13 @@ class Booking {
   final String paymentReference;
   final String promoCode;
   final double discountAmount;
+  final String staffMember;
+  final String blockReason;
 
   DateTime get endsAt => startsAt.add(Duration(minutes: durationMinutes));
+
+  bool get isBlocked =>
+      blockReason.isNotEmpty || customer.startsWith('[BLOCKED]');
 
   bool get isPendingPayment =>
       status == 'pending_payment' &&
@@ -361,7 +531,8 @@ class Booking {
 
   bool get blocksAvailability =>
       !cancelled &&
-      (isConfirmed ||
+      (isBlocked ||
+          isConfirmed ||
           (status == 'pending_payment' &&
               (holdExpiresAt == null ||
                   holdExpiresAt!.isAfter(DateTime.now()))));
@@ -389,6 +560,8 @@ class Booking {
     String? paymentReference,
     String? promoCode,
     double? discountAmount,
+    String? staffMember,
+    String? blockReason,
   }) =>
       Booking(
         id: id ?? this.id,
@@ -413,6 +586,8 @@ class Booking {
         paymentReference: paymentReference ?? this.paymentReference,
         promoCode: promoCode ?? this.promoCode,
         discountAmount: discountAmount ?? this.discountAmount,
+        staffMember: staffMember ?? this.staffMember,
+        blockReason: blockReason ?? this.blockReason,
       );
 
   Map<String, dynamic> toJson() => {
@@ -437,6 +612,8 @@ class Booking {
         if (paymentReference.isNotEmpty) 'paymentReference': paymentReference,
         if (promoCode.isNotEmpty) 'promoCode': promoCode,
         if (discountAmount > 0) 'discountAmount': discountAmount,
+        if (staffMember.isNotEmpty) 'staffMember': staffMember,
+        if (blockReason.isNotEmpty) 'blockReason': blockReason,
       };
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -471,6 +648,8 @@ class Booking {
         paymentReference: json['paymentReference'] as String? ?? '',
         promoCode: json['promoCode'] as String? ?? '',
         discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
+        staffMember: json['staffMember'] as String? ?? '',
+        blockReason: json['blockReason'] as String? ?? '',
       );
 }
 
@@ -480,6 +659,14 @@ Venue naderSalonSample() => Venue(
       location: 'Kafr El Sheikh',
       type: VenueType.salon,
       depositPercent: 30,
+      latitude: 31.1107,
+      longitude: 30.9388,
+      staffMembers: const [
+        'كابتن نادر (Master Barber)',
+        'أحمد عصام (Senior Stylist)',
+        'مينا فوزي (Beard Specialist)',
+        'Any Specialist / أي مصفف متاح',
+      ],
       imageUrl:
           'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1000&q=80',
       galleryUrls: const [
@@ -505,27 +692,39 @@ Venue naderSalonSample() => Venue(
       services: [
         SalonService(
           id: 'nader-haircut',
-          name: 'Haircut',
+          name: 'Haircut (قص شعر كلاسيك)',
           minutes: 30,
           price: 150,
         ),
         SalonService(
           id: 'nader-beard-trim',
-          name: 'Beard trim',
+          name: 'Beard trim & shaping (تحديد لحية بالموس)',
           minutes: 20,
           price: 100,
         ),
         SalonService(
+          id: 'nader-vip-grooming',
+          name: 'VIP Grooming Package (باقة العريس VIP)',
+          minutes: 60,
+          price: 350,
+        ),
+        SalonService(
           id: 'nader-haircut-beard',
-          name: 'Haircut + beard',
+          name: 'Haircut + beard (شعر ولحية)',
           minutes: 45,
           price: 220,
         ),
         SalonService(
           id: 'nader-kids-haircut',
-          name: 'Kids haircut',
+          name: 'Kids haircut (قص أطفال)',
           minutes: 25,
           price: 100,
+        ),
+        SalonService(
+          id: 'nader-facial-scrub',
+          name: 'Facial Steam & Scrub (حمام بخار وسكراب)',
+          minutes: 25,
+          price: 120,
         ),
       ],
     );
@@ -539,6 +738,12 @@ List<Venue> defaultPrototypeVenues() => [
         type: VenueType.sports,
         ownerPhone: '01012345678',
         depositPercent: 25,
+        latitude: 30.0298,
+        longitude: 31.4789,
+        staffMembers: const [
+          'Court Marshal / مشرف الملعب',
+          'Padel Coach Omar / كابتن عمر',
+        ],
         imageUrl:
             'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=1000&q=80',
         galleryUrls: const [
@@ -575,6 +780,11 @@ List<Venue> defaultPrototypeVenues() => [
         type: VenueType.lounge,
         ownerPhone: '01098765432',
         depositPercent: 20,
+        latitude: 29.9602,
+        longitude: 31.2569,
+        staffMembers: const [
+          'VIP Lounge Host / مسؤول الصالة',
+        ],
         imageUrl:
             'https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=1000&q=80',
         galleryUrls: const [

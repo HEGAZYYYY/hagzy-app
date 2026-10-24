@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hagzy_app/main.dart';
+import 'package:hagzy_app/widgets/map_explorer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> enterAdminPreview(WidgetTester tester) async {
@@ -195,6 +196,8 @@ void main() {
     expect(find.text('AWAITING DEPOSIT'), findsOneWidget);
     expect(find.text('Confirmed'), findsNothing);
     await tester.ensureVisible(find.textContaining('Pay Deposit'));
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
+    await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Pay Deposit'));
     await tester.pumpAndSettle();
     expect(find.text('Secure Your Time'), findsOneWidget);
@@ -638,6 +641,8 @@ void main() {
     expect(find.text('Book Again'), findsOneWidget);
 
     // 3. Tap Book Again from My Bookings to return to Explore with venue pre-selected
+    await tester.ensureVisible(find.text('Book Again'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Book Again'));
     await tester.pumpAndSettle();
 
@@ -648,6 +653,81 @@ void main() {
     );
     expect(find.text('Your Booking'), findsOneWidget);
     expect(find.text('Choose Your Space'), findsOneWidget);
+  });
+
+  test('distance calculation computes correct haversine distance for Egypt coordinates', () {
+    final cairo = kEgyptGovernorateCoordinates['Cairo']!;
+    final alex = kEgyptGovernorateCoordinates['Alexandria']!;
+    final dist = calculateDistanceKm(cairo.$1, cairo.$2, alex.$1, alex.$2);
+    expect(dist, greaterThan(170));
+    expect(dist, lessThan(240));
+
+    final distSame = calculateDistanceKm(cairo.$1, cairo.$2, cairo.$1, cairo.$2);
+    expect(distSame, closeTo(0.0, 0.001));
+  });
+
+  test('promo engine correctly computes fixed, percentage, and category discounts', () {
+    final promo50 = kAvailablePromos.firstWhere((p) => p.code == 'HAGZY50');
+    expect(promo50.calculateDiscount(100, VenueType.sports), 0);
+    expect(promo50.calculateDiscount(300, VenueType.sports), 50);
+
+    final promoPadel = kAvailablePromos.firstWhere((p) => p.code == 'PADEL100');
+    expect(promoPadel.calculateDiscount(500, VenueType.sports), 100);
+    expect(promoPadel.calculateDiscount(500, VenueType.salon), 0);
+
+    final promo20 = kAvailablePromos.firstWhere((p) => p.code == 'HAGZY20');
+    expect(promo20.calculateDiscount(400, VenueType.sports), 80);
+    expect(promo20.calculateDiscount(1000, VenueType.sports), 100);
+  });
+
+  test('slot blocker booking correctly flags blocked status and hides from regular booking', () {
+    final slot = Booking(
+      id: 'blocked-slot-1',
+      venueId: 'v1',
+      itemId: 'space-1',
+      customer: 'VENUE BLOCKED',
+      phone: '01000000000',
+      startsAt: DateTime.now().add(const Duration(hours: 3)),
+      durationMinutes: 60,
+      price: 0,
+      status: 'confirmed',
+      paymentMethod: 'blocked',
+      blockReason: 'Court Maintenance & Cleaning',
+    );
+    expect(slot.isBlocked, isTrue);
+    expect(slot.blockReason, 'Court Maintenance & Cleaning');
+    expect(slot.blocksAvailability, isTrue);
+  });
+
+  testWidgets('customer can toggle Interactive Map View in BookTab', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'hagzy_app_data_v1': jsonEncode({
+        'venues': defaultPrototypeVenues().map((v) => v.toJson()).toList(),
+        'bookings': [],
+      }),
+    });
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    final pill = find.text('Map & Near Me');
+    await tester.scrollUntilVisible(
+      pill,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(pill);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HagzyMapExplorer), findsOneWidget);
+
+    // Tap again to toggle back to list view
+    await tester.ensureVisible(find.text('Map & Near Me'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Map & Near Me'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HagzyMapExplorer), findsNothing);
   });
 }
 

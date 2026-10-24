@@ -36,6 +36,178 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   bool _lookingUp = false;
   String? _lookupError;
 
+  Future<void> _shareOnWhatsApp(
+      Booking booking, Venue? venue, VenueItem? space) async {
+    final venueName = venue?.name ?? 'Hagzy Venue';
+    final itemName = space?.name ?? '';
+    final dateStr = formatDateTime(booking.startsAt);
+    final mapsLink = venue?.googleMapsUrl.isNotEmpty == true
+        ? venue!.googleMapsUrl
+        : 'https://maps.google.com/?q=${Uri.encodeComponent(venueName)}';
+    final staffInfo = booking.staffMember.isNotEmpty
+        ? '\n${widget.arabic ? "المصفف" : "Specialist"}: ${booking.staffMember}'
+        : '';
+    final text = widget.arabic
+        ? '🎾 حجزنا في حجزي (Hagzy)!\nالمكان: $venueName ${itemName.isNotEmpty ? "($itemName)" : ""}$staffInfo\nالميعاد: $dateStr\nالاتجاهات: $mapsLink\nرقم الحجز: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length)}\nيلا جهزوا نفسكم! 🔥'
+        : '🎾 Our Hagzy Booking!\nVenue: $venueName ${itemName.isNotEmpty ? "($itemName)" : ""}$staffInfo\nTime: $dateStr\nDirections: $mapsLink\nBooking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length)}\nSee you all there! 🔥';
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _topUpWalletDialog(double currentBalance) async {
+    final arabic = widget.arabic;
+    double amount = 100.0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.account_balance_wallet_rounded, color: kGreen),
+              const SizedBox(width: 8),
+              Text(localized(arabic, 'Top Up Hagzy Wallet', 'شحن محفظة حجزي')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${localized(arabic, 'Current Balance:', 'رصيدك الحالي:')} ${formatMoney(currentBalance)} EGP',
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, color: kMuted),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                  localized(arabic, 'Select Top-Up Amount:', 'اختر مبلغ الشحن:'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 13)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [50.0, 100.0, 200.0, 500.0].map((amt) {
+                  return ChoiceChip(
+                    label: Text('${amt.toInt()} EGP'),
+                    selected: amount == amt,
+                    onSelected: (_) => setDlgState(() => amount = amt),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(localized(arabic, 'Cancel', 'إلغاء')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(localized(arabic, 'Top Up Now', 'شحن الآن')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true) {
+      await HagzyWallet.addFunds(amount);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localized(
+                arabic,
+                'Successfully added ${formatMoney(amount)} EGP to your wallet!',
+                'تم إضافة ${formatMoney(amount)} جنيه إلى محفظتك بنجاح!')),
+            backgroundColor: kGreen,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildWalletCard(bool arabic) {
+    return FutureBuilder<double>(
+      future: HagzyWallet.getBalance(),
+      builder: (context, snapshot) {
+        final balance = snapshot.data ?? HagzyWallet.defaultWelcomeBalance;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border:
+                Border.all(color: kGreen.withValues(alpha: 0.35), width: 1.2),
+            boxShadow: HagzyTheme.softShadow,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: kGreen.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: kGreen.withValues(alpha: 0.35)),
+                ),
+                child: const Icon(Icons.account_balance_wallet_rounded,
+                    color: kGreenLight, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      localized(arabic, 'Hagzy In-App Wallet', 'محفظة حجزي'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${formatMoney(balance)} ${localized(arabic, 'EGP Available', 'جنيه متاح')}',
+                      style: const TextStyle(
+                        color: kGreenLight,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () => _topUpWalletDialog(balance),
+                style: FilledButton.styleFrom(
+                  backgroundColor: kGreen,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                label: Text(
+                  localized(arabic, 'Top Up', 'شحن'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _lookupByPhone() async {
     var phone = '';
     final confirmed = await showDialog<bool>(
@@ -209,7 +381,9 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 'ستظهر حجوزاتك هنا.'),
             icon: Icons.calendar_month_outlined,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          _buildWalletCard(arabic),
+          const SizedBox(height: 2),
           EmptyCard(
             icon: Icons.event_available_outlined,
             title:
@@ -255,7 +429,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               'تابع حجوزاتك القادمة.'),
           icon: Icons.calendar_month_outlined,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
+        _buildWalletCard(arabic),
         ...active.map((booking) {
           final venue = widget.venues
               .where((item) => item.id == booking.venueId)
@@ -548,6 +723,24 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                             ),
                           ),
                         ],
+                        if (booking.staffMember.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.content_cut_rounded,
+                                  size: 13, color: kGreen),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${localized(arabic, "Specialist", "المصفف")}: ${booking.staffMember}',
+                                style: const TextStyle(
+                                  color: kGreen,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         Padding(
                           padding: const EdgeInsets.only(top: 14),
                           child: booking.isPendingPayment
@@ -618,6 +811,22 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               label: Text(
                                 localized(arabic, 'QR Check-In Pass',
                                     'بطاقة الدخول QR'),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () =>
+                                  _shareOnWhatsApp(booking, venue, space),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.share_rounded,
+                                  size: 16, color: Color(0xFF25D366)),
+                              label: Text(
+                                localized(
+                                    arabic, 'Share on WhatsApp', 'دعوة واتساب'),
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),

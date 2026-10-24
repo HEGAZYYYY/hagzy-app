@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/map_explorer.dart';
 
 class BookTab extends StatefulWidget {
   const BookTab({
@@ -40,6 +41,7 @@ class _BookTabState extends State<BookTab> {
   Set<String> _favoriteIds = {};
   bool _favoritesOnly = false;
   bool _sortByPrice = false;
+  bool _showMapView = false;
   DateTime _date = DateTime.now().hour >= 21
       ? DateTime.now().add(const Duration(days: 1))
       : DateTime.now();
@@ -647,6 +649,14 @@ class _BookTabState extends State<BookTab> {
                 label: localized(widget.arabic, 'Saved', 'المفضلة'),
                 onTap: () => setState(() => _favoritesOnly = !_favoritesOnly),
               ),
+              const SizedBox(width: 8),
+              CustomPill(
+                selected: _showMapView,
+                icon: Icons.map_outlined,
+                label: localized(
+                    widget.arabic, 'Map & Near Me', 'على الخريطة وقريب مني'),
+                onTap: () => setState(() => _showMapView = !_showMapView),
+              ),
               if (_sortByPrice) ...[
                 const SizedBox(width: 8),
                 CustomPill(
@@ -659,6 +669,26 @@ class _BookTabState extends State<BookTab> {
           ),
         ),
         const SizedBox(height: 8),
+        if (_showMapView && matchingVenues.isNotEmpty) ...[
+          HagzyMapExplorer(
+            venues: matchingVenues,
+            arabic: widget.arabic,
+            selectedArea: _area == kAllEgyptAreas ? 'Cairo' : _area,
+            selectedVenueId: _venueId,
+            onSelectVenue: (v) => _selectVenue(v, toggleIfSame: false),
+            onBookVenue: (v) {
+              final defaultItem = v.items.firstOrNull ??
+                  VenueItem(
+                      id: generateId(),
+                      name: v.name,
+                      kind: 'Standard',
+                      hourlyRate: 150);
+              widget.onBook(
+                  v, defaultItem, DateTime.now().add(const Duration(hours: 1)));
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
         if (matchingVenues.isEmpty)
           EmptyCard(
             icon: _favoritesOnly ? Icons.favorite_border : Icons.store_outlined,

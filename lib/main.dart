@@ -935,6 +935,15 @@ class _HagzyHomeState extends State<HagzyHome> {
     var split = 1;
     var multi = false;
     var selectedPromo = '';
+    var selectedBarber = venue.staffMembers.isNotEmpty
+        ? venue.staffMembers.first
+        : (venue.type == VenueType.salon ? 'كابتن نادر (Master Barber)' : '');
+    var useWallet = false;
+    var walletDeducted = 0.0;
+    double walletBalance = 150.0;
+    try {
+      walletBalance = await HagzyWallet.getBalance();
+    } catch (_) {}
     final selectedServices = <String>{};
     DateTime startsAt() => DateTime(
           date.year,
@@ -968,11 +977,19 @@ class _HagzyHomeState extends State<HagzyHome> {
 
     double discount() {
       final base = subtotal();
+      if (selectedPromo.trim().isEmpty) return 0;
+      final offer = kAvailablePromos
+          .where((p) =>
+              p.code.toLowerCase() == selectedPromo.trim().toLowerCase())
+          .firstOrNull;
+      if (offer != null) {
+        return offer.calculateDiscount(base, venue.type);
+      }
       if (selectedPromo == 'HAGZY20') {
         final d = base * 0.20;
         return d > 100 ? 100 : d;
       }
-      if (selectedPromo == 'FIRST50') {
+      if (selectedPromo == 'FIRST50' || selectedPromo == 'HAGZY50') {
         return base > 100 ? 50 : base * 0.25;
       }
       return 0;
@@ -994,6 +1011,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           end.isAfter(booking.startsAt));
     }
 
+    if (!mounted) return;
     final booking = await showDialog<Booking>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1201,6 +1219,38 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       validator: phoneValidator,
                     ),
+                    if (venue.type == VenueType.salon) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        localized(arabic, 'Barber Specialist',
+                            'مصفف الشعر / الحلاق'),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: (venue.staffMembers.isNotEmpty
+                                ? venue.staffMembers
+                                : const [
+                                    'كابتن نادر (Master Barber)',
+                                    'أحمد عصام (Senior Stylist)',
+                                    'مينا فوزي (Beard Specialist)',
+                                    'Any Specialist / أي مصفف متاح'
+                                  ])
+                            .map((staff) {
+                          final isSel = selectedBarber == staff;
+                          return CustomPill(
+                            icon: Icons.content_cut,
+                            label: staff,
+                            selected: isSel,
+                            onTap: () =>
+                                setDialogState(() => selectedBarber = staff),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                     if (venue.type == VenueType.salon &&
                         venue.services.isNotEmpty) ...[
                       const SizedBox(height: 14),
@@ -1319,29 +1369,104 @@ class _HagzyHomeState extends State<HagzyHome> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: [
-                          (
-                            'HAGZY20',
-                            localized(
-                                arabic, 'HAGZY20 · 20% Off', 'HAGZY20 · خصم ٢٠٪')
-                          ),
-                          (
-                            'FIRST50',
-                            localized(arabic, 'FIRST50 · 50 EGP Off',
-                                'FIRST50 · خصم ٥٠ ج')
-                          ),
-                        ].map((offer) {
-                          final active = selectedPromo == offer.$1;
+                        children: kAvailablePromos
+                            .where((offer) =>
+                                offer.allowedCategory == null ||
+                                offer.allowedCategory == venue.type)
+                            .map((offer) {
+                          final active =
+                              selectedPromo.toUpperCase() == offer.code;
+                          final promoBadge = offer.discountType == 'fixed'
+                              ? '-${offer.value.toInt()} EGP'
+                              : '-${offer.value.toInt()}%';
                           return CustomPill(
                             icon: Icons.local_offer_outlined,
-                            label: offer.$2,
+                            label: '${offer.code} ($promoBadge)',
                             selected: active,
                             onTap: () => setDialogState(() {
-                              selectedPromo = active ? '' : offer.$1;
+                              selectedPromo = active ? '' : offer.code;
                             }),
                           );
                         }).toList(),
                       ),
+                      if (selectedPromo.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Builder(builder: (_) {
+                          final selectedOffer = kAvailablePromos
+                              .where((o) => o.code == selectedPromo)
+                              .firstOrNull;
+                          if (selectedOffer == null) return const SizedBox();
+                          return Text(
+                            localized(arabic, selectedOffer.englishDescription,
+                                selectedOffer.arabicDescription),
+                            style: const TextStyle(
+                                fontSize: 11.5,
+                                color: kGreen,
+                                fontWeight: FontWeight.w700),
+                          );
+                        }),
+                      ],
+                      if (walletBalance > 0) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: useWallet
+                                ? kGreen.withValues(alpha: 0.12)
+                                : kPage,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: useWallet ? kGreen : kBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: useWallet
+                                      ? kGreen
+                                      : kMuted.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  size: 18,
+                                  color: useWallet ? Colors.white : kInk,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      localized(arabic, 'Pay from Hagzy Wallet',
+                                          'الدفع من محفظة حجزي'),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12.5),
+                                    ),
+                                    Text(
+                                      '${formatMoney(walletBalance)} EGP ${localized(arabic, 'available', 'رصيد متاح')}',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: useWallet ? kGreen : kMuted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: useWallet,
+                                activeThumbColor: kGreen,
+                                onChanged: (val) =>
+                                    setDialogState(() => useWallet = val),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 16),
                     Builder(
@@ -1352,10 +1477,15 @@ class _HagzyHomeState extends State<HagzyHome> {
                         final parts = split > 1 ? amount / split : amount;
                         final requiredDeposit =
                             amount * venue.depositPercent / 100;
-                        final deposit =
+                        final baseDeposit =
                             split > 1 && (amount / split) > requiredDeposit
                                 ? amount / split
                                 : requiredDeposit;
+                        final currentWalletDeducted = useWallet
+                            ? (walletBalance < baseDeposit ? walletBalance : baseDeposit)
+                            : 0.0;
+                        final deposit = (baseDeposit - currentWalletDeducted)
+                            .clamp(0.0, double.infinity);
                         return Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -1391,6 +1521,32 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     ),
                                     Text(
                                       '-${formatMoney(savedAmount)} EGP (was ${formatMoney(rawAmount)})',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12.5,
+                                          color: kGreen),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                              if (currentWalletDeducted > 0) ...[
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      localized(
+                                          arabic,
+                                          'Wallet Deduction',
+                                          'خصم من المحفظة'),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12.5,
+                                          color: kGreen),
+                                    ),
+                                    Text(
+                                      '-${formatMoney(currentWalletDeducted)} EGP',
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 12.5,
@@ -1530,17 +1686,27 @@ class _HagzyHomeState extends State<HagzyHome> {
                   }
                   final requiredDeposit =
                       total() * venue.depositPercent / 100;
-                  final dueNow =
+                  final baseDeposit =
                       split > 1 && (total() / split) > requiredDeposit
                           ? total() / split
                           : requiredDeposit;
-                  if (!walkIn && dueNow <= 0) {
+                  final effectiveWalletDeducted = useWallet
+                      ? (walletBalance < baseDeposit ? walletBalance : baseDeposit)
+                      : 0.0;
+                  final remainingDue =
+                      (baseDeposit - effectiveWalletDeducted)
+                          .clamp(0.0, double.infinity);
+                  final isWalletPaid =
+                      useWallet && effectiveWalletDeducted >= baseDeposit && baseDeposit > 0;
+
+                  if (!walkIn && !isWalletPaid && baseDeposit <= 0) {
                     _message(
                       'This venue has no deposit configured, so reservations cannot be confirmed.',
                       error: true,
                     );
                     return;
                   }
+                  walletDeducted = effectiveWalletDeducted;
                   Navigator.pop(
                     context,
                     Booking(
@@ -1560,14 +1726,20 @@ class _HagzyHomeState extends State<HagzyHome> {
                       multiController: multi,
                       phone: phone.trim(),
                       email: '',
-                      dueNow: walkIn ? 0 : dueNow,
-                      status: walkIn ? 'confirmed' : 'pending_payment',
-                      paymentStatus: 'unpaid',
-                      holdExpiresAt: walkIn
+                      dueNow: walkIn || isWalletPaid ? 0 : remainingDue,
+                      status: walkIn || isWalletPaid
+                          ? 'confirmed'
+                          : 'pending_payment',
+                      paymentStatus: isWalletPaid ? 'paid' : 'unpaid',
+                      paymentMethod: isWalletPaid ? 'wallet' : '',
+                      holdExpiresAt: walkIn || isWalletPaid
                           ? null
                           : DateTime.now().add(const Duration(minutes: 15)),
                       promoCode: selectedPromo,
                       discountAmount: discount(),
+                      staffMember: venue.type == VenueType.salon
+                          ? selectedBarber
+                          : '',
                     ),
                   );
                 },
@@ -1591,6 +1763,9 @@ class _HagzyHomeState extends State<HagzyHome> {
       ),
     );
     if (booking == null) return;
+    if (walletDeducted > 0) {
+      await HagzyWallet.deductFunds(walletDeducted);
+    }
     if (!walkIn) {
       _savedCustomerName = booking.customer;
       _savedCustomerPhone = booking.phone;
@@ -1622,7 +1797,15 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
       await _commit(_venues, [..._bookings, savedBooking]);
       if (!walkIn) {
-        await _showPaymentMethods(savedBooking, dueNow);
+        if (dueNow <= 0 || savedBooking.paymentStatus == 'paid') {
+          _message(localized(
+              arabic,
+              'Booking confirmed! Deposit paid from your Hagzy wallet.',
+              'تم تأكيد الحجز! تم دفع العربون بنجاح من محفظة حجزي.'));
+          if (mounted) setState(() => _tab = 1);
+        } else {
+          await _showPaymentMethods(savedBooking, dueNow);
+        }
       }
     } catch (error) {
       _message('Could not create the reservation: $error', error: true);
@@ -2087,6 +2270,65 @@ class _HagzyHomeState extends State<HagzyHome> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      if (method == 'instapay')
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                            ),
+                            onPressed: () async {
+                              Clipboard.setData(
+                                  ClipboardData(text: destination));
+                              _message(localized(
+                                  arabic,
+                                  'InstaPay handle copied! Opening app...',
+                                  'تم نسخ العنوان! جارٍ فتح إنستاباي...'));
+                              final uri = Uri.parse('https://www.instapay.eg/');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            icon:
+                                const Icon(Icons.open_in_new_rounded, size: 16),
+                            label: Text(localized(arabic, 'Open InstaPay App',
+                                'فتح تطبيق إنستاباي')),
+                          ),
+                        ),
+                      if (method == 'vodafone_cash')
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                            ),
+                            onPressed: () async {
+                              final cleanNum =
+                                  destination.replaceAll(RegExp(r'\D'), '');
+                              Clipboard.setData(ClipboardData(text: cleanNum));
+                              _message(localized(
+                                  arabic,
+                                  'Dialing Vodafone Cash USSD code...',
+                                  'جارٍ طلب كود تحويل فودافون كاش...'));
+                              final uri = Uri.parse(
+                                  'tel:*9*7*$cleanNum*${dueNow.toInt()}#');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
+                              }
+                            },
+                            icon: const Icon(Icons.dialpad_rounded, size: 16),
+                            label: Text(localized(
+                                arabic,
+                                'Dial *9*7* USSD Code',
+                                'اطلب كود التحويل المباشر')),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -2918,6 +3160,62 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
   }
 
+  Future<void> _blockSlot({
+    required Venue venue,
+    required VenueItem item,
+    required DateTime start,
+    required int duration,
+    required String reason,
+  }) async {
+    final arabic = _language == 'AR';
+    final end = start.add(Duration(minutes: duration));
+    final isClashing = _bookings.any((b) =>
+        b.blocksAvailability &&
+        b.venueId == venue.id &&
+        b.itemId == item.id &&
+        start.isBefore(b.endsAt) &&
+        end.isAfter(b.startsAt));
+    if (isClashing) {
+      _message(
+        localized(arabic, 'This time slot is already booked or locked.',
+            'هذا الموعد محجوز أو مقفل بالفعل.'),
+        error: true,
+      );
+      return;
+    }
+    final blockedBooking = Booking(
+      id: generateId(),
+      venueId: venue.id,
+      itemId: item.id,
+      customer: '[BLOCKED] $reason',
+      phone: '01000000000',
+      startsAt: start,
+      durationMinutes: duration,
+      price: 0,
+      dueNow: 0,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      blockReason: reason,
+    );
+    try {
+      if (_api.isConfigured && _adminToken != null) {
+        await _api.createBooking(
+          {
+            ...blockedBooking.toJson(),
+            'walkIn': true,
+            'blockReason': reason,
+          },
+          adminToken: _adminToken,
+        );
+      }
+      await _commit(_venues, [..._bookings, blockedBooking]);
+      _message(localized(arabic, 'Slot locked successfully.',
+          'تم قفل الموعد وحجبه عن الحجز بنجاح.'));
+    } catch (e) {
+      _message('Error locking slot: $e', error: true);
+    }
+  }
+
   Future<void> _confirmBooking(Booking booking) async {
     await _runSave(() async {
       var confirmedBooking = booking.copyWith(
@@ -3245,6 +3543,14 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               venue: venue,
                                               item: item,
                                               walkIn: true,
+                                            ),
+                                            onBlockSlot: (venue, item, start, duration, reason) =>
+                                                _blockSlot(
+                                              venue: venue,
+                                              item: item,
+                                              start: start,
+                                              duration: duration,
+                                              reason: reason,
                                             ),
                                             onCancel: _cancelBooking,
                                             onConfirm: _confirmBooking,

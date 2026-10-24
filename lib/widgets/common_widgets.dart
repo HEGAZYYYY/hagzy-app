@@ -295,15 +295,10 @@ class CustomPill extends StatelessWidget {
                     )
                   ],
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: onTap,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                child: Row(
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+            child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (icon != null) ...[
@@ -314,23 +309,25 @@ class CustomPill extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                     ],
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: selected ? Colors.white : kInk,
-                        fontWeight:
-                            selected ? FontWeight.w800 : FontWeight.w700,
-                        fontSize: 12.5,
-                        letterSpacing: -0.1,
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected ? Colors.white : kInk,
+                          fontWeight:
+                              selected ? FontWeight.w800 : FontWeight.w700,
+                          fontSize: 12.5,
+                          letterSpacing: -0.1,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-        ),
-      );
+          );
 }
 
 class LanguageOption extends StatelessWidget {
