@@ -1227,10 +1227,14 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
           const SizedBox(height: 24),
         ],
 
-        const Center(
+        Center(
           child: Text(
-            'Hagzy v2.4 · Made with ❤️ in Egypt',
-            style: TextStyle(
+            localized(
+              arabic,
+              'Hagzy v2.4 · Made with ❤️ in Kafr El-Sheikh',
+              'حجزي v2.4 · صُنع بـ ❤️ في كفر الشيخ',
+            ),
+            style: const TextStyle(
               color: kMuted,
               fontSize: 11.5,
               fontWeight: FontWeight.w600,

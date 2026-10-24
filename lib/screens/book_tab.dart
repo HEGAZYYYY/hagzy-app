@@ -950,27 +950,64 @@ class _BookTabState extends State<BookTab> {
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 8,
           children: [
-            CustomPill(
-              label: localized(widget.arabic, 'Everything', 'الكل'),
+            _CategoryVisualCard(
+              title: localized(widget.arabic, 'Everything', 'الكل'),
+              subtitle: localized(widget.arabic, 'All Places', 'جميع الأماكن'),
               icon: Icons.grid_view_rounded,
-              selected: _type == null,
+              isSelected: _type == null,
+              gradient: const [Color(0xFF064E3B), Color(0xFF047857)],
+              glowColor: kGreen,
+              count: matchingVenues.length,
+              arabic: widget.arabic,
               onTap: () => _selectCategory(null),
             ),
-            ...VenueType.values.map((type) => CustomPill(
-                  label: switch (type) {
-                    VenueType.sports => localized(
-                        widget.arabic, 'Padel & Football', 'بادل وكرة قدم'),
-                    VenueType.salon => localized(
-                        widget.arabic, 'Hair & Beauty', 'العناية والجمال'),
-                    VenueType.lounge => localized(
-                        widget.arabic, 'Gaming & Tables', 'ألعاب وطاولات'),
-                  },
-                  icon: type.icon,
-                  selected: _type == type,
-                  onTap: () => _selectCategory(type),
-                )),
+            _CategoryVisualCard(
+              title: localized(widget.arabic, 'Grooming', 'حلاقة وعناية'),
+              subtitle: localized(widget.arabic, 'Hair & Beauty', 'صالونات وحلاقة'),
+              icon: Icons.content_cut_rounded,
+              isSelected: _type == VenueType.salon,
+              gradient: const [Color(0xFF1E1B4B), Color(0xFF4338CA)],
+              glowColor: const Color(0xFF6366F1),
+              count: upsertNaderSalon(widget.venues)
+                  .where((v) =>
+                      v.type == VenueType.salon &&
+                      _locationMatchesArea(v.location))
+                  .length,
+              arabic: widget.arabic,
+              onTap: () => _selectCategory(VenueType.salon),
+            ),
+            _CategoryVisualCard(
+              title: localized(widget.arabic, 'Entertainment', 'ترفيه وألعاب'),
+              subtitle: localized(widget.arabic, 'Gaming & Tables', 'ألعاب وبلايستيشن'),
+              icon: Icons.sports_esports_rounded,
+              isSelected: _type == VenueType.lounge,
+              gradient: const [Color(0xFF311042), Color(0xFF6D28D9)],
+              glowColor: const Color(0xFF8B5CF6),
+              count: widget.venues
+                  .where((v) =>
+                      v.type == VenueType.lounge &&
+                      _locationMatchesArea(v.location))
+                  .length,
+              arabic: widget.arabic,
+              onTap: () => _selectCategory(VenueType.lounge),
+            ),
+            _CategoryVisualCard(
+              title: localized(widget.arabic, 'Sports', 'ملاعب ورياضة'),
+              subtitle: localized(widget.arabic, 'Padel & Football', 'بادل وكرة قدم'),
+              icon: Icons.sports_soccer_rounded,
+              isSelected: _type == VenueType.sports,
+              gradient: const [Color(0xFF064E3B), Color(0xFF059669)],
+              glowColor: kGreen,
+              count: widget.venues
+                  .where((v) =>
+                      v.type == VenueType.sports &&
+                      _locationMatchesArea(v.location))
+                  .length,
+              arabic: widget.arabic,
+              onTap: () => _selectCategory(VenueType.sports),
+            ),
           ],
         ),
         const SizedBox(height: 18),
@@ -1089,46 +1126,278 @@ class _BookTabState extends State<BookTab> {
                 'Add New Venue / Pitch / Barber',
                 'أضف مكاناً أو ملعباً أو حلاقاً'),
           )
-        else
-          ...matchingVenues.expand((value) {
-            final selected = value.id == venue?.id;
-            return [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: RepaintBoundary(
-                  child: VenueBrowseCard(
-                    key: _venueCardKeys.putIfAbsent(value.id, () => GlobalKey()),
-                    venue: value,
-                    arabic: widget.arabic,
-                    selected: selected,
-                    favorite: _favoriteIds.contains(value.id),
-                    onTap: () => _selectVenue(value),
-                    onFavorite: () => _toggleFavorite(value),
-                    onDetails: () => _openVenueDetails(value),
-                  ),
+        else ...[
+          if (_type != null) ...[
+            _buildActiveCategoryFilterBanner(),
+            ...matchingVenues.expand(
+              (value) => _buildVenueCardAndBooking(
+                  value, venue, item, estimatedMinutes),
+            ),
+          ] else ...[
+            ..._buildCategorizedVenues(
+              matchingVenues,
+              venue,
+              item,
+              estimatedMinutes,
+            ),
+          ],
+          const SizedBox(height: 24),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 28),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: kPanel,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: kBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kInk.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.location_on_rounded,
+                      size: 15,
+                      color: kGreen,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      localized(
+                        widget.arabic,
+                        'Made with ❤️ in Kafr El-Sheikh',
+                        'صُنع بـ ❤️ في كفر الشيخ',
+                      ),
+                      style: const TextStyle(
+                        color: kMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topCenter,
-                child: (selected && venue != null)
-                    ? Container(
-                        key: _bookingSectionKey,
-                        margin: const EdgeInsets.only(bottom: 18),
-                        decoration: BoxDecoration(
-                          color: kPanel,
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
-                            color: kGreen.withValues(alpha: 0.28),
-                            width: 1.5,
-                          ),
-                          boxShadow: HagzyTheme.softShadow,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildActiveCategoryFilterBanner() {
+    final type = _type!;
+    final (label, icon, color) = switch (type) {
+      VenueType.salon => (
+          localized(widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
+          Icons.content_cut_rounded,
+          const Color(0xFF6366F1),
+        ),
+      VenueType.lounge => (
+          localized(widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
+          Icons.sports_esports_rounded,
+          const Color(0xFF8B5CF6),
+        ),
+      VenueType.sports => (
+          localized(widget.arabic, 'Sports & Courts', 'ملاعب ورياضة'),
+          Icons.sports_soccer_rounded,
+          kGreen,
+        ),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () => _selectCategory(null),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    localized(widget.arabic, 'Show All', 'عرض الكل'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.close_rounded, size: 14, color: color),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildCategorizedVenues(
+    List<Venue> matchingVenues,
+    Venue? selectedVenue,
+    VenueItem? item,
+    int estimatedMinutes,
+  ) {
+    if (matchingVenues.isEmpty) return const [];
+
+    final groomingVenues = matchingVenues
+        .where((v) => v.type == VenueType.salon)
+        .toList();
+    final entertainmentVenues = matchingVenues
+        .where((v) => v.type == VenueType.lounge)
+        .toList();
+    final sportsVenues = matchingVenues
+        .where((v) => v.type == VenueType.sports)
+        .toList();
+
+    return [
+      if (groomingVenues.isNotEmpty) ...[
+        _CategorySectionHeader(
+          title: localized(
+              widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
+          subtitle: localized(
+              widget.arabic,
+              'Barbershops, haircuts, beard styling & VIP chairs',
+              'صالونات حلاقة، تصفيف شعر، عناية شخصية وحجز الكراسي'),
+          icon: Icons.content_cut_rounded,
+          count: groomingVenues.length,
+          accentColor: const Color(0xFF6366F1),
+          arabic: widget.arabic,
+          onSeeAll: () => _selectCategory(VenueType.salon),
+        ),
+        ...groomingVenues.expand(
+          (v) => _buildVenueCardAndBooking(
+              v, selectedVenue, item, estimatedMinutes),
+        ),
+        const SizedBox(height: 10),
+      ],
+      if (entertainmentVenues.isNotEmpty) ...[
+        _CategorySectionHeader(
+          title: localized(
+              widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
+          subtitle: localized(
+              widget.arabic,
+              'PS5 VIP rooms, billiards, board games & lounges',
+              'غرف بلايستيشن VIP، بلياردو، ألعاب وكافيهات'),
+          icon: Icons.sports_esports_rounded,
+          count: entertainmentVenues.length,
+          accentColor: const Color(0xFF8B5CF6),
+          arabic: widget.arabic,
+          onSeeAll: () => _selectCategory(VenueType.lounge),
+        ),
+        ...entertainmentVenues.expand(
+          (v) => _buildVenueCardAndBooking(
+              v, selectedVenue, item, estimatedMinutes),
+        ),
+        const SizedBox(height: 10),
+      ],
+      if (sportsVenues.isNotEmpty) ...[
+        _CategorySectionHeader(
+          title: localized(
+              widget.arabic, 'Sports & Courts', 'ملاعب ورياضة'),
+          subtitle: localized(
+              widget.arabic,
+              'Padel courts, football pitches & fitness',
+              'ملاعب بادل، ملاعب كرة قدم وتمارين رياضية'),
+          icon: Icons.sports_soccer_rounded,
+          count: sportsVenues.length,
+          accentColor: kGreen,
+          arabic: widget.arabic,
+          onSeeAll: () => _selectCategory(VenueType.sports),
+        ),
+        ...sportsVenues.expand(
+          (v) => _buildVenueCardAndBooking(
+              v, selectedVenue, item, estimatedMinutes),
+        ),
+        const SizedBox(height: 10),
+      ],
+    ];
+  }
+
+  List<Widget> _buildVenueCardAndBooking(
+    Venue value,
+    Venue? selectedVenue,
+    VenueItem? item,
+    int estimatedMinutes,
+  ) {
+    final selected = value.id == selectedVenue?.id;
+    return [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: RepaintBoundary(
+          child: VenueBrowseCard(
+            key: _venueCardKeys.putIfAbsent(value.id, () => GlobalKey()),
+            venue: value,
+            arabic: widget.arabic,
+            selected: selected,
+            favorite: _favoriteIds.contains(value.id),
+            onTap: () => _selectVenue(value),
+            onFavorite: () => _toggleFavorite(value),
+            onDetails: () => _openVenueDetails(value),
+          ),
+        ),
+      ),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: (selected && selectedVenue != null)
+            ? _buildBookingSection(selectedVenue, item, estimatedMinutes)
+            : const SizedBox.shrink(),
+      ),
+    ];
+  }
+
+  Widget _buildBookingSection(
+    Venue venue,
+    VenueItem? item,
+    int estimatedMinutes,
+  ) {
+    return Container(
+      key: _bookingSectionKey,
+      margin: const EdgeInsets.only(bottom: 18),
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: kGreen.withValues(alpha: 0.28),
+          width: 1.5,
+        ),
+        boxShadow: HagzyTheme.softShadow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
                             // Breadfast / Talabat-style Top Tray Header
                             Container(
                               padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
@@ -1545,13 +1814,7 @@ class _BookTabState extends State<BookTab> {
                             ),
                           ],
                         ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ];
-          }),
-      ],
-    );
+                      );
   }
 
   List<TimeSlot> _timesFor(Venue venue, VenueItem item, int durationMinutes) {
@@ -2311,26 +2574,26 @@ class CustomerHero extends StatelessWidget {
         VenueType.sports => (
             const [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF059669)],
             Icons.sports_tennis,
-            localized(arabic, 'Padel & Football', 'بادل وكرة قدم'),
+            localized(arabic, 'Sports & Courts', 'ملاعب ورياضة'),
             localized(arabic, 'Courts, Pitches & Split-Pay Matches',
                 'ملاعب ومباريات مع تقسيم الدفع'),
             const Color(0xFFA7F3D0),
           ),
         VenueType.salon => (
-            const [Color(0xFF0F2922), Color(0xFF065F46), Color(0xFF059669)],
+            const [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
             Icons.content_cut,
-            localized(arabic, 'Hair & Beauty', 'العناية والجمال'),
+            localized(arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
             localized(arabic, 'Barbershops, Grooming & Chair Locks',
                 'حلاقة وعناية وحجز الكراسي'),
-            const Color(0xFFA7F3D0),
+            const Color(0xFFC7D2FE),
           ),
         VenueType.lounge => (
-            const [Color(0xFF0C221E), Color(0xFF047857), Color(0xFF10B981)],
+            const [Color(0xFF311042), Color(0xFF4C1D95), Color(0xFF6D28D9)],
             Icons.sports_esports,
-            localized(arabic, 'Gaming & Tables', 'ألعاب وطاولات'),
+            localized(arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
             localized(arabic, 'PS5 VIP Rooms, Billiards & Ping Pong',
                 'غرف بلايستيشن وبلياردو وبينغ بونغ'),
-            const Color(0xFFA7F3D0),
+            const Color(0xFFDDD6FE),
           ),
         null => (
             const [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF059669)],
@@ -2655,9 +2918,9 @@ class VenueBrowseCard extends StatelessWidget {
                                           VenueType.sports => localized(
                                               arabic, 'SPORTS & COURTS', 'رياضة وملاعب'),
                                           VenueType.salon => localized(
-                                              arabic, 'HAIR & BEAUTY', 'عناية وجمال'),
+                                              arabic, 'GROOMING & SALONS', 'حلاقة وعناية'),
                                           VenueType.lounge => localized(
-                                              arabic, 'GAMES & TABLES', 'ألعاب وطاولات'),
+                                              arabic, 'ENTERTAINMENT', 'ترفيه وألعاب'),
                                         },
                                         style: const TextStyle(
                                             color: Colors.white,
@@ -3364,6 +3627,292 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
               onPressed: widget.onBookNow,
               icon: const Icon(Icons.bookmark_add_rounded, size: 17),
               label: Text(localized(arabic, 'Book Now', 'احجز الآن')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryVisualCard extends StatelessWidget {
+  const _CategoryVisualCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.isSelected,
+    required this.gradient,
+    required this.glowColor,
+    required this.count,
+    required this.arabic,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isSelected;
+  final List<Color> gradient;
+  final Color glowColor;
+  final int count;
+  final bool arabic;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      scaleDown: 0.94,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: gradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isSelected ? null : kPanel,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? glowColor.withValues(alpha: 0.6)
+                : kBorder,
+            width: isSelected ? 1.6 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: glowColor.withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  )
+                ]
+              : [
+                  BoxShadow(
+                    color: kInk.withValues(alpha: 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : glowColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : glowColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
+                        color: isSelected ? Colors.white : kInk,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if (count > 0) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white.withValues(alpha: 0.25)
+                              : kSurfaceTint,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: isSelected ? Colors.white : kMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : kMuted,
+                  ),
+                ),
+              ],
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 16,
+                height: 16,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.check_rounded,
+                    size: 11,
+                    color: gradient.first,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategorySectionHeader extends StatelessWidget {
+  const _CategorySectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.count,
+    required this.accentColor,
+    required this.arabic,
+    required this.onSeeAll,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final int count;
+  final Color accentColor;
+  final bool arabic;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18, bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: accentColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: accentColor.withValues(alpha: 0.15),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: accentColor, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: kInk,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: accentColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: kMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(
+                foregroundColor: accentColor,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    localized(arabic, 'Filter', 'تصفية'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    arabic
+                        ? Icons.arrow_back_ios_new_rounded
+                        : Icons.arrow_forward_ios_rounded,
+                    size: 11,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
