@@ -143,26 +143,56 @@ class HagzyApi {
     return result['checkoutUrl'] as String;
   }
 
-  /// Requests a 6-digit OTP for customer phone verification.
-  Future<Map<String, dynamic>> requestCustomerOtp(String phone) async => _send(
+  /// Requests a 6-digit OTP code for customer phone or email verification.
+  Future<Map<String, dynamic>> requestCustomerOtp([
+    String? phone,
+    String? email,
+    String? name,
+  ]) async =>
+      _send(
         'POST',
         '/api/auth/customer-otp/request',
-        body: {'phone': phone.trim()},
+        body: {
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        },
       );
 
-  /// Verifies a customer OTP code and returns a signed customer session token.
-  Future<Map<String, dynamic>> verifyCustomerOtp(
-    String phone,
-    String code,
-  ) async =>
+  /// Requests a 6-digit OTP code with named parameters (for phone or email).
+  Future<Map<String, dynamic>> requestVerificationOtp({
+    String? phone,
+    String? email,
+    String? name,
+  }) async =>
+      requestCustomerOtp(phone, email, name);
+
+  /// Verifies a customer OTP code (SMS or Email) and returns session token & customer profile.
+  Future<Map<String, dynamic>> verifyCustomerOtp([
+    String? phone,
+    String? code,
+    String? email,
+    String? name,
+  ]) async =>
       _send(
         'POST',
         '/api/auth/customer-otp/verify',
         body: {
-          'phone': phone.trim(),
-          'code': code.trim(),
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+          if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
         },
       );
+
+  /// Verifies a customer OTP code with named parameters.
+  Future<Map<String, dynamic>> verifyVerificationOtp({
+    String? phone,
+    String? email,
+    required String code,
+    String? name,
+  }) async =>
+      verifyCustomerOtp(phone, code, email, name);
 
   /// Signs in a customer with an email address or phone number.
   Future<Map<String, dynamic>> customerSignIn({

@@ -62,6 +62,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   String _savedCustomerName = '';
   String _savedCustomerPhone = '';
   String _savedCustomerEmail = '';
+  String? _customerToken;
   bool _customerSignedIn = false;
   String _currentArea = 'Cairo';
   double _walletBalance = HagzyWallet.defaultWelcomeBalance;
@@ -122,6 +123,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           _savedCustomerName = profile['name'] as String? ?? '';
           _savedCustomerPhone = profile['phone'] as String? ?? '';
           _savedCustomerEmail = profile['email'] as String? ?? '';
+          _customerToken = profile['token'] as String?;
           _customerSignedIn = profile['isSignedIn'] as bool? ??
               (_savedCustomerPhone.isNotEmpty ||
                   _savedCustomerEmail.isNotEmpty);
@@ -3284,12 +3286,16 @@ class _HagzyHomeState extends State<HagzyHome> {
     required String email,
     required String phone,
     bool isSignedIn = true,
+    String? token,
   }) async {
     setState(() {
       _savedCustomerName = name;
       _savedCustomerEmail = email;
       _savedCustomerPhone = phone;
       _customerSignedIn = isSignedIn;
+      if (token != null && token.isNotEmpty) {
+        _customerToken = token;
+      }
     });
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -3300,6 +3306,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           'email': _savedCustomerEmail,
           'phone': _savedCustomerPhone,
           'isSignedIn': _customerSignedIn,
+          'token': _customerToken,
         }),
       );
     } catch (_) {}
@@ -3309,15 +3316,23 @@ class _HagzyHomeState extends State<HagzyHome> {
     required String name,
     required String email,
     required String phone,
+    String? token,
+    double? walletBalance,
   }) async {
-    double? remoteBalance;
-    if (_api.isConfigured) {
+    double? remoteBalance = walletBalance;
+    if (token != null && token.isNotEmpty) {
+      _customerToken = token;
+    }
+    if (_api.isConfigured && remoteBalance == null) {
       try {
         final res =
             await _api.customerSignIn(name: name, email: email, phone: phone);
         if (res['customer'] is Map<String, dynamic>) {
           final cust = res['customer'] as Map<String, dynamic>;
           remoteBalance = (cust['walletBalance'] as num?)?.toDouble();
+        }
+        if (_customerToken == null && res['token'] is String) {
+          _customerToken = res['token'] as String;
         }
       } catch (_) {}
     }
@@ -3326,6 +3341,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       email: email,
       phone: phone,
       isSignedIn: true,
+      token: _customerToken,
     );
     if (remoteBalance != null) {
       final prefs = await SharedPreferences.getInstance();
@@ -3344,6 +3360,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       final profileRes = await _api.getCustomerProfile(
         phone: _savedCustomerPhone,
         email: _savedCustomerEmail,
+        token: _customerToken,
       );
       if (profileRes['customer'] is Map<String, dynamic>) {
         final cust = profileRes['customer'] as Map<String, dynamic>;
@@ -3376,6 +3393,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       final remoteBookings = await _api.customerBookings(
         phone: _savedCustomerPhone,
         email: _savedCustomerEmail,
+        token: _customerToken,
       );
       final parsedRemote = remoteBookings
           .map((b) => Booking.fromJson(b as Map<String, dynamic>))
@@ -3403,6 +3421,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _savedCustomerEmail = '';
       _savedCustomerPhone = '';
       _customerSignedIn = false;
+      _customerToken = null;
     });
     try {
       final prefs = await SharedPreferences.getInstance();

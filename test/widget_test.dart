@@ -784,18 +784,38 @@ void main() {
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Phone Number'), findsOneWidget);
 
-    // 2. Sign in with Email
+    // 2. Sign in with Email via verification code
     await tester.enterText(
         find.widgetWithText(TextField, 'Full Name (optional)'),
         'Mohamed Hegazy');
     await tester.enterText(
         find.widgetWithText(TextField, 'Email Address'),
         'hegazy@example.com');
-    await tester.tap(find.text('Sign In Now'));
+    await tester.tap(find.text('Send Verification Code'));
+    await tester.pumpAndSettle();
+
+    // Verify OTP verification view is shown
+    expect(find.text('Enter Verification Code'), findsOneWidget);
+    expect(find.textContaining('hegazy@example.com'), findsWidgets);
+
+    // Enter 6-digit OTP and complete verification
+    await tester.enterText(find.byType(TextField).last, '123456');
+    await tester.pumpAndSettle();
+    final verifyBtn = find.text('Verify & Sign In');
+    await tester.ensureVisible(verifyBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(verifyBtn);
     await tester.pumpAndSettle();
 
     // Verify user is now signed in with profile card
-    expect(find.text('Mohamed Hegazy'), findsOneWidget);
+    final profileName = find.text('Mohamed Hegazy');
+    await tester.scrollUntilVisible(
+      profileName,
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(profileName, findsOneWidget);
     expect(find.text('hegazy@example.com'), findsWidgets);
 
     // 3. Sign out
@@ -812,7 +832,7 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Out'));
     await tester.pumpAndSettle();
 
-    // 4. Scroll back up and sign in with Phone Number
+    // 4. Scroll back up and sign in with Phone Number via SMS verification code
     final phoneToggle = find.text('Phone Number');
     await tester.scrollUntilVisible(
       phoneToggle,
@@ -831,10 +851,23 @@ void main() {
         find.widgetWithText(TextField, 'Phone Number'),
         '01012345678');
 
-    final signInBtn = find.text('Sign In Now');
-    await tester.ensureVisible(signInBtn);
+    final sendSmsBtn = find.text('Send SMS Verification Code');
+    await tester.ensureVisible(sendSmsBtn);
     await tester.pumpAndSettle();
-    await tester.tap(signInBtn);
+    await tester.tap(sendSmsBtn);
+    await tester.pumpAndSettle();
+
+    // Verify OTP verification view is shown for SMS
+    expect(find.text('Enter Verification Code'), findsOneWidget);
+    expect(find.textContaining('01012345678'), findsWidgets);
+
+    // Enter 6-digit OTP and complete verification
+    await tester.enterText(find.byType(TextField).last, '123456');
+    await tester.pumpAndSettle();
+    final verifyPhoneBtn = find.text('Verify & Sign In');
+    await tester.ensureVisible(verifyPhoneBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(verifyPhoneBtn);
     await tester.pumpAndSettle();
 
     // Scroll up to view the signed-in profile card
