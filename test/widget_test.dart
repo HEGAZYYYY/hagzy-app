@@ -735,5 +735,35 @@ void main() {
 
     expect(find.byType(HagzyMapExplorer), findsNothing);
   });
+
+  testWidgets(
+      'customer can auto-assign area via GPS in modal and from area bar',
+      (tester) async {
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // 1. Open area selection modal by tapping Change
+    await tester.tap(find.text('Change'));
+    await tester.pumpAndSettle();
+
+    // Verify modal elements
+    expect(find.text('Choose a governorate'), findsOneWidget);
+    expect(find.text('Auto-Assign Area via GPS'), findsOneWidget);
+
+    // Tap Auto-Assign Area via GPS inside the dialog
+    await tester.tap(find.text('Auto-Assign Area via GPS'));
+    await tester.pumpAndSettle();
+
+    // Verify feedback and updated area
+    expect(find.textContaining('Auto-assigned area via GPS'), findsOneWidget);
+
+    // 2. Also test tapping the GPS badge on the CustomerAreaBar directly
+    final gpsBadge = find.text('GPS');
+    expect(gpsBadge, findsOneWidget);
+    await tester.tap(gpsBadge);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Auto-assigned area via GPS'), findsOneWidget);
+  });
 }
 
