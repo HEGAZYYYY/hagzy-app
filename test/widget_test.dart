@@ -960,5 +960,55 @@ void main() {
     // Verify active filter banner is cleared
     expect(find.textContaining('Barbers:'), findsNothing);
   });
+
+  testWidgets('when no places found in an area, customer can change area or explore all governorates', (tester) async {
+    // Seed with a venue in Cairo, but user area is Aswan where there are 0 venues
+    SharedPreferences.setMockInitialValues({
+      'hagzy_app_data_v1': jsonEncode({
+        'venues': [
+          {
+            'id': 'cairo-club',
+            'name': 'Cairo Sports Hub',
+            'location': 'Cairo',
+            'type': 'sports',
+            'items': [
+              {'id': 'c1', 'name': 'Court 1', 'kind': 'Padel court', 'hourlyRate': 300.0}
+            ],
+            'services': [],
+          }
+        ],
+        'bookings': [],
+      }),
+      'hagzy_customer_area': 'Aswan',
+    });
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // Verify empty state is shown with area explanation
+    final emptyFinder = find.text('No Places Found Here');
+    await tester.scrollUntilVisible(
+      emptyFinder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(emptyFinder, findsOneWidget);
+    expect(find.textContaining('No venues currently found in Aswan'), findsOneWidget);
+
+    // Verify option to Change Area is present
+    final changeAreaBtn = find.text('Change Area / Governorate');
+    expect(changeAreaBtn, findsOneWidget);
+
+    // Verify option to Explore All Egypt Governorates is present
+    final exploreAllBtn = find.text('Explore All Egypt Governorates');
+    expect(exploreAllBtn, findsOneWidget);
+
+    // Tap Explore All Egypt Governorates
+    await tester.tap(exploreAllBtn);
+    await tester.pumpAndSettle();
+
+    // Now Cairo Sports Hub appears
+    expect(find.text('Cairo Sports Hub'), findsOneWidget);
+  });
 }
 

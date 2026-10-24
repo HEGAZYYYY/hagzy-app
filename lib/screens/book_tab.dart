@@ -1107,7 +1107,7 @@ class _BookTabState extends State<BookTab> {
         ],
         if (matchingVenues.isEmpty)
           EmptyCard(
-            icon: _favoritesOnly ? Icons.favorite_border : Icons.store_outlined,
+            icon: _favoritesOnly ? Icons.favorite_border : Icons.location_off_outlined,
             title: _favoritesOnly
                 ? localized(widget.arabic, 'No Saved Places Yet',
                     'لا توجد أماكن مفضلة بعد')
@@ -1118,15 +1118,20 @@ class _BookTabState extends State<BookTab> {
                     widget.arabic,
                     'Tap the heart on a venue to keep it close.',
                     'اضغط على القلب لحفظ المكان في المفضلة.')
-                : widget.venues.isEmpty
+                : _area != kAllEgyptAreas
                     ? localized(
                         widget.arabic,
-                        'We’re bringing great local venues to Hagzy. Check back soon.',
-                        'نعمل على إضافة أماكن رائعة بالقرب منك. تفقّدنا قريباً.')
-                    : localized(
-                        widget.arabic,
-                        'Try another category, search or area.',
-                        'جرّب تصنيفاً أو بحثاً أو محافظة أخرى.'),
+                        'No venues currently found in ${governorateName(_area, widget.arabic)}. Change your area or explore all governorates.',
+                        'لا توجد أماكن متاحة حالياً في ${governorateName(_area, widget.arabic)}. يمكنك تغيير منطقتك أو استعراض كل المحافظات.')
+                    : widget.venues.isEmpty
+                        ? localized(
+                            widget.arabic,
+                            'We’re bringing great local venues to Hagzy. Check back soon.',
+                            'نعمل على إضافة أماكن رائعة بالقرب منك. تفقّدنا قريباً.')
+                        : localized(
+                            widget.arabic,
+                            'Try changing your area, category or search query.',
+                            'جرّب تغيير المنطقة أو التصنيف أو عبارة البحث.'),
             action: !_favoritesOnly && widget.onAddVenue != null
                 ? () => widget.onAddVenue!(_type)
                 : null,
@@ -1134,6 +1139,19 @@ class _BookTabState extends State<BookTab> {
                 widget.arabic,
                 'Add New Venue / Pitch / Barber',
                 'أضف مكاناً أو ملعباً أو حلاقاً'),
+            secondaryAction: !_favoritesOnly ? _chooseArea : null,
+            secondaryActionLabel: localized(
+                widget.arabic,
+                'Change Area / Governorate',
+                'تغيير المنطقة أو المحافظة'),
+            secondaryIcon: Icons.location_on_outlined,
+            tertiaryAction: !_favoritesOnly && _area != kAllEgyptAreas
+                ? () => _assignArea(kAllEgyptAreas)
+                : null,
+            tertiaryActionLabel: localized(
+                widget.arabic,
+                'Explore All Egypt Governorates',
+                'استكشف كل محافظات مصر'),
           )
         else ...[
           if (_type != null) ...[

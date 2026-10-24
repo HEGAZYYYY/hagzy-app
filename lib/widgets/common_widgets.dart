@@ -840,6 +840,12 @@ class EmptyCard extends StatelessWidget {
     required this.body,
     this.action,
     this.actionLabel,
+    this.actionIcon = Icons.add_business_outlined,
+    this.secondaryAction,
+    this.secondaryActionLabel,
+    this.secondaryIcon = Icons.location_on_outlined,
+    this.tertiaryAction,
+    this.tertiaryActionLabel,
   });
 
   final IconData icon;
@@ -847,6 +853,12 @@ class EmptyCard extends StatelessWidget {
   final String body;
   final VoidCallback? action;
   final String? actionLabel;
+  final IconData actionIcon;
+  final VoidCallback? secondaryAction;
+  final String? secondaryActionLabel;
+  final IconData secondaryIcon;
+  final VoidCallback? tertiaryAction;
+  final String? tertiaryActionLabel;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -862,6 +874,7 @@ class EmptyCard extends StatelessWidget {
             IconBox(icon: icon),
             const SizedBox(height: 14),
             Text(title,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -876,8 +889,64 @@ class EmptyCard extends StatelessWidget {
               const SizedBox(height: 18),
               FilledButton.icon(
                 onPressed: action,
-                icon: const Icon(Icons.add_business_outlined),
+                icon: Icon(actionIcon),
                 label: Text(actionLabel!),
+                style: FilledButton.styleFrom(
+                  backgroundColor: kGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+            if (secondaryAction != null && secondaryActionLabel != null) ...[
+              SizedBox(height: (action != null && actionLabel != null) ? 10 : 18),
+              (action == null || actionLabel == null)
+                  ? FilledButton.icon(
+                      onPressed: secondaryAction,
+                      icon: Icon(secondaryIcon, size: 18),
+                      label: Text(secondaryActionLabel!),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: kGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: secondaryAction,
+                      icon: Icon(secondaryIcon, size: 18),
+                      label: Text(secondaryActionLabel!),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kGreen,
+                        side: const BorderSide(color: kGreen, width: 1.4),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+            ],
+            if (tertiaryAction != null && tertiaryActionLabel != null) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: tertiaryAction,
+                style: TextButton.styleFrom(
+                  foregroundColor: kGreen,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Text(
+                  tertiaryActionLabel!,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
               ),
             ],
           ],
