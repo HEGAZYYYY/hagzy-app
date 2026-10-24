@@ -180,6 +180,71 @@ class HagzyApi {
         },
       );
 
+  /// Retrieves synced customer profile and cloud wallet balance.
+  Future<Map<String, dynamic>> getCustomerProfile({
+    String? token,
+    String? phone,
+    String? email,
+  }) async {
+    final queryParams = <String, String>{
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+    };
+    final uri = Uri(path: '/api/customer/profile', queryParameters: queryParams.isEmpty ? null : queryParams);
+    return _send('GET', uri.toString(), token: token);
+  }
+
+  /// Atomically deducts customer wallet balance on the cloud server.
+  Future<Map<String, dynamic>> deductWalletFunds({
+    required double amount,
+    String? token,
+    String? phone,
+    String? email,
+  }) async =>
+      _send(
+        'POST',
+        '/api/customer/wallet/deduct',
+        token: token,
+        body: {
+          'amount': amount,
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+        },
+      );
+
+  /// Adds funds to the customer cloud wallet.
+  Future<Map<String, dynamic>> addWalletFunds({
+    required double amount,
+    String? token,
+    String? phone,
+    String? email,
+  }) async =>
+      _send(
+        'POST',
+        '/api/customer/wallet/add',
+        token: token,
+        body: {
+          'amount': amount,
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+        },
+      );
+
+  /// Retrieves all confirmed and pending customer bookings from cloud server.
+  Future<List<dynamic>> customerBookings({
+    String? phone,
+    String? email,
+    String? token,
+  }) async {
+    final queryParams = <String, String>{
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+    };
+    final uri = Uri(path: '/api/bookings', queryParameters: queryParams.isEmpty ? null : queryParams);
+    final result = await _send('GET', uri.toString(), token: token);
+    return result['bookings'] as List<dynamic>? ?? const [];
+  }
+
   /// Creates a FawryPay reference number for a pending booking deposit.
   Future<Map<String, dynamic>> createFawryCheckout(
     String bookingId, {

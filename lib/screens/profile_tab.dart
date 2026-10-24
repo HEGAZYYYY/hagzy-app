@@ -380,6 +380,11 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       icon: Icons.location_on_rounded,
                       label: governorateName(widget.currentArea, arabic),
                     ),
+                    _InfoChip(
+                      icon: Icons.cloud_done_rounded,
+                      label: localized(
+                          arabic, 'Cloud Synced', 'متزامن سحابياً'),
+                    ),
                   ],
                 ),
               ],

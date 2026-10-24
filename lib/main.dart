@@ -171,6 +171,11 @@ class _HagzyHomeState extends State<HagzyHome> {
               _bookings.length) {
         await _persistExpiredBookingRemoval(prefs);
       }
+      if (_customerSignedIn ||
+          _savedCustomerPhone.isNotEmpty ||
+          _savedCustomerEmail.isNotEmpty) {
+        unawaited(_syncAccountData());
+      }
       if (mounted) setState(() {});
     } catch (error) {
       if (mounted) {
@@ -1777,6 +1782,20 @@ class _HagzyHomeState extends State<HagzyHome> {
     if (booking == null) return;
     if (walletDeducted > 0) {
       await HagzyWallet.deductFunds(walletDeducted);
+      if (_api.isConfigured &&
+          (_savedCustomerPhone.isNotEmpty || _savedCustomerEmail.isNotEmpty)) {
+        try {
+          final res = await _api.deductWalletFunds(
+            amount: walletDeducted,
+            phone: _savedCustomerPhone,
+            email: _savedCustomerEmail,
+          );
+          final newBal = (res['walletBalance'] as num?)?.toDouble();
+          if (newBal != null && mounted) {
+            setState(() => _walletBalance = newBal);
+          }
+        } catch (_) {}
+      }
     }
     if (!walkIn) {
       _savedCustomerName = booking.customer;
@@ -3291,9 +3310,15 @@ class _HagzyHomeState extends State<HagzyHome> {
     required String email,
     required String phone,
   }) async {
+    double? remoteBalance;
     if (_api.isConfigured) {
       try {
-        await _api.customerSignIn(name: name, email: email, phone: phone);
+        final res =
+            await _api.customerSignIn(name: name, email: email, phone: phone);
+        if (res['customer'] is Map<String, dynamic>) {
+          final cust = res['customer'] as Map<String, dynamic>;
+          remoteBalance = (cust['walletBalance'] as num?)?.toDouble();
+        }
       } catch (_) {}
     }
     await _saveCustomerProfile(
@@ -3302,6 +3327,74 @@ class _HagzyHomeState extends State<HagzyHome> {
       phone: phone,
       isSignedIn: true,
     );
+    if (remoteBalance != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(HagzyWallet.keyWallet, remoteBalance);
+      if (mounted) setState(() => _walletBalance = remoteBalance!);
+    }
+    await _syncAccountData();
+  }
+
+  Future<void> _syncAccountData() async {
+    if (!_api.isConfigured) return;
+    if (_savedCustomerPhone.isEmpty && _savedCustomerEmail.isEmpty) return;
+
+    try {
+      // 1. Sync Customer Profile & Cloud Wallet Balance
+      final profileRes = await _api.getCustomerProfile(
+        phone: _savedCustomerPhone,
+        email: _savedCustomerEmail,
+      );
+      if (profileRes['customer'] is Map<String, dynamic>) {
+        final cust = profileRes['customer'] as Map<String, dynamic>;
+        final cloudBalance = (cust['walletBalance'] as num?)?.toDouble();
+        final cloudName = cust['name'] as String? ?? '';
+        final cloudEmail = cust['email'] as String? ?? '';
+        final cloudPhone = cust['phone'] as String? ?? '';
+
+        if (cloudBalance != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setDouble(HagzyWallet.keyWallet, cloudBalance);
+          if (mounted) {
+            setState(() {
+              _walletBalance = cloudBalance;
+              if (_savedCustomerName.isEmpty && cloudName.isNotEmpty) {
+                _savedCustomerName = cloudName;
+              }
+              if (_savedCustomerEmail.isEmpty && cloudEmail.isNotEmpty) {
+                _savedCustomerEmail = cloudEmail;
+              }
+              if (_savedCustomerPhone.isEmpty && cloudPhone.isNotEmpty) {
+                _savedCustomerPhone = cloudPhone;
+              }
+            });
+          }
+        }
+      }
+
+      // 2. Sync Customer Bookings from Cloud
+      final remoteBookings = await _api.customerBookings(
+        phone: _savedCustomerPhone,
+        email: _savedCustomerEmail,
+      );
+      final parsedRemote = remoteBookings
+          .map((b) => Booking.fromJson(b as Map<String, dynamic>))
+          .where(_bookingHasNotExpired)
+          .toList();
+
+      if (parsedRemote.isNotEmpty) {
+        final merged = [..._bookings];
+        for (final remote in parsedRemote) {
+          final idx = merged.indexWhere((b) => b.id == remote.id);
+          if (idx >= 0) {
+            merged[idx] = remote;
+          } else {
+            merged.add(remote);
+          }
+        }
+        await _commit(_venues, merged);
+      }
+    } catch (_) {}
   }
 
   Future<void> _handleCustomerSignOut() async {
