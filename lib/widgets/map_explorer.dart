@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
+
 import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import 'common_widgets.dart';
@@ -14,6 +17,7 @@ class HagzyMapExplorer extends StatefulWidget {
     required this.onSelectVenue,
     required this.onBookVenue,
     this.selectedVenueId,
+    this.onAreaDetected,
   });
 
   final List<Venue> venues;
@@ -22,12 +26,14 @@ class HagzyMapExplorer extends StatefulWidget {
   final ValueChanged<Venue> onSelectVenue;
   final void Function(Venue venue) onBookVenue;
   final String? selectedVenueId;
+  final ValueChanged<String>? onAreaDetected;
 
   @override
   State<HagzyMapExplorer> createState() => _HagzyMapExplorerState();
 }
 
 class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
+  late final MapController _mapController;
   String? _activeVenueId;
   double? _maxDistanceKm; // null = all distances, or 5, 15, 30, 50
   Position? _userGpsPosition;
@@ -37,6 +43,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _activeVenueId = widget.selectedVenueId ?? widget.venues.firstOrNull?.id;
     // Auto-request GPS on device/browser (skip in automated test runner)
     if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
@@ -97,7 +104,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
 
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
+          accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 10),
         ),
       );
@@ -106,14 +113,28 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
         setState(() {
           _userGpsPosition = pos;
           _locating = false;
-          _gpsStatusMessage = widget.arabic ? 'تم تحديد موقعك' : 'Location found';
+          _gpsStatusMessage =
+              widget.arabic ? 'تم تحديد موقعك بدقة' : 'GPS location found';
         });
+
+        // Center the functional map on the user's live position
+        try {
+          _mapController.move(ll.LatLng(pos.latitude, pos.longitude), 13.5);
+        } catch (_) {}
+
+        // Auto-assign nearest governorate in the app
+        final nearestGov =
+            findNearestGovernorate(pos.latitude, pos.longitude);
+        if (widget.onAreaDetected != null) {
+          widget.onAreaDetected!(nearestGov);
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _locating = false;
-          _gpsStatusMessage = widget.arabic ? 'تعذر جلب GPS' : 'GPS unavailable';
+          _gpsStatusMessage =
+              widget.arabic ? 'تعذر جلب GPS' : 'GPS unavailable';
         });
       }
     }
@@ -125,6 +146,16 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
     if (widget.selectedVenueId != null &&
         widget.selectedVenueId != _activeVenueId) {
       setState(() => _activeVenueId = widget.selectedVenueId);
+      final venue =
+          widget.venues.where((v) => v.id == widget.selectedVenueId).firstOrNull;
+      if (venue != null) {
+        try {
+          _mapController.move(
+            ll.LatLng(venue.effectiveLatitude, venue.effectiveLongitude),
+            14.5,
+          );
+        } catch (_) {}
+      }
     }
   }
 
@@ -135,18 +166,6 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
     return kEgyptGovernorateCoordinates[widget.selectedArea] ??
         kEgyptGovernorateCoordinates['Cairo'] ??
         (30.0444, 31.2357);
-  }
-
-  (double, double) _coordToRelative(double lat, double lng) {
-    const minLat = 27.0;
-    const maxLat = 31.5;
-    const minLon = 29.5;
-    const maxLon = 34.0;
-
-    final relX = ((lng - minLon) / (maxLon - minLon)).clamp(0.10, 0.90);
-    final relY =
-        (1.0 - ((lat - minLat) / (maxLat - minLat))).clamp(0.10, 0.90);
-    return (relX, relY);
   }
 
   double _getDistanceToVenue(Venue venue) {
@@ -165,7 +184,8 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
       final dist = _getDistanceToVenue(v);
       return dist <= _maxDistanceKm!;
     }).toList()
-      ..sort((a, b) => _getDistanceToVenue(a).compareTo(_getDistanceToVenue(b)));
+      ..sort((a, b) =>
+          _getDistanceToVenue(a).compareTo(_getDistanceToVenue(b)));
     return list;
   }
 
@@ -179,12 +199,171 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
     }
   }
 
+  void _onTapVenuePin(Venue v) {
+    setState(() => _activeVenueId = v.id);
+    widget.onSelectVenue(v);
+    try {
+      _mapController.move(
+        ll.LatLng(v.effectiveLatitude, v.effectiveLongitude),
+        15.0,
+      );
+    } catch (_) {}
+  }
+
+  Widget _buildUserLocationMarker(bool arabic) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.28),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x662563EB),
+                blurRadius: 12,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF2563EB),
+              border: Border.all(color: Colors.white, width: 2.5),
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E3A8A),
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: const [
+              BoxShadow(color: Colors.black26, blurRadius: 4),
+            ],
+          ),
+          child: Text(
+            localized(arabic, 'You', 'أنت هنا'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVenueMarker(Venue v, bool isSelected) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.all(isSelected ? 9 : 6),
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? HagzyTheme.brandGradient
+                : HagzyTheme.obsidianGradient,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white,
+              width: isSelected ? 2.5 : 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? kGreen.withValues(alpha: 0.5)
+                    : Colors.black.withValues(alpha: 0.35),
+                blurRadius: isSelected ? 12 : 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(
+            v.type.icon,
+            size: isSelected ? 18 : 13,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          constraints: const BoxConstraints(maxWidth: 78),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.95),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? kGreen : kBorder,
+              width: isSelected ? 1.5 : 0.8,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Text(
+            v.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+              color: isSelected ? kGreen : kInk,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMapControlButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    Color color = kInk,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: PressableScale(
+        scaleDown: 0.92,
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.96),
+            shape: BoxShape.circle,
+            border: Border.all(color: kBorder),
+            boxShadow: const [
+              BoxShadow(
+                  color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
+            ],
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final arabic = widget.arabic;
     final sortedVenues = _getFilteredAndSortedVenues();
-    final activeVenue = sortedVenues.where((v) => v.id == _activeVenueId).firstOrNull ??
-        sortedVenues.firstOrNull;
+    final activeVenue =
+        sortedVenues.where((v) => v.id == _activeVenueId).firstOrNull ??
+            sortedVenues.firstOrNull;
+    final center = _getUserCenter();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -370,203 +549,148 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
         ),
         const SizedBox(height: 12),
 
-        // Interactive Map Canvas
-        ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            height: 280,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE2EBE5),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: kBorder),
-              boxShadow: HagzyTheme.softShadow,
-            ),
-            child: Stack(
-              children: [
-                // Stylized map background pattern representing Nile delta & road grid
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _EgyptMapGridPainter(),
+        // Real Functional Interactive Map (OpenStreetMap tile engine)
+        Container(
+          height: 330,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: kBorder, width: 1.5),
+            boxShadow: HagzyTheme.softShadow,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: ll.LatLng(center.$1, center.$2),
+                  initialZoom: _userGpsPosition != null ? 13.5 : 12.0,
+                  minZoom: 4.0,
+                  maxZoom: 18.0,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
                   ),
                 ),
-
-                // Area / City label watermarks
-                Positioned(
-                  top: 18,
-                  left: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.explore_rounded,
-                            size: 14, color: kGreen),
-                        const SizedBox(width: 6),
-                        Text(
-                          localized(arabic, 'Egypt Interactive Map',
-                              'خريطة مصر التفاعلية'),
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: kInk,
-                          ),
-                        ),
-                      ],
-                    ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'app.hagzy.customer',
+                    maxZoom: 19,
                   ),
-                ),
-
-                // Venue Pins
-                ...sortedVenues.map((v) {
-                  final isSelected = v.id == activeVenue?.id;
-                  final rel = _coordToRelative(
-                    v.effectiveLatitude,
-                    v.effectiveLongitude,
-                  );
-
-                  return Positioned(
-                    left: rel.$1 * 320,
-                    top: rel.$2 * 230,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() => _activeVenueId = v.id);
-                        widget.onSelectVenue(v);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: EdgeInsets.all(isSelected ? 9 : 6),
-                            decoration: BoxDecoration(
-                              gradient: isSelected
-                                  ? HagzyTheme.brandGradient
-                                  : HagzyTheme.obsidianGradient,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: isSelected ? 2.5 : 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isSelected
-                                      ? kGreen.withValues(alpha: 0.45)
-                                      : Colors.black.withValues(alpha: 0.25),
-                                  blurRadius: isSelected ? 12 : 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              v.type.icon,
-                              size: isSelected ? 18 : 13,
-                              color: Colors.white,
-                            ),
+                  MarkerLayer(
+                    markers: [
+                      // User's exact live location marker
+                      if (_userGpsPosition != null)
+                        Marker(
+                          point: ll.LatLng(
+                            _userGpsPosition!.latitude,
+                            _userGpsPosition!.longitude,
                           ),
-                          const SizedBox(height: 3),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(6),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              v.name,
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: isSelected
-                                    ? FontWeight.w900
-                                    : FontWeight.w700,
-                                color: isSelected ? kGreen : kInk,
-                              ),
-                            ),
+                          width: 65,
+                          height: 65,
+                          alignment: Alignment.center,
+                          child: _buildUserLocationMarker(arabic),
+                        ),
+                      // Real venue markers on actual streets
+                      ...sortedVenues.map((v) {
+                        final isSelected = v.id == activeVenue?.id;
+                        return Marker(
+                          point: ll.LatLng(
+                            v.effectiveLatitude,
+                            v.effectiveLongitude,
                           ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-
-                // User Live GPS Pin (if enabled)
-                if (_userGpsPosition != null) ...[
-                  Builder(builder: (ctx) {
-                    final rel = _coordToRelative(
-                      _userGpsPosition!.latitude,
-                      _userGpsPosition!.longitude,
-                    );
-                    return Positioned(
-                      left: rel.$1 * 320 - 15,
-                      top: rel.$2 * 230 - 15,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF3B82F6)
-                                  .withValues(alpha: 0.3),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x662563EB),
-                                  blurRadius: 10,
-                                  spreadRadius: 3,
-                                ),
-                              ],
-                            ),
-                            child: Container(
-                              width: 14,
-                              height: 14,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFF2563EB),
-                                border: Border.fromBorderSide(
-                                  BorderSide(color: Colors.white, width: 2),
-                                ),
-                              ),
-                            ),
+                          width: isSelected ? 80 : 54,
+                          height: isSelected ? 80 : 54,
+                          alignment: Alignment.topCenter,
+                          child: GestureDetector(
+                            onTap: () => _onTapVenuePin(v),
+                            child: _buildVenueMarker(v, isSelected),
                           ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E3A8A),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              localized(arabic, 'You', 'موقعك'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                        );
+                      }),
+                    ],
+                  ),
                 ],
-              ],
-            ),
+              ),
+
+              // Interactive Floating Map Controls (Zoom In, Zoom Out, Recenter)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Column(
+                  children: [
+                    _buildMapControlButton(
+                      icon: Icons.add_rounded,
+                      tooltip: localized(arabic, 'Zoom In', 'تكبير'),
+                      onTap: () {
+                        final current = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          (current + 1.0).clamp(4.0, 18.0),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    _buildMapControlButton(
+                      icon: Icons.remove_rounded,
+                      tooltip: localized(arabic, 'Zoom Out', 'تصغير'),
+                      onTap: () {
+                        final current = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          (current - 1.0).clamp(4.0, 18.0),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    _buildMapControlButton(
+                      icon: Icons.my_location_rounded,
+                      tooltip: localized(
+                          arabic, 'Center on my location', 'توسيط موقعي'),
+                      color: _userGpsPosition != null
+                          ? const Color(0xFF2563EB)
+                          : kGreen,
+                      onTap: () {
+                        if (_userGpsPosition != null) {
+                          _mapController.move(
+                            ll.LatLng(
+                              _userGpsPosition!.latitude,
+                              _userGpsPosition!.longitude,
+                            ),
+                            14.5,
+                          );
+                        } else {
+                          _requestGpsLocation();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Attribution Watermark
+              Positioned(
+                bottom: 6,
+                left: 10,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '© OpenStreetMap contributors',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
@@ -664,7 +788,8 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                         onPressed: () => _openDirections(activeVenue),
                         icon: const Icon(Icons.directions_rounded,
                             size: 16, color: kGreen),
-                        label: Text(localized(arabic, 'Directions', 'الاتجاهات')),
+                        label: Text(
+                            localized(arabic, 'Directions', 'الاتجاهات')),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -678,7 +803,8 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                               borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () => widget.onBookVenue(activeVenue),
-                        icon: const Icon(Icons.calendar_today_rounded, size: 15),
+                        icon:
+                            const Icon(Icons.calendar_today_rounded, size: 15),
                         label: Text(localized(arabic, 'Book Now', 'احجز الآن')),
                       ),
                     ),
@@ -691,67 +817,4 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
       ],
     );
   }
-}
-
-class _EgyptMapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final riverPaint = Paint()
-      ..color = const Color(0xFF93C5FD).withValues(alpha: 0.5)
-      ..strokeWidth = 3.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final nilePath = Path()
-      ..moveTo(size.width * 0.58, size.height)
-      ..quadraticBezierTo(
-        size.width * 0.54,
-        size.height * 0.65,
-        size.width * 0.52,
-        size.height * 0.45,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.51,
-        size.height * 0.35,
-        size.width * 0.50,
-        size.height * 0.22,
-      );
-
-    // Delta branches
-    final deltaBranchWest = Path()
-      ..moveTo(size.width * 0.50, size.height * 0.22)
-      ..quadraticBezierTo(
-        size.width * 0.44,
-        size.height * 0.12,
-        size.width * 0.38,
-        0,
-      );
-    final deltaBranchEast = Path()
-      ..moveTo(size.width * 0.50, size.height * 0.22)
-      ..quadraticBezierTo(
-        size.width * 0.54,
-        size.height * 0.10,
-        size.width * 0.60,
-        0,
-      );
-
-    canvas.drawPath(nilePath, riverPaint);
-    canvas.drawPath(deltaBranchWest, riverPaint);
-    canvas.drawPath(deltaBranchEast, riverPaint);
-
-    // Grid lines for modern radar / geo look
-    final gridPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.04)
-      ..strokeWidth = 1.0;
-
-    for (double x = 0; x < size.width; x += 35) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = 0; y < size.height; y += 35) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

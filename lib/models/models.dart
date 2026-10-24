@@ -71,6 +71,25 @@ double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
   return 12742 * asin(sqrt(a));
 }
 
+String findNearestGovernorate(double userLat, double userLng) {
+  String nearest = 'Cairo';
+  double minDistance = double.infinity;
+
+  for (final entry in kEgyptGovernorateCoordinates.entries) {
+    final dist = calculateDistanceKm(
+      userLat,
+      userLng,
+      entry.value.$1,
+      entry.value.$2,
+    );
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearest = entry.key;
+    }
+  }
+  return nearest;
+}
+
 String localized(bool arabic, String english, String arabicText) =>
     arabic ? arabicText : english;
 

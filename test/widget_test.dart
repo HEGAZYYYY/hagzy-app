@@ -666,6 +666,12 @@ void main() {
     expect(distSame, closeTo(0.0, 0.001));
   });
 
+  test('findNearestGovernorate correctly identifies nearest Egyptian city from GPS coords', () {
+    expect(findNearestGovernorate(30.05, 31.24), 'Cairo');
+    expect(findNearestGovernorate(31.21, 29.92), 'Alexandria');
+    expect(findNearestGovernorate(31.11, 30.94), 'Kafr El Sheikh');
+  });
+
   test('promo engine correctly computes fixed, percentage, and category discounts', () {
     final promo50 = kAvailablePromos.firstWhere((p) => p.code == 'HAGZY50');
     expect(promo50.calculateDiscount(100, VenueType.sports), 0);

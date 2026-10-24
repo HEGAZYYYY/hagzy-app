@@ -675,6 +675,11 @@ class _BookTabState extends State<BookTab> {
             arabic: widget.arabic,
             selectedArea: _area == kAllEgyptAreas ? 'Cairo' : _area,
             selectedVenueId: _venueId,
+            onAreaDetected: (detectedGov) {
+              if (_area != detectedGov) {
+                setState(() => _area = detectedGov);
+              }
+            },
             onSelectVenue: (v) => _selectVenue(v, toggleIfSame: false),
             onBookVenue: (v) {
               final defaultItem = v.items.firstOrNull ??
