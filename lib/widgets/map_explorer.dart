@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
@@ -29,11 +30,93 @@ class HagzyMapExplorer extends StatefulWidget {
 class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
   String? _activeVenueId;
   double? _maxDistanceKm; // null = all distances, or 5, 15, 30, 50
+  Position? _userGpsPosition;
+  bool _locating = false;
+  String? _gpsStatusMessage;
 
   @override
   void initState() {
     super.initState();
     _activeVenueId = widget.selectedVenueId ?? widget.venues.firstOrNull?.id;
+    // Auto-request GPS on device/browser (skip in automated test runner)
+    if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _requestGpsLocation();
+      });
+    }
+  }
+
+  Future<void> _requestGpsLocation() async {
+    if (_locating) return;
+    setState(() {
+      _locating = true;
+      _gpsStatusMessage = null;
+    });
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          setState(() {
+            _locating = false;
+            _gpsStatusMessage = widget.arabic
+                ? 'خدمات الموقع غير مفعلة'
+                : 'Location services disabled';
+          });
+        }
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            setState(() {
+              _locating = false;
+              _gpsStatusMessage = widget.arabic
+                  ? 'تم رفض إذن الموقع'
+                  : 'Location permission denied';
+            });
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _locating = false;
+            _gpsStatusMessage = widget.arabic
+                ? 'إذن الموقع محظور في الإعدادات'
+                : 'Location permanently denied';
+          });
+        }
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _userGpsPosition = pos;
+          _locating = false;
+          _gpsStatusMessage = widget.arabic ? 'تم تحديد موقعك' : 'Location found';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _locating = false;
+          _gpsStatusMessage = widget.arabic ? 'تعذر جلب GPS' : 'GPS unavailable';
+        });
+      }
+    }
   }
 
   @override
@@ -46,9 +129,24 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
   }
 
   (double, double) _getUserCenter() {
+    if (_userGpsPosition != null) {
+      return (_userGpsPosition!.latitude, _userGpsPosition!.longitude);
+    }
     return kEgyptGovernorateCoordinates[widget.selectedArea] ??
         kEgyptGovernorateCoordinates['Cairo'] ??
         (30.0444, 31.2357);
+  }
+
+  (double, double) _coordToRelative(double lat, double lng) {
+    const minLat = 27.0;
+    const maxLat = 31.5;
+    const minLon = 29.5;
+    const maxLon = 34.0;
+
+    final relX = ((lng - minLon) / (maxLon - minLon)).clamp(0.10, 0.90);
+    final relY =
+        (1.0 - ((lat - minLat) / (maxLat - minLat))).clamp(0.10, 0.90);
+    return (relX, relY);
   }
 
   double _getDistanceToVenue(Venue venue) {
@@ -104,21 +202,102 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.my_location_rounded, size: 16, color: kGreen),
+                  Icon(
+                    _userGpsPosition != null
+                        ? Icons.gps_fixed_rounded
+                        : Icons.my_location_rounded,
+                    size: 16,
+                    color: _userGpsPosition != null
+                        ? const Color(0xFF2563EB)
+                        : kGreen,
+                  ),
                   const SizedBox(width: 8),
-                  Text(
-                    localized(
-                      arabic,
-                      'Current Center: ${widget.selectedArea}',
-                      'مركز البحث: ${governorateName(widget.selectedArea, arabic)}',
-                    ),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12.5,
-                      color: kInk,
+                  Expanded(
+                    child: Text(
+                      _userGpsPosition != null
+                          ? localized(
+                              arabic,
+                              'Live GPS: Near You (${_userGpsPosition!.latitude.toStringAsFixed(2)}°, ${_userGpsPosition!.longitude.toStringAsFixed(2)}°)',
+                              'موقعك المباشر: قريب منك (${_userGpsPosition!.latitude.toStringAsFixed(2)}°, ${_userGpsPosition!.longitude.toStringAsFixed(2)}°)',
+                            )
+                          : localized(
+                              arabic,
+                              'Current Center: ${widget.selectedArea}',
+                              'مركز البحث: ${governorateName(widget.selectedArea, arabic)}',
+                            ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                        color: _userGpsPosition != null
+                            ? const Color(0xFF1D4ED8)
+                            : kInk,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
+                  PressableScale(
+                    scaleDown: 0.95,
+                    onTap: _locating ? null : _requestGpsLocation,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _userGpsPosition != null
+                            ? const Color(0xFFDBEAFE)
+                            : kSurfaceTint,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _userGpsPosition != null
+                              ? const Color(0xFF93C5FD)
+                              : kGreen.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_locating) ...[
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 5),
+                          ] else ...[
+                            Icon(
+                              _userGpsPosition != null
+                                  ? Icons.refresh_rounded
+                                  : Icons.gps_fixed_rounded,
+                              size: 13,
+                              color: _userGpsPosition != null
+                                  ? const Color(0xFF1E40AF)
+                                  : kGreen,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            _locating
+                                ? localized(
+                                    arabic, 'Locating...', 'جاري التحديد...')
+                                : _userGpsPosition != null
+                                    ? localized(
+                                        arabic, 'Update GPS', 'تحديث')
+                                    : localized(
+                                        arabic, 'Use GPS', 'موقعي (GPS)'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: _userGpsPosition != null
+                                  ? const Color(0xFF1E40AF)
+                                  : kGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -137,6 +316,24 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                   ),
                 ],
               ),
+              if (_gpsStatusMessage != null && _userGpsPosition == null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        size: 13, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 5),
+                    Text(
+                      _gpsStatusMessage!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -232,23 +429,14 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                 // Venue Pins
                 ...sortedVenues.map((v) {
                   final isSelected = v.id == activeVenue?.id;
-                  // Normalized relative coordinate on map canvas
-                  // Egypt Lat range: approx 27.0 to 31.5 -> height
-                  // Egypt Lon range: approx 29.5 to 34.0 -> width
-                  const minLat = 27.0;
-                  const maxLat = 31.5;
-                  const minLon = 29.5;
-                  const maxLon = 34.0;
-
-                  final relX = ((v.effectiveLongitude - minLon) / (maxLon - minLon))
-                      .clamp(0.08, 0.92);
-                  final relY = (1.0 -
-                          ((v.effectiveLatitude - minLat) / (maxLat - minLat)))
-                      .clamp(0.12, 0.88);
+                  final rel = _coordToRelative(
+                    v.effectiveLatitude,
+                    v.effectiveLongitude,
+                  );
 
                   return Positioned(
-                    left: relX * 320,
-                    top: relY * 230,
+                    left: rel.$1 * 320,
+                    top: rel.$2 * 230,
                     child: GestureDetector(
                       onTap: () {
                         setState(() => _activeVenueId = v.id);
@@ -315,6 +503,68 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                     ),
                   );
                 }),
+
+                // User Live GPS Pin (if enabled)
+                if (_userGpsPosition != null) ...[
+                  Builder(builder: (ctx) {
+                    final rel = _coordToRelative(
+                      _userGpsPosition!.latitude,
+                      _userGpsPosition!.longitude,
+                    );
+                    return Positioned(
+                      left: rel.$1 * 320 - 15,
+                      top: rel.$2 * 230 - 15,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF3B82F6)
+                                  .withValues(alpha: 0.3),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x662563EB),
+                                  blurRadius: 10,
+                                  spreadRadius: 3,
+                                ),
+                              ],
+                            ),
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF2563EB),
+                                border: Border.fromBorderSide(
+                                  BorderSide(color: Colors.white, width: 2),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E3A8A),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              localized(arabic, 'You', 'موقعك'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ],
             ),
           ),
