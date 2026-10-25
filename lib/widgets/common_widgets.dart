@@ -1246,10 +1246,13 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   late final Animation<double> _glowProgress;
   late final Animation<double> _shimmerProgress;
 
-  // Progressive typewriter for Name & Slogan
-  late final Animation<double> _titleProgress;
-  late final Animation<double> _titleOpacity;
-  late final Animation<double> _sloganProgress;
+  // Horizontal expansion & typewriter for name suffix ([H] + agzy)
+  late final Animation<double> _expandWidth;
+  late final Animation<double> _nameTypeProgress;
+  late final Animation<double> _nameOpacity;
+
+  // Slogan typewriter
+  late final Animation<double> _sloganTypeProgress;
   late final Animation<double> _sloganOpacity;
 
   // Cinematic exit
@@ -1261,18 +1264,18 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2750),
+      duration: const Duration(milliseconds: 2850),
     );
 
     // Subtle breathing ambient bloom in deep emerald
     _ambientBloom = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.15, end: 0.38)
+        tween: Tween<double>(begin: 0.16, end: 0.38)
             .chain(CurveTween(curve: Curves.easeOutCubic)),
         weight: 45,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.38, end: 0.26)
+        tween: Tween<double>(begin: 0.38, end: 0.24)
             .chain(CurveTween(curve: Curves.easeInOutCubic)),
         weight: 55,
       ),
@@ -1282,60 +1285,66 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     _containerScale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.32, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.28, curve: Curves.easeOutCubic),
       ),
     );
     _containerOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.20, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.18, curve: Curves.easeOut),
     );
 
-    // Assembling left and right vertical pillars (12% -> 38%)
+    // Assembling left and right vertical pillars (10% -> 32%)
     _pillarProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.12, 0.38, curve: Curves.easeOutCubic),
+      curve: const Interval(0.10, 0.32, curve: Curves.easeOutCubic),
     );
 
-    // Assembling stadium arch bridge (26% -> 50%)
+    // Assembling stadium arch bridge (22% -> 42%)
     _archProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.26, 0.50, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.22, 0.42, curve: Curves.easeInOutCubic),
     );
 
-    // Completion glow pulse (46% -> 68%)
+    // Completion glow pulse (38% -> 60%)
     _glowProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.46, 0.68, curve: Curves.easeOut),
+      curve: const Interval(0.38, 0.60, curve: Curves.easeOut),
     );
 
-    // Diamond light shimmer sweep across finished mark (48% -> 68%)
+    // Diamond light shimmer sweep across finished mark (40% -> 58%)
     _shimmerProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.48, 0.68, curve: Curves.easeInOut),
+      curve: const Interval(0.40, 0.58, curve: Curves.easeInOut),
     );
 
-    // Title typewriter reveal (starts as logo finishes: 34% -> 58%)
-    _titleProgress = CurvedAnimation(
+    // Horizontal expansion of [ H ] into [ H ] agzy (34% -> 58%)
+    _expandWidth = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.34, 0.58, curve: Curves.linear),
-    );
-    _titleOpacity = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.30, 0.40, curve: Curves.easeOut),
+      curve: const Interval(0.34, 0.58, curve: Curves.easeOutCubic),
     );
 
-    // Slogan typewriter reveal (types immediately after title: 56% -> 82%)
-    _sloganProgress = CurvedAnimation(
+    // Sequential typewriter reveal for name suffix (38% -> 58%)
+    _nameTypeProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.56, 0.82, curve: Curves.linear),
+      curve: const Interval(0.38, 0.58, curve: Curves.linear),
+    );
+    _nameOpacity = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.34, 0.42, curve: Curves.easeOut),
+    );
+
+    // Slogan typewriter reveal (types right after name locks: 58% -> 82%)
+    _sloganTypeProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.58, 0.82, curve: Curves.linear),
     );
     _sloganOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.52, 0.60, curve: Curves.easeOut),
+      curve: const Interval(0.54, 0.62, curve: Curves.easeOut),
     );
 
     // Cinematic zoom exit (86% -> 100%)
-    _zoomExit = Tween<double>(begin: 1.0, end: 1.05).animate(
+    _zoomExit = Tween<double>(begin: 1.0, end: 1.04).animate(
       CurvedAnimation(
         parent: _ctrl,
         curve: const Interval(0.86, 1.0, curve: Curves.easeInOutCubic),
@@ -1369,45 +1378,45 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
-          final titleText = widget.arabic ? 'حجزي' : 'HAGZY';
-          final titleLength = titleText.length;
-          final visibleTitleCount = (_titleProgress.value * titleLength)
+          final nameSuffix = widget.arabic ? 'حجزي' : 'agzy';
+          final nameLength = nameSuffix.length;
+          final visibleNameCount = (_nameTypeProgress.value * nameLength)
               .round()
-              .clamp(0, titleLength);
-          final visibleTitle = titleText.substring(0, visibleTitleCount);
-          final hiddenTitle = titleText.substring(visibleTitleCount);
+              .clamp(0, nameLength);
+          final visibleName = nameSuffix.substring(0, visibleNameCount);
+          final hiddenName = nameSuffix.substring(visibleNameCount);
 
           final sloganText = widget.arabic
               ? 'احجز مكانك.. في ثواني'
               : 'YOUR SPOT, BOOKED IN SECONDS';
           final sloganLength = sloganText.length;
-          final visibleSloganCount = (_sloganProgress.value * sloganLength)
+          final visibleSloganCount = (_sloganTypeProgress.value * sloganLength)
               .round()
               .clamp(0, sloganLength);
           final visibleSlogan = sloganText.substring(0, visibleSloganCount);
           final hiddenSlogan = sloganText.substring(visibleSloganCount);
 
-          final titleStyle = TextStyle(
+          final nameStyle = TextStyle(
             color: Colors.white,
             fontFamily: widget.arabic ? 'Almarai' : 'Montserrat',
             fontFamilyFallback: widget.arabic
-                ? const ['Tajawal', 'Alexandria', 'Cairo', 'sans-serif']
+                ? const ['Alexandria', 'Tajawal', 'Cairo', 'sans-serif']
                 : const ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-            fontSize: widget.arabic ? 32 : 26,
+            fontSize: widget.arabic ? 32 : 36,
             fontWeight: FontWeight.w800,
-            letterSpacing: widget.arabic ? 0.0 : 5.0,
-            height: 1.1,
+            letterSpacing: widget.arabic ? 0.0 : -0.5,
+            height: 1.0,
           );
 
           final sloganStyle = TextStyle(
-            color: Colors.white.withValues(alpha: 0.68),
+            color: Colors.white.withValues(alpha: 0.72),
             fontFamily: widget.arabic ? 'Almarai' : 'Plus Jakarta Sans',
             fontFamilyFallback: widget.arabic
-                ? const ['Tajawal', 'Alexandria', 'Cairo', 'sans-serif']
+                ? const ['Alexandria', 'Tajawal', 'sans-serif']
                 : const ['Montserrat', 'Inter', 'sans-serif'],
-            fontSize: widget.arabic ? 12.5 : 10.0,
-            fontWeight: widget.arabic ? FontWeight.w500 : FontWeight.w600,
-            letterSpacing: widget.arabic ? 0.4 : 2.2,
+            fontSize: widget.arabic ? 12.5 : 10.5,
+            fontWeight: widget.arabic ? FontWeight.w600 : FontWeight.w600,
+            letterSpacing: widget.arabic ? 0.5 : 2.4,
           );
 
           return Opacity(
@@ -1448,94 +1457,131 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                           ),
                         ),
                       ),
-                      // 2. Central Hero Content (Zero rings, pure luxury assembling mark)
+                      // 2. Central Hero Content:
+                      // [ H ] starts in dead-center, then smoothly expands horizontally into [ H ] agzy,
+                      // followed by typing the slogan in a clean smaller font underneath
                       Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Assembling Emerald Logo Squircle with Pure White H
-                            Opacity(
-                              opacity: _containerOpacity.value,
-                              child: Transform.scale(
-                                scale: _containerScale.value,
-                                child: Container(
-                                  width: 96,
-                                  height: 96,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(26),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.40),
-                                        blurRadius: 30,
-                                        offset: const Offset(0, 14),
-                                      ),
-                                      BoxShadow(
-                                        color: const Color(0xFF059669)
-                                            .withValues(
-                                          alpha: 0.35 * _glowProgress.value,
+                        child: Directionality(
+                          textDirection: widget.arabic
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Assembling Emerald Logo Squircle with Pure White H
+                                  Opacity(
+                                    opacity: _containerOpacity.value,
+                                    child: Transform.scale(
+                                      scale: _containerScale.value,
+                                      child: Container(
+                                        width: 58,
+                                        height: 58,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.40),
+                                              blurRadius: 22,
+                                              offset: const Offset(0, 10),
+                                            ),
+                                            BoxShadow(
+                                              color: const Color(0xFF059669)
+                                                  .withValues(
+                                                alpha:
+                                                    0.38 * _glowProgress.value,
+                                              ),
+                                              blurRadius: 30,
+                                              spreadRadius: -1,
+                                            ),
+                                          ],
                                         ),
-                                        blurRadius: 38,
-                                        spreadRadius: -2,
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: CustomPaint(
+                                            size: const Size(58, 58),
+                                            painter: _AssemblingHagzyLogoPainter(
+                                              pillarProgress:
+                                                  _pillarProgress.value,
+                                              archProgress:
+                                                  _archProgress.value,
+                                              glowProgress:
+                                                  _glowProgress.value,
+                                              shimmerProgress:
+                                                  _shimmerProgress.value,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(26),
-                                    child: CustomPaint(
-                                      size: const Size(96, 96),
-                                      painter: _AssemblingHagzyLogoPainter(
-                                        pillarProgress: _pillarProgress.value,
-                                        archProgress: _archProgress.value,
-                                        glowProgress: _glowProgress.value,
-                                        shimmerProgress: _shimmerProgress.value,
+                                  // Smooth horizontal expansion + sequential typewriter of name suffix
+                                  ClipRect(
+                                    child: Align(
+                                      alignment: widget.arabic
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft,
+                                      widthFactor: _expandWidth.value,
+                                      child: Opacity(
+                                        opacity: _nameOpacity.value,
+                                        child: Padding(
+                                          padding: const EdgeInsetsDirectional
+                                              .only(start: 12),
+                                          child: RichText(
+                                            text: TextSpan(
+                                              children: [
+                                                TextSpan(
+                                                  text: visibleName,
+                                                  style: nameStyle,
+                                                ),
+                                                TextSpan(
+                                                  text: hiddenName,
+                                                  style: nameStyle.copyWith(
+                                                      color:
+                                                          Colors.transparent),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              // Slogan Typewriter in smaller, clean, elegant font
+                              Opacity(
+                                opacity: _sloganOpacity.value,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24),
+                                  child: RichText(
+                                    textAlign: TextAlign.center,
+                                    text: TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: visibleSlogan,
+                                          style: sloganStyle,
+                                        ),
+                                        TextSpan(
+                                          text: hiddenSlogan,
+                                          style: sloganStyle.copyWith(
+                                              color: Colors.transparent),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            // Title Typewriter Reveal (as logo finishes)
-                            Opacity(
-                              opacity: _titleOpacity.value,
-                              child: RichText(
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: visibleTitle,
-                                      style: titleStyle,
-                                    ),
-                                    TextSpan(
-                                      text: hiddenTitle,
-                                      style: titleStyle.copyWith(
-                                          color: Colors.transparent),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            // Slogan Typewriter in smaller clean font
-                            Opacity(
-                              opacity: _sloganOpacity.value,
-                              child: RichText(
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: visibleSlogan,
-                                      style: sloganStyle,
-                                    ),
-                                    TextSpan(
-                                      text: hiddenSlogan,
-                                      style: sloganStyle.copyWith(
-                                          color: Colors.transparent),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
