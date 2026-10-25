@@ -1417,6 +1417,11 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                   height: 100,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(27),
+                                    border: Border.all(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.16),
+                                      width: 1.5,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black
@@ -1450,37 +1455,84 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                               ),
                             ),
                             const SizedBox(height: 24),
-                            // Clean Luxury Title (Montserrat for EN, Almarai for AR)
+                            // Clean Luxury Title with sharp dark outline
                             Opacity(
                               opacity: _textOpacity.value,
                               child: Transform.translate(
                                 offset: Offset(0, _textSlide.value),
-                                child: Text(
-                                  widget.arabic ? 'حجزي' : 'Hagzy',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontFamily: widget.arabic
-                                        ? 'Almarai'
-                                        : 'Montserrat',
-                                    fontFamilyFallback: widget.arabic
-                                        ? const [
-                                            'Tajawal',
-                                            'Alexandria',
-                                            'Cairo',
-                                            'sans-serif'
-                                          ]
-                                        : const [
-                                            'Poppins',
-                                            'Plus Jakarta Sans',
-                                            'Inter',
-                                            'sans-serif'
-                                          ],
-                                    fontSize: widget.arabic ? 34 : 33,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing:
-                                        widget.arabic ? 0.0 : 1.2,
-                                    height: 1.1,
-                                  ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    // 1. Sharp black outline for definition
+                                    Text(
+                                      widget.arabic ? 'حجزي' : 'Hagzy',
+                                      style: TextStyle(
+                                        fontFamily: widget.arabic
+                                            ? 'Almarai'
+                                            : 'Montserrat',
+                                        fontFamilyFallback: widget.arabic
+                                            ? const [
+                                                'Tajawal',
+                                                'Alexandria',
+                                                'Cairo',
+                                                'sans-serif'
+                                              ]
+                                            : const [
+                                                'Poppins',
+                                                'Plus Jakarta Sans',
+                                                'Inter',
+                                                'sans-serif'
+                                              ],
+                                        fontSize: widget.arabic ? 34 : 33,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing:
+                                            widget.arabic ? 0.0 : 1.2,
+                                        height: 1.1,
+                                        foreground: Paint()
+                                          ..style = PaintingStyle.stroke
+                                          ..strokeWidth = 2.4
+                                          ..strokeCap = StrokeCap.round
+                                          ..strokeJoin = StrokeJoin.round
+                                          ..color = Colors.black
+                                              .withValues(alpha: 0.80),
+                                      ),
+                                    ),
+                                    // 2. Pure crisp white fill
+                                    Text(
+                                      widget.arabic ? 'حجزي' : 'Hagzy',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontFamily: widget.arabic
+                                            ? 'Almarai'
+                                            : 'Montserrat',
+                                        fontFamilyFallback: widget.arabic
+                                            ? const [
+                                                'Tajawal',
+                                                'Alexandria',
+                                                'Cairo',
+                                                'sans-serif'
+                                              ]
+                                            : const [
+                                                'Poppins',
+                                                'Plus Jakarta Sans',
+                                                'Inter',
+                                                'sans-serif'
+                                              ],
+                                        fontSize: widget.arabic ? 34 : 33,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing:
+                                            widget.arabic ? 0.0 : 1.2,
+                                        height: 1.1,
+                                        shadows: const [
+                                          Shadow(
+                                            color: Colors.black45,
+                                            offset: Offset(0, 2),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1516,6 +1568,13 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                     fontWeight: FontWeight.w400,
                                     letterSpacing:
                                         widget.arabic ? 0.2 : 0.8,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black45,
+                                        offset: Offset(0, 1),
+                                        blurRadius: 3,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
