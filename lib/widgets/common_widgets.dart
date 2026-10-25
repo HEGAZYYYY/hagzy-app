@@ -1246,13 +1246,13 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   late final Animation<double> _glowProgress;
   late final Animation<double> _shimmerProgress;
 
-  // Horizontal expansion & typewriter for name suffix ([H] + agzy)
+  // Butter-smooth liquid expansion & wipe for [ H ] + AGZY
   late final Animation<double> _expandWidth;
-  late final Animation<double> _nameTypeProgress;
+  late final Animation<double> _nameWipe;
   late final Animation<double> _nameOpacity;
 
-  // Slogan typewriter
-  late final Animation<double> _sloganTypeProgress;
+  // Liquid wipe for Slogan
+  late final Animation<double> _sloganWipe;
   late final Animation<double> _sloganOpacity;
 
   // Cinematic exit
@@ -1264,7 +1264,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2850),
+      duration: const Duration(milliseconds: 2900),
     );
 
     // Subtle breathing ambient bloom in deep emerald
@@ -1285,58 +1285,58 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     _containerScale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.28, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.26, curve: Curves.easeOutCubic),
       ),
     );
     _containerOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.18, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.16, curve: Curves.easeOut),
     );
 
-    // Assembling left and right vertical pillars (10% -> 32%)
+    // Assembling left and right vertical pillars (8% -> 30%)
     _pillarProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.10, 0.32, curve: Curves.easeOutCubic),
+      curve: const Interval(0.08, 0.30, curve: Curves.easeOutCubic),
     );
 
-    // Assembling stadium arch bridge (22% -> 42%)
+    // Assembling stadium arch bridge (20% -> 40%)
     _archProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.22, 0.42, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.20, 0.40, curve: Curves.easeInOutCubic),
     );
 
-    // Completion glow pulse (38% -> 60%)
+    // Completion glow pulse (36% -> 58%)
     _glowProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.38, 0.60, curve: Curves.easeOut),
+      curve: const Interval(0.36, 0.58, curve: Curves.easeOut),
     );
 
-    // Diamond light shimmer sweep across finished mark (40% -> 58%)
+    // Diamond light shimmer sweep across finished mark (38% -> 56%)
     _shimmerProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.40, 0.58, curve: Curves.easeInOut),
+      curve: const Interval(0.38, 0.56, curve: Curves.easeInOut),
     );
 
-    // Horizontal expansion of [ H ] into [ H ] agzy (34% -> 58%)
+    // Butter-smooth horizontal expansion of [ H ] into [ H ] AGZY (32% -> 58%)
     _expandWidth = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.34, 0.58, curve: Curves.easeOutCubic),
+      curve: const Interval(0.32, 0.58, curve: Curves.easeOutCubic),
     );
 
-    // Sequential typewriter reveal for name suffix (38% -> 58%)
-    _nameTypeProgress = CurvedAnimation(
+    // Liquid light gradient reveal for AGZY (34% -> 60%) - zero stepping!
+    _nameWipe = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.38, 0.58, curve: Curves.linear),
+      curve: const Interval(0.34, 0.60, curve: Curves.easeOutCubic),
     );
     _nameOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.34, 0.42, curve: Curves.easeOut),
+      curve: const Interval(0.32, 0.40, curve: Curves.easeOut),
     );
 
-    // Slogan typewriter reveal (types right after name locks: 58% -> 82%)
-    _sloganTypeProgress = CurvedAnimation(
+    // Liquid light gradient reveal for Slogan (56% -> 82%)
+    _sloganWipe = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.58, 0.82, curve: Curves.linear),
+      curve: const Interval(0.56, 0.82, curve: Curves.easeOutCubic),
     );
     _sloganOpacity = CurvedAnimation(
       parent: _ctrl,
@@ -1378,23 +1378,11 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
-          final nameSuffix = widget.arabic ? 'حجزي' : 'agzy';
-          final nameLength = nameSuffix.length;
-          final visibleNameCount = (_nameTypeProgress.value * nameLength)
-              .round()
-              .clamp(0, nameLength);
-          final visibleName = nameSuffix.substring(0, visibleNameCount);
-          final hiddenName = nameSuffix.substring(visibleNameCount);
-
+          // Option B: All-Caps Capital Lockup matching H monogram geometry
+          final nameSuffix = widget.arabic ? 'حجزي' : 'AGZY';
           final sloganText = widget.arabic
               ? 'احجز مكانك.. في ثواني'
               : 'YOUR SPOT, BOOKED IN SECONDS';
-          final sloganLength = sloganText.length;
-          final visibleSloganCount = (_sloganTypeProgress.value * sloganLength)
-              .round()
-              .clamp(0, sloganLength);
-          final visibleSlogan = sloganText.substring(0, visibleSloganCount);
-          final hiddenSlogan = sloganText.substring(visibleSloganCount);
 
           final nameStyle = TextStyle(
             color: Colors.white,
@@ -1402,21 +1390,35 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
             fontFamilyFallback: widget.arabic
                 ? const ['Alexandria', 'Tajawal', 'Cairo', 'sans-serif']
                 : const ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-            fontSize: widget.arabic ? 32 : 36,
+            fontSize: widget.arabic ? 30 : 29,
             fontWeight: FontWeight.w800,
-            letterSpacing: widget.arabic ? 0.0 : -0.5,
+            letterSpacing: widget.arabic ? 0.0 : 3.5,
             height: 1.0,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           );
 
           final sloganStyle = TextStyle(
-            color: Colors.white.withValues(alpha: 0.72),
+            color: Colors.white.withValues(alpha: 0.70),
             fontFamily: widget.arabic ? 'Almarai' : 'Plus Jakarta Sans',
             fontFamilyFallback: widget.arabic
                 ? const ['Alexandria', 'Tajawal', 'sans-serif']
                 : const ['Montserrat', 'Inter', 'sans-serif'],
             fontSize: widget.arabic ? 12.5 : 10.5,
             fontWeight: widget.arabic ? FontWeight.w600 : FontWeight.w600,
-            letterSpacing: widget.arabic ? 0.5 : 2.4,
+            letterSpacing: widget.arabic ? 0.6 : 2.8,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           );
 
           return Opacity(
@@ -1458,7 +1460,8 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                         ),
                       ),
                       // 2. Central Hero Content:
-                      // [ H ] starts in dead-center, then smoothly expands horizontally into [ H ] agzy,
+                      // [ H ] starts in dead-center, then smoothly expands horizontally into [ H ] AGZY,
+                      // with liquid light alpha gradient wipe (120fps continuous, zero stepping),
                       // followed by typing the slogan in a clean smaller font underneath
                       Center(
                         child: Directionality(
@@ -1478,17 +1481,17 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                     child: Transform.scale(
                                       scale: _containerScale.value,
                                       child: Container(
-                                        width: 58,
-                                        height: 58,
+                                        width: 54,
+                                        height: 54,
                                         decoration: BoxDecoration(
                                           borderRadius:
-                                              BorderRadius.circular(16),
+                                              BorderRadius.circular(15),
                                           boxShadow: [
                                             BoxShadow(
                                               color: Colors.black
                                                   .withValues(alpha: 0.40),
-                                              blurRadius: 22,
-                                              offset: const Offset(0, 10),
+                                              blurRadius: 20,
+                                              offset: const Offset(0, 8),
                                             ),
                                             BoxShadow(
                                               color: const Color(0xFF059669)
@@ -1496,16 +1499,16 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                                 alpha:
                                                     0.38 * _glowProgress.value,
                                               ),
-                                              blurRadius: 30,
+                                              blurRadius: 28,
                                               spreadRadius: -1,
                                             ),
                                           ],
                                         ),
                                         child: ClipRRect(
                                           borderRadius:
-                                              BorderRadius.circular(16),
+                                              BorderRadius.circular(15),
                                           child: CustomPaint(
-                                            size: const Size(58, 58),
+                                            size: const Size(54, 54),
                                             painter: _AssemblingHagzyLogoPainter(
                                               pillarProgress:
                                                   _pillarProgress.value,
@@ -1521,7 +1524,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                       ),
                                     ),
                                   ),
-                                  // Smooth horizontal expansion + sequential typewriter of name suffix
+                                  // Butter-smooth horizontal expansion + Liquid Light alpha wipe for AGZY
                                   ClipRect(
                                     child: Align(
                                       alignment: widget.arabic
@@ -1532,21 +1535,36 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                         opacity: _nameOpacity.value,
                                         child: Padding(
                                           padding: const EdgeInsetsDirectional
-                                              .only(start: 12),
-                                          child: RichText(
-                                            text: TextSpan(
-                                              children: [
-                                                TextSpan(
-                                                  text: visibleName,
-                                                  style: nameStyle,
-                                                ),
-                                                TextSpan(
-                                                  text: hiddenName,
-                                                  style: nameStyle.copyWith(
-                                                      color:
-                                                          Colors.transparent),
-                                                ),
-                                              ],
+                                              .only(start: 14),
+                                          child: ShaderMask(
+                                            blendMode: BlendMode.dstIn,
+                                            shaderCallback: (Rect bounds) {
+                                              final t = _nameWipe.value;
+                                              final start = (t * 1.25 - 0.25)
+                                                  .clamp(0.0, 1.0);
+                                              final end =
+                                                  (t * 1.25).clamp(0.0, 1.0);
+                                              return LinearGradient(
+                                                begin: widget.arabic
+                                                    ? Alignment.centerRight
+                                                    : Alignment.centerLeft,
+                                                end: widget.arabic
+                                                    ? Alignment.centerLeft
+                                                    : Alignment.centerRight,
+                                                colors: const [
+                                                  Colors.white,
+                                                  Colors.white,
+                                                  Colors.transparent,
+                                                  Colors.transparent,
+                                                ],
+                                                stops: [0.0, start, end, 1.0],
+                                              ).createShader(bounds);
+                                            },
+                                            child: Text(
+                                              nameSuffix,
+                                              maxLines: 1,
+                                              softWrap: false,
+                                              style: nameStyle,
                                             ),
                                           ),
                                         ),
@@ -1556,26 +1574,42 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              // Slogan Typewriter in smaller, clean, elegant font
+                              // Slogan Liquid Wipe in clean geometric tracked-out typography
                               Opacity(
                                 opacity: _sloganOpacity.value,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 24),
-                                  child: RichText(
-                                    textAlign: TextAlign.center,
-                                    text: TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: visibleSlogan,
-                                          style: sloganStyle,
-                                        ),
-                                        TextSpan(
-                                          text: hiddenSlogan,
-                                          style: sloganStyle.copyWith(
-                                              color: Colors.transparent),
-                                        ),
-                                      ],
+                                  child: ShaderMask(
+                                    blendMode: BlendMode.dstIn,
+                                    shaderCallback: (Rect bounds) {
+                                      final t = _sloganWipe.value;
+                                      final start = (t * 1.30 - 0.30)
+                                          .clamp(0.0, 1.0);
+                                      final end =
+                                          (t * 1.30).clamp(0.0, 1.0);
+                                      return LinearGradient(
+                                        begin: widget.arabic
+                                            ? Alignment.centerRight
+                                            : Alignment.centerLeft,
+                                        end: widget.arabic
+                                            ? Alignment.centerLeft
+                                            : Alignment.centerRight,
+                                        colors: const [
+                                          Colors.white,
+                                          Colors.white,
+                                          Colors.transparent,
+                                          Colors.transparent,
+                                        ],
+                                        stops: [0.0, start, end, 1.0],
+                                      ).createShader(bounds);
+                                    },
+                                    child: Text(
+                                      sloganText,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: sloganStyle,
                                     ),
                                   ),
                                 ),
