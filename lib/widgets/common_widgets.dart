@@ -1109,14 +1109,26 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
     final scale = size.width / 40.0;
     final rect = Offset.zero & size;
 
-    // 1. Pristine architectural squircle canvas
+    // 1. Official Hagzy Emerald Gradient Squircle
     final bgPaint = Paint()
       ..isAntiAlias = true
-      ..color = Colors.white;
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF047857), Color(0xFF059669)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(rect);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(11 * scale));
     canvas.drawRRect(rrect, bgPaint);
 
-    // 2. Monogram Paint Setup
+    // Subtle 1px glassmorphism inner rim highlight
+    final rimPaint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 * scale
+      ..color = Colors.white.withValues(alpha: 0.22);
+    canvas.drawRRect(rrect, rimPaint);
+
+    // 2. Pure White Monogram Setup
     final strokeWidth = 3.8 * scale;
     final glyphPaint = Paint()
       ..isAntiAlias = true
@@ -1124,9 +1136,9 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..color = const Color(0xFF059669);
+      ..color = Colors.white;
 
-    // 4. Assembling Left Vertical Pillar (draws top -> bottom: 11 to 29)
+    // 3. Assembling Left Vertical Pillar (draws top -> bottom: 11 to 29)
     if (pillarProgress > 0.01) {
       final startY = 11.0 * scale;
       final totalH = (29.0 - 11.0) * scale;
@@ -1138,9 +1150,9 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       );
     }
 
-    // 5. Assembling Right Vertical Pillar (draws top -> bottom with slight offset)
-    if (pillarProgress > 0.08) {
-      final adjustedProg = ((pillarProgress - 0.08) / 0.92).clamp(0.0, 1.0);
+    // 4. Assembling Right Vertical Pillar (draws top -> bottom with slight offset)
+    if (pillarProgress > 0.06) {
+      final adjustedProg = ((pillarProgress - 0.06) / 0.94).clamp(0.0, 1.0);
       final startY = 11.0 * scale;
       final totalH = (29.0 - 11.0) * scale;
       final currentY = startY + totalH * adjustedProg;
@@ -1151,7 +1163,7 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       );
     }
 
-    // 6. Assembling Stadium Arch Bridge (draws across from left to right)
+    // 5. Assembling Stadium Arch Bridge (draws across from left to right)
     if (archProgress > 0.01) {
       final fullArchPath = Path()
         ..moveTo(12.5 * scale, 21 * scale)
@@ -1171,18 +1183,18 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       }
     }
 
-    // 7. Light Shimmer / Gleam Sweep over the assembled H
+    // 6. Diamond Light Gleam sweep across the assembled mark
     if (shimmerProgress > 0.05 && shimmerProgress < 0.95) {
       canvas.save();
       canvas.clipRRect(rrect);
-      final pos = -0.5 + shimmerProgress * 2.0;
+      final pos = -0.6 + shimmerProgress * 2.2;
       final shimmerPaint = Paint()
         ..shader = LinearGradient(
-          begin: Alignment(pos - 0.5, -1.0),
-          end: Alignment(pos + 0.5, 1.0),
+          begin: Alignment(pos - 0.4, -1.0),
+          end: Alignment(pos + 0.4, 1.0),
           colors: [
             Colors.transparent,
-            Colors.white.withValues(alpha: 0.65),
+            Colors.white.withValues(alpha: 0.38),
             Colors.transparent,
           ],
           stops: const [0.0, 0.5, 1.0],
@@ -1234,10 +1246,10 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   late final Animation<double> _glowProgress;
   late final Animation<double> _shimmerProgress;
 
-  // Modern luxury typography
-  late final Animation<double> _textSlide;
-  late final Animation<double> _textOpacity;
-  late final Animation<double> _sloganSlide;
+  // Progressive typewriter for Name & Slogan
+  late final Animation<double> _titleProgress;
+  late final Animation<double> _titleOpacity;
+  late final Animation<double> _sloganProgress;
   late final Animation<double> _sloganOpacity;
 
   // Cinematic exit
@@ -1249,7 +1261,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2600),
+      duration: const Duration(milliseconds: 2750),
     );
 
     // Subtle breathing ambient bloom in deep emerald
@@ -1257,80 +1269,76 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       TweenSequenceItem(
         tween: Tween<double>(begin: 0.15, end: 0.38)
             .chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 50,
+        weight: 45,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.38, end: 0.28)
+        tween: Tween<double>(begin: 0.38, end: 0.26)
             .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 50,
+        weight: 55,
       ),
     ]).animate(_ctrl);
 
-    // Squircle container slowly materializing
-    _containerScale = Tween<double>(begin: 0.86, end: 1.0).animate(
+    // Squircle container smoothly materializing
+    _containerScale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.35, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.32, curve: Curves.easeOutCubic),
       ),
     );
     _containerOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.22, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.20, curve: Curves.easeOut),
     );
 
-    // Assembling left and right vertical pillars (16% -> 44%)
+    // Assembling left and right vertical pillars (12% -> 38%)
     _pillarProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.16, 0.44, curve: Curves.easeOutCubic),
+      curve: const Interval(0.12, 0.38, curve: Curves.easeOutCubic),
     );
 
-    // Assembling stadium arch bridge (30% -> 58%)
+    // Assembling stadium arch bridge (26% -> 50%)
     _archProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.30, 0.58, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.26, 0.50, curve: Curves.easeInOutCubic),
     );
 
-    // Completion glow pulse (50% -> 72%)
+    // Completion glow pulse (46% -> 68%)
     _glowProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.50, 0.72, curve: Curves.easeOut),
+      curve: const Interval(0.46, 0.68, curve: Curves.easeOut),
     );
 
-    // Diamond light shimmer sweep across finished mark (58% -> 78%)
+    // Diamond light shimmer sweep across finished mark (48% -> 68%)
     _shimmerProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.58, 0.78, curve: Curves.easeInOut),
+      curve: const Interval(0.48, 0.68, curve: Curves.easeInOut),
     );
 
-    // Clean modern title entrance (44% -> 66%)
-    _textSlide = Tween<double>(begin: 14.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.44, 0.66, curve: Curves.easeOutCubic),
-      ),
-    );
-    _textOpacity = CurvedAnimation(
+    // Title typewriter reveal (starts as logo finishes: 34% -> 58%)
+    _titleProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.44, 0.62, curve: Curves.easeOut),
+      curve: const Interval(0.34, 0.58, curve: Curves.linear),
+    );
+    _titleOpacity = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.30, 0.40, curve: Curves.easeOut),
     );
 
-    // Slogan entrance (56% -> 78%)
-    _sloganSlide = Tween<double>(begin: 10.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.56, 0.78, curve: Curves.easeOutCubic),
-      ),
+    // Slogan typewriter reveal (types immediately after title: 56% -> 82%)
+    _sloganProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.56, 0.82, curve: Curves.linear),
     );
     _sloganOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.56, 0.74, curve: Curves.easeOut),
+      curve: const Interval(0.52, 0.60, curve: Curves.easeOut),
     );
 
-    // Cinematic zoom exit (82% -> 100%)
+    // Cinematic zoom exit (86% -> 100%)
     _zoomExit = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.82, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.86, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1338,7 +1346,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     _overlayOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.84, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.88, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1361,6 +1369,47 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
+          final titleText = widget.arabic ? 'حجزي' : 'HAGZY';
+          final titleLength = titleText.length;
+          final visibleTitleCount = (_titleProgress.value * titleLength)
+              .round()
+              .clamp(0, titleLength);
+          final visibleTitle = titleText.substring(0, visibleTitleCount);
+          final hiddenTitle = titleText.substring(visibleTitleCount);
+
+          final sloganText = widget.arabic
+              ? 'احجز مكانك.. في ثواني'
+              : 'YOUR SPOT, BOOKED IN SECONDS';
+          final sloganLength = sloganText.length;
+          final visibleSloganCount = (_sloganProgress.value * sloganLength)
+              .round()
+              .clamp(0, sloganLength);
+          final visibleSlogan = sloganText.substring(0, visibleSloganCount);
+          final hiddenSlogan = sloganText.substring(visibleSloganCount);
+
+          final titleStyle = TextStyle(
+            color: Colors.white,
+            fontFamily: widget.arabic ? 'Almarai' : 'Montserrat',
+            fontFamilyFallback: widget.arabic
+                ? const ['Tajawal', 'Alexandria', 'Cairo', 'sans-serif']
+                : const ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            fontSize: widget.arabic ? 32 : 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: widget.arabic ? 0.0 : 5.0,
+            height: 1.1,
+          );
+
+          final sloganStyle = TextStyle(
+            color: Colors.white.withValues(alpha: 0.68),
+            fontFamily: widget.arabic ? 'Almarai' : 'Plus Jakarta Sans',
+            fontFamilyFallback: widget.arabic
+                ? const ['Tajawal', 'Alexandria', 'Cairo', 'sans-serif']
+                : const ['Montserrat', 'Inter', 'sans-serif'],
+            fontSize: widget.arabic ? 12.5 : 10.0,
+            fontWeight: widget.arabic ? FontWeight.w500 : FontWeight.w600,
+            letterSpacing: widget.arabic ? 0.4 : 2.2,
+          );
+
           return Opacity(
             opacity: _overlayOpacity.value,
             child: Transform.scale(
@@ -1370,15 +1419,14 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                 child: Container(
                   decoration: const BoxDecoration(
                     gradient: RadialGradient(
-                      center: Alignment(0.0, -0.12),
+                      center: Alignment(0.0, -0.15),
                       radius: 1.35,
                       colors: [
-                        Color(0xFF065F46), // Radiant emerald center
-                        Color(0xFF044E3B),
-                        Color(0xFF022C22), // Deep luxury forest perimeter
-                        Color(0xFF011A14), // Near obsidian edge
+                        Color(0xFF042F24), // Radiant deep emerald center
+                        Color(0xFF021B14),
+                        Color(0xFF010A07), // Deep velvet obsidian edge
                       ],
-                      stops: [0.0, 0.36, 0.76, 1.0],
+                      stops: [0.0, 0.45, 1.0],
                     ),
                   ),
                   child: Stack(
@@ -1392,13 +1440,11 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              const Color(0xFF34D399)
-                                  .withValues(alpha: _ambientBloom.value),
                               const Color(0xFF10B981)
-                                  .withValues(alpha: _ambientBloom.value * 0.4),
+                                  .withValues(alpha: _ambientBloom.value),
                               Colors.transparent,
                             ],
-                            stops: const [0.0, 0.45, 1.0],
+                            stops: const [0.0, 0.70],
                           ),
                         ),
                       ),
@@ -1407,42 +1453,37 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Assembling Monogram Container
+                            // Assembling Emerald Logo Squircle with Pure White H
                             Opacity(
                               opacity: _containerOpacity.value,
                               child: Transform.scale(
                                 scale: _containerScale.value,
                                 child: Container(
-                                  width: 100,
-                                  height: 100,
+                                  width: 96,
+                                  height: 96,
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(27),
-                                    border: Border.all(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.16),
-                                      width: 1.5,
-                                    ),
+                                    borderRadius: BorderRadius.circular(26),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black
-                                            .withValues(alpha: 0.32),
-                                        blurRadius: 28,
-                                        offset: const Offset(0, 12),
+                                            .withValues(alpha: 0.40),
+                                        blurRadius: 30,
+                                        offset: const Offset(0, 14),
                                       ),
                                       BoxShadow(
-                                        color: const Color(0xFF34D399)
+                                        color: const Color(0xFF059669)
                                             .withValues(
                                           alpha: 0.35 * _glowProgress.value,
                                         ),
-                                        blurRadius: 36,
-                                        spreadRadius: 2,
+                                        blurRadius: 38,
+                                        spreadRadius: -2,
                                       ),
                                     ],
                                   ),
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(27),
+                                    borderRadius: BorderRadius.circular(26),
                                     child: CustomPaint(
-                                      size: const Size(100, 100),
+                                      size: const Size(96, 96),
                                       painter: _AssemblingHagzyLogoPainter(
                                         pillarProgress: _pillarProgress.value,
                                         archProgress: _archProgress.value,
@@ -1455,127 +1496,42 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                               ),
                             ),
                             const SizedBox(height: 24),
-                            // Clean Luxury Title with sharp dark outline
+                            // Title Typewriter Reveal (as logo finishes)
                             Opacity(
-                              opacity: _textOpacity.value,
-                              child: Transform.translate(
-                                offset: Offset(0, _textSlide.value),
-                                child: Stack(
-                                  alignment: Alignment.center,
+                              opacity: _titleOpacity.value,
+                              child: RichText(
+                                text: TextSpan(
                                   children: [
-                                    // 1. Sharp black outline for definition
-                                    Text(
-                                      widget.arabic ? 'حجزي' : 'Hagzy',
-                                      style: TextStyle(
-                                        fontFamily: widget.arabic
-                                            ? 'Almarai'
-                                            : 'Montserrat',
-                                        fontFamilyFallback: widget.arabic
-                                            ? const [
-                                                'Tajawal',
-                                                'Alexandria',
-                                                'Cairo',
-                                                'sans-serif'
-                                              ]
-                                            : const [
-                                                'Poppins',
-                                                'Plus Jakarta Sans',
-                                                'Inter',
-                                                'sans-serif'
-                                              ],
-                                        fontSize: widget.arabic ? 34 : 33,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing:
-                                            widget.arabic ? 0.0 : 1.2,
-                                        height: 1.1,
-                                        foreground: Paint()
-                                          ..style = PaintingStyle.stroke
-                                          ..strokeWidth = 2.4
-                                          ..strokeCap = StrokeCap.round
-                                          ..strokeJoin = StrokeJoin.round
-                                          ..color = Colors.black
-                                              .withValues(alpha: 0.80),
-                                      ),
+                                    TextSpan(
+                                      text: visibleTitle,
+                                      style: titleStyle,
                                     ),
-                                    // 2. Pure crisp white fill
-                                    Text(
-                                      widget.arabic ? 'حجزي' : 'Hagzy',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: widget.arabic
-                                            ? 'Almarai'
-                                            : 'Montserrat',
-                                        fontFamilyFallback: widget.arabic
-                                            ? const [
-                                                'Tajawal',
-                                                'Alexandria',
-                                                'Cairo',
-                                                'sans-serif'
-                                              ]
-                                            : const [
-                                                'Poppins',
-                                                'Plus Jakarta Sans',
-                                                'Inter',
-                                                'sans-serif'
-                                              ],
-                                        fontSize: widget.arabic ? 34 : 33,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing:
-                                            widget.arabic ? 0.0 : 1.2,
-                                        height: 1.1,
-                                        shadows: const [
-                                          Shadow(
-                                            color: Colors.black45,
-                                            offset: Offset(0, 2),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
+                                    TextSpan(
+                                      text: hiddenTitle,
+                                      style: titleStyle.copyWith(
+                                          color: Colors.transparent),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            // Clean, Human Slogan (Plus Jakarta Sans for EN, Almarai for AR)
+                            const SizedBox(height: 10),
+                            // Slogan Typewriter in smaller clean font
                             Opacity(
                               opacity: _sloganOpacity.value,
-                              child: Transform.translate(
-                                offset: Offset(0, _sloganSlide.value),
-                                child: Text(
-                                  widget.arabic
-                                      ? 'احجز مكانك.. في ثواني'
-                                      : 'Your spot, booked in seconds',
-                                  style: TextStyle(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.85),
-                                    fontFamily: widget.arabic
-                                        ? 'Almarai'
-                                        : 'Plus Jakarta Sans',
-                                    fontFamilyFallback: widget.arabic
-                                        ? const [
-                                            'Tajawal',
-                                            'Alexandria',
-                                            'Cairo',
-                                            'sans-serif'
-                                          ]
-                                        : const [
-                                            'Montserrat',
-                                            'Poppins',
-                                            'sans-serif'
-                                          ],
-                                    fontSize: widget.arabic ? 13.5 : 12.5,
-                                    fontWeight: FontWeight.w400,
-                                    letterSpacing:
-                                        widget.arabic ? 0.2 : 0.8,
-                                    shadows: const [
-                                      Shadow(
-                                        color: Colors.black45,
-                                        offset: Offset(0, 1),
-                                        blurRadius: 3,
-                                      ),
-                                    ],
-                                  ),
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: visibleSlogan,
+                                      style: sloganStyle,
+                                    ),
+                                    TextSpan(
+                                      text: hiddenSlogan,
+                                      style: sloganStyle.copyWith(
+                                          color: Colors.transparent),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
