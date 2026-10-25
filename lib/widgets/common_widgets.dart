@@ -1110,12 +1110,40 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final scale = size.height / 256.0;
     final strokeWidth = 24.32 * scale;
-    final glyphPaint = Paint()
+
+    // 1. Signature stadium pill paint for [ H ] and vertical stems (matches hagzy_logo.svg)
+    final logoRoundPaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
+      ..color = Colors.white;
+
+    // 2. Precision architectural typographic paint for crisp vector edges (clean butt cuts & sharp miter corners)
+    final miterPaint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt
+      ..strokeJoin = StrokeJoin.miter
+      ..color = Colors.white;
+
+    // 3. Peak paint for A apex and Y junction (clean miter corner with rounded baseline feet)
+    final peakPaint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.miter
+      ..color = Colors.white;
+
+    // 4. Flush crossbar paint with flat butt ends (no protruding round nubs)
+    final flushBarPaint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt
       ..color = Colors.white;
 
     // ----------------------------------------------------
@@ -1128,7 +1156,7 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
         Offset(80.0 * scale, 70.4 * scale),
         Offset(80.0 * scale, 185.6 * scale),
         (hProgress / 0.45).clamp(0.0, 1.0),
-        glyphPaint,
+        logoRoundPaint,
       );
 
       // Right pillar (176, 70.4) -> (176, 185.6)
@@ -1138,7 +1166,7 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
           Offset(176.0 * scale, 70.4 * scale),
           Offset(176.0 * scale, 185.6 * scale),
           ((hProgress - 0.15) / 0.45).clamp(0.0, 1.0),
-          glyphPaint,
+          logoRoundPaint,
         );
       }
 
@@ -1156,7 +1184,7 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
           canvas,
           archPath,
           ((hProgress - 0.40) / 0.60).clamp(0.0, 1.0),
-          glyphPaint,
+          logoRoundPaint,
         );
       }
     }
@@ -1165,34 +1193,27 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
     // 2. LETTER [ A ] (X: 216 -> 312, Apex 264)
     // ----------------------------------------------------
     if (aProgress > 0.01) {
-      // Left diagonal leg (264, 70.4) -> (216, 185.6)
-      _drawLineSegment(
+      // Continuous architectural legs from bottom-left up to apex and down to bottom-right
+      final aPath = Path()
+        ..moveTo(216.0 * scale, 185.6 * scale)
+        ..lineTo(264.0 * scale, 70.4 * scale)
+        ..lineTo(312.0 * scale, 185.6 * scale);
+
+      _drawSegment(
         canvas,
-        Offset(264.0 * scale, 70.4 * scale),
-        Offset(216.0 * scale, 185.6 * scale),
-        (aProgress / 0.55).clamp(0.0, 1.0),
-        glyphPaint,
+        aPath,
+        (aProgress / 0.65).clamp(0.0, 1.0),
+        peakPaint,
       );
 
-      // Right diagonal leg (264, 70.4) -> (312, 185.6)
-      if (aProgress > 0.10) {
+      // Flush horizontal crossbar: clean flat butt ends perfectly inside without protruding round nubs
+      if (aProgress > 0.45) {
         _drawLineSegment(
           canvas,
-          Offset(264.0 * scale, 70.4 * scale),
-          Offset(312.0 * scale, 185.6 * scale),
-          ((aProgress - 0.10) / 0.55).clamp(0.0, 1.0),
-          glyphPaint,
-        );
-      }
-
-      // Horizontal crossbar (235.2, 139.2) -> (292.8, 139.2)
-      if (aProgress > 0.50) {
-        _drawLineSegment(
-          canvas,
-          Offset(235.2 * scale, 139.2 * scale),
-          Offset(292.8 * scale, 139.2 * scale),
-          ((aProgress - 0.50) / 0.50).clamp(0.0, 1.0),
-          glyphPaint,
+          Offset(238.0 * scale, 139.2 * scale),
+          Offset(290.0 * scale, 139.2 * scale),
+          ((aProgress - 0.45) / 0.55).clamp(0.0, 1.0),
+          flushBarPaint,
         );
       }
     }
@@ -1207,7 +1228,7 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
       final cy = 128.0 * scale;
 
       final gPath = Path()
-        // 1. Start at top-right terminal
+        // 1. Clean flat top-right terminal
         ..moveTo(436.0 * scale, 88.0 * scale)
         // 2. Smoothly curve up into the top arch
         ..cubicTo(
@@ -1247,80 +1268,51 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
         )
         // 6. Right vertical upright to waistline
         ..lineTo(440.0 * scale, 134.4 * scale)
-        // 7. Horizontal inward crossbar to center
+        // 7. Horizontal inward crossbar to center with clean flat vertical cut
         ..lineTo(cx, 134.4 * scale);
 
-      _drawSegment(canvas, gPath, gProgress.clamp(0.0, 1.0), glyphPaint);
+      _drawSegment(canvas, gPath, gProgress.clamp(0.0, 1.0), miterPaint);
     }
 
     // ----------------------------------------------------
     // 4. LETTER [ Z ] (X: 476 -> 572)
     // ----------------------------------------------------
     if (zProgress > 0.01) {
-      // Top bar (476, 70.4) -> (572, 70.4)
-      _drawLineSegment(
-        canvas,
-        Offset(476.0 * scale, 70.4 * scale),
-        Offset(572.0 * scale, 70.4 * scale),
-        (zProgress / 0.35).clamp(0.0, 1.0),
-        glyphPaint,
-      );
+      // Single continuous architectural path with sharp mitered corners and clean flat cuts
+      final zPath = Path()
+        ..moveTo(476.0 * scale, 70.4 * scale)
+        ..lineTo(572.0 * scale, 70.4 * scale)
+        ..lineTo(476.0 * scale, 185.6 * scale)
+        ..lineTo(572.0 * scale, 185.6 * scale);
 
-      // Diagonal slice (572, 70.4) -> (476, 185.6)
-      if (zProgress > 0.30) {
-        _drawLineSegment(
-          canvas,
-          Offset(572.0 * scale, 70.4 * scale),
-          Offset(476.0 * scale, 185.6 * scale),
-          ((zProgress - 0.30) / 0.45).clamp(0.0, 1.0),
-          glyphPaint,
-        );
-      }
-
-      // Bottom bar (476, 185.6) -> (572, 185.6)
-      if (zProgress > 0.65) {
-        _drawLineSegment(
-          canvas,
-          Offset(476.0 * scale, 185.6 * scale),
-          Offset(572.0 * scale, 185.6 * scale),
-          ((zProgress - 0.65) / 0.35).clamp(0.0, 1.0),
-          glyphPaint,
-        );
-      }
+      _drawSegment(canvas, zPath, zProgress.clamp(0.0, 1.0), miterPaint);
     }
 
     // ----------------------------------------------------
     // 5. LETTER [ Y ] (X: 608 -> 704, Center 656)
     // ----------------------------------------------------
     if (yProgress > 0.01) {
-      // Left arm (608, 70.4) -> (656, 134.4)
-      _drawLineSegment(
+      // Left arm into stem as continuous stroke with clean miter junction and stadium base
+      final yStemPath = Path()
+        ..moveTo(612.0 * scale, 70.4 * scale)
+        ..lineTo(656.0 * scale, 134.4 * scale)
+        ..lineTo(656.0 * scale, 185.6 * scale);
+
+      _drawSegment(
         canvas,
-        Offset(608.0 * scale, 70.4 * scale),
-        Offset(656.0 * scale, 134.4 * scale),
-        (yProgress / 0.45).clamp(0.0, 1.0),
-        glyphPaint,
+        yStemPath,
+        (yProgress / 0.70).clamp(0.0, 1.0),
+        peakPaint,
       );
 
-      // Right arm (704, 70.4) -> (656, 134.4)
-      if (yProgress > 0.10) {
+      // Right arm joins cleanly at (656, 134.4) with flush butt end (no intersection blob!)
+      if (yProgress > 0.15) {
         _drawLineSegment(
           canvas,
-          Offset(704.0 * scale, 70.4 * scale),
+          Offset(700.0 * scale, 70.4 * scale),
           Offset(656.0 * scale, 134.4 * scale),
-          ((yProgress - 0.10) / 0.45).clamp(0.0, 1.0),
-          glyphPaint,
-        );
-      }
-
-      // Vertical stem (656, 134.4) -> (656, 185.6)
-      if (yProgress > 0.45) {
-        _drawLineSegment(
-          canvas,
-          Offset(656.0 * scale, 134.4 * scale),
-          Offset(656.0 * scale, 185.6 * scale),
-          ((yProgress - 0.45) / 0.55).clamp(0.0, 1.0),
-          glyphPaint,
+          ((yProgress - 0.15) / 0.55).clamp(0.0, 1.0),
+          flushBarPaint,
         );
       }
     }
