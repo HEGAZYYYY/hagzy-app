@@ -1164,14 +1164,14 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
     }
 
     // ----------------------------------------------------
-    // 2. LETTER [ A ] (X: 216 -> 312, Apex 264)
+    // 2. LETTER [ A ] (X: 208 -> 320, Apex 264, Wide Inner Triangle)
     // ----------------------------------------------------
     if (aProgress > 0.01) {
-      // Continuous architectural legs meeting at smooth rounded crest
+      // Continuous architectural legs with wider stance for open inner counter
       final aPath = Path()
-        ..moveTo(216.0 * scale, 185.6 * scale)
+        ..moveTo(208.0 * scale, 185.6 * scale)
         ..lineTo(264.0 * scale, 70.4 * scale)
-        ..lineTo(312.0 * scale, 185.6 * scale);
+        ..lineTo(320.0 * scale, 185.6 * scale);
 
       _drawSegment(
         canvas,
@@ -1180,12 +1180,12 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
         glyphPaint,
       );
 
-      // Smooth rounded crossbar nestled inside without protruding past legs
+      // Wider, perfectly placed crossbar opening up the middle triangle
       if (aProgress > 0.45) {
         _drawLineSegment(
           canvas,
-          Offset(242.0 * scale, 139.2 * scale),
-          Offset(286.0 * scale, 139.2 * scale),
+          Offset(235.0 * scale, 146.0 * scale),
+          Offset(293.0 * scale, 146.0 * scale),
           ((aProgress - 0.45) / 0.55).clamp(0.0, 1.0),
           glyphPaint,
         );
@@ -1193,57 +1193,55 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
     }
 
     // ----------------------------------------------------
-    // 3. LETTER [ G ] (X: 344 -> 440, Center 392, Top 70.4, Bottom 185.6)
+    // 3. LETTER [ G ] (Pure Geometric Circular Bottom, R=57.6, Center 392, 128)
     // ----------------------------------------------------
     if (gProgress > 0.01) {
-      final kx = 26.51 * scale;
-      final ky = 31.81 * scale;
       final cx = 392.0 * scale;
       final cy = 128.0 * scale;
+      final r = 57.6 * scale;
+      final k = 31.8116 * scale; // r * 0.552285 for exact circle
 
       final gPath = Path()
         // 1. Top-right terminal with smooth stadium cap
-        ..moveTo(436.0 * scale, 88.0 * scale)
-        // 2. Smoothly curve up into the top arch
+        ..moveTo(434.0 * scale, 89.0 * scale)
+        // 2. Smoothly curve into top circular tangent
         ..cubicTo(
-          432.0 * scale,
-          74.0 * scale,
-          412.0 * scale,
+          424.0 * scale,
+          70.4 * scale,
+          408.0 * scale,
           70.4 * scale,
           cx,
           70.4 * scale,
         )
-        // 3. Mathematical ellipse quadrant down through left spine
+        // 3. Top-to-left quadrant (pure circle)
         ..cubicTo(
-          cx - kx,
+          cx - k,
           70.4 * scale,
-          344.0 * scale,
-          cy - ky,
-          344.0 * scale,
+          cx - r,
+          cy - k,
+          cx - r,
           cy,
         )
-        // 4. Mathematical ellipse quadrant down through bottom baseline
+        // 4. Left-to-bottom quadrant (pure circle)
         ..cubicTo(
-          344.0 * scale,
-          cy + ky,
-          cx - kx,
-          185.6 * scale,
+          cx - r,
+          cy + k,
+          cx - k,
+          cy + r,
           cx,
-          185.6 * scale,
+          cy + r,
         )
-        // 5. Curve up into right upright
+        // 5. Bottom-to-right quadrant (100% PURE CIRCULAR BOWL)
         ..cubicTo(
-          cx + kx,
-          185.6 * scale,
-          440.0 * scale,
-          cy + 30.0 * scale,
-          440.0 * scale,
-          148.0 * scale,
+          cx + k,
+          cy + r,
+          cx + r,
+          cy + k,
+          cx + r,
+          cy,
         )
-        // 6. Right vertical upright to waistline
-        ..lineTo(440.0 * scale, 134.4 * scale)
-        // 7. Horizontal inward crossbar to center with rounded terminal
-        ..lineTo(cx, 134.4 * scale);
+        // 6. Horizontal inward crossbar straight to center
+        ..lineTo(cx, cy);
 
       _drawSegment(canvas, gPath, gProgress.clamp(0.0, 1.0), glyphPaint);
     }
