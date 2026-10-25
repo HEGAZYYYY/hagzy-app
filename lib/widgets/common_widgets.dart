@@ -1123,25 +1123,29 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1450),
+      duration: const Duration(milliseconds: 2450), // Lasts a full second longer for a relaxed luxury feel
     );
 
-    // Spring logo entrance (0% -> 48%): spring overshoot -> settle
+    // Spring logo entrance (0% -> 35%): spring overshoot -> settle -> hold -> zoom exit
     _logoScale = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(begin: 0.65, end: 1.06)
             .chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 46,
+        weight: 32,
       ),
       TweenSequenceItem(
         tween: Tween<double>(begin: 1.06, end: 1.0)
             .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 24,
+        weight: 18,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.12)
-            .chain(CurveTween(curve: Curves.easeInCubic)),
+        tween: ConstantTween<double>(1.0),
         weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.10)
+            .chain(CurveTween(curve: Curves.easeInCubic)),
+        weight: 20,
       ),
     ]).animate(_ctrl);
 
@@ -1149,21 +1153,21 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     _logoRotation = Tween<double>(begin: -0.05, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.35, curve: Curves.easeOutCubic),
       ),
     );
 
     // Fade logo into view smoothly
     _logoOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.22, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.16, curve: Curves.easeOut),
     );
 
     // Ambient acoustic pulse rings (expanding wave from behind mark)
     _rippleScale = Tween<double>(begin: 0.75, end: 1.95).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.12, 0.75, curve: Curves.easeOutQuart),
+        curve: const Interval(0.08, 0.60, curve: Curves.easeOutQuart),
       ),
     );
     _rippleOpacity = TweenSequence<double>([
@@ -1179,26 +1183,26 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       ),
     ]).animate(CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.12, 0.85),
+      curve: const Interval(0.08, 0.70),
     ));
 
-    // Staggered text & badge entrance (30% -> 60%)
-    _textSlide = Tween<double>(begin: 18.0, end: 0.0).animate(
+    // Staggered title entrance (20% -> 42%)
+    _textSlide = Tween<double>(begin: 16.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.28, 0.58, curve: Curves.easeOutCubic),
+        curve: const Interval(0.20, 0.42, curve: Curves.easeOutCubic),
       ),
     );
     _textOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.28, 0.55, curve: Curves.easeOut),
+      curve: const Interval(0.20, 0.40, curve: Curves.easeOut),
     );
 
-    // Cinematic zoom exit (72% -> 100%)
-    _zoomExit = Tween<double>(begin: 1.0, end: 1.08).animate(
+    // Cinematic zoom exit (80% -> 100%)
+    _zoomExit = Tween<double>(begin: 1.0, end: 1.07).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.70, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.78, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1206,7 +1210,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     _overlayOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.72, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.80, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1338,73 +1342,20 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                               ),
                             ),
                             const SizedBox(height: 22),
-                            // Staggered Title and Tagline
+                            // Staggered Title (Clean & Minimalist, no slogan)
                             Opacity(
                               opacity: _textOpacity.value,
                               child: Transform.translate(
                                 offset: Offset(0, _textSlide.value),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      widget.arabic ? 'حجزي' : 'Hagzy',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 34,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -1.0,
-                                        height: 1.05,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    // Luxury Tagline Badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: Colors.white.withValues(alpha: 0.22),
-                                          width: 1,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.1),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 6,
-                                            height: 6,
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFF34D399),
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            widget.arabic
-                                                ? 'حجز فوري ومضمون للملاعب'
-                                                : 'INSTANT VENUE BOOKINGS',
-                                            style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.95),
-                                              fontSize: widget.arabic ? 12 : 10.5,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: widget.arabic ? 0.3 : 1.8,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  widget.arabic ? 'حجزي' : 'Hagzy',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.0,
+                                    height: 1.05,
+                                  ),
                                 ),
                               ),
                             ),
