@@ -4,7 +4,11 @@ import 'package:http/http.dart' as http;
 
 class HagzyApi {
   HagzyApi({String? baseUrl, http.Client? client})
-      : baseUrl = (baseUrl ?? const String.fromEnvironment('HAGZY_API_URL'))
+      : baseUrl = (baseUrl ??
+                const String.fromEnvironment(
+                  'HAGZY_API_URL',
+                  defaultValue: 'http://localhost:4000',
+                ))
             .trim()
             .replaceFirst(RegExp(r'/$'), ''),
         _client = client ?? http.Client();

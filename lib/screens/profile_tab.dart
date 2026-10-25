@@ -21,11 +21,13 @@ class CustomerProfileTab extends StatefulWidget {
     required this.apiConfigured,
     required this.onSignIn,
     required this.onSignOut,
+    this.onDeleteAccount,
     required this.onUpdateProfile,
     required this.onChangeLanguage,
     required this.onViewBookings,
     required this.onSelectArea,
     required this.onAutoAssignGps,
+    this.onSwitchToAdmin,
   });
 
   final bool arabic;
@@ -46,6 +48,7 @@ class CustomerProfileTab extends StatefulWidget {
     double? walletBalance,
   }) onSignIn;
   final Future<void> Function() onSignOut;
+  final Future<void> Function()? onDeleteAccount;
   final Future<void> Function({
     required String name,
     required String email,
@@ -57,6 +60,7 @@ class CustomerProfileTab extends StatefulWidget {
   final VoidCallback onViewBookings;
   final VoidCallback onSelectArea;
   final VoidCallback onAutoAssignGps;
+  final VoidCallback? onSwitchToAdmin;
 
   @override
   State<CustomerProfileTab> createState() => _CustomerProfileTabState();
@@ -1139,6 +1143,38 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 trailing: const Icon(Icons.arrow_forward_ios_rounded,
                     size: 14, color: kMuted),
               ),
+              if (widget.onSwitchToAdmin != null) ...[
+                const Divider(height: 1),
+                _SettingTile(
+                  icon: Icons.storefront_rounded,
+                  title: localized(
+                      arabic,
+                      'Venue Owner & Partner Portal',
+                      'بوابة أصحاب الملاعب والصالونات'),
+                  subtitle: localized(
+                    arabic,
+                    'Manage courts, calendar, walk-ins & daily POS',
+                    'إدارة الملاعب والمواعيد والحجوزات ونقاط البيع',
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      localized(arabic, 'Manage', 'دخول الإدارة'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        color: kGreen,
+                      ),
+                    ),
+                  ),
+                  onTap: widget.onSwitchToAdmin,
+                ),
+              ],
             ],
           ),
         ),
@@ -1224,7 +1260,88 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          // Apple App Store Guideline 5.1.1(v) & Google Play Data Safety requirement
+          Center(
+            child: TextButton.icon(
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    title: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded,
+                            color: Colors.redAccent),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(localized(
+                            arabic,
+                            'Delete Account Permanently?',
+                            'حذف الحساب نهائياً؟',
+                          )),
+                        ),
+                      ],
+                    ),
+                    content: Text(localized(
+                      arabic,
+                      'Are you sure you want to permanently delete your Hagzy account? This will erase your personal profile, phone number, and reservation history from this device and our servers. This action cannot be undone.',
+                      'هل أنت متأكد من رغبتك في حذف حسابك في حجزي نهائياً؟ سيتم مسح بياناتك الشخصية ورقم الموبايل وسجل الحجوزات تماماً من هذا الجهاز وسيرفراتنا ولا يمكن التراجع عن هذا الإجراء.',
+                    )),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text(localized(arabic, 'Cancel', 'إلغاء')),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade800,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text(localized(
+                            arabic, 'Delete Forever', 'حذف نهائياً')),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  if (widget.onDeleteAccount != null) {
+                    await widget.onDeleteAccount!();
+                  } else {
+                    await widget.onSignOut();
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: Colors.red.shade900,
+                        content: Text(localized(
+                          arabic,
+                          'Your account and personal data have been permanently deleted.',
+                          'تم حذف حسابك وكافة بياناتك الشخصية نهائياً.',
+                        )),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              icon: Icon(Icons.delete_forever_rounded,
+                  color: Colors.grey.shade500, size: 17),
+              label: Text(
+                localized(arabic, 'Delete Account & Personal Data',
+                    'حذف الحساب والبيانات الشخصية'),
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12.5,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
 
         Center(
