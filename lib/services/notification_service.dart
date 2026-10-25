@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'url_launcher_stub.dart' if (dart.library.html) 'url_launcher_web.dart';
 
 class NotificationService {
   NotificationService({

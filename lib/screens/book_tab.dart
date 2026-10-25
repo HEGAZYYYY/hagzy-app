@@ -46,9 +46,12 @@ class _BookTabState extends State<BookTab> {
   bool _sortByPrice = false;
   bool _showMapView = false;
   bool _isAutoAssigningGps = false;
-  DateTime _date = DateTime.now().hour >= 21
-      ? DateTime.now().add(const Duration(days: 1))
-      : DateTime.now();
+  DateTime _date = () {
+    final now = DateTime.now();
+    return now.hour >= 21
+        ? DateTime(now.year, now.month, now.day + 1)
+        : DateTime(now.year, now.month, now.day);
+  }();
   DateTime? _selectedStart;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -2250,7 +2253,7 @@ class _BookTabState extends State<BookTab> {
     final now = DateTime.now();
     final isToday =
         date.year == now.year && date.month == now.month && date.day == now.day;
-    final tomorrow = now.add(const Duration(days: 1));
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
     final isTomorrow = date.year == tomorrow.year &&
         date.month == tomorrow.month &&
         date.day == tomorrow.day;
@@ -2304,13 +2307,13 @@ class _BookTabState extends State<BookTab> {
 
   Widget _buildDateStrip(bool arabic) {
     final today = DateTime.now();
+    // Calculate calendar dates without 24h DST duplication
     final days = List.generate(
       14,
-      (index) =>
-          DateTime(today.year, today.month, today.day).add(Duration(days: index)),
+      (index) => DateTime(today.year, today.month, today.day + index),
     );
     return SizedBox(
-      height: 86,
+      height: 92,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: days.length,
@@ -2321,76 +2324,96 @@ class _BookTabState extends State<BookTab> {
               d.day == _date.day;
           return Padding(
             padding:
-                EdgeInsets.only(right: arabic ? 0 : 8, left: arabic ? 8 : 0),
+                EdgeInsets.only(right: arabic ? 0 : 10, left: arabic ? 10 : 0),
             child: PressableScale(
-              scaleDown: 0.93,
+              scaleDown: 0.94,
               onTap: () {
                 setState(() {
                   _date = d;
                   _selectedStart = null;
                 });
               },
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  setState(() {
-                    _date = d;
-                    _selectedStart = null;
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 68,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: isSelected ? HagzyTheme.brandGradient : null,
-                    color: isSelected ? null : kPage,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: isSelected ? kGreen : kBorder,
-                      width: isSelected ? 1.5 : 1,
-                    ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                width: 70,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: isSelected ? HagzyTheme.brandGradient : null,
+                  color: isSelected ? null : kPage,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF10B981) : kBorder.withValues(alpha: 0.9),
+                    width: isSelected ? 1.8 : 1,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _dayLabel(d, arabic),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1.1,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                          color: isSelected ? Colors.white70 : kMuted,
-                        ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF059669).withValues(alpha: 0.35),
+                            blurRadius: 14,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 5),
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _dayLabel(d, arabic),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        height: 1.1,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        letterSpacing: 0.2,
+                        color: isSelected ? Colors.white.withValues(alpha: 0.9) : kMuted,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${d.day}',
-                        style: TextStyle(
-                          fontSize: 17,
-                          height: 1.15,
-                          fontWeight: FontWeight.w900,
-                          color: isSelected ? Colors.white : kInk,
-                        ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${d.day}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        color: isSelected ? Colors.white : kInk,
                       ),
-                      const SizedBox(height: 1),
-                      Text(
-                        _monthLabel(d.month, arabic),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1.1,
-                          fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white70 : kMuted,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _monthLabel(d.month, arabic),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        height: 1.1,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? Colors.white.withValues(alpha: 0.9) : kMuted,
+                      ),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(height: 3),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),

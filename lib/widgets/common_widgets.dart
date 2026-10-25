@@ -1087,8 +1087,10 @@ class _HagzyLogoPainter extends CustomPainter {
 
 /// Breadfast-style opening animation:
 /// Clean, solid brand-colored full-screen canvas with the original Hagzy logo
-/// that springs in smoothly, holds for a beat, and zooms/fades directly into
-/// the app without any loading spinners or slogans.
+/// Luxury Opus-grade opening splash animation:
+/// Deep architectural emerald gradient canvas with ambient expanding glow rings,
+/// tactile spring-physics logo entrance, staggered luxury typography badge,
+/// and smooth cinematic zoom-through cross-dissolve directly into the app.
 class HagzySplashOverlay extends StatefulWidget {
   const HagzySplashOverlay({
     super.key,
@@ -1107,7 +1109,13 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _logoScale;
+  late final Animation<double> _logoRotation;
   late final Animation<double> _logoOpacity;
+  late final Animation<double> _rippleScale;
+  late final Animation<double> _rippleOpacity;
+  late final Animation<double> _textSlide;
+  late final Animation<double> _textOpacity;
+  late final Animation<double> _zoomExit;
   late final Animation<double> _overlayOpacity;
 
   @override
@@ -1115,37 +1123,90 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1150),
+      duration: const Duration(milliseconds: 1450),
     );
 
-    // Breadfast-style spring pop-in -> brief hold -> smooth zoom-through exit
+    // Spring logo entrance (0% -> 48%): spring overshoot -> settle
     _logoScale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.76, end: 1.03)
+        tween: Tween<double>(begin: 0.65, end: 1.06)
             .chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 42,
+        weight: 46,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.03, end: 1.0)
+        tween: Tween<double>(begin: 1.06, end: 1.0)
             .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 26,
+        weight: 24,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.15)
+        tween: Tween<double>(begin: 1.0, end: 1.12)
             .chain(CurveTween(curve: Curves.easeInCubic)),
-        weight: 32,
+        weight: 30,
       ),
     ]).animate(_ctrl);
 
-    _logoOpacity = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.0, 0.25, curve: Curves.easeOut),
+    // Subtle natural tilt settling into true level
+    _logoRotation = Tween<double>(begin: -0.05, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
+      ),
     );
 
+    // Fade logo into view smoothly
+    _logoOpacity = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.22, curve: Curves.easeOut),
+    );
+
+    // Ambient acoustic pulse rings (expanding wave from behind mark)
+    _rippleScale = Tween<double>(begin: 0.75, end: 1.95).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.12, 0.75, curve: Curves.easeOutQuart),
+      ),
+    );
+    _rippleOpacity = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 0.45)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.45, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInCubic)),
+        weight: 75,
+      ),
+    ]).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.12, 0.85),
+    ));
+
+    // Staggered text & badge entrance (30% -> 60%)
+    _textSlide = Tween<double>(begin: 18.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.28, 0.58, curve: Curves.easeOutCubic),
+      ),
+    );
+    _textOpacity = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.28, 0.55, curve: Curves.easeOut),
+    );
+
+    // Cinematic zoom exit (72% -> 100%)
+    _zoomExit = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.70, 1.0, curve: Curves.easeInOutCubic),
+      ),
+    );
+
+    // Smooth dissolve into the app
     _overlayOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.68, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.72, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1164,50 +1225,193 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onDismiss,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
           return Opacity(
             opacity: _overlayOpacity.value,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF047857),
-                      Color(0xFF059669),
-                    ],
+            child: Transform.scale(
+              scale: _zoomExit.value,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(0.0, -0.15),
+                      radius: 1.25,
+                      colors: [
+                        Color(0xFF065F46), // Radiant emerald center
+                        Color(0xFF044E3B),
+                        Color(0xFF022C22), // Deep luxury forest perimeter
+                        Color(0xFF011C15),
+                      ],
+                      stops: [0.0, 0.38, 0.78, 1.0],
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Opacity(
-                    opacity: _logoOpacity.value,
-                    child: Transform.scale(
-                      scale: _logoScale.value,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const HagzyLogoMark(
-                            size: 88,
-                            withGlow: true,
-                            inverted: true,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            widget.arabic ? 'حجزي' : 'Hagzy',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.8,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Ambient expanding acoustic radar ripple 1
+                      Transform.scale(
+                        scale: _rippleScale.value,
+                        child: Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF34D399).withValues(
+                                alpha: (_rippleOpacity.value * 0.7).clamp(0.0, 1.0),
+                              ),
+                              width: 1.8,
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      // Ambient acoustic radar ripple 2
+                      Transform.scale(
+                        scale: _rippleScale.value * 1.35,
+                        child: Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF10B981).withValues(
+                                alpha: (_rippleOpacity.value * 0.4).clamp(0.0, 1.0),
+                              ),
+                              width: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Soft radial light glow behind logo
+                      Container(
+                        width: 240,
+                        height: 240,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFF10B981).withValues(alpha: 0.28),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Central Hero Content
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Spring Logo with subtle rotation
+                            Opacity(
+                              opacity: _logoOpacity.value,
+                              child: Transform.scale(
+                                scale: _logoScale.value,
+                                child: Transform.rotate(
+                                  angle: _logoRotation.value,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(26),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.35),
+                                          blurRadius: 28,
+                                          offset: const Offset(0, 10),
+                                        ),
+                                        BoxShadow(
+                                          color: const Color(0xFF34D399).withValues(alpha: 0.3),
+                                          blurRadius: 36,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const HagzyLogoMark(
+                                      size: 96,
+                                      withGlow: false,
+                                      inverted: true,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 22),
+                            // Staggered Title and Tagline
+                            Opacity(
+                              opacity: _textOpacity.value,
+                              child: Transform.translate(
+                                offset: Offset(0, _textSlide.value),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      widget.arabic ? 'حجزي' : 'Hagzy',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -1.0,
+                                        height: 1.05,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    // Luxury Tagline Badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.22),
+                                          width: 1,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.1),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF34D399),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            widget.arabic
+                                                ? 'حجز فوري ومضمون للملاعب'
+                                                : 'INSTANT VENUE BOOKINGS',
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(alpha: 0.95),
+                                              fontSize: widget.arabic ? 12 : 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: widget.arabic ? 0.3 : 1.8,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
