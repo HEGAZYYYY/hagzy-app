@@ -8,8 +8,9 @@ RUN cd server && npm install --omit=dev
 # Copy server code
 COPY server/ ./server/
 
-# Copy prebuilt Flutter web bundle and assets
+# Copy prebuilt Flutter web bundles and assets
 COPY build/web/ ./build/web/
+COPY build/web-admin/ ./build/web-admin/
 COPY assets/ ./assets/
 
 ENV PORT=10000

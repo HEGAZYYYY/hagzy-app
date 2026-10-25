@@ -55,7 +55,18 @@ let db = loadDb();
 app.use(cors());
 app.use(express.json());
 
-// Serve static web app and documents (privacy, terms, and flutter web)
+// 1. Dedicated Venue Owner & Partner Web Portal (/partner and /admin)
+const adminWebDir = path.join(__dirname, '..', 'build', 'web-admin');
+if (fs.existsSync(adminWebDir)) {
+  app.use('/partner', express.static(adminWebDir));
+  app.get('/admin', (req, res) => res.redirect('/partner'));
+  app.get('/admin/*', (req, res) => res.redirect('/partner'));
+  app.get(['/partner', '/partner/*'], (req, res) => {
+    res.sendFile(path.join(adminWebDir, 'index.html'));
+  });
+}
+
+// 2. Player Consumer Web App (/)
 const buildWebDir = path.join(__dirname, '..', 'build', 'web');
 const staticWebDir = path.join(__dirname, '..', 'web');
 const activeWebDir = fs.existsSync(buildWebDir)
@@ -67,7 +78,7 @@ const activeWebDir = fs.existsSync(buildWebDir)
 if (activeWebDir) {
   app.use(express.static(activeWebDir));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/partner') || req.path.startsWith('/admin')) return next();
     const indexPath = path.join(activeWebDir, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);

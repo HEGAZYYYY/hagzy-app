@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../hagzy_api.dart';
 import '../models/models.dart';
@@ -1143,38 +1144,38 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 trailing: const Icon(Icons.arrow_forward_ios_rounded,
                     size: 14, color: kMuted),
               ),
-              if (widget.onSwitchToAdmin != null) ...[
-                const Divider(height: 1),
-                _SettingTile(
-                  icon: Icons.storefront_rounded,
-                  title: localized(
-                      arabic,
-                      'Venue Owner & Partner Portal',
-                      'بوابة أصحاب الملاعب والصالونات'),
-                  subtitle: localized(
+              const Divider(height: 1),
+              _SettingTile(
+                icon: Icons.storefront_rounded,
+                title: localized(
                     arabic,
-                    'Manage courts, calendar, walk-ins & daily POS',
-                    'إدارة الملاعب والمواعيد والحجوزات ونقاط البيع',
-                  ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: kGreen.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      localized(arabic, 'Manage', 'دخول الإدارة'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        color: kGreen,
-                      ),
-                    ),
-                  ),
-                  onTap: widget.onSwitchToAdmin,
+                    'Partner with Hagzy',
+                    'انضم كشريك في حجزي'),
+                subtitle: localized(
+                  arabic,
+                  'List your courts or salon on our platform',
+                  'سجّل ملاعبك أو صالونك واستقبل حجوزاتك رقمياً',
                 ),
-              ],
+                trailing: const Icon(
+                  Icons.open_in_new_rounded,
+                  size: 16,
+                  color: kGreen,
+                ),
+                onTap: () async {
+                  final partnerUri =
+                      Uri.parse('https://hagzy-api.onrender.com/partner');
+                  try {
+                    if (await canLaunchUrl(partnerUri)) {
+                      await launchUrl(partnerUri,
+                          mode: LaunchMode.externalApplication);
+                      return;
+                    }
+                  } catch (_) {}
+                  if (widget.onSwitchToAdmin != null) {
+                    widget.onSwitchToAdmin!();
+                  }
+                },
+              ),
             ],
           ),
         ),
