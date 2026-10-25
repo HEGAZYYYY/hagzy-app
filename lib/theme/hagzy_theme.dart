@@ -125,7 +125,7 @@ class HagzyTheme {
       ),
       textTheme: _isTest
           ? null
-          : GoogleFonts.plusJakartaSansTextTheme().apply(
+          : GoogleFonts.plusJakartaSansTextTheme(baseScheme.toString().isEmpty ? const TextTheme() : const TextTheme()).apply(
               bodyColor: kInk,
               displayColor: kInk,
             ),
