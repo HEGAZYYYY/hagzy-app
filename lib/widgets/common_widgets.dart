@@ -1116,23 +1116,7 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(11 * scale));
     canvas.drawRRect(rrect, bgPaint);
 
-    // 2. Blueprint alignment guidelines (very subtle architectural crosslines)
-    if (glowProgress > 0.01 && glowProgress < 0.99) {
-      final guideAlpha = (0.12 * (1.0 - glowProgress)).clamp(0.0, 1.0);
-      final guidePaint = Paint()
-        ..color = const Color(0xFF059669).withValues(alpha: guideAlpha)
-        ..strokeWidth = 1.0 * scale
-        ..style = PaintingStyle.stroke;
-
-      // Subtle horizontal centerline axis
-      canvas.drawLine(
-        Offset(6 * scale, 21 * scale),
-        Offset(34 * scale, 21 * scale),
-        guidePaint,
-      );
-    }
-
-    // 3. Monogram Paint Setup
+    // 2. Monogram Paint Setup
     final strokeWidth = 3.8 * scale;
     final glyphPaint = Paint()
       ..isAntiAlias = true
@@ -1241,8 +1225,6 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
 
   // Background and ambient atmosphere
   late final Animation<double> _ambientBloom;
-  late final Animation<double> _haloScale;
-  late final Animation<double> _haloOpacity;
 
   // Assembling logo mechanics
   late final Animation<double> _containerScale;
@@ -1283,29 +1265,6 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
         weight: 50,
       ),
     ]).animate(_ctrl);
-
-    // Delicate architectural halo (soft hairline guide, not harsh sonar circles)
-    _haloScale = Tween<double>(begin: 0.85, end: 1.15).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.10, 0.75, curve: Curves.easeOutCubic),
-      ),
-    );
-    _haloOpacity = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 0.22)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 35,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.22, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeInCubic)),
-        weight: 65,
-      ),
-    ]).animate(CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.10, 0.80),
-    ));
 
     // Squircle container slowly materializing
     _containerScale = Tween<double>(begin: 0.86, end: 1.0).animate(
@@ -1443,24 +1402,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                           ),
                         ),
                       ),
-                      // 2. Delicate hairline halo ring (subtle precision alignment, not sonar circles)
-                      Transform.scale(
-                        scale: _haloScale.value,
-                        child: Container(
-                          width: 170,
-                          height: 170,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF34D399).withValues(
-                                alpha: _haloOpacity.value,
-                              ),
-                              width: 1.0,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // 3. Central Hero Content
+                      // 2. Central Hero Content (Zero rings, pure luxury assembling mark)
                       Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -1508,7 +1450,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                               ),
                             ),
                             const SizedBox(height: 24),
-                            // Clean Luxury Title (Outfit for EN, Alexandria for AR)
+                            // Clean Luxury Title (Montserrat for EN, Almarai for AR)
                             Opacity(
                               opacity: _textOpacity.value,
                               child: Transform.translate(
@@ -1518,32 +1460,32 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontFamily: widget.arabic
-                                        ? 'Alexandria'
-                                        : 'Outfit',
+                                        ? 'Almarai'
+                                        : 'Montserrat',
                                     fontFamilyFallback: widget.arabic
                                         ? const [
-                                            'Readex Pro',
+                                            'Tajawal',
+                                            'Alexandria',
                                             'Cairo',
                                             'sans-serif'
                                           ]
                                         : const [
+                                            'Poppins',
                                             'Plus Jakarta Sans',
                                             'Inter',
                                             'sans-serif'
                                           ],
-                                    fontSize: widget.arabic ? 35 : 37,
-                                    fontWeight: widget.arabic
-                                        ? FontWeight.w800
-                                        : FontWeight.w700,
+                                    fontSize: widget.arabic ? 34 : 33,
+                                    fontWeight: FontWeight.w800,
                                     letterSpacing:
-                                        widget.arabic ? 0.0 : -0.8,
+                                        widget.arabic ? 0.0 : 1.2,
                                     height: 1.1,
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 8),
-                            // Clean, Human Slogan (Plus Jakarta Sans for EN, Alexandria for AR)
+                            // Clean, Human Slogan (Plus Jakarta Sans for EN, Almarai for AR)
                             Opacity(
                               opacity: _sloganOpacity.value,
                               child: Transform.translate(
@@ -1554,25 +1496,26 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                       : 'Your spot, booked in seconds',
                                   style: TextStyle(
                                     color:
-                                        Colors.white.withValues(alpha: 0.84),
+                                        Colors.white.withValues(alpha: 0.85),
                                     fontFamily: widget.arabic
-                                        ? 'Alexandria'
+                                        ? 'Almarai'
                                         : 'Plus Jakarta Sans',
                                     fontFamilyFallback: widget.arabic
                                         ? const [
-                                            'Readex Pro',
+                                            'Tajawal',
+                                            'Alexandria',
                                             'Cairo',
                                             'sans-serif'
                                           ]
                                         : const [
-                                            'Outfit',
-                                            'Inter',
+                                            'Montserrat',
+                                            'Poppins',
                                             'sans-serif'
                                           ],
                                     fontSize: widget.arabic ? 13.5 : 12.5,
                                     fontWeight: FontWeight.w400,
                                     letterSpacing:
-                                        widget.arabic ? 0.3 : 0.8,
+                                        widget.arabic ? 0.2 : 0.8,
                                   ),
                                 ),
                               ),
