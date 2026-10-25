@@ -959,7 +959,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         : (venue.type == VenueType.salon ? 'كابتن نادر (Master Barber)' : '');
     var useWallet = false;
     var walletDeducted = 0.0;
-    double walletBalance = 150.0;
+    double walletBalance = 0.0;
     try {
       walletBalance = await HagzyWallet.getBalance();
     } catch (_) {}
@@ -1789,6 +1789,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         try {
           final res = await _api.deductWalletFunds(
             amount: walletDeducted,
+            token: _customerToken,
             phone: _savedCustomerPhone,
             email: _savedCustomerEmail,
           );
