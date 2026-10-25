@@ -228,14 +228,56 @@ class _BookTabState extends State<BookTab> {
   Future<void> _toggleFavorite(Venue venue) async {
     try {
       final next = {..._favoriteIds};
-      if (!next.add(venue.id)) next.remove(venue.id);
+      final isAdding = !next.contains(venue.id);
+      if (isAdding) {
+        next.add(venue.id);
+      } else {
+        next.remove(venue.id);
+      }
       final prefs = await SharedPreferences.getInstance();
       final saved =
           await prefs.setStringList(kFavoriteStorageKey, next.toList());
       if (!saved) {
         throw StateError('Could not save your favorites on this device.');
       }
-      if (mounted) setState(() => _favoriteIds = next);
+      if (mounted) {
+        setState(() => _favoriteIds = next);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            backgroundColor: kInk,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: kBorder),
+            ),
+            content: Row(
+              children: [
+                Icon(
+                  isAdding
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isAdding ? const Color(0xFFE11D48) : Colors.white70,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isAdding
+                        ? localized(widget.arabic, 'Added to Saved Places',
+                            'تمت الإضافة إلى الأماكن المفضلة')
+                        : localized(widget.arabic, 'Removed from Saved Places',
+                            'تمت الإزالة من الأماكن المفضلة'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
     } catch (error) {
       _showPreferenceError(error);
     }
@@ -332,20 +374,30 @@ class _BookTabState extends State<BookTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _VenueDetailsSheet(
-        venue: venue,
-        arabic: arabic,
-        onBookNow: () {
-          Navigator.pop(ctx);
-          if (_venueId != venue.id) {
-            _selectVenue(venue);
-          }
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, modalSetState) {
+          final isFav = _favoriteIds.contains(venue.id);
+          return _VenueDetailsSheet(
+            venue: venue,
+            arabic: arabic,
+            favorite: isFav,
+            onFavorite: () async {
+              await _toggleFavorite(venue);
+              if (ctx.mounted) modalSetState(() {});
+            },
+            onBookNow: () {
+              Navigator.pop(ctx);
+              if (_venueId != venue.id) {
+                _selectVenue(venue);
+              }
+            },
+            onAddReview: widget.onAddReview == null
+                ? null
+                : (author, rating, comment) async {
+                    await widget.onAddReview!(venue, author, rating, comment);
+                  },
+          );
         },
-        onAddReview: widget.onAddReview == null
-            ? null
-            : (author, rating, comment) async {
-                await widget.onAddReview!(venue, author, rating, comment);
-              },
       ),
     );
   }
@@ -1202,8 +1254,15 @@ class _BookTabState extends State<BookTab> {
               const SizedBox(width: 8),
               CustomPill(
                 selected: _favoritesOnly,
-                icon: Icons.favorite_border,
-                label: localized(widget.arabic, 'Saved', 'المفضلة'),
+                icon: _favoriteIds.isNotEmpty
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                label: _favoriteIds.isNotEmpty
+                    ? localized(
+                        widget.arabic,
+                        'Saved (${_favoriteIds.length})',
+                        'المفضلة (${_favoriteIds.length})')
+                    : localized(widget.arabic, 'Saved', 'المفضلة'),
                 onTap: () => setState(() => _favoritesOnly = !_favoritesOnly),
               ),
               const SizedBox(width: 8),
@@ -1253,7 +1312,9 @@ class _BookTabState extends State<BookTab> {
         ],
         if (matchingVenues.isEmpty)
           EmptyCard(
-            icon: _favoritesOnly ? Icons.favorite_border : Icons.location_off_outlined,
+            icon: _favoritesOnly
+                ? Icons.favorite_border_rounded
+                : Icons.location_off_outlined,
             title: _favoritesOnly
                 ? localized(widget.arabic, 'No Saved Places Yet',
                     'لا توجد أماكن مفضلة بعد')
@@ -1262,8 +1323,8 @@ class _BookTabState extends State<BookTab> {
             body: _favoritesOnly
                 ? localized(
                     widget.arabic,
-                    'Tap the heart on a venue to keep it close.',
-                    'اضغط على القلب لحفظ المكان في المفضلة.')
+                    'Tap the heart icon (🤍) on any venue to save it to your favorites for quick booking.',
+                    'اضغط على أيقونة القلب (🤍) في أي مكان لحفظه في المفضلة وسهولة حجزه لاحقاً.')
                 : _area != kAllEgyptAreas
                     ? localized(
                         widget.arabic,
@@ -1278,13 +1339,19 @@ class _BookTabState extends State<BookTab> {
                             widget.arabic,
                             'Try changing your area, category or search query.',
                             'جرّب تغيير المنطقة أو التصنيف أو عبارة البحث.'),
-            action: !_favoritesOnly && widget.onAddVenue != null
-                ? () => widget.onAddVenue!(_type)
-                : null,
-            actionLabel: localized(
-                widget.arabic,
-                'Add New Venue / Pitch / Barber',
-                'أضف مكاناً أو ملعباً أو حلاقاً'),
+            action: _favoritesOnly
+                ? () => setState(() => _favoritesOnly = false)
+                : widget.onAddVenue != null
+                    ? () => widget.onAddVenue!(_type)
+                    : null,
+            actionLabel: _favoritesOnly
+                ? localized(
+                    widget.arabic, 'Browse All Places', 'استعراض كل الأماكن')
+                : localized(widget.arabic, 'Add New Venue / Pitch / Barber',
+                    'أضف مكاناً أو ملعباً أو حلاقاً'),
+            actionIcon: _favoritesOnly
+                ? Icons.explore_outlined
+                : Icons.add_business_outlined,
             secondaryAction: !_favoritesOnly ? _chooseArea : null,
             secondaryActionLabel: localized(
                 widget.arabic,
@@ -1819,6 +1886,24 @@ class _BookTabState extends State<BookTab> {
                                       ],
                                     ),
                                   ),
+                                  IconButton(
+                                    tooltip: _favoriteIds.contains(venue.id)
+                                        ? localized(widget.arabic,
+                                            'Remove from Saved', 'إزالة من المفضلة')
+                                        : localized(widget.arabic, 'Save Place',
+                                            'حفظ في المفضلة'),
+                                    onPressed: () => _toggleFavorite(venue),
+                                    icon: Icon(
+                                      _favoriteIds.contains(venue.id)
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      color: _favoriteIds.contains(venue.id)
+                                          ? const Color(0xFFE11D48)
+                                          : kMuted,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
                                   PressableScale(
                                     scaleDown: 0.92,
                                     onTap: () {
@@ -3225,10 +3310,7 @@ class VenueBrowseCard extends StatelessWidget {
     final ratingStr = venue.rating.toStringAsFixed(1);
     final hasReviews = venue.reviews.isNotEmpty;
     final reviewCount = venue.reviews.length;
-    return PressableScale(
-      onTap: onTap,
-      scaleDown: 0.98,
-      child: AnimatedContainer(
+    return AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
@@ -3299,7 +3381,7 @@ class VenueBrowseCard extends StatelessWidget {
                           child: Stack(
                             children: [
                               Align(
-                                alignment: Alignment.topLeft,
+                                alignment: AlignmentDirectional.topStart,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10, vertical: 5),
@@ -3335,25 +3417,32 @@ class VenueBrowseCard extends StatelessWidget {
                                 ),
                               ),
                               Align(
-                                alignment: Alignment.topRight,
+                                alignment: AlignmentDirectional.topEnd,
                                 child: Material(
-                                  color: Colors.white.withValues(alpha: 0.94),
+                                  color: favorite
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.94),
                                   shape: const CircleBorder(),
-                                  elevation: 2,
-                                  shadowColor: Colors.black26,
+                                  elevation: favorite ? 3 : 2,
+                                  shadowColor: favorite
+                                      ? const Color(0xFFE11D48).withValues(alpha: 0.4)
+                                      : Colors.black26,
                                   child: IconButton(
                                     tooltip: favorite
-                                        ? localized(arabic, 'Remove from Saved',
-                                            'إزالة من المفضلة')
-                                        : localized(arabic, 'Save Venue', 'أضف للمفضلة'),
+                                        ? localized(arabic, 'Remove from Saved Places',
+                                            'إزالة من الأماكن المفضلة')
+                                        : localized(arabic, 'Save to Favorites',
+                                            'حفظ في المفضلة'),
                                     visualDensity: VisualDensity.compact,
                                     onPressed: onFavorite,
                                     icon: Icon(
-                                      favorite ? Icons.favorite : Icons.favorite_border,
+                                      favorite
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
                                       color: favorite
                                           ? const Color(0xFFE11D48)
                                           : kInk,
-                                      size: 19,
+                                      size: 20,
                                     ),
                                   ),
                                 ),
@@ -3718,8 +3807,7 @@ class VenueBrowseCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -3729,6 +3817,8 @@ class _VenueDetailsSheet extends StatefulWidget {
     required this.arabic,
     required this.onBookNow,
     this.onAddReview,
+    this.favorite = false,
+    this.onFavorite,
   });
 
   final Venue venue;
@@ -3736,6 +3826,8 @@ class _VenueDetailsSheet extends StatefulWidget {
   final VoidCallback onBookNow;
   final Future<void> Function(String author, double rating, String comment)?
       onAddReview;
+  final bool favorite;
+  final VoidCallback? onFavorite;
 
   @override
   State<_VenueDetailsSheet> createState() => _VenueDetailsSheetState();
@@ -3899,6 +3991,32 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                     ],
                   ),
                 ),
+                if (widget.onFavorite != null) ...[
+                  const SizedBox(width: 8),
+                  Material(
+                    color: widget.favorite
+                        ? const Color(0xFFFFE4E6)
+                        : const Color(0xFFF1F5F9),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: widget.favorite
+                          ? localized(arabic, 'Remove from Saved Places',
+                              'إزالة من الأماكن المفضلة')
+                          : localized(arabic, 'Save Place', 'حفظ في المفضلة'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: widget.onFavorite,
+                      icon: Icon(
+                        widget.favorite
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: widget.favorite
+                            ? const Color(0xFFE11D48)
+                            : kInk,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 14),
@@ -4064,10 +4182,54 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: widget.onBookNow,
-              icon: const Icon(Icons.bookmark_add_rounded, size: 17),
-              label: Text(localized(arabic, 'Book Now', 'احجز الآن')),
+            Row(
+              children: [
+                if (widget.onFavorite != null) ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      side: BorderSide(
+                        color: widget.favorite
+                            ? const Color(0xFFE11D48).withValues(alpha: 0.5)
+                            : kBorder,
+                      ),
+                      backgroundColor: widget.favorite
+                          ? const Color(0xFFFFE4E6).withValues(alpha: 0.4)
+                          : Colors.transparent,
+                    ),
+                    onPressed: widget.onFavorite,
+                    icon: Icon(
+                      widget.favorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: widget.favorite
+                          ? const Color(0xFFE11D48)
+                          : kInk,
+                      size: 18,
+                    ),
+                    label: Text(
+                      widget.favorite
+                          ? localized(arabic, 'Saved', 'محفوظ')
+                          : localized(arabic, 'Save', 'حفظ'),
+                      style: TextStyle(
+                        color: widget.favorite
+                            ? const Color(0xFFE11D48)
+                            : kInk,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: widget.onBookNow,
+                    icon: const Icon(Icons.calendar_today_rounded, size: 17),
+                    label: Text(localized(arabic, 'Book Now', 'احجز الآن')),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
