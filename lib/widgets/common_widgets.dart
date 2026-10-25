@@ -1198,32 +1198,59 @@ class _ExactLogoWordmarkPainter extends CustomPainter {
     }
 
     // ----------------------------------------------------
-    // 3. LETTER [ G ] (X: 344 -> 440, Center 392, Ry=57.6, Rx=48)
+    // 3. LETTER [ G ] (X: 344 -> 440, Center 392, Top 70.4, Bottom 185.6)
     // ----------------------------------------------------
     if (gProgress > 0.01) {
-      // Geometric oval arc
-      final gArc = Path()
-        ..addArc(
-          Rect.fromCenter(
-            center: Offset(392.0 * scale, 128.0 * scale),
-            width: 96.0 * scale,
-            height: 115.2 * scale,
-          ),
-          -0.75,
-          5.35,
-        );
-      _drawSegment(canvas, gArc, (gProgress / 0.75).clamp(0.0, 1.0), glyphPaint);
+      final kx = 26.51 * scale;
+      final ky = 31.81 * scale;
+      final cx = 392.0 * scale;
+      final cy = 128.0 * scale;
 
-      // Inward crossbar (440, 138) -> (392, 138)
-      if (gProgress > 0.70) {
-        _drawLineSegment(
-          canvas,
-          Offset(440.0 * scale, 138.0 * scale),
-          Offset(392.0 * scale, 138.0 * scale),
-          ((gProgress - 0.70) / 0.30).clamp(0.0, 1.0),
-          glyphPaint,
-        );
-      }
+      final gPath = Path()
+        // 1. Start at top-right terminal
+        ..moveTo(436.0 * scale, 88.0 * scale)
+        // 2. Smoothly curve up into the top arch
+        ..cubicTo(
+          432.0 * scale,
+          74.0 * scale,
+          412.0 * scale,
+          70.4 * scale,
+          cx,
+          70.4 * scale,
+        )
+        // 3. Mathematical ellipse quadrant down through left spine
+        ..cubicTo(
+          cx - kx,
+          70.4 * scale,
+          344.0 * scale,
+          cy - ky,
+          344.0 * scale,
+          cy,
+        )
+        // 4. Mathematical ellipse quadrant down through bottom baseline
+        ..cubicTo(
+          344.0 * scale,
+          cy + ky,
+          cx - kx,
+          185.6 * scale,
+          cx,
+          185.6 * scale,
+        )
+        // 5. Curve up into right upright
+        ..cubicTo(
+          cx + kx,
+          185.6 * scale,
+          440.0 * scale,
+          cy + 30.0 * scale,
+          440.0 * scale,
+          148.0 * scale,
+        )
+        // 6. Right vertical upright to waistline
+        ..lineTo(440.0 * scale, 134.4 * scale)
+        // 7. Horizontal inward crossbar to center
+        ..lineTo(cx, 134.4 * scale);
+
+      _drawSegment(canvas, gPath, gProgress.clamp(0.0, 1.0), glyphPaint);
     }
 
     // ----------------------------------------------------
