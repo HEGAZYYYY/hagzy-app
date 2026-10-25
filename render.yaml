@@ -1,10 +1,30 @@
 services:
+  # 1. Hagzy Backend API (Node.js & Express)
+  - type: web
+    name: hagzy-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    plan: starter
+    region: frankfurt
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@hagzy.app
+      - key: ADMIN_PASSWORD
+        value: hagzy2026!
+
+  # 2. Hagzy Web Client (Flutter Web)
   - type: static
     name: hagzy-web
-    env: static
-    repo: https://github.com/HEGAZYYYY/hagzy-app
-    branch: main
-    buildCommand: flutter pub get && flutter build web --release
+    buildCommand: flutter pub get && flutter build web --release --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
     staticPublishPath: build/web
     autoDeploy: true
     routes:

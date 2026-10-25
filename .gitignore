@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Keystore & Secrets
+*.jks
+*.keystore
+**/android/key.properties
+
+# Node.js
+**/node_modules/
+server/.env
+server/data/hagzy_db.json

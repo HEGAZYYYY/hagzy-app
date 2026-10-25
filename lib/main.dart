@@ -3430,6 +3430,24 @@ class _HagzyHomeState extends State<HagzyHome> {
     } catch (_) {}
   }
 
+  Future<void> _handleCustomerDeleteAccount() async {
+    setState(() {
+      _savedCustomerName = '';
+      _savedCustomerEmail = '';
+      _savedCustomerPhone = '';
+      _customerSignedIn = false;
+      _customerToken = null;
+      _walletBalance = 0;
+      _customerBookings = [];
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(kCustomerProfileStorageKey);
+      await prefs.remove('hagzy_customer_bookings');
+      await prefs.remove('hagzy_customer_wallet');
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadError != null) {
@@ -3722,12 +3740,14 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             apiConfigured: _api.isConfigured,
                                             onSignIn: _handleCustomerSignIn,
                                             onSignOut: _handleCustomerSignOut,
+                                            onDeleteAccount: _handleCustomerDeleteAccount,
                                             onUpdateProfile: _handleCustomerSignIn,
                                             onChangeLanguage: () =>
                                                 _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
                                             onViewBookings: () => setState(() => _tab = 1),
                                             onSelectArea: () => setState(() => _tab = 0),
                                             onAutoAssignGps: () => setState(() => _tab = 0),
+                                            onSwitchToAdmin: () => setState(() { _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview'; _tab = 2; }),
                                           ),
                                       }
                                     : switch (_tab) {
@@ -3809,12 +3829,14 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             apiConfigured: _api.isConfigured,
                                             onSignIn: _handleCustomerSignIn,
                                             onSignOut: _handleCustomerSignOut,
+                                            onDeleteAccount: _handleCustomerDeleteAccount,
                                             onUpdateProfile: _handleCustomerSignIn,
                                             onChangeLanguage: () =>
                                                 _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
                                             onViewBookings: () => setState(() => _tab = 1),
                                             onSelectArea: () => setState(() => _tab = 0),
                                             onAutoAssignGps: () => setState(() => _tab = 0),
+                                            onSwitchToAdmin: () => setState(() { _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview'; _tab = 2; }),
                                           ),
                                       },
                               ),
@@ -3860,6 +3882,13 @@ class _HagzyHomeState extends State<HagzyHome> {
         appBar: AppBar(
           automaticallyImplyLeading: false,
           title: const Text('Venue owner sign in'),
+          actions: [
+            TextButton.icon(
+              onPressed: () => setState(() => _mode = 'customer'),
+              icon: const Icon(Icons.arrow_back_rounded),
+              label: const Text('Customer Mode'),
+            ),
+          ],
         ),
         body: Center(
           child: ConstrainedBox(

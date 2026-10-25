@@ -37,7 +37,7 @@
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<true/>
+		<false/>
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hagzy needs access to your photos to attach payment receipts to reservations.</string>
