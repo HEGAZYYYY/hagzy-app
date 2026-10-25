@@ -1,0 +1,19 @@
+{
+    "name": "Hagzy · حجزي",
+    "short_name": "Hagzy",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#022C22",
+    "theme_color": "#059669",
+    "description": "Smart Instant Bookings in Egypt · Sports, Salons & Spaces",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/hagzy_logo.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}
