@@ -1085,50 +1085,19 @@ class _HagzyLogoPainter extends CustomPainter {
       oldDelegate.inverted != inverted;
 }
 
-/// Precision architectural assembling logo painter:
-/// Draws the bespoke Hagzy "H" mark piece-by-piece:
-/// 1. Left pillar draws downwards
-/// 2. Right pillar draws downwards with subtle organic delay
-/// 3. Stadium arch sweeps and bridges across, locking the emblem
-/// 4. Diamond light gleam sweeps across the finished emblem
-class _AssemblingHagzyLogoPainter extends CustomPainter {
-  _AssemblingHagzyLogoPainter({
+/// Assembles the bespoke pure white "H" monogram glyph inside a custom slot
+class _AssemblingHagzyMonogramOnlyPainter extends CustomPainter {
+  _AssemblingHagzyMonogramOnlyPainter({
     required this.pillarProgress,
     required this.archProgress,
-    required this.glowProgress,
-    required this.shimmerProgress,
   });
 
   final double pillarProgress;
   final double archProgress;
-  final double glowProgress;
-  final double shimmerProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.width / 40.0;
-    final rect = Offset.zero & size;
-
-    // 1. Official Hagzy Emerald Gradient Squircle
-    final bgPaint = Paint()
-      ..isAntiAlias = true
-      ..shader = const LinearGradient(
-        colors: [Color(0xFF047857), Color(0xFF059669)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(rect);
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(11 * scale));
-    canvas.drawRRect(rrect, bgPaint);
-
-    // Subtle 1px glassmorphism inner rim highlight
-    final rimPaint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 * scale
-      ..color = Colors.white.withValues(alpha: 0.22);
-    canvas.drawRRect(rrect, rimPaint);
-
-    // 2. Pure White Monogram Setup
     final strokeWidth = 3.8 * scale;
     final glyphPaint = Paint()
       ..isAntiAlias = true
@@ -1138,7 +1107,7 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..color = Colors.white;
 
-    // 3. Assembling Left Vertical Pillar (draws top -> bottom: 11 to 29)
+    // 1. Left Vertical Pillar
     if (pillarProgress > 0.01) {
       final startY = 11.0 * scale;
       final totalH = (29.0 - 11.0) * scale;
@@ -1150,7 +1119,7 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       );
     }
 
-    // 4. Assembling Right Vertical Pillar (draws top -> bottom with slight offset)
+    // 2. Right Vertical Pillar
     if (pillarProgress > 0.06) {
       final adjustedProg = ((pillarProgress - 0.06) / 0.94).clamp(0.0, 1.0);
       final startY = 11.0 * scale;
@@ -1163,7 +1132,7 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
       );
     }
 
-    // 5. Assembling Stadium Arch Bridge (draws across from left to right)
+    // 3. Stadium Arch Bridge
     if (archProgress > 0.01) {
       final fullArchPath = Path()
         ..moveTo(12.5 * scale, 21 * scale)
@@ -1182,35 +1151,42 @@ class _AssemblingHagzyLogoPainter extends CustomPainter {
         canvas.drawPath(segment, glyphPaint);
       }
     }
-
-    // 6. Diamond Light Gleam sweep across the assembled mark
-    if (shimmerProgress > 0.05 && shimmerProgress < 0.95) {
-      canvas.save();
-      canvas.clipRRect(rrect);
-      final pos = -0.6 + shimmerProgress * 2.2;
-      final shimmerPaint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment(pos - 0.4, -1.0),
-          end: Alignment(pos + 0.4, 1.0),
-          colors: [
-            Colors.transparent,
-            Colors.white.withValues(alpha: 0.38),
-            Colors.transparent,
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ).createShader(rect);
-      canvas.drawPaint(shimmerPaint);
-      canvas.restore();
-    }
   }
 
   @override
-  bool shouldRepaint(covariant _AssemblingHagzyLogoPainter oldDelegate) {
+  bool shouldRepaint(covariant _AssemblingHagzyMonogramOnlyPainter oldDelegate) {
     return oldDelegate.pillarProgress != pillarProgress ||
-        oldDelegate.archProgress != archProgress ||
-        oldDelegate.glowProgress != glowProgress ||
-        oldDelegate.shimmerProgress != shimmerProgress;
+        oldDelegate.archProgress != archProgress;
   }
+}
+
+/// Diamond light gleam that sweeps across the entire unified expanding box
+class _ShimmerGleamPainter extends CustomPainter {
+  _ShimmerGleamPainter({required this.progress});
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0.01 || progress >= 0.99) return;
+    final rect = Offset.zero & size;
+    final pos = -0.6 + progress * 2.2;
+    final shimmerPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment(pos - 0.35, -1.0),
+        end: Alignment(pos + 0.35, 1.0),
+        colors: [
+          Colors.transparent,
+          Colors.white.withValues(alpha: 0.36),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, shimmerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShimmerGleamPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 /// Luxury Opus-grade opening splash animation:
@@ -1246,7 +1222,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   late final Animation<double> _glowProgress;
   late final Animation<double> _shimmerProgress;
 
-  // Butter-smooth liquid expansion & wipe for [ H ] + AGZY
+  // Butter-smooth liquid expansion & wipe for the UNIFIED box [ H AGZY ]
   late final Animation<double> _expandWidth;
   late final Animation<double> _nameWipe;
   late final Animation<double> _nameOpacity;
@@ -1264,7 +1240,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2900),
+      duration: const Duration(milliseconds: 2950),
     );
 
     // Subtle breathing ambient bloom in deep emerald
@@ -1281,66 +1257,66 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       ),
     ]).animate(_ctrl);
 
-    // Squircle container smoothly materializing
+    // Squircle container smoothly materializing (0% -> 24%)
     _containerScale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.26, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.24, curve: Curves.easeOutCubic),
       ),
     );
     _containerOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.16, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.15, curve: Curves.easeOut),
     );
 
-    // Assembling left and right vertical pillars (8% -> 30%)
+    // Assembling left and right vertical pillars (6% -> 26%)
     _pillarProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.08, 0.30, curve: Curves.easeOutCubic),
+      curve: const Interval(0.06, 0.26, curve: Curves.easeOutCubic),
     );
 
-    // Assembling stadium arch bridge (20% -> 40%)
+    // Assembling stadium arch bridge (16% -> 34%)
     _archProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.20, 0.40, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.16, 0.34, curve: Curves.easeInOutCubic),
     );
 
-    // Completion glow pulse (36% -> 58%)
-    _glowProgress = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.36, 0.58, curve: Curves.easeOut),
-    );
-
-    // Diamond light shimmer sweep across finished mark (38% -> 56%)
-    _shimmerProgress = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.38, 0.56, curve: Curves.easeInOut),
-    );
-
-    // Butter-smooth horizontal expansion of [ H ] into [ H ] AGZY (32% -> 58%)
+    // The unified box smoothly expands horizontally to hold AGZY (30% -> 56%)
     _expandWidth = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.30, 0.56, curve: Curves.easeOutCubic),
+    );
+
+    // Liquid light gradient reveal for AGZY inside the expanding box (32% -> 58%)
+    _nameWipe = CurvedAnimation(
       parent: _ctrl,
       curve: const Interval(0.32, 0.58, curve: Curves.easeOutCubic),
     );
-
-    // Liquid light gradient reveal for AGZY (34% -> 60%) - zero stepping!
-    _nameWipe = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.34, 0.60, curve: Curves.easeOutCubic),
-    );
     _nameOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.32, 0.40, curve: Curves.easeOut),
+      curve: const Interval(0.30, 0.38, curve: Curves.easeOut),
     );
 
-    // Liquid light gradient reveal for Slogan (56% -> 82%)
+    // Completion glow pulse (48% -> 70%)
+    _glowProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.48, 0.70, curve: Curves.easeOut),
+    );
+
+    // Diamond light shimmer sweep across the ENTIRE unified completed box (52% -> 72%)
+    _shimmerProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.52, 0.72, curve: Curves.easeInOut),
+    );
+
+    // Liquid light gradient reveal for Slogan underneath (58% -> 82%)
     _sloganWipe = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.56, 0.82, curve: Curves.easeOutCubic),
+      curve: const Interval(0.58, 0.82, curve: Curves.easeOutCubic),
     );
     _sloganOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.54, 0.62, curve: Curves.easeOut),
+      curve: const Interval(0.56, 0.64, curve: Curves.easeOut),
     );
 
     // Cinematic zoom exit (86% -> 100%)
@@ -1378,7 +1354,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
-          // Option B: All-Caps Capital Lockup matching H monogram geometry
+          // Unified Box content: H monogram + AGZY inside the same emerald capsule
           final nameSuffix = widget.arabic ? 'حجزي' : 'AGZY';
           final sloganText = widget.arabic
               ? 'احجز مكانك.. في ثواني'
@@ -1390,15 +1366,15 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
             fontFamilyFallback: widget.arabic
                 ? const ['Alexandria', 'Tajawal', 'Cairo', 'sans-serif']
                 : const ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-            fontSize: widget.arabic ? 30 : 29,
+            fontSize: widget.arabic ? 25 : 25.5,
             fontWeight: FontWeight.w800,
-            letterSpacing: widget.arabic ? 0.0 : 3.5,
+            letterSpacing: widget.arabic ? 0.0 : 2.6,
             height: 1.0,
             shadows: [
               Shadow(
-                color: Colors.black.withValues(alpha: 0.45),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
             ],
           );
@@ -1460,9 +1436,9 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                         ),
                       ),
                       // 2. Central Hero Content:
-                      // [ H ] starts in dead-center, then smoothly expands horizontally into [ H ] AGZY,
-                      // with liquid light alpha gradient wipe (120fps continuous, zero stepping),
-                      // followed by typing the slogan in a clean smaller font underneath
+                      // Unified Box: [ H ] starts in center as squircle, then expands into
+                      // an architectural emerald plaque containing [ H  AGZY ] in the same box!
+                      // Shimmer sweeps across the whole box, and slogan types underneath.
                       Center(
                         child: Directionality(
                           textDirection: widget.arabic
@@ -1471,109 +1447,162 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // Assembling Emerald Logo Squircle with Pure White H
-                                  Opacity(
-                                    opacity: _containerOpacity.value,
-                                    child: Transform.scale(
-                                      scale: _containerScale.value,
-                                      child: Container(
-                                        width: 54,
-                                        height: 54,
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(15),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.40),
-                                              blurRadius: 20,
-                                              offset: const Offset(0, 8),
-                                            ),
-                                            BoxShadow(
-                                              color: const Color(0xFF059669)
-                                                  .withValues(
-                                                alpha:
-                                                    0.38 * _glowProgress.value,
+                              // The Unified Box: starts 54x54, then smoothly expands horizontally!
+                              Opacity(
+                                opacity: _containerOpacity.value,
+                                child: Transform.scale(
+                                  scale: _containerScale.value,
+                                  child: Container(
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(16),
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF047857),
+                                          Color(0xFF059669)
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.22),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.40),
+                                          blurRadius: 22,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                        BoxShadow(
+                                          color: const Color(0xFF059669)
+                                              .withValues(
+                                            alpha:
+                                                0.38 * _glowProgress.value,
+                                          ),
+                                          blurRadius: 30,
+                                          spreadRadius: -1,
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // Content Row inside the same box
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              // Fixed 54x54 slot for the assembling H monogram
+                                              SizedBox(
+                                                width: 54,
+                                                height: 54,
+                                                child: CustomPaint(
+                                                  size: const Size(54, 54),
+                                                  painter:
+                                                      _AssemblingHagzyMonogramOnlyPainter(
+                                                    pillarProgress:
+                                                        _pillarProgress.value,
+                                                    archProgress:
+                                                        _archProgress.value,
+                                                  ),
+                                                ),
                                               ),
-                                              blurRadius: 28,
-                                              spreadRadius: -1,
-                                            ),
-                                          ],
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(15),
-                                          child: CustomPaint(
-                                            size: const Size(54, 54),
-                                            painter: _AssemblingHagzyLogoPainter(
-                                              pillarProgress:
-                                                  _pillarProgress.value,
-                                              archProgress:
-                                                  _archProgress.value,
-                                              glowProgress:
-                                                  _glowProgress.value,
-                                              shimmerProgress:
-                                                  _shimmerProgress.value,
-                                            ),
+                                              // Smooth horizontal expansion of AGZY inside the SAME box
+                                              ClipRect(
+                                                child: Align(
+                                                  alignment: widget.arabic
+                                                      ? Alignment.centerRight
+                                                      : Alignment.centerLeft,
+                                                  widthFactor:
+                                                      _expandWidth.value,
+                                                  child: Opacity(
+                                                    opacity:
+                                                        _nameOpacity.value,
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsetsDirectional
+                                                              .only(
+                                                        start: 4,
+                                                        end: 18,
+                                                      ),
+                                                      child: ShaderMask(
+                                                        blendMode:
+                                                            BlendMode.dstIn,
+                                                        shaderCallback:
+                                                            (Rect bounds) {
+                                                          final t =
+                                                              _nameWipe.value;
+                                                          final start = (t *
+                                                                      1.25 -
+                                                                  0.25)
+                                                              .clamp(0.0, 1.0);
+                                                          final end = (t * 1.25)
+                                                              .clamp(0.0, 1.0);
+                                                          return LinearGradient(
+                                                            begin: widget.arabic
+                                                                ? Alignment
+                                                                    .centerRight
+                                                                : Alignment
+                                                                    .centerLeft,
+                                                            end: widget.arabic
+                                                                ? Alignment
+                                                                    .centerLeft
+                                                                : Alignment
+                                                                    .centerRight,
+                                                            colors: const [
+                                                              Colors.white,
+                                                              Colors.white,
+                                                              Colors
+                                                                  .transparent,
+                                                              Colors
+                                                                  .transparent,
+                                                            ],
+                                                            stops: [
+                                                              0.0,
+                                                              start,
+                                                              end,
+                                                              1.0
+                                                            ],
+                                                          ).createShader(
+                                                              bounds);
+                                                        },
+                                                        child: Text(
+                                                          nameSuffix,
+                                                          maxLines: 1,
+                                                          softWrap: false,
+                                                          style: nameStyle,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
+                                          // Diamond light gleam sweeping across the ENTIRE unified box!
+                                          if (_shimmerProgress.value > 0.01 &&
+                                              _shimmerProgress.value < 0.99)
+                                            Positioned.fill(
+                                              child: CustomPaint(
+                                                painter: _ShimmerGleamPainter(
+                                                  progress:
+                                                      _shimmerProgress.value,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                                  // Butter-smooth horizontal expansion + Liquid Light alpha wipe for AGZY
-                                  ClipRect(
-                                    child: Align(
-                                      alignment: widget.arabic
-                                          ? Alignment.centerRight
-                                          : Alignment.centerLeft,
-                                      widthFactor: _expandWidth.value,
-                                      child: Opacity(
-                                        opacity: _nameOpacity.value,
-                                        child: Padding(
-                                          padding: const EdgeInsetsDirectional
-                                              .only(start: 14),
-                                          child: ShaderMask(
-                                            blendMode: BlendMode.dstIn,
-                                            shaderCallback: (Rect bounds) {
-                                              final t = _nameWipe.value;
-                                              final start = (t * 1.25 - 0.25)
-                                                  .clamp(0.0, 1.0);
-                                              final end =
-                                                  (t * 1.25).clamp(0.0, 1.0);
-                                              return LinearGradient(
-                                                begin: widget.arabic
-                                                    ? Alignment.centerRight
-                                                    : Alignment.centerLeft,
-                                                end: widget.arabic
-                                                    ? Alignment.centerLeft
-                                                    : Alignment.centerRight,
-                                                colors: const [
-                                                  Colors.white,
-                                                  Colors.white,
-                                                  Colors.transparent,
-                                                  Colors.transparent,
-                                                ],
-                                                stops: [0.0, start, end, 1.0],
-                                              ).createShader(bounds);
-                                            },
-                                            child: Text(
-                                              nameSuffix,
-                                              maxLines: 1,
-                                              softWrap: false,
-                                              style: nameStyle,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
                               // Slogan Liquid Wipe in clean geometric tracked-out typography
                               Opacity(
                                 opacity: _sloganOpacity.value,
@@ -1584,10 +1613,9 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                     blendMode: BlendMode.dstIn,
                                     shaderCallback: (Rect bounds) {
                                       final t = _sloganWipe.value;
-                                      final start = (t * 1.30 - 0.30)
-                                          .clamp(0.0, 1.0);
-                                      final end =
-                                          (t * 1.30).clamp(0.0, 1.0);
+                                      final start =
+                                          (t * 1.30 - 0.30).clamp(0.0, 1.0);
+                                      final end = (t * 1.30).clamp(0.0, 1.0);
                                       return LinearGradient(
                                         begin: widget.arabic
                                             ? Alignment.centerRight
