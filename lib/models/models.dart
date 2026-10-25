@@ -283,7 +283,7 @@ const List<PromoOffer> kAvailablePromos = [
 
 class HagzyWallet {
   static const String keyWallet = 'hagzy_customer_wallet_balance';
-  static const double defaultWelcomeBalance = 150.0;
+  static const double defaultWelcomeBalance = 0.0;
 
   static Future<double> getBalance() async {
     final prefs = await SharedPreferences.getInstance();
