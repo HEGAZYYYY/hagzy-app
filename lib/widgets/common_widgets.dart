@@ -1085,20 +1085,31 @@ class _HagzyLogoPainter extends CustomPainter {
       oldDelegate.inverted != inverted;
 }
 
-/// Assembles the bespoke pure white "H" monogram glyph inside a custom slot
-class _AssemblingHagzyMonogramOnlyPainter extends CustomPainter {
-  _AssemblingHagzyMonogramOnlyPainter({
-    required this.pillarProgress,
-    required this.archProgress,
+/// Precision architectural wordmark painter constructed from the EXACT geometry
+/// of the official Hagzy logo (assets/hagzy_logo.svg):
+/// - Stroke width = 24.32 / 256
+/// - Rounded line caps & joins (StrokeCap.round, StrokeJoin.round)
+/// - Identical stadium arch quadratic beziers
+/// - Sequential mechanical line-drawing assembly
+class _ExactLogoWordmarkPainter extends CustomPainter {
+  _ExactLogoWordmarkPainter({
+    required this.hProgress,
+    required this.aProgress,
+    required this.gProgress,
+    required this.zProgress,
+    required this.yProgress,
   });
 
-  final double pillarProgress;
-  final double archProgress;
+  final double hProgress;
+  final double aProgress;
+  final double gProgress;
+  final double zProgress;
+  final double yProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.width / 40.0;
-    final strokeWidth = 3.8 * scale;
+    final scale = size.height / 256.0;
+    final strokeWidth = 24.32 * scale;
     final glyphPaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
@@ -1107,56 +1118,222 @@ class _AssemblingHagzyMonogramOnlyPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..color = Colors.white;
 
-    // 1. Left Vertical Pillar
-    if (pillarProgress > 0.01) {
-      final startY = 11.0 * scale;
-      final totalH = (29.0 - 11.0) * scale;
-      final currentY = startY + totalH * pillarProgress.clamp(0.0, 1.0);
-      canvas.drawLine(
-        Offset(12.5 * scale, startY),
-        Offset(12.5 * scale, currentY),
+    // ----------------------------------------------------
+    // 1. LETTER [ H ] (X: 80 -> 176) - Exactly matches hagzy_logo.svg
+    // ----------------------------------------------------
+    if (hProgress > 0.01) {
+      // Left pillar (80, 70.4) -> (80, 185.6)
+      _drawLineSegment(
+        canvas,
+        Offset(80.0 * scale, 70.4 * scale),
+        Offset(80.0 * scale, 185.6 * scale),
+        (hProgress / 0.45).clamp(0.0, 1.0),
         glyphPaint,
       );
-    }
 
-    // 2. Right Vertical Pillar
-    if (pillarProgress > 0.06) {
-      final adjustedProg = ((pillarProgress - 0.06) / 0.94).clamp(0.0, 1.0);
-      final startY = 11.0 * scale;
-      final totalH = (29.0 - 11.0) * scale;
-      final currentY = startY + totalH * adjustedProg;
-      canvas.drawLine(
-        Offset(27.5 * scale, startY),
-        Offset(27.5 * scale, currentY),
-        glyphPaint,
-      );
-    }
-
-    // 3. Stadium Arch Bridge
-    if (archProgress > 0.01) {
-      final fullArchPath = Path()
-        ..moveTo(12.5 * scale, 21 * scale)
-        ..quadraticBezierTo(
-          20.0 * scale,
-          14.5 * scale,
-          27.5 * scale,
-          21 * scale,
+      // Right pillar (176, 70.4) -> (176, 185.6)
+      if (hProgress > 0.15) {
+        _drawLineSegment(
+          canvas,
+          Offset(176.0 * scale, 70.4 * scale),
+          Offset(176.0 * scale, 185.6 * scale),
+          ((hProgress - 0.15) / 0.45).clamp(0.0, 1.0),
+          glyphPaint,
         );
+      }
 
-      final metrics = fullArchPath.computeMetrics().toList();
-      if (metrics.isNotEmpty) {
-        final metric = metrics.first;
-        final extractLength = metric.length * archProgress.clamp(0.0, 1.0);
-        final segment = metric.extractPath(0.0, extractLength);
-        canvas.drawPath(segment, glyphPaint);
+      // Arch bridge (80, 134.4) Q (128, 92.8) (176, 134.4)
+      if (hProgress > 0.40) {
+        final archPath = Path()
+          ..moveTo(80.0 * scale, 134.4 * scale)
+          ..quadraticBezierTo(
+            128.0 * scale,
+            92.8 * scale,
+            176.0 * scale,
+            134.4 * scale,
+          );
+        _drawSegment(
+          canvas,
+          archPath,
+          ((hProgress - 0.40) / 0.60).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+    }
+
+    // ----------------------------------------------------
+    // 2. LETTER [ A ] (X: 216 -> 312, Apex 264)
+    // ----------------------------------------------------
+    if (aProgress > 0.01) {
+      // Left diagonal leg (264, 70.4) -> (216, 185.6)
+      _drawLineSegment(
+        canvas,
+        Offset(264.0 * scale, 70.4 * scale),
+        Offset(216.0 * scale, 185.6 * scale),
+        (aProgress / 0.55).clamp(0.0, 1.0),
+        glyphPaint,
+      );
+
+      // Right diagonal leg (264, 70.4) -> (312, 185.6)
+      if (aProgress > 0.10) {
+        _drawLineSegment(
+          canvas,
+          Offset(264.0 * scale, 70.4 * scale),
+          Offset(312.0 * scale, 185.6 * scale),
+          ((aProgress - 0.10) / 0.55).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+
+      // Horizontal crossbar (235.2, 139.2) -> (292.8, 139.2)
+      if (aProgress > 0.50) {
+        _drawLineSegment(
+          canvas,
+          Offset(235.2 * scale, 139.2 * scale),
+          Offset(292.8 * scale, 139.2 * scale),
+          ((aProgress - 0.50) / 0.50).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+    }
+
+    // ----------------------------------------------------
+    // 3. LETTER [ G ] (X: 344 -> 440, Center 392, Ry=57.6, Rx=48)
+    // ----------------------------------------------------
+    if (gProgress > 0.01) {
+      // Geometric oval arc
+      final gArc = Path()
+        ..addArc(
+          Rect.fromCenter(
+            center: Offset(392.0 * scale, 128.0 * scale),
+            width: 96.0 * scale,
+            height: 115.2 * scale,
+          ),
+          -0.75,
+          5.35,
+        );
+      _drawSegment(canvas, gArc, (gProgress / 0.75).clamp(0.0, 1.0), glyphPaint);
+
+      // Inward crossbar (440, 138) -> (392, 138)
+      if (gProgress > 0.70) {
+        _drawLineSegment(
+          canvas,
+          Offset(440.0 * scale, 138.0 * scale),
+          Offset(392.0 * scale, 138.0 * scale),
+          ((gProgress - 0.70) / 0.30).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+    }
+
+    // ----------------------------------------------------
+    // 4. LETTER [ Z ] (X: 476 -> 572)
+    // ----------------------------------------------------
+    if (zProgress > 0.01) {
+      // Top bar (476, 70.4) -> (572, 70.4)
+      _drawLineSegment(
+        canvas,
+        Offset(476.0 * scale, 70.4 * scale),
+        Offset(572.0 * scale, 70.4 * scale),
+        (zProgress / 0.35).clamp(0.0, 1.0),
+        glyphPaint,
+      );
+
+      // Diagonal slice (572, 70.4) -> (476, 185.6)
+      if (zProgress > 0.30) {
+        _drawLineSegment(
+          canvas,
+          Offset(572.0 * scale, 70.4 * scale),
+          Offset(476.0 * scale, 185.6 * scale),
+          ((zProgress - 0.30) / 0.45).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+
+      // Bottom bar (476, 185.6) -> (572, 185.6)
+      if (zProgress > 0.65) {
+        _drawLineSegment(
+          canvas,
+          Offset(476.0 * scale, 185.6 * scale),
+          Offset(572.0 * scale, 185.6 * scale),
+          ((zProgress - 0.65) / 0.35).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+    }
+
+    // ----------------------------------------------------
+    // 5. LETTER [ Y ] (X: 608 -> 704, Center 656)
+    // ----------------------------------------------------
+    if (yProgress > 0.01) {
+      // Left arm (608, 70.4) -> (656, 134.4)
+      _drawLineSegment(
+        canvas,
+        Offset(608.0 * scale, 70.4 * scale),
+        Offset(656.0 * scale, 134.4 * scale),
+        (yProgress / 0.45).clamp(0.0, 1.0),
+        glyphPaint,
+      );
+
+      // Right arm (704, 70.4) -> (656, 134.4)
+      if (yProgress > 0.10) {
+        _drawLineSegment(
+          canvas,
+          Offset(704.0 * scale, 70.4 * scale),
+          Offset(656.0 * scale, 134.4 * scale),
+          ((yProgress - 0.10) / 0.45).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+
+      // Vertical stem (656, 134.4) -> (656, 185.6)
+      if (yProgress > 0.45) {
+        _drawLineSegment(
+          canvas,
+          Offset(656.0 * scale, 134.4 * scale),
+          Offset(656.0 * scale, 185.6 * scale),
+          ((yProgress - 0.45) / 0.55).clamp(0.0, 1.0),
+          glyphPaint,
+        );
+      }
+    }
+  }
+
+  void _drawLineSegment(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    double progress,
+    Paint paint,
+  ) {
+    if (progress <= 0.0) return;
+    final p = progress.clamp(0.0, 1.0);
+    final current = Offset(
+      p1.dx + (p2.dx - p1.dx) * p,
+      p1.dy + (p2.dy - p1.dy) * p,
+    );
+    canvas.drawLine(p1, current, paint);
+  }
+
+  void _drawSegment(Canvas canvas, Path path, double progress, Paint paint) {
+    if (progress <= 0.0) return;
+    final metrics = path.computeMetrics().toList();
+    for (final metric in metrics) {
+      final extractLength = metric.length * progress.clamp(0.0, 1.0);
+      if (extractLength > 0.0) {
+        final seg = metric.extractPath(0.0, extractLength);
+        canvas.drawPath(seg, paint);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _AssemblingHagzyMonogramOnlyPainter oldDelegate) {
-    return oldDelegate.pillarProgress != pillarProgress ||
-        oldDelegate.archProgress != archProgress;
+  bool shouldRepaint(covariant _ExactLogoWordmarkPainter oldDelegate) {
+    return oldDelegate.hProgress != hProgress ||
+        oldDelegate.aProgress != aProgress ||
+        oldDelegate.gProgress != gProgress ||
+        oldDelegate.zProgress != zProgress ||
+        oldDelegate.yProgress != yProgress;
   }
 }
 
@@ -1214,24 +1391,29 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   // Background and ambient atmosphere
   late final Animation<double> _ambientBloom;
 
-  // Assembling logo mechanics
+  // Squircle container intro
   late final Animation<double> _containerScale;
   late final Animation<double> _containerOpacity;
-  late final Animation<double> _pillarProgress;
-  late final Animation<double> _archProgress;
-  late final Animation<double> _glowProgress;
-  late final Animation<double> _shimmerProgress;
 
-  // Horizontal expansion of the unified emerald box
+  // Letter H stroke assembly (matches official logo vector)
+  late final Animation<double> _hProgress;
+
+  // Horizontal expansion of the unified emerald plaque
   late final Animation<double> _expandWidth;
 
-  // Progressive mechanical assembly for A, G, Z, Y matching logo weight & style
+  // Progressive vector drawing for A, G, Z, Y matching the logo H
   late final Animation<double> _aProgress;
   late final Animation<double> _gProgress;
   late final Animation<double> _zProgress;
   late final Animation<double> _yProgress;
 
-  // Liquid wipe for Slogan
+  // Completion glow pulse
+  late final Animation<double> _glowProgress;
+
+  // Diamond light shimmer sweep across the ENTIRE completed plaque
+  late final Animation<double> _shimmerProgress;
+
+  // Slogan Liquid wipe and fade
   late final Animation<double> _sloganWipe;
   late final Animation<double> _sloganOpacity;
 
@@ -1244,7 +1426,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2950),
+      duration: const Duration(milliseconds: 3100),
     );
 
     // Subtle breathing ambient bloom in deep emerald
@@ -1261,11 +1443,11 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       ),
     ]).animate(_ctrl);
 
-    // Squircle container smoothly materializing (0% -> 24%)
+    // Squircle container smoothly materializing (0% -> 20%)
     _containerScale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.24, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.20, curve: Curves.easeOutCubic),
       ),
     );
     _containerOpacity = CurvedAnimation(
@@ -1273,84 +1455,78 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       curve: const Interval(0.0, 0.15, curve: Curves.easeOut),
     );
 
-    // Assembling left and right vertical pillars of H (6% -> 26%)
-    _pillarProgress = CurvedAnimation(
+    // Assembling letter H monogram (6% -> 30%)
+    _hProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.06, 0.26, curve: Curves.easeOutCubic),
+      curve: const Interval(0.06, 0.30, curve: Curves.easeOutCubic),
     );
 
-    // Assembling stadium arch bridge of H (16% -> 32%)
-    _archProgress = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.16, 0.32, curve: Curves.easeInOutCubic),
-    );
-
-    // The unified emerald box smoothly expands horizontally (28% -> 58%)
+    // The unified emerald box smoothly expands horizontally (30% -> 60%)
     _expandWidth = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.28, 0.58, curve: Curves.easeOutCubic),
+      curve: const Interval(0.30, 0.60, curve: Curves.easeOutCubic),
     );
 
-    // Sequential mechanical lock-in for A, G, Z, Y matching logo style:
-    // Letter A (32% -> 44%)
+    // Sequential mechanical assembly for A, G, Z, Y in the EXACT same logo style:
+    // Letter A (34% -> 46%)
     _aProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.32, 0.44, curve: Curves.easeOutCubic),
+      curve: const Interval(0.34, 0.46, curve: Curves.easeOutCubic),
     );
 
-    // Letter G (38% -> 50%)
+    // Letter G (42% -> 54%)
     _gProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.38, 0.50, curve: Curves.easeOutCubic),
+      curve: const Interval(0.42, 0.54, curve: Curves.easeOutCubic),
     );
 
-    // Letter Z (44% -> 56%)
+    // Letter Z (50% -> 62%)
     _zProgress = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.44, 0.56, curve: Curves.easeOutCubic),
-    );
-
-    // Letter Y (50% -> 62%)
-    _yProgress = CurvedAnimation(
       parent: _ctrl,
       curve: const Interval(0.50, 0.62, curve: Curves.easeOutCubic),
     );
 
-    // Completion glow pulse (48% -> 70%)
+    // Letter Y (58% -> 70%)
+    _yProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.58, 0.70, curve: Curves.easeOutCubic),
+    );
+
+    // Completion glow pulse (55% -> 75%)
     _glowProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.48, 0.70, curve: Curves.easeOut),
+      curve: const Interval(0.55, 0.75, curve: Curves.easeOut),
     );
 
-    // Diamond light shimmer sweep across the ENTIRE completed box (64% -> 80%)
+    // Diamond light shimmer sweep across the ENTIRE completed plaque (68% -> 84%)
     _shimmerProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.64, 0.80, curve: Curves.easeInOut),
+      curve: const Interval(0.68, 0.84, curve: Curves.easeInOut),
     );
 
-    // Liquid light gradient reveal for Slogan underneath (66% -> 86%)
+    // Liquid light gradient reveal for Slogan underneath (68% -> 88%)
     _sloganWipe = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.66, 0.86, curve: Curves.easeOutCubic),
+      curve: const Interval(0.68, 0.88, curve: Curves.easeOutCubic),
     );
     _sloganOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.64, 0.72, curve: Curves.easeOut),
+      curve: const Interval(0.68, 0.80, curve: Curves.easeOut),
     );
 
-    // Cinematic zoom exit (88% -> 100%)
+    // Cinematic zoom exit (90% -> 100%)
     _zoomExit = Tween<double>(begin: 1.0, end: 1.04).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.88, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.90, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
-    // Smooth cross-dissolve directly into the app
+    // Smooth cross-dissolve directly into the app (92% -> 100%)
     _overlayOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.90, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.92, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1365,21 +1541,6 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.dispose();
   }
 
-  Widget _buildLetter(String char, double progress, TextStyle style) {
-    final opacity = progress.clamp(0.0, 1.0);
-    final scale = 0.84 + 0.16 * progress.clamp(0.0, 1.0);
-    return Opacity(
-      opacity: opacity,
-      child: Transform.scale(
-        scale: scale,
-        child: Text(
-          char,
-          style: style,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1392,25 +1553,6 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
               ? 'احجز مكانك.. في ثواني'
               : 'YOUR SPOT, BOOKED IN SECONDS';
 
-          // Authentic luxury bold typography matching the logo monogram weight exactly
-          final letterStyle = TextStyle(
-            color: Colors.white,
-            fontFamily: widget.arabic ? 'Almarai' : 'Montserrat',
-            fontFamilyFallback: widget.arabic
-                ? const ['Alexandria', 'Tajawal', 'Cairo', 'sans-serif']
-                : const ['Plus Jakarta Sans', 'Poppins', 'sans-serif'],
-            fontSize: widget.arabic ? 26.0 : 27.0,
-            fontWeight: FontWeight.w900,
-            height: 1.0,
-            shadows: [
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          );
-
           final sloganStyle = TextStyle(
             color: Colors.white.withValues(alpha: 0.70),
             fontFamily: widget.arabic ? 'Almarai' : 'Plus Jakarta Sans',
@@ -1418,7 +1560,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                 ? const ['Alexandria', 'Tajawal', 'sans-serif']
                 : const ['Montserrat', 'Inter', 'sans-serif'],
             fontSize: widget.arabic ? 12.5 : 10.5,
-            fontWeight: widget.arabic ? FontWeight.w600 : FontWeight.w600,
+            fontWeight: FontWeight.w600,
             letterSpacing: widget.arabic ? 0.6 : 2.8,
             shadows: [
               Shadow(
@@ -1428,6 +1570,13 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
               ),
             ],
           );
+
+          // Box geometry: 58px high, starts 58px square, expands to 178px wide
+          const boxHeight = 58.0;
+          const initialWidth = 58.0;
+          const finalWidth = 178.0;
+          final currentWidth =
+              initialWidth + (finalWidth - initialWidth) * _expandWidth.value;
 
           return Opacity(
             opacity: _overlayOpacity.value,
@@ -1460,7 +1609,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                           gradient: RadialGradient(
                             colors: [
                               const Color(0xFF10B981)
-                                  .withValues(alpha: _ambientBloom.value),
+                                   .withValues(alpha: _ambientBloom.value),
                               Colors.transparent,
                             ],
                             stops: const [0.0, 0.70],
@@ -1468,204 +1617,127 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                         ),
                       ),
                       // 2. Central Hero Content:
-                      // Unified Box: starts 54x54 containing assembling [ H ],
+                      // Unified Box starts 58x58 square containing assembling [ H ],
                       // then smoothly expands into full emerald plaque where A, G, Z, Y
-                      // assemble in the exact same bold logo style with matching diamond gleam!
+                      // assemble in the exact same vector style with matching diamond gleam!
                       Center(
-                        child: Directionality(
-                          textDirection: widget.arabic
-                              ? TextDirection.rtl
-                              : TextDirection.ltr,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Opacity(
-                                opacity: _containerOpacity.value,
-                                child: Transform.scale(
-                                  scale: _containerScale.value,
-                                  child: Container(
-                                    height: 54,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFF047857),
-                                          Color(0xFF059669)
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.22),
-                                        width: 1.2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.40),
-                                          blurRadius: 22,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                        BoxShadow(
-                                          color: const Color(0xFF059669)
-                                              .withValues(
-                                            alpha:
-                                                0.38 * _glowProgress.value,
-                                          ),
-                                          blurRadius: 30,
-                                          spreadRadius: -1,
-                                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Opacity(
+                              opacity: _containerOpacity.value,
+                              child: Transform.scale(
+                                scale: _containerScale.value,
+                                child: Container(
+                                  width: currentWidth,
+                                  height: boxHeight,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14.5),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFF047857),
+                                        Color(0xFF059669)
                                       ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Stack(
-                                        alignment: Alignment.centerLeft,
-                                        children: [
-                                          // Row holding [ H ] and expanding bold logo letters
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              // 54x54 cell for the assembling H monogram
-                                              SizedBox(
-                                                width: 54,
-                                                height: 54,
-                                                child: CustomPaint(
-                                                  size: const Size(54, 54),
-                                                  painter:
-                                                      _AssemblingHagzyMonogramOnlyPainter(
-                                                    pillarProgress:
-                                                        _pillarProgress.value,
-                                                    archProgress:
-                                                        _archProgress.value,
-                                                  ),
-                                                ),
-                                              ),
-                                              // Expanding letters matching logo style & weight
-                                              ClipRect(
-                                                child: Align(
-                                                  alignment: widget.arabic
-                                                      ? Alignment.centerRight
-                                                      : Alignment.centerLeft,
-                                                  widthFactor:
-                                                      _expandWidth.value,
-                                                  child: Padding(
-                                                    padding:
-                                                        const EdgeInsetsDirectional
-                                                            .only(
-                                                      start: 6,
-                                                      end: 18,
-                                                    ),
-                                                    child: widget.arabic
-                                                        ? _buildLetter(
-                                                            'حجزي',
-                                                            _yProgress.value,
-                                                            letterStyle,
-                                                          )
-                                                        : Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              _buildLetter(
-                                                                'A',
-                                                                _aProgress
-                                                                    .value,
-                                                                letterStyle,
-                                                              ),
-                                                              const SizedBox(
-                                                                  width: 7),
-                                                              _buildLetter(
-                                                                'G',
-                                                                _gProgress
-                                                                    .value,
-                                                                letterStyle,
-                                                              ),
-                                                              const SizedBox(
-                                                                  width: 7),
-                                                              _buildLetter(
-                                                                'Z',
-                                                                _zProgress
-                                                                    .value,
-                                                                letterStyle,
-                                                              ),
-                                                              const SizedBox(
-                                                                  width: 7),
-                                                              _buildLetter(
-                                                                'Y',
-                                                                _yProgress
-                                                                    .value,
-                                                                letterStyle,
-                                                              ),
-                                                            ],
-                                                          ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                    border: Border.all(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.22),
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.40),
+                                        blurRadius: 22,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                      BoxShadow(
+                                        color: const Color(0xFF059669)
+                                            .withValues(
+                                          alpha:
+                                              0.38 * _glowProgress.value,
+                                        ),
+                                        blurRadius: 30,
+                                        spreadRadius: -1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(14.5),
+                                    child: Stack(
+                                      alignment: Alignment.centerLeft,
+                                      children: [
+                                        // Architectural vector wordmark painted on canvas
+                                        CustomPaint(
+                                          size: Size(currentWidth, boxHeight),
+                                          painter: _ExactLogoWordmarkPainter(
+                                            hProgress: _hProgress.value,
+                                            aProgress: _aProgress.value,
+                                            gProgress: _gProgress.value,
+                                            zProgress: _zProgress.value,
+                                            yProgress: _yProgress.value,
                                           ),
-                                          // Diamond light gleam sweeping across all letters in the box!
-                                          if (_shimmerProgress.value > 0.01 &&
-                                              _shimmerProgress.value < 0.99)
-                                            Positioned.fill(
-                                              child: CustomPaint(
-                                                painter: _ShimmerGleamPainter(
-                                                  progress:
-                                                      _shimmerProgress.value,
-                                                ),
+                                        ),
+                                        // Diamond light gleam sweeping across the entire plaque!
+                                        if (_shimmerProgress.value > 0.01 &&
+                                            _shimmerProgress.value < 0.99)
+                                          Positioned.fill(
+                                            child: CustomPaint(
+                                              painter: _ShimmerGleamPainter(
+                                                progress:
+                                                    _shimmerProgress.value,
                                               ),
                                             ),
-                                        ],
-                                      ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 18),
-                              // Slogan Liquid Wipe in clean geometric tracked-out typography
-                              Opacity(
-                                opacity: _sloganOpacity.value,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 24),
-                                  child: ShaderMask(
-                                    blendMode: BlendMode.dstIn,
-                                    shaderCallback: (Rect bounds) {
-                                      final t = _sloganWipe.value;
-                                      final start =
-                                          (t * 1.30 - 0.30).clamp(0.0, 1.0);
-                                      final end = (t * 1.30).clamp(0.0, 1.0);
-                                      return LinearGradient(
-                                        begin: widget.arabic
-                                            ? Alignment.centerRight
-                                            : Alignment.centerLeft,
-                                        end: widget.arabic
-                                            ? Alignment.centerLeft
-                                            : Alignment.centerRight,
-                                        colors: const [
-                                          Colors.white,
-                                          Colors.white,
-                                          Colors.transparent,
-                                          Colors.transparent,
-                                        ],
-                                        stops: [0.0, start, end, 1.0],
-                                      ).createShader(bounds);
-                                    },
-                                    child: Text(
-                                      sloganText,
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      softWrap: false,
-                                      style: sloganStyle,
-                                    ),
+                            ),
+                            const SizedBox(height: 18),
+                            // Slogan Liquid Wipe in clean geometric tracked-out typography
+                            Opacity(
+                              opacity: _sloganOpacity.value,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24),
+                                child: ShaderMask(
+                                  blendMode: BlendMode.dstIn,
+                                  shaderCallback: (Rect bounds) {
+                                    final t = _sloganWipe.value;
+                                    final start =
+                                        (t * 1.30 - 0.30).clamp(0.0, 1.0);
+                                    final end = (t * 1.30).clamp(0.0, 1.0);
+                                    return LinearGradient(
+                                      begin: widget.arabic
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft,
+                                      end: widget.arabic
+                                          ? Alignment.centerLeft
+                                          : Alignment.centerRight,
+                                      colors: const [
+                                        Colors.white,
+                                        Colors.white,
+                                        Colors.transparent,
+                                        Colors.transparent,
+                                      ],
+                                      stops: [0.0, start, end, 1.0],
+                                    ).createShader(bounds);
+                                  },
+                                  child: Text(
+                                    sloganText,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    style: sloganStyle,
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
