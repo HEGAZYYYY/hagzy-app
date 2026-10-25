@@ -1085,12 +1085,142 @@ class _HagzyLogoPainter extends CustomPainter {
       oldDelegate.inverted != inverted;
 }
 
-/// Breadfast-style opening animation:
-/// Clean, solid brand-colored full-screen canvas with the original Hagzy logo
+/// Precision architectural assembling logo painter:
+/// Draws the bespoke Hagzy "H" mark piece-by-piece:
+/// 1. Left pillar draws downwards
+/// 2. Right pillar draws downwards with subtle organic delay
+/// 3. Stadium arch sweeps and bridges across, locking the emblem
+/// 4. Diamond light gleam sweeps across the finished emblem
+class _AssemblingHagzyLogoPainter extends CustomPainter {
+  _AssemblingHagzyLogoPainter({
+    required this.pillarProgress,
+    required this.archProgress,
+    required this.glowProgress,
+    required this.shimmerProgress,
+  });
+
+  final double pillarProgress;
+  final double archProgress;
+  final double glowProgress;
+  final double shimmerProgress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 40.0;
+    final rect = Offset.zero & size;
+
+    // 1. Pristine architectural squircle canvas
+    final bgPaint = Paint()
+      ..isAntiAlias = true
+      ..color = Colors.white;
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(11 * scale));
+    canvas.drawRRect(rrect, bgPaint);
+
+    // 2. Blueprint alignment guidelines (very subtle architectural crosslines)
+    if (glowProgress > 0.01 && glowProgress < 0.99) {
+      final guideAlpha = (0.12 * (1.0 - glowProgress)).clamp(0.0, 1.0);
+      final guidePaint = Paint()
+        ..color = const Color(0xFF059669).withValues(alpha: guideAlpha)
+        ..strokeWidth = 1.0 * scale
+        ..style = PaintingStyle.stroke;
+
+      // Subtle horizontal centerline axis
+      canvas.drawLine(
+        Offset(6 * scale, 21 * scale),
+        Offset(34 * scale, 21 * scale),
+        guidePaint,
+      );
+    }
+
+    // 3. Monogram Paint Setup
+    final strokeWidth = 3.8 * scale;
+    final glyphPaint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..color = const Color(0xFF059669);
+
+    // 4. Assembling Left Vertical Pillar (draws top -> bottom: 11 to 29)
+    if (pillarProgress > 0.01) {
+      final startY = 11.0 * scale;
+      final totalH = (29.0 - 11.0) * scale;
+      final currentY = startY + totalH * pillarProgress.clamp(0.0, 1.0);
+      canvas.drawLine(
+        Offset(12.5 * scale, startY),
+        Offset(12.5 * scale, currentY),
+        glyphPaint,
+      );
+    }
+
+    // 5. Assembling Right Vertical Pillar (draws top -> bottom with slight offset)
+    if (pillarProgress > 0.08) {
+      final adjustedProg = ((pillarProgress - 0.08) / 0.92).clamp(0.0, 1.0);
+      final startY = 11.0 * scale;
+      final totalH = (29.0 - 11.0) * scale;
+      final currentY = startY + totalH * adjustedProg;
+      canvas.drawLine(
+        Offset(27.5 * scale, startY),
+        Offset(27.5 * scale, currentY),
+        glyphPaint,
+      );
+    }
+
+    // 6. Assembling Stadium Arch Bridge (draws across from left to right)
+    if (archProgress > 0.01) {
+      final fullArchPath = Path()
+        ..moveTo(12.5 * scale, 21 * scale)
+        ..quadraticBezierTo(
+          20.0 * scale,
+          14.5 * scale,
+          27.5 * scale,
+          21 * scale,
+        );
+
+      final metrics = fullArchPath.computeMetrics().toList();
+      if (metrics.isNotEmpty) {
+        final metric = metrics.first;
+        final extractLength = metric.length * archProgress.clamp(0.0, 1.0);
+        final segment = metric.extractPath(0.0, extractLength);
+        canvas.drawPath(segment, glyphPaint);
+      }
+    }
+
+    // 7. Light Shimmer / Gleam Sweep over the assembled H
+    if (shimmerProgress > 0.05 && shimmerProgress < 0.95) {
+      canvas.save();
+      canvas.clipRRect(rrect);
+      final pos = -0.5 + shimmerProgress * 2.0;
+      final shimmerPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment(pos - 0.5, -1.0),
+          end: Alignment(pos + 0.5, 1.0),
+          colors: [
+            Colors.transparent,
+            Colors.white.withValues(alpha: 0.65),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(rect);
+      canvas.drawPaint(shimmerPaint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AssemblingHagzyLogoPainter oldDelegate) {
+    return oldDelegate.pillarProgress != pillarProgress ||
+        oldDelegate.archProgress != archProgress ||
+        oldDelegate.glowProgress != glowProgress ||
+        oldDelegate.shimmerProgress != shimmerProgress;
+  }
+}
+
 /// Luxury Opus-grade opening splash animation:
-/// Deep architectural emerald gradient canvas with ambient expanding glow rings,
-/// tactile spring-physics logo entrance, staggered luxury typography badge,
-/// and smooth cinematic zoom-through cross-dissolve directly into the app.
+/// Deep architectural emerald gradient canvas with breathing ambient bloom,
+/// progressive mechanical/architectural assembly of the "H" monogram,
+/// bespoke luxury typography, and smooth cinematic cross-dissolve exit.
 class HagzySplashOverlay extends StatefulWidget {
   const HagzySplashOverlay({
     super.key,
@@ -1108,15 +1238,27 @@ class HagzySplashOverlay extends StatefulWidget {
 class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoRotation;
-  late final Animation<double> _logoOpacity;
-  late final Animation<double> _rippleScale;
-  late final Animation<double> _rippleOpacity;
+
+  // Background and ambient atmosphere
+  late final Animation<double> _ambientBloom;
+  late final Animation<double> _haloScale;
+  late final Animation<double> _haloOpacity;
+
+  // Assembling logo mechanics
+  late final Animation<double> _containerScale;
+  late final Animation<double> _containerOpacity;
+  late final Animation<double> _pillarProgress;
+  late final Animation<double> _archProgress;
+  late final Animation<double> _glowProgress;
+  late final Animation<double> _shimmerProgress;
+
+  // Modern luxury typography
   late final Animation<double> _textSlide;
   late final Animation<double> _textOpacity;
   late final Animation<double> _sloganSlide;
   late final Animation<double> _sloganOpacity;
+
+  // Cinematic exit
   late final Animation<double> _zoomExit;
   late final Animation<double> _overlayOpacity;
 
@@ -1125,106 +1267,119 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2450), // Lasts a full second longer for a relaxed luxury feel
+      duration: const Duration(milliseconds: 2600),
     );
 
-    // Spring logo entrance (0% -> 35%): spring overshoot -> settle -> hold -> zoom exit
-    _logoScale = TweenSequence<double>([
+    // Subtle breathing ambient bloom in deep emerald
+    _ambientBloom = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.65, end: 1.06)
-            .chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 32,
+        tween: Tween<double>(begin: 0.15, end: 0.38)
+            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 50,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.06, end: 1.0)
+        tween: Tween<double>(begin: 0.38, end: 0.28)
             .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 18,
-      ),
-      TweenSequenceItem(
-        tween: ConstantTween<double>(1.0),
-        weight: 30,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.10)
-            .chain(CurveTween(curve: Curves.easeInCubic)),
-        weight: 20,
+        weight: 50,
       ),
     ]).animate(_ctrl);
 
-    // Subtle natural tilt settling into true level
-    _logoRotation = Tween<double>(begin: -0.05, end: 0.0).animate(
+    // Delicate architectural halo (soft hairline guide, not harsh sonar circles)
+    _haloScale = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.10, 0.75, curve: Curves.easeOutCubic),
+      ),
+    );
+    _haloOpacity = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 0.22)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 35,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.22, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInCubic)),
+        weight: 65,
+      ),
+    ]).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.10, 0.80),
+    ));
+
+    // Squircle container slowly materializing
+    _containerScale = Tween<double>(begin: 0.86, end: 1.0).animate(
       CurvedAnimation(
         parent: _ctrl,
         curve: const Interval(0.0, 0.35, curve: Curves.easeOutCubic),
       ),
     );
-
-    // Fade logo into view smoothly
-    _logoOpacity = CurvedAnimation(
+    _containerOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.16, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.22, curve: Curves.easeOut),
     );
 
-    // Ambient acoustic pulse rings (expanding wave from behind mark)
-    _rippleScale = Tween<double>(begin: 0.75, end: 1.95).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.08, 0.60, curve: Curves.easeOutQuart),
-      ),
-    );
-    _rippleOpacity = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 0.45)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 25,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.45, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeInCubic)),
-        weight: 75,
-      ),
-    ]).animate(CurvedAnimation(
+    // Assembling left and right vertical pillars (16% -> 44%)
+    _pillarProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.08, 0.70),
-    ));
+      curve: const Interval(0.16, 0.44, curve: Curves.easeOutCubic),
+    );
 
-    // Staggered title entrance (20% -> 42%)
-    _textSlide = Tween<double>(begin: 16.0, end: 0.0).animate(
+    // Assembling stadium arch bridge (30% -> 58%)
+    _archProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.30, 0.58, curve: Curves.easeInOutCubic),
+    );
+
+    // Completion glow pulse (50% -> 72%)
+    _glowProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.50, 0.72, curve: Curves.easeOut),
+    );
+
+    // Diamond light shimmer sweep across finished mark (58% -> 78%)
+    _shimmerProgress = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.58, 0.78, curve: Curves.easeInOut),
+    );
+
+    // Clean modern title entrance (44% -> 66%)
+    _textSlide = Tween<double>(begin: 14.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.20, 0.42, curve: Curves.easeOutCubic),
+        curve: const Interval(0.44, 0.66, curve: Curves.easeOutCubic),
       ),
     );
     _textOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.20, 0.40, curve: Curves.easeOut),
+      curve: const Interval(0.44, 0.62, curve: Curves.easeOut),
     );
 
-    // Human, clean slogan glide (32% -> 56%)
-    _sloganSlide = Tween<double>(begin: 12.0, end: 0.0).animate(
+    // Slogan entrance (56% -> 78%)
+    _sloganSlide = Tween<double>(begin: 10.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.32, 0.56, curve: Curves.easeOutCubic),
+        curve: const Interval(0.56, 0.78, curve: Curves.easeOutCubic),
       ),
     );
     _sloganOpacity = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.32, 0.52, curve: Curves.easeOut),
+      curve: const Interval(0.56, 0.74, curve: Curves.easeOut),
     );
 
-    // Cinematic zoom exit (80% -> 100%)
-    _zoomExit = Tween<double>(begin: 1.0, end: 1.07).animate(
+    // Cinematic zoom exit (82% -> 100%)
+    _zoomExit = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.78, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.82, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
-    // Smooth dissolve into the app
+    // Smooth cross-dissolve directly into the app
     _overlayOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.80, 1.0, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.84, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
@@ -1256,125 +1411,139 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                 child: Container(
                   decoration: const BoxDecoration(
                     gradient: RadialGradient(
-                      center: Alignment(0.0, -0.15),
-                      radius: 1.25,
+                      center: Alignment(0.0, -0.12),
+                      radius: 1.35,
                       colors: [
                         Color(0xFF065F46), // Radiant emerald center
                         Color(0xFF044E3B),
                         Color(0xFF022C22), // Deep luxury forest perimeter
-                        Color(0xFF011C15),
+                        Color(0xFF011A14), // Near obsidian edge
                       ],
-                      stops: [0.0, 0.38, 0.78, 1.0],
+                      stops: [0.0, 0.36, 0.76, 1.0],
                     ),
                   ),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Ambient expanding acoustic radar ripple 1
-                      Transform.scale(
-                        scale: _rippleScale.value,
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF34D399).withValues(
-                                alpha: (_rippleOpacity.value * 0.7).clamp(0.0, 1.0),
-                              ),
-                              width: 1.8,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Ambient acoustic radar ripple 2
-                      Transform.scale(
-                        scale: _rippleScale.value * 1.35,
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF10B981).withValues(
-                                alpha: (_rippleOpacity.value * 0.4).clamp(0.0, 1.0),
-                              ),
-                              width: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Soft radial light glow behind logo
+                      // 1. Soft atmospheric bloom in deep emerald (breathes smoothly)
                       Container(
-                        width: 240,
-                        height: 240,
+                        width: 320,
+                        height: 320,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              const Color(0xFF10B981).withValues(alpha: 0.28),
+                              const Color(0xFF34D399)
+                                  .withValues(alpha: _ambientBloom.value),
+                              const Color(0xFF10B981)
+                                  .withValues(alpha: _ambientBloom.value * 0.4),
                               Colors.transparent,
                             ],
+                            stops: const [0.0, 0.45, 1.0],
                           ),
                         ),
                       ),
-                      // Central Hero Content
+                      // 2. Delicate hairline halo ring (subtle precision alignment, not sonar circles)
+                      Transform.scale(
+                        scale: _haloScale.value,
+                        child: Container(
+                          width: 170,
+                          height: 170,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF34D399).withValues(
+                                alpha: _haloOpacity.value,
+                              ),
+                              width: 1.0,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 3. Central Hero Content
                       Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Spring Logo with subtle rotation
+                            // Assembling Monogram Container
                             Opacity(
-                              opacity: _logoOpacity.value,
+                              opacity: _containerOpacity.value,
                               child: Transform.scale(
-                                scale: _logoScale.value,
-                                child: Transform.rotate(
-                                  angle: _logoRotation.value,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(26),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.35),
-                                          blurRadius: 28,
-                                          offset: const Offset(0, 10),
+                                scale: _containerScale.value,
+                                child: Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(27),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.32),
+                                        blurRadius: 28,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                      BoxShadow(
+                                        color: const Color(0xFF34D399)
+                                            .withValues(
+                                          alpha: 0.35 * _glowProgress.value,
                                         ),
-                                        BoxShadow(
-                                          color: const Color(0xFF34D399).withValues(alpha: 0.3),
-                                          blurRadius: 36,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const HagzyLogoMark(
-                                      size: 96,
-                                      withGlow: false,
-                                      inverted: true,
+                                        blurRadius: 36,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(27),
+                                    child: CustomPaint(
+                                      size: const Size(100, 100),
+                                      painter: _AssemblingHagzyLogoPainter(
+                                        pillarProgress: _pillarProgress.value,
+                                        archProgress: _archProgress.value,
+                                        glowProgress: _glowProgress.value,
+                                        shimmerProgress: _shimmerProgress.value,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 22),
-                            // Staggered Title
+                            const SizedBox(height: 24),
+                            // Clean Luxury Title (Outfit for EN, Alexandria for AR)
                             Opacity(
                               opacity: _textOpacity.value,
                               child: Transform.translate(
                                 offset: Offset(0, _textSlide.value),
                                 child: Text(
                                   widget.arabic ? 'حجزي' : 'Hagzy',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -1.0,
-                                    height: 1.05,
+                                    fontFamily: widget.arabic
+                                        ? 'Alexandria'
+                                        : 'Outfit',
+                                    fontFamilyFallback: widget.arabic
+                                        ? const [
+                                            'Readex Pro',
+                                            'Cairo',
+                                            'sans-serif'
+                                          ]
+                                        : const [
+                                            'Plus Jakarta Sans',
+                                            'Inter',
+                                            'sans-serif'
+                                          ],
+                                    fontSize: widget.arabic ? 35 : 37,
+                                    fontWeight: widget.arabic
+                                        ? FontWeight.w800
+                                        : FontWeight.w700,
+                                    letterSpacing:
+                                        widget.arabic ? 0.0 : -0.8,
+                                    height: 1.1,
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 8),
-                            // Clean, Authentic Human Slogan (No bulky AI badges, pure elegant typography)
+                            // Clean, Human Slogan (Plus Jakarta Sans for EN, Alexandria for AR)
                             Opacity(
                               opacity: _sloganOpacity.value,
                               child: Transform.translate(
@@ -1384,10 +1553,26 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                       ? 'احجز مكانك.. في ثواني'
                                       : 'Your spot, booked in seconds',
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.82),
-                                    fontSize: widget.arabic ? 14 : 12.5,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: widget.arabic ? 0.2 : 0.6,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.84),
+                                    fontFamily: widget.arabic
+                                        ? 'Alexandria'
+                                        : 'Plus Jakarta Sans',
+                                    fontFamilyFallback: widget.arabic
+                                        ? const [
+                                            'Readex Pro',
+                                            'Cairo',
+                                            'sans-serif'
+                                          ]
+                                        : const [
+                                            'Outfit',
+                                            'Inter',
+                                            'sans-serif'
+                                          ],
+                                    fontSize: widget.arabic ? 13.5 : 12.5,
+                                    fontWeight: FontWeight.w400,
+                                    letterSpacing:
+                                        widget.arabic ? 0.3 : 0.8,
                                   ),
                                 ),
                               ),
