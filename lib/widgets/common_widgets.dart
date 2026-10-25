@@ -1085,29 +1085,19 @@ class _HagzyLogoPainter extends CustomPainter {
       oldDelegate.inverted != inverted;
 }
 
-/// Precision architectural assembling wordmark painter:
-/// Draws the bespoke Hagzy letters (H, A, G, Z, Y) in the EXACT same
-/// custom stroke style, rounded caps, and progressive mechanical line-drawing animation.
-class _AssemblingFullWordmarkPainter extends CustomPainter {
-  _AssemblingFullWordmarkPainter({
-    required this.hPillarProgress,
-    required this.hArchProgress,
-    required this.aProgress,
-    required this.gProgress,
-    required this.zProgress,
-    required this.yProgress,
+/// Assembles the bespoke pure white "H" monogram glyph inside a custom slot
+class _AssemblingHagzyMonogramOnlyPainter extends CustomPainter {
+  _AssemblingHagzyMonogramOnlyPainter({
+    required this.pillarProgress,
+    required this.archProgress,
   });
 
-  final double hPillarProgress;
-  final double hArchProgress;
-  final double aProgress;
-  final double gProgress;
-  final double zProgress;
-  final double yProgress;
+  final double pillarProgress;
+  final double archProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.height / 40.0;
+    final scale = size.width / 40.0;
     final strokeWidth = 3.8 * scale;
     final glyphPaint = Paint()
       ..isAntiAlias = true
@@ -1117,25 +1107,23 @@ class _AssemblingFullWordmarkPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..color = Colors.white;
 
-    // ==========================================
-    // 1. LETTER [ H ] (X: 12.5 -> 27.5)
-    // ==========================================
-    // Left Pillar (top -> bottom: 11 to 29)
-    if (hPillarProgress > 0.01) {
+    // 1. Left Vertical Pillar
+    if (pillarProgress > 0.01) {
       final startY = 11.0 * scale;
-      final totalH = 18.0 * scale;
-      final currentY = startY + totalH * hPillarProgress.clamp(0.0, 1.0);
+      final totalH = (29.0 - 11.0) * scale;
+      final currentY = startY + totalH * pillarProgress.clamp(0.0, 1.0);
       canvas.drawLine(
         Offset(12.5 * scale, startY),
         Offset(12.5 * scale, currentY),
         glyphPaint,
       );
     }
-    // Right Pillar (top -> bottom with slight offset)
-    if (hPillarProgress > 0.06) {
-      final adjustedProg = ((hPillarProgress - 0.06) / 0.94).clamp(0.0, 1.0);
+
+    // 2. Right Vertical Pillar
+    if (pillarProgress > 0.06) {
+      final adjustedProg = ((pillarProgress - 0.06) / 0.94).clamp(0.0, 1.0);
       final startY = 11.0 * scale;
-      final totalH = 18.0 * scale;
+      final totalH = (29.0 - 11.0) * scale;
       final currentY = startY + totalH * adjustedProg;
       canvas.drawLine(
         Offset(27.5 * scale, startY),
@@ -1143,152 +1131,32 @@ class _AssemblingFullWordmarkPainter extends CustomPainter {
         glyphPaint,
       );
     }
-    // Stadium Arch Bridge
-    if (hArchProgress > 0.01) {
+
+    // 3. Stadium Arch Bridge
+    if (archProgress > 0.01) {
       final fullArchPath = Path()
-        ..moveTo(12.5 * scale, 21.0 * scale)
+        ..moveTo(12.5 * scale, 21 * scale)
         ..quadraticBezierTo(
           20.0 * scale,
           14.5 * scale,
           27.5 * scale,
-          21.0 * scale,
+          21 * scale,
         );
-      _drawPathProgress(canvas, fullArchPath, hArchProgress, glyphPaint);
-    }
 
-    // ==========================================
-    // 2. LETTER [ A ] (X: 36.0 -> 51.0, Apex at 43.5)
-    // ==========================================
-    if (aProgress > 0.01) {
-      // Outer roof: left foot -> apex -> right foot
-      final aRoofPath = Path()
-        ..moveTo(36.0 * scale, 29.0 * scale)
-        ..lineTo(43.5 * scale, 11.0 * scale)
-        ..lineTo(51.0 * scale, 29.0 * scale);
-      _drawPathProgress(
-          canvas, aRoofPath, aProgress.clamp(0.0, 1.0), glyphPaint);
-
-      // Horizontal crossbar at y = 21.0 (draws across in second half)
-      if (aProgress > 0.50) {
-        final barProg = ((aProgress - 0.50) / 0.50).clamp(0.0, 1.0);
-        final startX = 39.33 * scale;
-        final endX = startX + (47.67 - 39.33) * scale * barProg;
-        canvas.drawLine(
-          Offset(startX, 21.0 * scale),
-          Offset(endX, 21.0 * scale),
-          glyphPaint,
-        );
+      final metrics = fullArchPath.computeMetrics().toList();
+      if (metrics.isNotEmpty) {
+        final metric = metrics.first;
+        final extractLength = metric.length * archProgress.clamp(0.0, 1.0);
+        final segment = metric.extractPath(0.0, extractLength);
+        canvas.drawPath(segment, glyphPaint);
       }
-    }
-
-    // ==========================================
-    // 3. LETTER [ G ] (X: 59.5 -> 74.5)
-    // ==========================================
-    if (gProgress > 0.01) {
-      final gPath = Path()
-        ..moveTo(73.5 * scale, 15.0 * scale)
-        ..cubicTo(
-          71.0 * scale,
-          11.0 * scale,
-          63.0 * scale,
-          11.0 * scale,
-          59.5 * scale,
-          16.5 * scale,
-        )
-        ..cubicTo(
-          56.5 * scale,
-          21.5 * scale,
-          56.5 * scale,
-          24.5 * scale,
-          61.0 * scale,
-          28.2 * scale,
-        )
-        ..cubicTo(
-          64.0 * scale,
-          29.5 * scale,
-          71.0 * scale,
-          29.5 * scale,
-          74.5 * scale,
-          25.5 * scale,
-        )
-        ..lineTo(74.5 * scale, 20.5 * scale)
-        ..lineTo(67.0 * scale, 20.5 * scale);
-
-      _drawPathProgress(
-          canvas, gPath, gProgress.clamp(0.0, 1.0), glyphPaint);
-    }
-
-    // ==========================================
-    // 4. LETTER [ Z ] (X: 83.0 -> 98.0)
-    // ==========================================
-    if (zProgress > 0.01) {
-      final zPath = Path()
-        ..moveTo(83.0 * scale, 11.0 * scale)
-        ..lineTo(98.0 * scale, 11.0 * scale)
-        ..lineTo(83.0 * scale, 29.0 * scale)
-        ..lineTo(98.0 * scale, 29.0 * scale);
-
-      _drawPathProgress(
-          canvas, zPath, zProgress.clamp(0.0, 1.0), glyphPaint);
-    }
-
-    // ==========================================
-    // 5. LETTER [ Y ] (X: 106.5 -> 121.5, Stem at 114.0)
-    // ==========================================
-    if (yProgress > 0.01) {
-      // Left and right upper arms meeting at center (114.0, 20.5)
-      final armProg = (yProgress * 1.5).clamp(0.0, 1.0);
-      final currentLeftX =
-          106.5 * scale + (114.0 - 106.5) * scale * armProg;
-      final currentLeftY =
-          11.0 * scale + (20.5 - 11.0) * scale * armProg;
-      canvas.drawLine(
-        Offset(106.5 * scale, 11.0 * scale),
-        Offset(currentLeftX, currentLeftY),
-        glyphPaint,
-      );
-
-      final currentRightX =
-          121.5 * scale - (121.5 - 114.0) * scale * armProg;
-      canvas.drawLine(
-        Offset(121.5 * scale, 11.0 * scale),
-        Offset(currentRightX, currentLeftY),
-        glyphPaint,
-      );
-
-      // Center vertical stem (draws downwards in second half)
-      if (yProgress > 0.50) {
-        final stemProg = ((yProgress - 0.50) / 0.50).clamp(0.0, 1.0);
-        final startY = 20.5 * scale;
-        final currentStemY = startY + (29.0 - 20.5) * scale * stemProg;
-        canvas.drawLine(
-          Offset(114.0 * scale, startY),
-          Offset(114.0 * scale, currentStemY),
-          glyphPaint,
-        );
-      }
-    }
-  }
-
-  void _drawPathProgress(
-      Canvas canvas, Path fullPath, double progress, Paint paint) {
-    if (progress <= 0.0) return;
-    final metrics = fullPath.computeMetrics().toList();
-    for (final metric in metrics) {
-      final extractLength = metric.length * progress.clamp(0.0, 1.0);
-      final segment = metric.extractPath(0.0, extractLength);
-      canvas.drawPath(segment, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _AssemblingFullWordmarkPainter oldDelegate) {
-    return oldDelegate.hPillarProgress != hPillarProgress ||
-        oldDelegate.hArchProgress != hArchProgress ||
-        oldDelegate.aProgress != aProgress ||
-        oldDelegate.gProgress != gProgress ||
-        oldDelegate.zProgress != zProgress ||
-        oldDelegate.yProgress != yProgress;
+  bool shouldRepaint(covariant _AssemblingHagzyMonogramOnlyPainter oldDelegate) {
+    return oldDelegate.pillarProgress != pillarProgress ||
+        oldDelegate.archProgress != archProgress;
   }
 }
 
@@ -1357,7 +1225,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   // Horizontal expansion of the unified emerald box
   late final Animation<double> _expandWidth;
 
-  // Progressive mechanical stroke assembly for A, G, Z, Y (same style & animation as H)
+  // Progressive mechanical assembly for A, G, Z, Y matching logo weight & style
   late final Animation<double> _aProgress;
   late final Animation<double> _gProgress;
   late final Animation<double> _zProgress;
@@ -1423,29 +1291,29 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
       curve: const Interval(0.28, 0.58, curve: Curves.easeOutCubic),
     );
 
-    // Sequential mechanical stroke drawing for A, G, Z, Y in the exact same style as H:
-    // Letter A (34% -> 48%)
+    // Sequential mechanical lock-in for A, G, Z, Y matching logo style:
+    // Letter A (32% -> 44%)
     _aProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.34, 0.48, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.32, 0.44, curve: Curves.easeOutCubic),
     );
 
-    // Letter G (42% -> 54%)
+    // Letter G (38% -> 50%)
     _gProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.42, 0.54, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.38, 0.50, curve: Curves.easeOutCubic),
     );
 
-    // Letter Z (48% -> 60%)
+    // Letter Z (44% -> 56%)
     _zProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.48, 0.60, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.44, 0.56, curve: Curves.easeOutCubic),
     );
 
-    // Letter Y (54% -> 66%)
+    // Letter Y (50% -> 62%)
     _yProgress = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.54, 0.66, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.50, 0.62, curve: Curves.easeOutCubic),
     );
 
     // Completion glow pulse (48% -> 70%)
@@ -1497,6 +1365,21 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     super.dispose();
   }
 
+  Widget _buildLetter(String char, double progress, TextStyle style) {
+    final opacity = progress.clamp(0.0, 1.0);
+    final scale = 0.84 + 0.16 * progress.clamp(0.0, 1.0);
+    return Opacity(
+      opacity: opacity,
+      child: Transform.scale(
+        scale: scale,
+        child: Text(
+          char,
+          style: style,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1508,6 +1391,25 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
           final sloganText = widget.arabic
               ? 'احجز مكانك.. في ثواني'
               : 'YOUR SPOT, BOOKED IN SECONDS';
+
+          // Authentic luxury bold typography matching the logo monogram weight exactly
+          final letterStyle = TextStyle(
+            color: Colors.white,
+            fontFamily: widget.arabic ? 'Almarai' : 'Montserrat',
+            fontFamilyFallback: widget.arabic
+                ? const ['Alexandria', 'Tajawal', 'Cairo', 'sans-serif']
+                : const ['Plus Jakarta Sans', 'Poppins', 'sans-serif'],
+            fontSize: widget.arabic ? 26.0 : 27.0,
+            fontWeight: FontWeight.w900,
+            height: 1.0,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          );
 
           final sloganStyle = TextStyle(
             color: Colors.white.withValues(alpha: 0.70),
@@ -1526,9 +1428,6 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
               ),
             ],
           );
-
-          // Initial width = 54 (square squircle), fully expanded width = 182 (full plaque)
-          final boxWidth = 54.0 + (182.0 - 54.0) * _expandWidth.value;
 
           return Opacity(
             opacity: _overlayOpacity.value,
@@ -1571,8 +1470,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                       // 2. Central Hero Content:
                       // Unified Box: starts 54x54 containing assembling [ H ],
                       // then smoothly expands into full emerald plaque where A, G, Z, Y
-                      // assemble with the EXACT same stroke style and line drawing animation!
-                      // Shimmer sweeps across all 5 letters, and slogan types underneath.
+                      // assemble in the exact same bold logo style with matching diamond gleam!
                       Center(
                         child: Directionality(
                           textDirection: widget.arabic
@@ -1586,7 +1484,6 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                 child: Transform.scale(
                                   scale: _containerScale.value,
                                   child: Container(
-                                    width: boxWidth,
                                     height: 54,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(16),
@@ -1626,22 +1523,91 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                       child: Stack(
                                         alignment: Alignment.centerLeft,
                                         children: [
-                                          // Full wordmark custom-drawn with exact same stroke style
-                                          CustomPaint(
-                                            size: const Size(182, 54),
-                                            painter:
-                                                _AssemblingFullWordmarkPainter(
-                                              hPillarProgress:
-                                                  _pillarProgress.value,
-                                              hArchProgress:
-                                                  _archProgress.value,
-                                              aProgress: _aProgress.value,
-                                              gProgress: _gProgress.value,
-                                              zProgress: _zProgress.value,
-                                              yProgress: _yProgress.value,
-                                            ),
+                                          // Row holding [ H ] and expanding bold logo letters
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              // 54x54 cell for the assembling H monogram
+                                              SizedBox(
+                                                width: 54,
+                                                height: 54,
+                                                child: CustomPaint(
+                                                  size: const Size(54, 54),
+                                                  painter:
+                                                      _AssemblingHagzyMonogramOnlyPainter(
+                                                    pillarProgress:
+                                                        _pillarProgress.value,
+                                                    archProgress:
+                                                        _archProgress.value,
+                                                  ),
+                                                ),
+                                              ),
+                                              // Expanding letters matching logo style & weight
+                                              ClipRect(
+                                                child: Align(
+                                                  alignment: widget.arabic
+                                                      ? Alignment.centerRight
+                                                      : Alignment.centerLeft,
+                                                  widthFactor:
+                                                      _expandWidth.value,
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsetsDirectional
+                                                            .only(
+                                                      start: 6,
+                                                      end: 18,
+                                                    ),
+                                                    child: widget.arabic
+                                                        ? _buildLetter(
+                                                            'حجزي',
+                                                            _yProgress.value,
+                                                            letterStyle,
+                                                          )
+                                                        : Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              _buildLetter(
+                                                                'A',
+                                                                _aProgress
+                                                                    .value,
+                                                                letterStyle,
+                                                              ),
+                                                              const SizedBox(
+                                                                  width: 7),
+                                                              _buildLetter(
+                                                                'G',
+                                                                _gProgress
+                                                                    .value,
+                                                                letterStyle,
+                                                              ),
+                                                              const SizedBox(
+                                                                  width: 7),
+                                                              _buildLetter(
+                                                                'Z',
+                                                                _zProgress
+                                                                    .value,
+                                                                letterStyle,
+                                                              ),
+                                                              const SizedBox(
+                                                                  width: 7),
+                                                              _buildLetter(
+                                                                'Y',
+                                                                _yProgress
+                                                                    .value,
+                                                                letterStyle,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          // Diamond light gleam sweeping across all 5 letters in the box!
+                                          // Diamond light gleam sweeping across all letters in the box!
                                           if (_shimmerProgress.value > 0.01 &&
                                               _shimmerProgress.value < 0.99)
                                             Positioned.fill(
