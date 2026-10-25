@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'google_fonts_stub.dart' if (dart.library.html) 'google_fonts_web.dart';
 
 // ---------------------------------------------------------------------------
 // HAGZY COHESIVE PALETTE — Harmonious Emerald & Clean Slate
@@ -67,24 +67,24 @@ class HagzyTheme {
 
   static List<BoxShadow> get softShadow => [
         BoxShadow(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-          blurRadius: 20,
-          spreadRadius: -2,
-          offset: const Offset(0, 8),
+          color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+          blurRadius: 24,
+          spreadRadius: -3,
+          offset: const Offset(0, 10),
         ),
         BoxShadow(
           color: const Color(0xFF0F172A).withValues(alpha: 0.02),
-          blurRadius: 6,
-          offset: const Offset(0, 2),
+          blurRadius: 8,
+          offset: const Offset(0, 3),
         ),
       ];
 
   static List<BoxShadow> get emeraldGlowShadow => [
         BoxShadow(
-          color: kGreen.withValues(alpha: 0.22),
-          blurRadius: 18,
+          color: kGreen.withValues(alpha: 0.28),
+          blurRadius: 22,
           spreadRadius: -2,
-          offset: const Offset(0, 6),
+          offset: const Offset(0, 8),
         ),
       ];
 
@@ -114,6 +114,15 @@ class HagzyTheme {
       useMaterial3: true,
       colorScheme: baseScheme,
       scaffoldBackgroundColor: kPage,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       textTheme: _isTest
           ? null
           : GoogleFonts.plusJakartaSansTextTheme().apply(
@@ -132,7 +141,7 @@ class HagzyTheme {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(24),
           side: const BorderSide(color: kBorder),
         ),
       ),
@@ -140,32 +149,49 @@ class HagzyTheme {
         filled: true,
         fillColor: kPage,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: kBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: kBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kGreen, width: 1.8),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: kGreen, width: 1.5),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: kGreen,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            letterSpacing: -0.2,
+          ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          elevation: 0,
           backgroundColor: kGreen,
           foregroundColor: Colors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           textStyle: const TextStyle(
             fontWeight: FontWeight.w800,
+            fontSize: 15,
             letterSpacing: -0.2,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
@@ -173,26 +199,15 @@ class HagzyTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: kInk,
           side: const BorderSide(color: kBorder),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           textStyle: const TextStyle(
             fontWeight: FontWeight.w700,
-            letterSpacing: -0.1,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            fontSize: 14.5,
           ),
         ),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: kPage,
-        side: const BorderSide(color: kBorder),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      dividerTheme: const DividerThemeData(
-        color: kBorder,
-        thickness: 1,
       ),
     );
   }
