@@ -1115,6 +1115,8 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
   late final Animation<double> _rippleOpacity;
   late final Animation<double> _textSlide;
   late final Animation<double> _textOpacity;
+  late final Animation<double> _sloganSlide;
+  late final Animation<double> _sloganOpacity;
   late final Animation<double> _zoomExit;
   late final Animation<double> _overlayOpacity;
 
@@ -1196,6 +1198,18 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     _textOpacity = CurvedAnimation(
       parent: _ctrl,
       curve: const Interval(0.20, 0.40, curve: Curves.easeOut),
+    );
+
+    // Human, clean slogan glide (32% -> 56%)
+    _sloganSlide = Tween<double>(begin: 12.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.32, 0.56, curve: Curves.easeOutCubic),
+      ),
+    );
+    _sloganOpacity = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.32, 0.52, curve: Curves.easeOut),
     );
 
     // Cinematic zoom exit (80% -> 100%)
@@ -1342,7 +1356,7 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                               ),
                             ),
                             const SizedBox(height: 22),
-                            // Staggered Title (Clean & Minimalist, no slogan)
+                            // Staggered Title
                             Opacity(
                               opacity: _textOpacity.value,
                               child: Transform.translate(
@@ -1355,6 +1369,25 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: -1.0,
                                     height: 1.05,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Clean, Authentic Human Slogan (No bulky AI badges, pure elegant typography)
+                            Opacity(
+                              opacity: _sloganOpacity.value,
+                              child: Transform.translate(
+                                offset: Offset(0, _sloganSlide.value),
+                                child: Text(
+                                  widget.arabic
+                                      ? 'احجز مكانك.. في ثواني'
+                                      : 'Your spot, booked in seconds',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.82),
+                                    fontSize: widget.arabic ? 14 : 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: widget.arabic ? 0.2 : 0.6,
                                   ),
                                 ),
                               ),
