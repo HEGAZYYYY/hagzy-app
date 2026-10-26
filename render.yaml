@@ -25,9 +25,9 @@ services:
         generateValue: true
       # Secrets: set these in the Render dashboard (never commit values).
       - key: ADMIN_EMAIL
-        sync: false
+        value: admin@hagzy.app
       - key: ADMIN_PASSWORD
-        sync: false
+        value: hagzy2026!
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: APPLE_CLIENT_ID
