@@ -5,14 +5,39 @@ const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_production_secret_2026';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hagzy.app';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hagzy2026!';
+const IS_PROD = process.env.NODE_ENV === 'production';
+const IS_TEST = process.env.NODE_ENV === 'test';
+
+// Secrets must come from the environment. Fail fast in production instead of
+// silently falling back to a value that is public in the git history.
+function requireSecret(name, devFallback) {
+  const value = process.env[name];
+  if (value) return value;
+  if (IS_PROD) {
+    console.error(`FATAL: environment variable ${name} is required in production.`);
+    process.exit(1);
+  }
+  console.warn(`WARNING: ${name} is not set; using an insecure development value.`);
+  return devFallback;
+}
+const JWT_SECRET = requireSecret('JWT_SECRET', crypto.randomBytes(32).toString('hex'));
+const ADMIN_EMAIL = requireSecret('ADMIN_EMAIL', 'admin@hagzy.local');
+const ADMIN_PASSWORD = requireSecret('ADMIN_PASSWORD', 'dev-only-change-me');
+// App Store / Play review login. Disabled unless explicitly configured.
+const REVIEWER_TARGET = process.env.REVIEWER_TARGET || '';
+const REVIEWER_CODE = process.env.REVIEWER_CODE || '';
+
+function safeEqual(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 
 // Live PostgreSQL Cloud Database connection (if DATABASE_URL is set in Render / cloud)
 let pgPool = null;
@@ -29,7 +54,7 @@ if (process.env.DATABASE_URL) {
 }
 
 // Database file storage
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.HAGZY_DATA_DIR || path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_FILE = path.join(DATA_DIR, 'hagzy_db.json');
@@ -75,96 +100,56 @@ function saveDb(data) {
   }
 }
 
-async function persistToPostgres(data) {
-  if (!pgPool) return;
-  // Upsert users
-  for (const u of (data.users || [])) {
-    await pgPool.query(`
-      INSERT INTO users (id, email, phone, name, avatar, auth_provider, is_admin, wallet_balance, google_id, apple_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        phone = EXCLUDED.phone,
-        name = EXCLUDED.name,
-        avatar = EXCLUDED.avatar,
-        wallet_balance = EXCLUDED.wallet_balance
-    `, [
-      u.id, u.email || '', u.phone || '', u.name || '', u.avatar || '',
-      u.authProvider || 'phone', !!u.isAdmin, u.walletBalance || 0,
-      u.googleId || null, u.appleId || null
-    ]).catch(() => {});
-  }
+// Postgres holds a single JSONB snapshot of the whole state. It is loaded at
+// startup (hydratePostgres) and rewritten after every change, so data survives
+// restarts on hosts with an ephemeral disk (e.g. Render free tier).
+let pgWriteChain = Promise.resolve();
+function persistToPostgres(data) {
+  if (!pgPool) return Promise.resolve();
+  const snapshot = JSON.stringify(data);
+  // Serialise writes so an older snapshot can never overwrite a newer one.
+  pgWriteChain = pgWriteChain
+    .then(() => pgPool.query(
+      `INSERT INTO hagzy_state (id, data, updated_at) VALUES (1, $1::jsonb, now())
+       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+      [snapshot]))
+    .catch(e => console.error('Postgres sync error:', e.message));
+  return pgWriteChain;
 }
 
-async function initPostgresSchema() {
+async function hydratePostgres() {
   if (!pgPool) return;
-  try {
-    await pgPool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        email TEXT,
-        phone TEXT,
-        name TEXT,
-        avatar TEXT,
-        auth_provider TEXT,
-        is_admin BOOLEAN DEFAULT FALSE,
-        wallet_balance NUMERIC DEFAULT 50.0,
-        google_id TEXT,
-        apple_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS venues (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        category TEXT,
-        area TEXT,
-        data JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS bookings (
-        id TEXT PRIMARY KEY,
-        venue_id TEXT,
-        customer_name TEXT,
-        customer_email TEXT,
-        customer_phone TEXT,
-        date TEXT,
-        time_slot TEXT,
-        total NUMERIC,
-        status TEXT,
-        data JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS otps (
-        target TEXT PRIMARY KEY,
-        code TEXT,
-        expires_at BIGINT,
-        name TEXT
-      );
-    `);
-    console.log('🐘 PostgreSQL tables and schemas verified.');
-  } catch (err) {
-    console.warn('PostgreSQL schema notice:', err.message);
+  await pgPool.query(`CREATE TABLE IF NOT EXISTS hagzy_state (
+    id INT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())`);
+  const { rows } = await pgPool.query('SELECT data FROM hagzy_state WHERE id = 1');
+  if (rows.length) {
+    db = rows[0].data;
+    db.users = db.users || []; db.venues = db.venues || [];
+    db.bookings = db.bookings || []; db.otps = db.otps || {};
+    console.log('🐘 State restored from PostgreSQL.');
+  } else {
+    await persistToPostgres(db);
+    console.log('🐘 PostgreSQL initialised with the current state.');
   }
-}
-
-if (pgPool) {
-  initPostgresSchema();
 }
 
 let db = loadDb();
 
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-test-suite');
-  if (req.headers['access-control-request-private-network']) {
-    res.setHeader('Access-Control-Allow-Private-Network', 'true');
-  }
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
-app.use(cors());
-app.use(express.json());
+app.set('trust proxy', 1); // behind Render's proxy: needed for correct client IPs
+app.disable('x-powered-by');
+app.use(cors({
+  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()) : true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+app.use(express.json({ limit: '200kb' }));
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
+const otpLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: true, legacyHeaders: false });
+app.use('/api/', apiLimiter);
+app.use(['/api/auth/login', '/api/auth/customer/login', '/api/auth/customer/register', '/api/auth/customer-otp/verify'], authLimiter);
+app.use('/api/auth/customer-otp/request', otpLimiter);
 
 // 1. Dedicated Venue Owner & Partner Web Portal (/partner and /admin)
 const adminWebDir = path.join(__dirname, '..', 'build', 'web-admin');
@@ -372,47 +357,93 @@ function authenticateAdmin(req, res, next) {
 // 1. AUTH & CUSTOMER VERIFICATION (SMS OTP)
 // ==========================================
 
+
+// Parses a bearer token if present (never rejects). Sets req.user / req.admin.
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+      if (decoded.isAdmin) req.admin = decoded; else req.user = decoded;
+    } catch (_) { /* treated as anonymous */ }
+  }
+  next();
+}
+
+function sanitizeUser(u) {
+  return { id: u.id, name: u.name, phone: u.phone || '', email: u.email || '', walletBalance: u.walletBalance || 0 };
+}
+
+function normalizeTarget(value) {
+  const t = String(value || '').trim();
+  return t.includes('@') ? t.toLowerCase() : t;
+}
+
+function escapeForInlineScript(json) {
+  return json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+}
+
+// Verifies an Apple identity token (RS256) against Apple's published keys.
+let appleKeysCache = { keys: null, fetchedAt: 0 };
+async function verifyAppleIdentityToken(identityToken) {
+  const audience = process.env.APPLE_CLIENT_ID;
+  if (!audience) throw new Error('APPLE_CLIENT_ID is not configured');
+  const [h, p, sig] = String(identityToken).split('.');
+  if (!h || !p || !sig) throw new Error('Malformed identity token');
+  const header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
+  if (header.alg !== 'RS256') throw new Error('Unexpected algorithm');
+  if (!appleKeysCache.keys || Date.now() - appleKeysCache.fetchedAt > 3600e3) {
+    const r = await fetch('https://appleid.apple.com/auth/keys');
+    if (!r.ok) throw new Error('Could not fetch Apple keys');
+    appleKeysCache = { keys: (await r.json()).keys, fetchedAt: Date.now() };
+  }
+  const jwk = appleKeysCache.keys.find(k => k.kid === header.kid);
+  if (!jwk) throw new Error('Unknown signing key');
+  const ok = crypto.verify('RSA-SHA256', Buffer.from(`${h}.${p}`),
+    crypto.createPublicKey({ key: jwk, format: 'jwk' }), Buffer.from(sig, 'base64url'));
+  if (!ok) throw new Error('Bad signature');
+  const claims = JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
+  if (claims.iss !== 'https://appleid.apple.com') throw new Error('Bad issuer');
+  if (claims.aud !== audience) throw new Error('Bad audience');
+  if (!claims.exp || claims.exp * 1000 < Date.now()) throw new Error('Token expired');
+  return claims;
+}
+
 // Request 6-digit OTP via SMS or Email
 app.post('/api/auth/customer-otp/request', async (req, res) => {
-  const { phone, email, name } = req.body;
-  const target = (phone || email || '').trim();
+  const { phone, email, name } = req.body || {};
+  const target = normalizeTarget(phone || email);
 
-  if (!target) {
+  if (!target || target.length > 120) {
     return res.status(400).json({ error: 'Phone number or email is required' });
   }
 
-  // Fixed test reviewer credentials bypass for Apple & Google App Store Review
-  const isReviewer = target === '01000000000' || target === 'reviewer@hagzy.app';
-  let otp;
-  if (isReviewer) {
-    otp = '123456';
-  } else {
-    // Generate secure 6-digit OTP
-    otp = Math.floor(100000 + Math.random() * 900000).toString();
-  }
+  // Optional fixed credentials for App Store / Play review. Off unless configured.
+  const isReviewer = !!REVIEWER_TARGET && !!REVIEWER_CODE && target === REVIEWER_TARGET;
+  const otp = isReviewer ? REVIEWER_CODE : crypto.randomInt(100000, 1000000).toString();
 
-  // Store OTP with 5 minute expiration
   db.otps[target] = {
     code: otp,
     expiresAt: Date.now() + 5 * 60 * 1000,
-    name: name || ''
+    attempts: 0,
+    name: String(name || '').slice(0, 80)
   };
   saveDb(db);
 
-  // Send message via real Email or SMS/WhatsApp
-  if (target.includes('@')) {
-    await sendRealEmail({ email: target, code: otp });
-  } else {
-    const smsBody = `رمز التحقق الخاص بك في منصة حجزي (Hagzy) هو: ${otp}. لا تشارك هذا الرمز مع أحد.`;
-    await sendSmsOrWhatsApp({ phone: target, message: smsBody, otp });
+  if (!isReviewer) {
+    if (target.includes('@')) {
+      await sendRealEmail({ email: target, code: otp });
+    } else {
+      const smsBody = `رمز التحقق الخاص بك في منصة حجزي (Hagzy) هو: ${otp}. لا تشارك هذا الرمز مع أحد.`;
+      await sendSmsOrWhatsApp({ phone: target, message: smsBody, otp });
+    }
   }
 
-  const isTestOrReview = req.headers['x-test-suite'] === 'true' || isReviewer || process.env.NODE_ENV === 'test';
-
+  // The code is only ever echoed back in the automated test environment.
   return res.json({
     success: true,
     message: `Verification code sent to ${target}`,
-    ...(isTestOrReview ? { testOtp: otp } : {})
+    ...(IS_TEST ? { testOtp: otp } : {})
   });
 });
 
@@ -523,11 +554,11 @@ app.get('/api/auth/google/callback', async (req, res) => {
         <script>
           const payload = {
             type: 'HAGZY_AUTH_SUCCESS',
-            token: ${JSON.stringify(jwtToken)},
-            customer: ${JSON.stringify(user)}
+            token: ${escapeForInlineScript(JSON.stringify(jwtToken))},
+            customer: ${escapeForInlineScript(JSON.stringify(sanitizeUser(user)))}
           };
           if (window.opener) {
-            window.opener.postMessage(payload, '*');
+            window.opener.postMessage(payload, window.location.origin);
             window.close();
           } else {
             window.location.href = '/?auth_token=' + encodeURIComponent(payload.token) + '&auth_name=' + encodeURIComponent(payload.customer.name) + '&auth_email=' + encodeURIComponent(payload.customer.email);
@@ -582,33 +613,36 @@ app.get('/api/auth/apple/start', (req, res) => {
 app.post('/api/auth/social/google', async (req, res) => {
   try {
     const { email, name, avatar, googleId, idToken } = req.body;
-    if (!email && !googleId) {
-      return res.status(400).json({ error: 'Valid Google account credentials required' });
+
+    // The id token is mandatory and verified with Google. Client-supplied
+    // email/googleId fields are never trusted on their own.
+    if (!idToken) {
+      return res.status(400).json({ error: 'Google idToken is required' });
     }
-
-    let verifiedEmail = (email || '').trim().toLowerCase();
-    let verifiedName = (name || '').trim();
-    let verifiedAvatar = (avatar || '').trim();
-    let verifiedId = (googleId || '').trim();
-
-    // If Google idToken is provided, verify with Google OAuth tokeninfo endpoint
-    if (idToken) {
-      try {
-        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
-        if (verifyRes.ok) {
-          const payload = await verifyRes.json();
-          if (payload.email) verifiedEmail = payload.email.toLowerCase();
-          if (payload.name) verifiedName = payload.name;
-          if (payload.picture) verifiedAvatar = payload.picture;
-          if (payload.sub) verifiedId = payload.sub;
-        }
-      } catch (err) {
-        console.warn('Google id_token validation warning:', err.message);
+    const expectedAud = process.env.GOOGLE_CLIENT_ID;
+    if (!expectedAud) {
+      return res.status(503).json({ error: 'Google sign-in is not configured on the server' });
+    }
+    let verifiedEmail = '';
+    let verifiedName = '';
+    let verifiedAvatar = '';
+    let verifiedId = '';
+    try {
+      const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+      if (!verifyRes.ok) return res.status(401).json({ error: 'Invalid Google token' });
+      const payload = await verifyRes.json();
+      const audOk = payload.aud === expectedAud;
+      const emailOk = payload.email_verified === true || payload.email_verified === 'true';
+      if (!audOk || !emailOk || !payload.email || !payload.sub) {
+        return res.status(401).json({ error: 'Invalid Google token' });
       }
-    }
-
-    if (!verifiedEmail) {
-      return res.status(400).json({ error: 'Google account must have an associated email address.' });
+      verifiedEmail = payload.email.toLowerCase();
+      verifiedName = (payload.name || '').trim();
+      verifiedAvatar = (payload.picture || '').trim();
+      verifiedId = payload.sub;
+    } catch (err) {
+      console.warn('Google id_token validation failed:', err.message);
+      return res.status(502).json({ error: 'Could not verify Google token' });
     }
 
     // Find or create customer
@@ -662,30 +696,22 @@ app.post('/api/auth/social/google', async (req, res) => {
 app.post('/api/auth/social/apple', async (req, res) => {
   try {
     const { email, name, appleUserId, identityToken } = req.body;
-    if (!appleUserId && !email) {
-      return res.status(400).json({ error: 'Valid Apple ID credentials required' });
-    }
 
-    let verifiedEmail = (email || '').trim().toLowerCase();
-    let verifiedName = (name || '').trim();
-    let verifiedId = (appleUserId || '').trim();
-
-    if (identityToken && !verifiedEmail) {
-      try {
-        const parts = identityToken.split('.');
-        if (parts.length >= 2) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-          if (payload.email) verifiedEmail = payload.email.toLowerCase();
-          if (payload.sub && !verifiedId) verifiedId = payload.sub;
-        }
-      } catch (err) {
-        console.warn('Apple identityToken decode warning:', err.message);
-      }
+    if (!identityToken) {
+      return res.status(400).json({ error: 'Apple identityToken is required' });
     }
-
-    if (!verifiedEmail && verifiedId) {
-      verifiedEmail = `${verifiedId.slice(0, 10)}@privaterelay.appleid.com`;
+    let verifiedEmail = '';
+    let verifiedId = '';
+    const verifiedName = (name || '').trim();
+    try {
+      const claims = await verifyAppleIdentityToken(identityToken);
+      verifiedId = claims.sub;
+      verifiedEmail = (claims.email || '').toLowerCase();
+    } catch (err) {
+      console.warn('Apple identityToken validation failed:', err.message);
+      return res.status(401).json({ error: 'Invalid Apple token' });
     }
+    if (!verifiedEmail) verifiedEmail = `${verifiedId.slice(0, 10)}@privaterelay.appleid.com`;
 
     // Find or create customer
     let user = db.users.find(u => (u.appleUserId && u.appleUserId === verifiedId) || (u.email && u.email.toLowerCase() === verifiedEmail));
@@ -733,65 +759,62 @@ app.post('/api/auth/social/apple', async (req, res) => {
 
 // Verify OTP & Log In / Register User in Database
 app.post('/api/auth/customer-otp/verify', (req, res) => {
-  const { phone, email, code, name } = req.body;
-  const target = (phone || email || '').trim();
-  const inputCode = (code || '').trim();
+  const { phone, email, code, name } = req.body || {};
+  const target = normalizeTarget(phone || email);
+  const inputCode = String(code || '').trim();
 
-  const isTestSuite = req.headers['x-test-suite'] === 'true' || process.env.NODE_ENV === 'test';
-  const isReviewer = (target === '01000000000' || target === 'reviewer@hagzy.app') && inputCode === '123456';
   const record = db.otps[target];
-
-  if (!isReviewer && !isTestSuite) {
-    if (!record) {
-      return res.status(400).json({ error: 'No verification code was requested for this phone/email. Please request a code.' });
-    }
-    if (Date.now() > record.expiresAt) {
-      delete db.otps[target];
-      saveDb(db);
-      return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
-    }
-    if (record.code !== inputCode) {
-      return res.status(400).json({ error: 'Invalid verification code. Please enter the code sent to your email/phone.' });
-    }
+  if (!record) {
+    return res.status(400).json({ error: 'No verification code was requested for this phone/email. Please request a code.' });
+  }
+  if (Date.now() > record.expiresAt) {
+    delete db.otps[target];
+    saveDb(db);
+    return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+  }
+  record.attempts = (record.attempts || 0) + 1;
+  if (record.attempts > 5) {
+    delete db.otps[target];
+    saveDb(db);
+    return res.status(429).json({ error: 'Too many attempts. Please request a new code.' });
+  }
+  const a = Buffer.from(String(record.code));
+  const b = Buffer.from(inputCode);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    saveDb(db);
+    return res.status(400).json({ error: 'Invalid verification code. Please enter the code sent to your email/phone.' });
   }
 
-  // Clear OTP once used
   delete db.otps[target];
 
-  // Find or create user in DB
-  let user = db.users.find(u => (phone && u.phone === phone) || (email && u.email === email));
+  // Look the account up ONLY by the identifier that was actually verified.
+  // (Matching on a second, unverified identifier allowed account takeover.)
+  const isEmail = target.includes('@');
+  let user = db.users.find(u => isEmail
+    ? (u.email && u.email.toLowerCase() === target)
+    : (u.phone && u.phone === target));
   if (!user) {
     user = {
       id: 'usr_' + crypto.randomUUID().slice(0, 8),
-      phone: phone || '',
-      email: email || '',
-      name: name || (record && record.name) || 'Hagzy Member',
-      walletBalance: 50.0, // 50 EGP welcome gift balance!
+      phone: isEmail ? '' : target,
+      email: isEmail ? target : '',
+      name: String(name || record.name || 'Hagzy Member').slice(0, 80),
+      walletBalance: 50.0, // 50 EGP welcome gift balance
       createdAt: new Date().toISOString()
     };
     db.users.push(user);
   } else if (name && (!user.name || user.name === 'Hagzy Member')) {
-    user.name = name;
+    user.name = String(name).slice(0, 80);
   }
   saveDb(db);
 
   const token = jwt.sign(
     { id: user.id, phone: user.phone, email: user.email, name: user.name },
     JWT_SECRET,
-    { expiresIn: '90d' }
+    { expiresIn: '30d' }
   );
 
-  return res.json({
-    success: true,
-    token,
-    customer: {
-      id: user.id,
-      name: user.name,
-      phone: user.phone,
-      email: user.email,
-      walletBalance: user.walletBalance || 0
-    }
-  });
+  return res.json({ success: true, token, customer: sanitizeUser(user) });
 });
 
 // Customer Password Registration
@@ -895,46 +918,37 @@ app.post('/api/auth/customer/login', (req, res) => {
 });
 
 // Fetch Customer Profile
-app.get('/api/customer/profile', (req, res) => {
-  const { phone, email } = req.query;
-  const user = db.users.find(u => (phone && u.phone === phone) || (email && u.email === email));
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-  return res.json({
-    success: true,
-    customer: {
-      id: user.id,
-      name: user.name,
-      phone: user.phone,
-      email: user.email,
-      walletBalance: user.walletBalance || 0
-    }
-  });
+app.get('/api/customer/profile', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  return res.json({ success: true, customer: sanitizeUser(user) });
 });
 
 // Wallet Operations
-app.post('/api/customer/wallet/deduct', (req, res) => {
-  const { amount, phone, email } = req.body;
-  const user = db.users.find(u => (phone && u.phone === phone) || (email && u.email === email));
+app.post('/api/customer/wallet/deduct', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
-
-  const numAmount = parseFloat(amount) || 0;
+  const numAmount = Number(req.body && req.body.amount);
+  if (!Number.isFinite(numAmount) || numAmount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
   if ((user.walletBalance || 0) < numAmount) {
     return res.status(400).json({ error: 'Insufficient wallet balance' });
   }
-
-  user.walletBalance = Math.max(0, (user.walletBalance || 0) - numAmount);
+  user.walletBalance = (user.walletBalance || 0) - numAmount;
   saveDb(db);
   return res.json({ success: true, walletBalance: user.walletBalance });
 });
 
-app.post('/api/customer/wallet/add', (req, res) => {
-  const { amount, phone, email } = req.body;
-  const user = db.users.find(u => (phone && u.phone === phone) || (email && u.email === email));
+app.post('/api/customer/wallet/add', authenticateAdmin, (req, res) => {
+  const { amount, userId, email } = req.body || {};
+  const user = db.users.find(u => (userId && u.id === userId) || (email && u.email === email));
   if (!user) return res.status(404).json({ error: 'User not found' });
-
-  user.walletBalance = (user.walletBalance || 0) + (parseFloat(amount) || 0);
+  const numAmount = Number(amount);
+  if (!Number.isFinite(numAmount) || numAmount <= 0 || numAmount > 100000) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+  user.walletBalance = (user.walletBalance || 0) + numAmount;
   saveDb(db);
   return res.json({ success: true, walletBalance: user.walletBalance });
 });
@@ -946,8 +960,9 @@ app.post('/api/customer/wallet/add', (req, res) => {
 // Admin Sign In
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
-  if ((email === ADMIN_EMAIL && password === ADMIN_PASSWORD) || (email === 'admin@hagzy.app' && password === 'admin123')) {
-    const token = jwt.sign({ email, isAdmin: true }, JWT_SECRET, { expiresIn: '30d' });
+  if (typeof email === 'string' && typeof password === 'string' &&
+      safeEqual(email, ADMIN_EMAIL) && safeEqual(password, ADMIN_PASSWORD)) {
+    const token = jwt.sign({ email, isAdmin: true }, JWT_SECRET, { expiresIn: '12h' });
     return res.json({
       success: true,
       token,
@@ -967,12 +982,12 @@ app.get('/api/venues', (req, res) => {
 });
 
 // Admin Venues List
-app.get('/api/admin/venues', (req, res) => {
+app.get('/api/admin/venues', authenticateAdmin, (req, res) => {
   return res.json({ success: true, venues: db.venues });
 });
 
 // Add / Update Venue
-app.put('/api/admin/venues/:id', (req, res) => {
+app.put('/api/admin/venues/:id', authenticateAdmin, (req, res) => {
   const venueId = req.params.id;
   const venueData = req.body;
   const index = db.venues.findIndex(v => v.id === venueId);
@@ -987,7 +1002,7 @@ app.put('/api/admin/venues/:id', (req, res) => {
 });
 
 // Delete Venue
-app.delete('/api/admin/venues/:id', (req, res) => {
+app.delete('/api/admin/venues/:id', authenticateAdmin, (req, res) => {
   const venueId = req.params.id;
   db.venues = db.venues.filter(v => v.id !== venueId);
   db.bookings = db.bookings.filter(b => b.venueId !== venueId);
@@ -1000,37 +1015,149 @@ app.delete('/api/admin/venues/:id', (req, res) => {
 // ==========================================
 
 // Admin Bookings List
-app.get('/api/admin/bookings', (req, res) => {
+app.get('/api/admin/bookings', authenticateAdmin, (req, res) => {
   return res.json({ success: true, bookings: db.bookings });
 });
 
 // Create Booking
-app.post('/api/bookings', async (req, res) => {
-  const booking = req.body;
-  if (!booking.id) {
-    booking.id = 'bk_' + crypto.randomUUID().slice(0, 8);
+const BOOKING_FIELDS = [
+  'id', 'venueId', 'itemId', 'customer', 'startsAt', 'durationMinutes', 'price',
+  'serviceNames', 'splitCount', 'multiController', 'phone', 'email', 'paymentMethod',
+  'promoCode', 'discountAmount', 'staffMember', 'dueNow', 'serviceIds'
+];
+
+function bookingBlocksSlot(b, now) {
+  if (b.cancelled || b.status === 'cancelled') return false;
+  if (b.status === 'confirmed') return true;
+  // pending holds only block while they have not expired
+  return !b.holdExpiresAt || new Date(b.holdExpiresAt).getTime() > now;
+}
+
+app.post('/api/bookings', optionalAuth, async (req, res) => {
+  const body = req.body || {};
+  const isAdmin = !!req.admin;
+  const now = Date.now();
+
+  const venue = db.venues.find(v => v.id === body.venueId);
+  if (!venue) return res.status(404).json({ error: 'Venue not found' });
+
+  const start = new Date(body.startsAt);
+  const duration = Number(body.durationMinutes);
+  const price = Number(body.price);
+  if (isNaN(start.getTime())) return res.status(400).json({ error: 'Invalid start time' });
+  if (!Number.isInteger(duration) || duration < 15 || duration > 720) {
+    return res.status(400).json({ error: 'Invalid duration' });
   }
+  if (!Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'Invalid price' });
+  if (!isAdmin && start.getTime() < now - 5 * 60 * 1000) {
+    return res.status(400).json({ error: 'Cannot book a time in the past' });
+  }
+  if (typeof body.itemId !== 'string' || !body.itemId) {
+    return res.status(400).json({ error: 'itemId is required' });
+  }
+
+  // Whitelist fields: never persist arbitrary client-supplied keys.
+  const booking = {};
+  for (const k of BOOKING_FIELDS) if (body[k] !== undefined) booking[k] = body[k];
+  booking.customer = String(booking.customer || '').slice(0, 80);
+  booking.durationMinutes = duration;
+  booking.price = price;
+  booking.startsAt = start.toISOString();
+
+  if (!booking.id || !/^[\w-]{1,64}$/.test(String(booking.id)) || db.bookings.some(b => b.id === booking.id)) {
+    booking.id = 'bk_' + crypto.randomUUID();
+  }
+
+  // Double-booking guard. No `await` between this check and the push, so it is atomic.
+  const end = start.getTime() + duration * 60000;
+  const conflict = db.bookings.find(b =>
+    b.venueId === booking.venueId && b.itemId === booking.itemId && bookingBlocksSlot(b, now) &&
+    new Date(b.startsAt).getTime() < end &&
+    new Date(b.startsAt).getTime() + Number(b.durationMinutes) * 60000 > start.getTime());
+  if (conflict) return res.status(409).json({ error: 'Overlap conflict. This slot is already booked.' });
+
   booking.createdAt = new Date().toISOString();
+  booking.cancelled = false;
+
+  if (isAdmin) {
+    // Venue staff may create walk-ins and blocks.
+    booking.status = body.walkIn ? 'confirmed' : (body.status || 'confirmed');
+    booking.paymentStatus = body.paymentStatus || (body.walkIn ? 'paid' : 'unpaid');
+    booking.holdExpiresAt = body.holdExpiresAt || null;
+    if (body.blockReason) booking.blockReason = String(body.blockReason).slice(0, 200);
+  } else {
+    booking.status = 'pending_payment';
+    booking.paymentStatus = 'unpaid';
+    booking.holdExpiresAt = new Date(now + 15 * 60 * 1000).toISOString();
+    if (req.user) booking.ownerId = req.user.id;
+
+    // Wallet payment is settled here, on the server, atomically with the booking.
+    if (body.paymentMethod === 'wallet') {
+      const user = req.user && db.users.find(u => u.id === req.user.id);
+      if (!user) return res.status(401).json({ error: 'Sign in to pay with your wallet' });
+      // The wallet pays the venue's deposit (same rule the app uses to quote it),
+      // computed here from server-side venue data rather than a client number.
+      const split = Math.max(1, Math.floor(Number(body.splitCount) || 1));
+      const requiredDeposit = price * (Number(venue.depositPercent) || 0) / 100;
+      const deposit = Math.round((split > 1 && price / split > requiredDeposit
+        ? price / split : requiredDeposit) * 100) / 100;
+      if (deposit <= 0) {
+        return res.status(400).json({ error: 'This venue has no deposit configured' });
+      }
+      if ((user.walletBalance || 0) < deposit) {
+        return res.status(402).json({ error: 'Insufficient wallet balance' });
+      }
+      user.walletBalance -= deposit;
+      booking.status = 'confirmed';
+      booking.paymentStatus = 'paid';
+      booking.paymentMethod = 'wallet';
+      booking.holdExpiresAt = null;
+      booking.dueNow = 0;
+    } else {
+      booking.paymentMethod = '';
+    }
+  }
   db.bookings.push(booking);
   saveDb(db);
 
-  // Send WhatsApp Confirmation Slip if phone is available
-  if (booking.customerPhone) {
-    const venue = db.venues.find(v => v.id === booking.venueId);
-    const venueName = venue ? venue.name : 'Hagzy Venue';
-    const pinMsg = venue && venue.googleMapsUrl ? `\n📍 رابط الموقع على الخريطة: ${venue.googleMapsUrl}` : '';
-    const slip = `🎉 تم استلام حجزك في ${venueName} بنجاح!\n` +
+  const phone = booking.phone || booking.customerPhone;
+  if (phone) {
+    const slipVenue = venue.name || 'Hagzy Venue';
+    const pinMsg = venue.googleMapsUrl ? `\n📍 رابط الموقع على الخريطة: ${venue.googleMapsUrl}` : '';
+    const slip = `🎉 تم استلام حجزك في ${slipVenue} بنجاح!\n` +
       `📅 الموعد: ${booking.startsAt}\n` +
       `🏷️ رقم الحجز: ${booking.id}\n` +
       `💵 الإجمالي: ${booking.price} ج.م` + pinMsg;
-    sendSmsOrWhatsApp({ phone: booking.customerPhone, message: slip, otp: '' });
+    sendSmsOrWhatsApp({ phone, message: slip, otp: '' }).catch(() => {});
   }
 
-  return res.json({ success: true, booking });
+  const walletUser = req.user && db.users.find(u => u.id === req.user.id);
+  return res.json({
+    success: true,
+    booking,
+    ...(booking.paymentMethod === 'wallet' && walletUser ? { walletBalance: walletUser.walletBalance } : {})
+  });
+});
+
+// Customer: own bookings (matched by account, or by the phone verified on the account)
+app.get('/api/bookings', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const mine = db.bookings.filter(b =>
+    b.ownerId === user.id || (user.phone && b.phone === user.phone && !b.ownerId));
+  return res.json({ success: true, bookings: mine });
+});
+
+// Public status poll: no contact details are returned.
+app.get('/api/bookings/:id', (req, res) => {
+  const b = db.bookings.find(x => x.id === req.params.id);
+  if (!b) return res.status(404).json({ error: 'Booking not found' });
+  const { phone, email, customerPhone, ownerId, paymentReference, ...safe } = b;
+  return res.json({ success: true, booking: safe });
 });
 
 // Confirm Booking (Deposit Verified)
-app.post('/api/admin/bookings/:id/confirm', (req, res) => {
+app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
@@ -1051,7 +1178,7 @@ app.post('/api/admin/bookings/:id/confirm', (req, res) => {
 });
 
 // Cancel Booking
-app.delete('/api/admin/bookings/:id', (req, res) => {
+app.delete('/api/admin/bookings/:id', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (booking) {
     booking.cancelled = true;
@@ -1065,25 +1192,34 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 app.post('/api/bookings/:id/payment-proof', (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
-
-  booking.paymentProof = {
-    method: req.body.method,
-    reference: req.body.reference,
-    submittedAt: new Date().toISOString()
-  };
-  booking.isPendingPayment = false;
+  if (booking.status !== 'pending_payment') {
+    return res.status(409).json({ error: 'This booking is not awaiting payment' });
+  }
+  const method = String((req.body && req.body.method) || '');
+  const reference = String((req.body && req.body.reference) || '').trim();
+  if (!['instapay', 'vodafone_cash', 'vodafoneCash', 'fawry', 'card'].includes(method) &&
+      !/^[\w \-]{2,32}$/.test(method)) {
+    return res.status(400).json({ error: 'Invalid payment method' });
+  }
+  if (reference.length < 4 || reference.length > 64) {
+    return res.status(400).json({ error: 'Invalid payment reference' });
+  }
+  booking.paymentMethod = method;
+  booking.paymentReference = reference;
+  booking.paymentProof = { method, reference, submittedAt: new Date().toISOString() };
   booking.proofSubmitted = true;
+  // The venue still has to verify the transfer (POST /api/admin/bookings/:id/confirm).
+  // Extend the hold so the customer isn't dropped while the venue checks.
+  booking.holdExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   saveDb(db);
-
   return res.json({ success: true, booking });
 });
 
 // Paymob Intention Mock / Webhook
 app.post('/api/bookings/:id/paymob-intention', (req, res) => {
-  return res.json({
-    success: true,
-    checkoutUrl: `https://accept.paymob.com/unifiedcheckout/?publicKey=${process.env.PAYMOB_PUBLIC_KEY || 'mock_pk'}&clientSecret=mock_secret`
-  });
+  // TODO: create a real Paymob intention with PAYMOB_SECRET_KEY and confirm bookings
+  // from a signed (HMAC-verified) webhook. Until then, don't hand customers a fake URL.
+  return res.status(501).json({ error: 'Online card payments are not enabled yet. Please use InstaPay or Vodafone Cash.' });
 });
 
 // Health check
@@ -1097,10 +1233,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 Hagzy Production Server is live on http://localhost:${PORT}`);
-  console.log(`📡 Venues Loaded: ${db.venues.length}`);
-  console.log(`👥 Users in DB: ${db.users.length}`);
-  console.log(`🔑 Admin Login: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}\n`);
-});
+hydratePostgres()
+  .catch(err => {
+    console.error('PostgreSQL hydrate failed:', err.message);
+    if (IS_PROD) process.exit(1); // never serve an empty state in production
+  })
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`\n🚀 Hagzy server is live on port ${PORT}`);
+      console.log(`📡 Venues loaded: ${db.venues.length} · 👥 Users: ${db.users.length}\n`);
+    });
+  });
 

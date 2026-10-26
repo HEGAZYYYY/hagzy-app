@@ -67,7 +67,12 @@ class HagzyApi {
   }) async {
     final result =
         await _send('POST', '/api/bookings', token: adminToken, body: booking);
-    return result['booking'] as Map<String, dynamic>;
+    return {
+      ...(result['booking'] as Map<String, dynamic>),
+      // Present only for wallet payments: the server-side balance after payment.
+      if (result['walletBalance'] != null)
+        'walletBalance': result['walletBalance'],
+    };
   }
 
   Future<void> cancelBooking(String token, String bookingId) async {

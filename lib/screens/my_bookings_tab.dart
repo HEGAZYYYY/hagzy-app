@@ -90,20 +90,17 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         ),
       ),
     );
-    if (confirmed == true) {
-      await HagzyWallet.addFunds(amount);
-      if (mounted) {
-        setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(localized(
-                arabic,
-                'Successfully added ${formatMoney(amount)} EGP to your wallet!',
-                'تم إضافة ${formatMoney(amount)} جنيه إلى محفظتك بنجاح!')),
-            backgroundColor: kGreen,
-          ),
-        );
-      }
+    if (confirmed == true && mounted) {
+      // Wallet balance lives on the server and can only be credited after a
+      // verified payment. Never credit it locally (that was free money).
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localized(
+              arabic,
+              'Wallet top-up will be available soon.',
+              'شحن المحفظة سيكون متاحاً قريباً.')),
+        ),
+      );
     }
   }
 

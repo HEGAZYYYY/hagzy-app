@@ -58,3 +58,13 @@ app.*.map.json
 **/node_modules/
 server/.env
 server/data/hagzy_db.json
+
+# Backend runtime data & secrets (contains user PII and password hashes)
+server/.env
+server/data/hagzy_db.json
+server/node_modules/
+.env
+# Android signing
+android/key.properties
+*.jks
+*.keystore
