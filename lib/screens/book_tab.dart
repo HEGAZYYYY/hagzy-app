@@ -110,13 +110,23 @@ class _BookTabState extends State<BookTab> {
   void _scrollToVenue(String venueId) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final bookingCtx = _bookingSectionKey.currentContext;
+      if (bookingCtx != null && bookingCtx.mounted) {
+        Scrollable.ensureVisible(
+          bookingCtx,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+          alignment: 0.05,
+        );
+        return;
+      }
       final ctx = _venueCardKeys[venueId]?.currentContext;
-      if (ctx != null) {
+      if (ctx != null && ctx.mounted) {
         Scrollable.ensureVisible(
           ctx,
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeOutCubic,
-          alignment: 0.05,
+          alignment: 0.02,
         );
         return;
       }
@@ -138,7 +148,7 @@ class _BookTabState extends State<BookTab> {
             ctxAfter,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-            alignment: 0.05,
+            alignment: 0.02,
           );
         }
       }
@@ -934,7 +944,7 @@ class _BookTabState extends State<BookTab> {
         : 60;
     return ListView(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
       children: [
         CustomerAreaBar(
           area: governorateName(_area, widget.arabic),
@@ -975,7 +985,7 @@ class _BookTabState extends State<BookTab> {
             _selectedStart = null;
           }),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         RepaintBoundary(
           child: CustomerHero(
             venueCount: widget.venues.length,
@@ -984,7 +994,7 @@ class _BookTabState extends State<BookTab> {
           ),
         ),
         if (bookAgainVenues.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           SectionHeading(
             title: localized(widget.arabic, 'Book Again', 'احجز مرة أخرى'),
             subtitle: localized(widget.arabic,
@@ -1006,9 +1016,9 @@ class _BookTabState extends State<BookTab> {
                   )
                 : null,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           SizedBox(
-            height: 98,
+            height: 80,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: bookAgainVenues.length,
@@ -1037,12 +1047,12 @@ class _BookTabState extends State<BookTab> {
                           onTap: () => _selectVenue(v, toggleIfSame: false),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
+                                horizontal: 12, vertical: 8),
                             child: Row(
                               children: [
                                 Container(
-                                  width: 44,
-                                  height: 44,
+                                  width: 38,
+                                  height: 38,
                                   decoration: BoxDecoration(
                                     gradient: HagzyTheme.brandGradient,
                                     borderRadius: BorderRadius.circular(13),
@@ -1257,12 +1267,8 @@ class _BookTabState extends State<BookTab> {
                 icon: _favoriteIds.isNotEmpty
                     ? Icons.favorite_rounded
                     : Icons.favorite_border_rounded,
-                label: _favoriteIds.isNotEmpty
-                    ? localized(
-                        widget.arabic,
-                        'Saved (${_favoriteIds.length})',
-                        'المفضلة (${_favoriteIds.length})')
-                    : localized(widget.arabic, 'Saved', 'المفضلة'),
+                label: localized(widget.arabic, 'Saved', 'المفضلة'),
+                badge: _favoriteIds.isNotEmpty ? '${_favoriteIds.length}' : null,
                 onTap: () => setState(() => _favoritesOnly = !_favoritesOnly),
               ),
               const SizedBox(width: 8),
@@ -1502,8 +1508,7 @@ class _BookTabState extends State<BookTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(activeSubDef.emoji,
-                            style: const TextStyle(fontSize: 11)),
+                        SystemEmoji(activeSubDef.emoji, size: 11),
                         const SizedBox(width: 4),
                         Text(
                           activeSubDef.title(widget.arabic),
@@ -1651,7 +1656,7 @@ class _BookTabState extends State<BookTab> {
       ),
       child: Row(
         children: [
-          Text(def.emoji, style: const TextStyle(fontSize: 16)),
+          SystemEmoji(def.emoji, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1890,7 +1895,7 @@ class _BookTabState extends State<BookTab> {
                                     tooltip: _favoriteIds.contains(venue.id)
                                         ? localized(widget.arabic,
                                             'Remove from Saved', 'إزالة من المفضلة')
-                                        : localized(widget.arabic, 'Save Place',
+                                        : localized(widget.arabic, 'Save Venue',
                                             'حفظ في المفضلة'),
                                     onPressed: () => _toggleFavorite(venue),
                                     icon: Icon(
@@ -3115,7 +3120,7 @@ class CustomerHero extends StatelessWidget {
       switchOutCurve: Curves.easeInCubic,
       child: Container(
         key: ValueKey(type),
-        height: 158,
+        height: 110,
         padding: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -3168,7 +3173,7 @@ class CustomerHero extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Align(
                 alignment:
                     arabic ? Alignment.centerRight : Alignment.centerLeft,
@@ -3179,7 +3184,7 @@ class CustomerHero extends StatelessWidget {
                   children: [
                     Container(
                       padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(999),
@@ -3189,21 +3194,21 @@ class CustomerHero extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          LivePulseDot(color: content.$5, size: 6),
-                          const SizedBox(width: 6),
+                          LivePulseDot(color: content.$5, size: 5),
+                          const SizedBox(width: 5),
                           Text(
                             content.$3,
                             style: TextStyle(
                               color: content.$5,
-                              fontSize: 10.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 1.1,
+                              letterSpacing: 1.0,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     SizedBox(
                       width: MediaQuery.sizeOf(context).width * .64,
                       child: Text(
@@ -3212,20 +3217,20 @@ class CustomerHero extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 21,
-                          height: 1.16,
+                          fontSize: 16,
+                          height: 1.15,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: -0.6,
+                          letterSpacing: -0.4,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.verified_rounded,
-                            size: 14, color: kGreenLight),
-                        const SizedBox(width: 5),
+                            size: 13, color: kGreenLight),
+                        const SizedBox(width: 4),
                         Text(
                           arabic
                               ? '$venueCount ${venueCount == 1 ? 'مكان قريب' : 'أماكن قريبة'} · حجز فوري'
@@ -3670,8 +3675,7 @@ class VenueBrowseCard extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(def.emoji,
-                                      style: const TextStyle(fontSize: 11)),
+                                  SystemEmoji(def.emoji, size: 11),
                                   const SizedBox(width: 4),
                                   Text(
                                     def.title(arabic),
@@ -4002,7 +4006,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                       tooltip: widget.favorite
                           ? localized(arabic, 'Remove from Saved Places',
                               'إزالة من الأماكن المفضلة')
-                          : localized(arabic, 'Save Place', 'حفظ في المفضلة'),
+                          : localized(arabic, 'Save Venue', 'حفظ في المفضلة'),
                       visualDensity: VisualDensity.compact,
                       onPressed: widget.onFavorite,
                       icon: Icon(
@@ -4576,10 +4580,7 @@ class _SubCategoryVisualPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              emoji,
-              style: const TextStyle(fontSize: 13),
-            ),
+            SystemEmoji(emoji, size: 13),
             const SizedBox(width: 6),
             Text(
               label,

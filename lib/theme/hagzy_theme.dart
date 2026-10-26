@@ -90,6 +90,14 @@ class HagzyTheme {
 
   static List<BoxShadow> get brandGlowShadow => emeraldGlowShadow;
 
+  static const List<String> emojiFontFallbacks = [
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Noto Color Emoji',
+    'Twemoji Mozilla',
+    'sans-serif',
+  ];
+
   static TextTheme buildTextTheme(BuildContext context, bool arabic) {
     final base = Theme.of(context).textTheme;
     if (_isTest) {
@@ -98,7 +106,11 @@ class HagzyTheme {
     return (arabic
             ? GoogleFonts.cairoTextTheme(base)
             : GoogleFonts.plusJakartaSansTextTheme(base))
-        .apply(bodyColor: kInk, displayColor: kInk);
+        .apply(
+          bodyColor: kInk,
+          displayColor: kInk,
+          fontFamilyFallback: emojiFontFallbacks,
+        );
   }
 
   static ThemeData lightTheme() {
@@ -128,6 +140,7 @@ class HagzyTheme {
           : GoogleFonts.plusJakartaSansTextTheme(baseScheme.toString().isEmpty ? const TextTheme() : const TextTheme()).apply(
               bodyColor: kInk,
               displayColor: kInk,
+              fontFamilyFallback: emojiFontFallbacks,
             ),
       appBarTheme: const AppBarTheme(
         backgroundColor: kPanel,
