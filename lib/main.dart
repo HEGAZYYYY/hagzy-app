@@ -1801,23 +1801,11 @@ class _HagzyHomeState extends State<HagzyHome> {
       ),
     );
     if (booking == null) return;
-    if (walletDeducted > 0) {
+    // With a backend, the wallet is charged by the server as part of
+    // POST /api/bookings (atomic, and it fails the booking if funds are short).
+    // The local balance is only touched when running without a backend.
+    if (walletDeducted > 0 && !_api.isConfigured) {
       await HagzyWallet.deductFunds(walletDeducted);
-      if (_api.isConfigured &&
-          (_savedCustomerPhone.isNotEmpty || _savedCustomerEmail.isNotEmpty)) {
-        try {
-          final res = await _api.deductWalletFunds(
-            amount: walletDeducted,
-            token: _customerToken,
-            phone: _savedCustomerPhone,
-            email: _savedCustomerEmail,
-          );
-          final newBal = (res['walletBalance'] as num?)?.toDouble();
-          if (newBal != null && mounted) {
-            setState(() => _walletBalance = newBal);
-          }
-        } catch (_) {}
-      }
     }
     if (!walkIn) {
       _savedCustomerName = booking.customer;
@@ -1840,9 +1828,15 @@ class _HagzyHomeState extends State<HagzyHome> {
               'serviceIds': selectedServices.toList(),
               'walkIn': walkIn,
             },
-            adminToken: _mode == 'admin' ? _adminToken : null,
+            adminToken: _mode == 'admin' ? _adminToken : _customerToken,
           );
           savedBooking = Booking.fromJson(remote);
+          final newBalance = (remote['walletBalance'] as num?)?.toDouble();
+          if (newBalance != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setDouble(HagzyWallet.keyWallet, newBalance);
+            if (mounted) setState(() => _walletBalance = newBalance);
+          }
           dueNow = (remote['dueNow'] as num?)?.toDouble() ?? booking.price;
         } catch (e) {
           if (!WidgetsBinding.instance.runtimeType
