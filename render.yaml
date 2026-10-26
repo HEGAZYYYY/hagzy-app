@@ -6,7 +6,7 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: node index.js
-    plan: starter
+    plan: free
     region: frankfurt
     autoDeploy: true
     envVars:
@@ -24,7 +24,7 @@ services:
   # 2. Hagzy Web Client (Flutter Web)
   - type: static
     name: hagzy-web
-    buildCommand: flutter pub get && flutter build web --release --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
+    buildCommand: if command -v flutter >/dev/null 2>&1; then flutter pub get && flutter build web --release --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com; else echo "Using prebuilt Flutter web bundle"; fi
     staticPublishPath: build/web
     autoDeploy: true
     routes:

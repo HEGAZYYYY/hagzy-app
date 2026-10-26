@@ -113,7 +113,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       builder: (context, snapshot) {
         final balance = snapshot.data ?? HagzyWallet.defaultWelcomeBalance;
         return Container(
-          margin: const EdgeInsets.only(bottom: 16),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
@@ -125,20 +125,20 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 Border.all(color: kGreen.withValues(alpha: 0.35), width: 1.2),
             boxShadow: HagzyTheme.softShadow,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: kGreen.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border:
                       Border.all(color: kGreen.withValues(alpha: 0.35)),
                 ),
                 child: const Icon(Icons.account_balance_wallet_rounded,
-                    color: kGreenLight, size: 24),
+                    color: kGreenLight, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -401,7 +401,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       );
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       children: [
         IntroCard(
           title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
@@ -409,7 +409,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               'تابع حجوزاتك القادمة.'),
           icon: Icons.calendar_month_outlined,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         _buildWalletCard(arabic),
         ...active.map((booking) {
           final venue = widget.venues
@@ -433,7 +433,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               .inMinutes
               .clamp(1, 120);
           return Container(
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               boxShadow: HagzyTheme.softShadow,
@@ -454,7 +454,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
                     decoration: BoxDecoration(
                       gradient: booking.isConfirmed
                           ? HagzyTheme.obsidianGradient
@@ -566,7 +566,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                   ),
                   const _TicketPerforatedDivider(),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -824,6 +824,21 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
+                            OutlinedButton.icon(
+                              onPressed: () =>
+                                  _showReceiptModal(booking, venue, space),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.receipt_long_rounded,
+                                  size: 16, color: kGreen),
+                              label: Text(
+                                localized(arabic, 'Receipt', 'الفاتورة'),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -986,6 +1001,255 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             'query': '${venue.name} ${venue.location} Egypt'.trim(),
           });
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _showReceiptModal(
+      Booking booking, Venue? venue, VenueItem? space) async {
+    final arabic = widget.arabic;
+    final depositPaid = booking.isConfirmed
+        ? (booking.dueNow ?? (booking.price * 0.25))
+        : 0.0;
+    final remainingBalance =
+        (booking.price - depositPaid).clamp(0.0, booking.price);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: kPanel,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: kGreen.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.receipt_long_rounded,
+                            color: kGreen, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localized(
+                                  arabic, 'OFFICIAL RECEIPT', 'إيصال رسمي معتمد'),
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: kGreen,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            Text(
+                              localized(
+                                  arabic, 'Payment Breakdown', 'تفاصيل الفاتورة'),
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                color: kInk,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: kPage,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              venue?.name ?? 'Venue',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: kInk,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: booking.isConfirmed
+                                    ? kGreen.withValues(alpha: 0.15)
+                                    : const Color(0xFFF59E0B)
+                                        .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                booking.isConfirmed
+                                    ? localized(arabic, 'CONFIRMED', 'مؤكد')
+                                    : localized(
+                                        arabic, 'HELD (PENDING)', 'معلق'),
+                                style: TextStyle(
+                                  color: booking.isConfirmed
+                                      ? kGreen
+                                      : const Color(0xFFB45309),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (venue?.location.isNotEmpty == true) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            venue!.location,
+                            style: const TextStyle(color: kMuted, fontSize: 12),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 10),
+                        _receiptRow(localized(arabic, 'Booking ID', 'رقم الحجز'),
+                            booking.id),
+                        _receiptRow(
+                            localized(arabic, 'Customer', 'العميل'),
+                            booking.customer),
+                        _receiptRow(
+                            localized(arabic, 'Space / Service', 'المكان / الخدمة'),
+                            space?.name ??
+                                (booking.serviceNames.isNotEmpty
+                                    ? booking.serviceNames.join(', ')
+                                    : 'Standard')),
+                        _receiptRow(
+                            localized(arabic, 'Date & Time', 'الموعد'),
+                            formatDateTime(booking.startsAt)),
+                        _receiptRow(
+                            localized(arabic, 'Duration', 'المدة'),
+                            '${booking.durationMinutes} ${localized(arabic, 'min', 'دقيقة')}'),
+                        if (booking.paymentMethod.isNotEmpty)
+                          _receiptRow(
+                              localized(arabic, 'Payment Method', 'طريقة الدفع'),
+                              booking.paymentMethod.toUpperCase()),
+                        if (booking.paymentReference.isNotEmpty)
+                          _receiptRow(
+                              localized(arabic, 'Reference #', 'رقم العملية'),
+                              booking.paymentReference),
+                        const SizedBox(height: 10),
+                        const Divider(height: 1),
+                        const SizedBox(height: 10),
+                        _receiptRow(
+                            localized(arabic, 'Total Price', 'إجمالي المبلغ'),
+                            '${formatMoney(booking.price)} EGP',
+                            isBold: true),
+                        if (booking.discountAmount > 0)
+                          _receiptRow(
+                              localized(arabic, 'Discount (${booking.promoCode})',
+                                  'الخصم (${booking.promoCode})'),
+                              '-${formatMoney(booking.discountAmount)} EGP',
+                              color: kGreen),
+                        _receiptRow(
+                            localized(arabic, 'Deposit Status', 'حالة العربون'),
+                            booking.isConfirmed
+                                ? '${formatMoney(depositPaid)} EGP (${localized(arabic, 'Paid', 'مدفوع')})'
+                                : localized(arabic, 'Awaiting Verification',
+                                    'قيد المراجعة'),
+                            color: booking.isConfirmed
+                                ? kGreen
+                                : const Color(0xFFB45309)),
+                        _receiptRow(
+                            localized(arabic, 'Due Upon Check-In',
+                                'المتبقي عند الحضور'),
+                            '${formatMoney(remainingBalance)} EGP',
+                            isBold: true,
+                            color: kInk),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded, size: 16),
+                          label: Text(localized(arabic, 'Close', 'إغلاق')),
+                        ),
+                      ),
+                      if (widget.onBookAgain != null && venue != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              widget.onBookAgain!(venue.id);
+                            },
+                            icon: const Icon(Icons.replay_rounded, size: 16),
+                            label: Text(localized(
+                                arabic, 'Book Again', 'احجز مرة أخرى')),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _receiptRow(String label, String value,
+      {bool isBold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isBold ? kInk : kMuted,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 12,
+                color: color ?? (isBold ? kInk : kInk),
+                fontWeight: isBold ? FontWeight.w900 : FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

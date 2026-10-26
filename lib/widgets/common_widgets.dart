@@ -60,11 +60,13 @@ class PressableScale extends StatefulWidget {
     super.key,
     required this.child,
     this.onTap,
+    this.onLongPress,
     this.scaleDown = 0.96,
   });
 
   final Widget child;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final double scaleDown;
 
   @override
@@ -83,17 +85,20 @@ class _PressableScaleState extends State<PressableScale> {
       child: widget.child,
     );
 
+    final hasAction = widget.onTap != null || widget.onLongPress != null;
+
     return Listener(
       onPointerDown:
-          widget.onTap != null ? (_) => setState(() => _pressed = true) : null,
+          hasAction ? (_) => setState(() => _pressed = true) : null,
       onPointerUp:
-          widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
+          hasAction ? (_) => setState(() => _pressed = false) : null,
       onPointerCancel:
-          widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
-      child: widget.onTap != null
+          hasAction ? (_) => setState(() => _pressed = false) : null,
+      child: hasAction
           ? GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: widget.onTap,
+              onLongPress: widget.onLongPress,
               child: content,
             )
           : content,
@@ -251,18 +256,39 @@ class SectionHeading extends StatelessWidget {
       );
 }
 
+/// Renders in-app emojis using native iOS (Apple Color Emoji) or system emoji font stacks.
+class SystemEmoji extends StatelessWidget {
+  const SystemEmoji(this.emoji, {super.key, this.size = 14});
+
+  final String emoji;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      emoji,
+      style: TextStyle(
+        fontSize: size,
+        fontFamilyFallback: HagzyTheme.emojiFontFallbacks,
+      ),
+    );
+  }
+}
+
 class CustomPill extends StatelessWidget {
   const CustomPill({
     super.key,
     required this.label,
     this.icon,
     required this.selected,
+    this.badge,
     this.onTap,
   });
 
   final String label;
   final IconData? icon;
   final bool selected;
+  final String? badge;
   final VoidCallback? onTap;
 
   @override
@@ -323,6 +349,27 @@ class CustomPill extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (badge != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? Colors.white.withValues(alpha: 0.25)
+                              : kGreen.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badge!,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: selected ? Colors.white : kGreen,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -377,6 +424,7 @@ class FloatingDock extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.customerMode,
+    this.previewMode = false,
     required this.arabic,
     required this.onDestinationSelected,
     this.badgeCount = 0,
@@ -384,6 +432,7 @@ class FloatingDock extends StatelessWidget {
 
   final int selectedIndex;
   final bool customerMode;
+  final bool previewMode;
   final bool arabic;
   final ValueChanged<int> onDestinationSelected;
   final int badgeCount;
@@ -396,12 +445,20 @@ class FloatingDock extends StatelessWidget {
             (Icons.calendar_month_rounded, 'My Bookings'),
             (Icons.person_rounded, 'Profile'),
           ]
-        : const [
-            (Icons.view_timeline_rounded, 'POS Timeline'),
-            (Icons.storefront_rounded, 'My Venues'),
-            (Icons.insights_rounded, 'Analytics'),
-            (Icons.account_balance_wallet_rounded, 'Payment Settings'),
-          ];
+        : previewMode
+            ? const [
+                (Icons.explore_rounded, 'Explore'),
+                (Icons.storefront_rounded, 'Manage Venues'),
+                (Icons.view_timeline_rounded, 'POS timeline'),
+                (Icons.insights_rounded, 'Analytics'),
+                (Icons.account_balance_wallet_rounded, 'Payment Settings'),
+              ]
+            : const [
+                (Icons.view_timeline_rounded, 'POS timeline'),
+                (Icons.storefront_rounded, 'Manage Venues'),
+                (Icons.insights_rounded, 'Analytics'),
+                (Icons.account_balance_wallet_rounded, 'Payment Settings'),
+              ];
     final localizedItems = items
         .map((item) => (
               item.$1,
@@ -409,10 +466,10 @@ class FloatingDock extends StatelessWidget {
                 'Explore' => localized(arabic, 'Explore', 'استكشف'),
                 'My Bookings' => localized(arabic, 'My Bookings', 'حجوزاتي'),
                 'Profile' => localized(arabic, 'Profile', 'حسابي'),
-                'POS Timeline' =>
-                  localized(arabic, 'POS Timeline', 'المواعيد ونقاط البيع'),
-                'My Venues' =>
-                  localized(arabic, 'My Venues', 'ملاعبي وأماكني'),
+                'POS timeline' =>
+                  localized(arabic, 'POS timeline', 'المواعيد ونقاط البيع'),
+                'Manage Venues' =>
+                  localized(arabic, 'Manage Venues', 'إدارة الأماكن والملاعب'),
                 'Analytics' =>
                   localized(arabic, 'Analytics', 'الأرباح والتقارير'),
                 'Payment Settings' =>
@@ -421,8 +478,7 @@ class FloatingDock extends StatelessWidget {
               },
             ))
         .toList();
-    return Container(
-      color: Colors.transparent,
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
       child: SafeArea(
         top: false,
