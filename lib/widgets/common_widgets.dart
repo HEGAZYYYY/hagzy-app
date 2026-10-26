@@ -397,11 +397,10 @@ class FloatingDock extends StatelessWidget {
             (Icons.person_rounded, 'Profile'),
           ]
         : const [
-            (Icons.explore_rounded, 'Explore'),
-            (Icons.calendar_month_rounded, 'My Bookings'),
-            (Icons.storefront_rounded, 'Manage Venues'),
+            (Icons.view_timeline_rounded, 'POS Timeline'),
+            (Icons.storefront_rounded, 'My Venues'),
+            (Icons.insights_rounded, 'Analytics'),
             (Icons.account_balance_wallet_rounded, 'Payment Settings'),
-            (Icons.person_rounded, 'Profile'),
           ];
     final localizedItems = items
         .map((item) => (
@@ -410,8 +409,12 @@ class FloatingDock extends StatelessWidget {
                 'Explore' => localized(arabic, 'Explore', 'استكشف'),
                 'My Bookings' => localized(arabic, 'My Bookings', 'حجوزاتي'),
                 'Profile' => localized(arabic, 'Profile', 'حسابي'),
-                'Manage Venues' =>
-                  localized(arabic, 'Manage Venues', 'إدارة الأماكن'),
+                'POS Timeline' =>
+                  localized(arabic, 'POS Timeline', 'المواعيد ونقاط البيع'),
+                'My Venues' =>
+                  localized(arabic, 'My Venues', 'ملاعبي وأماكني'),
+                'Analytics' =>
+                  localized(arabic, 'Analytics', 'الأرباح والتقارير'),
                 'Payment Settings' =>
                   localized(arabic, 'Payment Settings', 'إعدادات الدفع'),
                 _ => item.$2,
