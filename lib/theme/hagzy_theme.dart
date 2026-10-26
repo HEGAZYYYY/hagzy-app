@@ -137,7 +137,7 @@ class HagzyTheme {
       ),
       textTheme: _isTest
           ? null
-          : GoogleFonts.plusJakartaSansTextTheme(baseScheme.toString().isEmpty ? const TextTheme() : const TextTheme()).apply(
+          : GoogleFonts.plusJakartaSansTextTheme(const TextTheme()).apply(
               bodyColor: kInk,
               displayColor: kInk,
               fontFamilyFallback: emojiFontFallbacks,
@@ -179,8 +179,10 @@ class HagzyTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor: kGreen,
+          // kGreenDark (not kGreen): white text needs >= 4.5:1 contrast (WCAG AA).
+          backgroundColor: kGreenDark,
           foregroundColor: Colors.white,
+          minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
@@ -195,8 +197,10 @@ class HagzyTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           elevation: 0,
-          backgroundColor: kGreen,
+          // kGreenDark (not kGreen): white text needs >= 4.5:1 contrast (WCAG AA).
+          backgroundColor: kGreenDark,
           foregroundColor: Colors.white,
+          minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
@@ -208,10 +212,18 @@ class HagzyTheme {
           ),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentTextStyle: const TextStyle(
+            color: Colors.white, fontWeight: FontWeight.w600, height: 1.35),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: kGreenDark),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: kInk,
           side: const BorderSide(color: kBorder),
+          minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),

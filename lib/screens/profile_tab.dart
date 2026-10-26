@@ -1202,6 +1202,14 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               prefixIcon:
                                   const Icon(Icons.lock_outline_rounded),
                               suffixIcon: IconButton(
+                                tooltip: localized(
+                                    arabic,
+                                    _obscurePassword
+                                        ? 'Show password'
+                                        : 'Hide password',
+                                    _obscurePassword
+                                        ? 'إظهار كلمة المرور'
+                                        : 'إخفاء كلمة المرور'),
                                 icon: Icon(
                                   _obscurePassword
                                       ? Icons.visibility_off_outlined
@@ -1977,6 +1985,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     ),
                   ),
                   IconButton(
+                    tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
                     icon: const Icon(Icons.close_rounded, color: kMuted),
                     onPressed: () => Navigator.pop(ctx),
                   ),

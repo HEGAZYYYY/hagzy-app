@@ -17,8 +17,11 @@ class MyBookingsTab extends StatefulWidget {
     required this.apiConfigured,
     this.onCancelBooking,
     this.onBookAgain,
+    this.onRefresh,
   });
 
+  /// Pull-to-refresh handler (re-syncs bookings from the server).
+  final Future<void> Function()? onRefresh;
   final List<Venue> venues;
   final List<Booking> bookings;
   final bool arabic;
@@ -336,6 +339,21 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final list = _buildBookings(context);
+    final refresh = widget.onRefresh;
+    if (refresh == null) return list;
+    return RefreshIndicator(
+      onRefresh: refresh,
+      // Let short (or empty) lists still be pulled down on Android.
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context)
+            .copyWith(physics: const AlwaysScrollableScrollPhysics()),
+        child: list,
+      ),
+    );
+  }
+
+  Widget _buildBookings(BuildContext context) {
     final arabic = widget.arabic;
     final active = widget.bookings
         .where((booking) =>
@@ -896,6 +914,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       ),
                     ),
                     IconButton(
+                      tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
                       onPressed: () => Navigator.pop(ctx),
                       icon: const Icon(Icons.close_rounded, size: 18),
                     ),
@@ -1064,6 +1083,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                         ),
                       ),
                       IconButton(
+                        tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
                         onPressed: () => Navigator.pop(ctx),
                         icon: const Icon(Icons.close_rounded, size: 18),
                       ),

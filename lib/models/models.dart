@@ -90,6 +90,49 @@ String findNearestGovernorate(double userLat, double userLng) {
   return nearest;
 }
 
+/// Turns an exception into a message a customer can act on, instead of
+/// showing raw text like "Exception: SocketException: Failed host lookup".
+String friendlyError(Object error, {required bool arabic}) {
+  final raw = error.toString();
+  final lower = raw.toLowerCase();
+  if (lower.contains('socketexception') ||
+      lower.contains('clientexception') ||
+      lower.contains('failed host lookup') ||
+      lower.contains('xmlhttprequest') ||
+      lower.contains('connection refused') ||
+      lower.contains('network is unreachable')) {
+    return localized(
+        arabic,
+        'No internet connection. Check your network and try again.',
+        'لا يوجد اتصال بالإنترنت. تحقق من الشبكة وحاول مرة أخرى.');
+  }
+  if (lower.contains('timeoutexception')) {
+    return localized(arabic, 'The request timed out. Please try again.',
+        'انتهت مهلة الطلب. حاول مرة أخرى.');
+  }
+  if (lower.contains('http 429')) {
+    return localized(arabic, 'Too many attempts. Please wait a few minutes.',
+        'محاولات كثيرة. انتظر بضع دقائق ثم حاول مرة أخرى.');
+  }
+  if (lower.contains('overlap conflict')) {
+    return localized(
+        arabic,
+        'Sorry, that slot was just taken. Please pick another time.',
+        'عذراً، تم حجز هذا الموعد للتو. اختر موعداً آخر.');
+  }
+  if (lower.contains('insufficient wallet')) {
+    return localized(arabic, 'Your wallet balance is not enough for this deposit.',
+        'رصيد محفظتك لا يكفي لدفع العربون.');
+  }
+  if (lower.contains('sign in to pay with your wallet')) {
+    return localized(arabic, 'Please sign in to pay with your wallet.',
+        'سجّل الدخول للدفع من محفظتك.');
+  }
+  return raw.replaceFirst(
+      RegExp(r'^(Exception|Bad state|FormatException|Invalid argument\(s\)):\s*'),
+      '');
+}
+
 String localized(bool arabic, String english, String arabicText) =>
     arabic ? arabicText : english;
 

@@ -895,7 +895,7 @@ class _BookTabState extends State<BookTab> {
   void _showPreferenceError(Object error) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not save this preference: $error')),
+      SnackBar(content: Text('Could not save this preference: ${friendlyError(error, arabic: widget.arabic)}')),
     );
   }
 
@@ -965,6 +965,7 @@ class _BookTabState extends State<BookTab> {
             suffixIcon: _query.isEmpty
                 ? null
                 : IconButton(
+                    tooltip: localized(widget.arabic, 'Clear search', 'مسح البحث'),
                     onPressed: () => setState(() {
                       _query = '';
                       _searchController.clear();
@@ -3870,6 +3871,8 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                   children: List.generate(5, (idx) {
                     final star = idx + 1;
                     return IconButton(
+                      tooltip: localized(
+                          arabic, '$star out of 5', '$star من 5'),
                       onPressed: () =>
                           setDialogState(() => rating = star.toDouble()),
                       icon: Icon(

@@ -23,6 +23,11 @@ void main() {
   runApp(const HagzyApp());
 }
 
+/// The app language, lifted above MaterialApp so that dialogs, bottom sheets
+/// and snackbars (which live in the Navigator overlay, above the home screen)
+/// get the right locale and text direction, not the device's.
+final ValueNotifier<String> kAppLanguage = ValueNotifier<String>('EN');
+
 class HagzyApp extends StatelessWidget {
   const HagzyApp({
     super.key,
@@ -32,13 +37,24 @@ class HagzyApp extends StatelessWidget {
   final bool adminMode;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'Hagzy',
-        debugShowCheckedModeBanner: false,
-        supportedLocales: const [Locale('en'), Locale('ar')],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: HagzyTheme.lightTheme(),
-        home: HagzyHome(adminMode: adminMode),
+  Widget build(BuildContext context) => ValueListenableBuilder<String>(
+        valueListenable: kAppLanguage,
+        builder: (context, language, _) => MaterialApp(
+          title: 'Hagzy',
+          debugShowCheckedModeBanner: false,
+          locale: Locale(language == 'AR' ? 'ar' : 'en'),
+          supportedLocales: const [Locale('en'), Locale('ar')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: HagzyTheme.lightTheme(),
+          // Respect the user's font size, but cap it so fixed-size cards
+          // don't overflow at extreme accessibility sizes.
+          builder: (context, child) => MediaQuery.withClampedTextScaling(
+            minScaleFactor: 1.0,
+            maxScaleFactor: 1.35,
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: HagzyHome(adminMode: adminMode),
+        ),
       );
 }
 
@@ -68,6 +84,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   String _currentArea = 'Cairo';
   double _walletBalance = HagzyWallet.defaultWelcomeBalance;
   bool _working = false;
+  bool _showAdminPassword = false;
   String? _loadError;
   String? _apiError;
   String? _loginError;
@@ -137,6 +154,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     try {
       final prefs = await SharedPreferences.getInstance();
       _language = prefs.getString(kLanguageStorageKey) == 'AR' ? 'AR' : 'EN';
+      kAppLanguage.value = _language;
       final profileRaw = prefs.getString(kCustomerProfileStorageKey);
       if (profileRaw != null) {
         try {
@@ -265,19 +283,20 @@ class _HagzyHomeState extends State<HagzyHome> {
         });
       }
     } catch (error) {
-      _message('Could not remove expired bookings: $error', error: true);
+      _message('Could not remove expired bookings: ${friendlyError(error, arabic: _language == 'AR')}', error: true);
     }
   }
 
   Future<void> _changeLanguage(String language) async {
     if (language == _language) return;
+    kAppLanguage.value = language;
     setState(() => _language = language);
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = await prefs.setString(kLanguageStorageKey, language);
       if (!saved) throw StateError('Could not save the language setting.');
     } catch (error) {
-      _message('Could not save language preference: $error', error: true);
+      _message('Could not save language preference: ${friendlyError(error, arabic: _language == 'AR')}', error: true);
     }
   }
 
@@ -310,7 +329,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         _passwordController.clear();
       });
     } catch (error) {
-      if (mounted) setState(() => _loginError = error.toString());
+      if (mounted) setState(() => _loginError = friendlyError(error, arabic: false));
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -382,7 +401,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     try {
       await action();
     } catch (error) {
-      _message('Could not save changes: $error', error: true);
+      _message('Could not save changes: ${friendlyError(error, arabic: _language == 'AR')}', error: true);
     }
   }
 
@@ -1118,6 +1137,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                 ),
               ),
               IconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close_rounded, color: kMuted),
               ),
@@ -1860,7 +1880,11 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
     } catch (error) {
-      _message('Could not create the reservation: $error', error: true);
+      final ar = _language == 'AR';
+      _message(
+          '${localized(ar, 'Could not create the reservation', 'تعذّر إنشاء الحجز')}: '
+          '${friendlyError(error, arabic: ar)}',
+          error: true);
     }
   }
 
@@ -1956,6 +1980,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                     ),
                     IconButton(
+                      tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                       onPressed: () => Navigator.pop(context, 'later'),
                       style: IconButton.styleFrom(
                         backgroundColor: kPage,
@@ -2505,7 +2530,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         'WhatsApp opened with your reservation details. Your deposit is still pending.',
       );
     } catch (error) {
-      _message('Could not open WhatsApp: $error', error: true);
+      _message('Could not open WhatsApp: ${friendlyError(error, arabic: _language == 'AR')}', error: true);
     }
   }
 
@@ -3265,7 +3290,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _message(localized(arabic, 'Slot locked successfully.',
           'تم قفل الموعد وحجبه عن الحجز بنجاح.'));
     } catch (e) {
-      _message('Error locking slot: $e', error: true);
+      _message('Error locking slot: ${friendlyError(e, arabic: _language == 'AR')}', error: true);
     }
   }
 
@@ -3375,7 +3400,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     await _syncAccountData();
   }
 
-  Future<void> _syncAccountData() async {
+  Future<void> _syncAccountData({bool showErrors = false}) async {
     if (!_api.isConfigured) return;
     if (_savedCustomerPhone.isEmpty && _savedCustomerEmail.isEmpty) return;
 
@@ -3436,7 +3461,12 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
         await _commit(_venues, merged);
       }
-    } catch (_) {}
+    } catch (error) {
+      // Background syncs stay quiet; an explicit pull-to-refresh must not.
+      if (showErrors) {
+        _message(friendlyError(error, arabic: _language == 'AR'), error: true);
+      }
+    }
   }
 
   Future<void> _handleCustomerSignOut() async {
@@ -3768,6 +3798,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               booking.dueNow ?? booking.price,
                                             ),
                                             onCancelBooking: _cancelBooking,
+                                            onRefresh: () => _syncAccountData(
+                                                showErrors: true),
                                             onBookAgain: (venueId) => setState(() {
                                               _tab = 0;
                                               _targetVenueId = venueId;
@@ -4035,6 +4067,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.username],
                           decoration: const InputDecoration(
                               labelText: 'Admin email',
                               prefixIcon: Icon(Icons.email_outlined)),
@@ -4042,16 +4076,29 @@ class _HagzyHomeState extends State<HagzyHome> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: _passwordController,
-                          obscureText: true,
+                          obscureText: !_showAdminPassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
                           onSubmitted: (_) => _working ? null : _loginAdmin(),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                               labelText: 'Password',
-                              prefixIcon: Icon(Icons.key_outlined)),
+                              prefixIcon: const Icon(Icons.key_outlined),
+                              suffixIcon: IconButton(
+                                tooltip: _showAdminPassword
+                                    ? 'Hide password'
+                                    : 'Show password',
+                                icon: Icon(_showAdminPassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined),
+                                onPressed: () => setState(() =>
+                                    _showAdminPassword = !_showAdminPassword),
+                              )),
                         ),
                         if (_loginError != null) ...[
                           const SizedBox(height: 12),
+                          // redAccent was 3.2:1 on white; this is 6.5:1.
                           Text(_loginError!,
-                              style: const TextStyle(color: Colors.redAccent)),
+                              style: const TextStyle(color: Color(0xFFB91C1C))),
                         ],
                         const SizedBox(height: 18),
                         FilledButton(
