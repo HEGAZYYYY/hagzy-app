@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1162,6 +1163,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   color: kGreen,
                   size: 20,
                 ),
+                onTap: () => _showWhatsAppUpdatesModal(context, arabic),
               ),
               const Divider(height: 1),
               _SettingTile(
@@ -1175,6 +1177,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 ),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded,
                     size: 14, color: kMuted),
+                onTap: () => _showPrivacySecurityModal(context, arabic),
               ),
               const Divider(height: 1),
               _SettingTile(
@@ -1500,6 +1503,485 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _openLegalWebPage(
+      BuildContext context, String path, String title) async {
+    Uri uri;
+    if (kIsWeb) {
+      uri = Uri.base.resolve(path);
+    } else {
+      uri = Uri.parse('https://hagzy-api.onrender.com/$path');
+    }
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localized(
+              widget.arabic,
+              'Opening $title...',
+              'جاري فتح $title...',
+            )),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showPrivacySecurityModal(BuildContext context, bool arabic) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        decoration: const BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kGreen.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.verified_user_rounded,
+                            color: kGreen,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                localized(
+                                    arabic, 'Privacy & Security', 'الخصوصية والأمان'),
+                                style: const TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                  color: kInk,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                localized(
+                                  arabic,
+                                  'Protected by Hagzy Escrow & Encrypted Payments',
+                                  'حماية كاملة للمدفوعات وحجز مؤكد بنكياً',
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: kMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _buildSecurityPillar(
+                      arabic: arabic,
+                      icon: Icons.timer_rounded,
+                      iconColor: kGreen,
+                      title: localized(arabic, '15-Minute Guaranteed Slot Hold',
+                          'ضمان حجز الموعد لمدة 15 دقيقة'),
+                      description: localized(
+                        arabic,
+                        'While you confirm payment, your court or salon appointment is exclusively locked on the system. No other customer can take your slot.',
+                        'أثناء مراجعة الحجز والدفع، يتم قفل الموعد حصرياً لك على السيستم ولا يمكن لأي عميل آخر حجزه.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSecurityPillar(
+                      arabic: arabic,
+                      icon: Icons.shield_rounded,
+                      iconColor: const Color(0xFF1E88E5),
+                      title: localized(arabic, 'PCI-DSS Paymob Escrow Protection',
+                          'حماية الضمان المالي عبر Paymob'),
+                      description: localized(
+                        arabic,
+                        'Online payments (Cards, InstaPay, Mobile Wallets) are encrypted with bank-grade security. Funds are only transferred after appointment confirmation.',
+                        'جميع المعاملات (كروت بنكية، إنستاباي، محافظ المحمول) مؤمنة بأعلى المعايير البنكية دون تخزين بيانات الكارت.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSecurityPillar(
+                      arabic: arabic,
+                      icon: Icons.lock_person_rounded,
+                      iconColor: const Color(0xFF7B1FA2),
+                      title: localized(arabic, 'Personal Data & Zero Spam Policy',
+                          'خصوصية بياناتك وسياسة منع الإزعاج'),
+                      description: localized(
+                        arabic,
+                        'Your mobile number is only shared with the venue manager 1 hour prior to your booking. We never sell or share your data with advertisers.',
+                        'رقم هاتفك محمي ولا تتم مشاركته إلا مع إدارة الملعب أو الصالون قبل الموعد بساعة لضمان دخولك دون أي رسائل إعلانية.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSecurityPillar(
+                      arabic: arabic,
+                      icon: Icons.delete_sweep_rounded,
+                      iconColor: const Color(0xFFE53935),
+                      title: localized(
+                          arabic,
+                          'Right to Permanent Account Deletion',
+                          'الحق في الحذف الكامل للبيانات'),
+                      description: localized(
+                        arabic,
+                        'In compliance with Egyptian Data Protection Law & Apple/Google policies, you can erase your account and booking history anytime in 1 click.',
+                        'وفقاً لقوانين حماية البيانات، يمكنك في أي وقت مسح حسابك وسجل حجوزاتك بالكامل بضغطة زر واحدة من بروفايلك.',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kInk,
+                              side: const BorderSide(color: kBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.description_outlined,
+                                size: 18, color: kGreen),
+                            label: Text(
+                              localized(
+                                  arabic, 'Privacy Policy', 'سياسة الخصوصية'),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                            onPressed: () => _openLegalWebPage(
+                                context,
+                                'privacy.html',
+                                localized(
+                                    arabic, 'Privacy Policy', 'سياسة الخصوصية')),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kInk,
+                              side: const BorderSide(color: kBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.gavel_rounded,
+                                size: 18, color: kGreen),
+                            label: Text(
+                              localized(
+                                  arabic, 'Terms of Service', 'شروط الاستخدام'),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                            onPressed: () => _openLegalWebPage(
+                                context,
+                                'terms.html',
+                                localized(arabic, 'Terms of Service',
+                                    'شروط الاستخدام')),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    PressableScale(
+                      onTap: () => Navigator.pop(ctx),
+                      child: Container(
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: kSurfaceTint,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: Center(
+                          child: Text(
+                            localized(arabic, 'Done', 'تم'),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
+                              color: kInk,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showWhatsAppUpdatesModal(BuildContext context, bool arabic) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        decoration: const BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF25D366).withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.mark_chat_read_rounded,
+                          color: Color(0xFF25D366),
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localized(arabic, 'WhatsApp Booking Updates',
+                                  'إشعارات وتأكيدات الواتساب'),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: kInk,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded,
+                                    color: kGreen, size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  localized(arabic, 'Active on this account',
+                                      'مفعلة تلقائياً لحسابك'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: kGreen,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSecurityPillar(
+                    arabic: arabic,
+                    icon: Icons.qr_code_2_rounded,
+                    iconColor: const Color(0xFF25D366),
+                    title: localized(arabic, 'Instant Digital Match Pass & QR',
+                        'تذكرة وتأكيد فوري برمز QR'),
+                    description: localized(
+                      arabic,
+                      'Get your official booking voucher directly on WhatsApp with arrival instructions and QR code for venue check-in.',
+                      'تصلك تذكرة الحجز الرسمية فوراً على الواتساب مع كود QR للدخول السريع وتعليمات الوصول للملعب أو الصالون.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSecurityPillar(
+                    arabic: arabic,
+                    icon: Icons.access_alarms_rounded,
+                    iconColor: const Color(0xFFFB8C00),
+                    title: localized(arabic, '1-Hour Smart Arrival Reminder',
+                        'تذكير ذكي قبل الموعد بساعة'),
+                    description: localized(
+                      arabic,
+                      'Automated WhatsApp reminder with 1-tap Google Maps directions so you and your friends arrive right on time.',
+                      'رسالة تذكيرية قبل بدء الموعد بساعة متضمنة لوكيشن المكان على خرائط جوجل لسهولة وصولك وفريقك.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSecurityPillar(
+                    arabic: arabic,
+                    icon: Icons.support_agent_rounded,
+                    iconColor: const Color(0xFF1E88E5),
+                    title: localized(arabic, 'Direct Support & Assistance',
+                        'دعم فوري ومباشر 24/7'),
+                    description: localized(
+                      arabic,
+                      'Need to reschedule, invite friends, or speak with venue staff? Our official WhatsApp support is available 24/7.',
+                      'تحتاج لتعديل موعدك أو إضافة أصدقاء أو سؤال الإدارة؟ خدمة عملاء حجزي متاحة للمساعدة الفورية.',
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  PressableScale(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final msg = Uri.encodeComponent(
+                        arabic
+                            ? 'مرحباً خدمة عملاء حجزي، لدي استفسار بخصوص الحجوزات.'
+                            : 'Hello Hagzy Support, I have an inquiry about my bookings.',
+                      );
+                      final uri = Uri.parse(
+                          'https://wa.me/$kWhatsappBusinessNumber?text=$msg');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF25D366),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF25D366).withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.chat_bubble_outline_rounded,
+                              color: Colors.white, size: 19),
+                          const SizedBox(width: 8),
+                          Text(
+                            localized(arabic, 'Chat with Hagzy on WhatsApp',
+                                'تواصل مع حجزي على الواتساب'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildSecurityPillar({
+    required bool arabic,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kSurfaceTint,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    color: kInk,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: kMuted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
