@@ -1189,24 +1189,11 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   'سجّل ملاعبك أو صالونك واستقبل حجوزاتك رقمياً',
                 ),
                 trailing: const Icon(
-                  Icons.open_in_new_rounded,
-                  size: 16,
-                  color: kGreen,
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: kMuted,
                 ),
-                onTap: () async {
-                  final partnerUri =
-                      Uri.parse('https://hagzy-api.onrender.com/partner');
-                  try {
-                    if (await canLaunchUrl(partnerUri)) {
-                      await launchUrl(partnerUri,
-                          mode: LaunchMode.externalApplication);
-                      return;
-                    }
-                  } catch (_) {}
-                  if (widget.onSwitchToAdmin != null) {
-                    widget.onSwitchToAdmin!();
-                  }
-                },
+                onTap: () => _showPartnerModal(context, arabic),
               ),
             ],
           ),
@@ -1392,6 +1379,128 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showPartnerModal(BuildContext context, bool arabic) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: kPanel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: kGreen.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.storefront_rounded,
+                      color: kGreen, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        localized(arabic, 'Partner with Hagzy',
+                            'انضم كشريك في حجزي'),
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: kInk),
+                      ),
+                      Text(
+                        localized(arabic, 'For Sports Clubs, Salons & Lounges',
+                            'لأصحاب الملاعب والصالونات ومراكز الترفيه'),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: kMuted,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: kBorder),
+              ),
+              leading: const Icon(Icons.admin_panel_settings_rounded,
+                  color: kGreen),
+              title: Text(
+                localized(
+                    arabic, 'Partner & Owner Portal', 'دخول بوابة الشركاء'),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+              subtitle: Text(
+                localized(arabic, 'Manage venues, POS timeline & payouts',
+                    'إدارة الملاعب والحجوزات ونقاط البيع'),
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: kMuted),
+              onTap: () {
+                Navigator.pop(ctx);
+                if (widget.onSwitchToAdmin != null) {
+                  widget.onSwitchToAdmin!();
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: kBorder),
+              ),
+              leading: const Icon(Icons.add_business_rounded,
+                  color: Color(0xFF25D366)),
+              title: Text(
+                localized(
+                    arabic, 'List a New Venue', 'سجّل مكاناً أو ملعباً جديداً'),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+              subtitle: Text(
+                localized(
+                    arabic,
+                    'Chat with our partner onboarding team',
+                    'تواصل مع فريق انضمام الشركاء عبر واتساب'),
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: kMuted),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final msg = Uri.encodeComponent(
+                  arabic
+                      ? 'مرحباً، أود تسجيل ملعبي/صالوني كشريك على منصة حجزي.'
+                      : 'Hello, I want to list my venue/salon as a partner on Hagzy.',
+                );
+                final uri = Uri.parse(
+                    'https://wa.me/$kWhatsappBusinessNumber?text=$msg');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
