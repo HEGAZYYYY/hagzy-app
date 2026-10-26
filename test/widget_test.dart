@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hagzy_app/main.dart';
+import 'package:hagzy_app/screens/profile_tab.dart';
 import 'package:hagzy_app/widgets/map_explorer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -1067,6 +1068,47 @@ void main() {
 
     // Verify Book Again is restored
     expect(find.text('Book Again'), findsOneWidget);
+  });
+
+  testWidgets('customer can tap Privacy & Security and WhatsApp Updates in profile', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // Navigate to Profile tab
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    // Drag down to reveal settings
+    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -600));
+    await tester.pumpAndSettle();
+
+    final privacyFinder = find.text('Privacy & Security');
+    expect(privacyFinder, findsOneWidget);
+    await tester.tap(privacyFinder);
+    await tester.pumpAndSettle();
+
+    // Verify modal appears
+    expect(find.text('15-Minute Guaranteed Slot Hold'), findsOneWidget);
+    expect(find.text('PCI-DSS Paymob Escrow Protection'), findsOneWidget);
+
+    // Dismiss modal
+    Navigator.pop(tester.element(find.text('15-Minute Guaranteed Slot Hold')));
+    await tester.pumpAndSettle();
+
+    // Tap WhatsApp Booking Updates
+    final whatsappFinder = find.text('WhatsApp Booking Updates');
+    expect(whatsappFinder, findsOneWidget);
+    await tester.tap(whatsappFinder);
+    await tester.pumpAndSettle();
+
+    // Verify WhatsApp modal appears
+    expect(find.text('Instant Digital Match Pass & QR'), findsOneWidget);
+    expect(find.text('Active on this account'), findsOneWidget);
+
+    // Dismiss WhatsApp modal
+    Navigator.pop(tester.element(find.text('Instant Digital Match Pass & QR')));
+    await tester.pumpAndSettle();
   });
 }
 
