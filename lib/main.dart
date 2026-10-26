@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -85,6 +86,26 @@ class _HagzyHomeState extends State<HagzyHome> {
     super.initState();
     _mode = widget.adminMode ? 'adminLogin' : 'customer';
     _load();
+
+    // Check for real OAuth 2.0 callback credentials in URL query parameters
+    if (kIsWeb) {
+      try {
+        final params = Uri.base.queryParameters;
+        final token = params['auth_token'];
+        final name = params['auth_name'];
+        final email = params['auth_email'];
+        if (token != null && token.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handleCustomerSignIn(
+              name: name ?? (email?.split('@')[0] ?? 'Hagzy Member'),
+              email: email ?? '',
+              phone: '',
+              token: token,
+            );
+          });
+        }
+      } catch (_) {}
+    }
   }
 
   Future<List<Venue>> _loadSeedVenues(List<Venue> venues) async {
