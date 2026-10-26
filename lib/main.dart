@@ -3355,14 +3355,14 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
     if (_api.isConfigured && remoteBalance == null) {
       try {
-        final res =
-            await _api.customerSignIn(name: name, email: email, phone: phone);
+        final res = await _api.getCustomerProfile(
+          token: _customerToken,
+          email: email,
+          phone: phone,
+        );
         if (res['customer'] is Map<String, dynamic>) {
           final cust = res['customer'] as Map<String, dynamic>;
           remoteBalance = (cust['walletBalance'] as num?)?.toDouble();
-        }
-        if (_customerToken == null && res['token'] is String) {
-          _customerToken = res['token'] as String;
         }
       } catch (_) {}
     }

@@ -211,21 +211,13 @@ class HagzyApi {
   }) async =>
       verifyCustomerOtp(phone, code, email, name);
 
-  /// Signs in a customer with an email address or phone number.
+  /// Retrieves customer profile by email or phone.
   Future<Map<String, dynamic>> customerSignIn({
     String? name,
     String? email,
     String? phone,
   }) async =>
-      _send(
-        'POST',
-        '/api/auth/customer-login',
-        body: {
-          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
-          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
-          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
-        },
-      );
+      getCustomerProfile(email: email, phone: phone);
 
   /// Authenticates a customer with a social identity provider (Google, Apple).
   Future<Map<String, dynamic>> signInWithSocial({
@@ -254,6 +246,30 @@ class HagzyApi {
             provider == 'google' ? 'idToken' : 'identityToken': idToken.trim(),
         },
       );
+
+  /// Registers a new customer with verified email and password.
+  Future<Map<String, dynamic>> registerCustomer({
+    required String name,
+    required String email,
+    required String password,
+    String? phone,
+  }) async =>
+      _send('POST', '/api/auth/customer/register', body: {
+        'name': name.trim(),
+        'email': email.trim(),
+        'password': password,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      });
+
+  /// Logs in a customer with registered email and password.
+  Future<Map<String, dynamic>> loginCustomer({
+    required String email,
+    required String password,
+  }) async =>
+      _send('POST', '/api/auth/customer/login', body: {
+        'email': email.trim(),
+        'password': password,
+      });
 
   /// Retrieves synced customer profile and cloud wallet balance.
   Future<Map<String, dynamic>> getCustomerProfile({
