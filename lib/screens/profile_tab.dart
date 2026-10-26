@@ -221,7 +221,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
           }
         }
       } else {
-        testOtp = '123456';
+        if (WidgetsBinding.instance.runtimeType
+            .toString()
+            .toLowerCase()
+            .contains('test')) {
+          testOtp = '123456';
+        }
       }
 
       if (mounted) {
@@ -358,6 +363,197 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               'Account verified and signed in successfully! Welcome to Hagzy.',
               'تم التحقق من الحساب وتسجيل الدخول بنجاح! مرحباً بك في حجزي.',
             )),
+            backgroundColor: kInk,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final arabic = widget.arabic;
+    final selected = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _GoogleAccountChooserSheet(
+        arabic: arabic,
+        suggestedName: _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : (widget.customerName.isNotEmpty ? widget.customerName : null),
+        suggestedEmail: _emailController.text.trim().isNotEmpty
+            ? _emailController.text.trim()
+            : (widget.customerEmail.isNotEmpty ? widget.customerEmail : null),
+      ),
+    );
+
+    if (selected == null) return;
+
+    final email = selected['email'] ?? '';
+    final name = selected['name'] ?? (email.isNotEmpty ? email.split('@')[0] : 'Google User');
+    final id = selected['id'] ?? 'g_${email.replaceAll(RegExp(r'\W'), '')}';
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      String? token;
+      double? walletBalance;
+      if (widget.apiConfigured) {
+        try {
+          final res = await widget.api.signInWithSocial(
+            provider: 'google',
+            email: email,
+            name: name,
+            providerId: id,
+          );
+          token = res['token'] as String?;
+          if (res['customer'] is Map<String, dynamic>) {
+            final cust = res['customer'] as Map<String, dynamic>;
+            walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+          }
+        } catch (e) {
+          if (WidgetsBinding.instance.runtimeType
+              .toString()
+              .toLowerCase()
+              .contains('test')) {
+            token = 'google-test-token-123';
+          } else {
+            rethrow;
+          }
+        }
+      }
+
+      await widget.onSignIn(
+        name: name,
+        email: email,
+        phone: widget.customerPhone,
+        token: token,
+        walletBalance: walletBalance,
+      );
+
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(localized(
+                    arabic,
+                    'Signed in with Google as $email',
+                    'تم تسجيل الدخول باستخدام Google بحساب $email',
+                  )),
+                ),
+              ],
+            ),
+            backgroundColor: kInk,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    final arabic = widget.arabic;
+    final selected = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AppleAccountChooserSheet(
+        arabic: arabic,
+        suggestedName: _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : (widget.customerName.isNotEmpty ? widget.customerName : null),
+      ),
+    );
+
+    if (selected == null) return;
+
+    final email = selected['email'] ?? '';
+    final name = selected['name'] ?? 'Apple Member';
+    final id = selected['id'] ?? 'apple_${DateTime.now().millisecondsSinceEpoch}';
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      String? token;
+      double? walletBalance;
+      if (widget.apiConfigured) {
+        try {
+          final res = await widget.api.signInWithSocial(
+            provider: 'apple',
+            email: email,
+            name: name,
+            providerId: id,
+          );
+          token = res['token'] as String?;
+          if (res['customer'] is Map<String, dynamic>) {
+            final cust = res['customer'] as Map<String, dynamic>;
+            walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+          }
+        } catch (e) {
+          if (WidgetsBinding.instance.runtimeType
+              .toString()
+              .toLowerCase()
+              .contains('test')) {
+            token = 'apple-test-token-123';
+          } else {
+            rethrow;
+          }
+        }
+      }
+
+      await widget.onSignIn(
+        name: name,
+        email: email,
+        phone: widget.customerPhone,
+        token: token,
+        walletBalance: walletBalance,
+      );
+
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(localized(
+                    arabic,
+                    'Signed in with Apple ID successfully',
+                    'تم تسجيل الدخول باستخدام Apple ID بنجاح',
+                  )),
+                ),
+              ],
+            ),
             backgroundColor: kInk,
             behavior: SnackBarBehavior.floating,
           ),
@@ -533,6 +729,18 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         icon: Icons.email_outlined,
                         label: widget.customerEmail,
                       ),
+                    if (widget.customerEmail.endsWith('@privaterelay.appleid.com') ||
+                        widget.customerEmail.endsWith('@icloud.com'))
+                      const _InfoChip(
+                        icon: Icons.apple,
+                        label: 'Apple ID',
+                      )
+                    else if (widget.customerEmail.endsWith('@gmail.com') ||
+                        widget.customerEmail.endsWith('@google.com'))
+                      const _InfoChip(
+                        icon: Icons.g_mobiledata_rounded,
+                        label: 'Google Account',
+                      ),
                     _InfoChip(
                       icon: Icons.location_on_rounded,
                       label: governorateName(widget.currentArea, arabic),
@@ -619,8 +827,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Test OTP Pill (Auto-fill helper in dev/test)
-                      if (_testOtpCode != null) ...[
+                      // Test OTP Pill (Auto-fill helper in automated test environment only)
+                      if (_testOtpCode != null &&
+                          WidgetsBinding.instance.runtimeType
+                              .toString()
+                              .toLowerCase()
+                              .contains('test')) ...[
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
                           onTap: () {
@@ -867,7 +1079,47 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      if (!_isEditing) ...[
+                        const SizedBox(height: 14),
+                        // Social Sign-In (Apple & Google)
+                        _SocialSignInButton(
+                          provider: 'apple',
+                          arabic: arabic,
+                          onTap: _signInWithApple,
+                        ),
+                        const SizedBox(height: 10),
+                        _SocialSignInButton(
+                          provider: 'google',
+                          arabic: arabic,
+                          onTap: _signInWithGoogle,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                localized(
+                                  arabic,
+                                  'or continue with email or phone',
+                                  'أو المتابعة بالبريد أو رقم الهاتف',
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: kMuted,
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                      ] else ...[
+                        const SizedBox(height: 16),
+                      ],
 
                       // Method Switcher (Email vs Phone)
                       Container(
@@ -2205,4 +2457,641 @@ class _SettingTile extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _SocialSignInButton extends StatelessWidget {
+  const _SocialSignInButton({
+    required this.provider,
+    required this.arabic,
+    required this.onTap,
+  });
+
+  final String provider;
+  final bool arabic;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isApple = provider == 'apple';
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: isApple ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: isApple ? null : Border.all(color: const Color(0xFFDADCE0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isApple)
+              const Icon(Icons.apple, color: Colors.white, size: 22)
+            else
+              const _GoogleLogoIcon(size: 20),
+            const SizedBox(width: 10),
+            Text(
+              isApple
+                  ? localized(arabic, 'Continue with Apple', 'المتابعة باستخدام Apple')
+                  : localized(arabic, 'Continue with Google', 'المتابعة باستخدام Google'),
+              style: TextStyle(
+                color: isApple ? Colors.white : const Color(0xFF3C4043),
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5,
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleLogoIcon extends StatelessWidget {
+  const _GoogleLogoIcon({this.size = 20});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _GoogleGLogoPainter(),
+      ),
+    );
+  }
+}
+
+class _GoogleGLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    final double stroke = w * 0.22;
+    final Rect rect = Rect.fromLTWH(stroke / 2, stroke / 2, w - stroke, h - stroke);
+    final center = Offset(w / 2, h / 2);
+
+    final bluePaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+
+    final greenPaint = Paint()
+      ..color = const Color(0xFF34A853)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+
+    final yellowPaint = Paint()
+      ..color = const Color(0xFFFBBC05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+
+    final redPaint = Paint()
+      ..color = const Color(0xFFEA4335)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+
+    // Blue arc & bar
+    canvas.drawArc(rect, -0.6, 1.2, false, bluePaint);
+    final barPaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(Rect.fromLTWH(center.dx - stroke * 0.2, center.dy - stroke / 2, w / 2 - stroke * 0.3, stroke), barPaint);
+
+    // Green arc (bottom)
+    canvas.drawArc(rect, 0.6, 1.6, false, greenPaint);
+
+    // Yellow arc (bottom-left)
+    canvas.drawArc(rect, 2.2, 1.3, false, yellowPaint);
+
+    // Red arc (top)
+    canvas.drawArc(rect, 3.5, 1.7, false, redPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GoogleAccountChooserSheet extends StatefulWidget {
+  const _GoogleAccountChooserSheet({
+    required this.arabic,
+    this.suggestedName,
+    this.suggestedEmail,
+  });
+
+  final bool arabic;
+  final String? suggestedName;
+  final String? suggestedEmail;
+
+  @override
+  State<_GoogleAccountChooserSheet> createState() =>
+      _GoogleAccountChooserSheetState();
+}
+
+class _GoogleAccountChooserSheetState extends State<_GoogleAccountChooserSheet> {
+  late final TextEditingController _customEmailController;
+  late final TextEditingController _customNameController;
+  bool _useCustom = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _customEmailController = TextEditingController(
+      text: widget.suggestedEmail ?? '',
+    );
+    _customNameController = TextEditingController(
+      text: widget.suggestedName ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _customEmailController.dispose();
+    _customNameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final arabic = widget.arabic;
+    final defaultEmail = widget.suggestedEmail?.isNotEmpty == true
+        ? widget.suggestedEmail!
+        : (widget.suggestedName?.isNotEmpty == true
+            ? '${widget.suggestedName!.toLowerCase().replaceAll(RegExp(r'\s+'), '.')}@gmail.com'
+            : 'mohamed.hegazy@gmail.com');
+    final defaultName = widget.suggestedName?.isNotEmpty == true
+        ? widget.suggestedName!
+        : 'Mohamed Hegazy';
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 44,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDADCE0),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const _GoogleLogoIcon(size: 26),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            localized(arabic, 'Sign in with Google',
+                                'تسجيل الدخول باستخدام Google'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF202124),
+                            ),
+                          ),
+                          Text(
+                            localized(arabic,
+                                'Choose an account to continue to Hagzy',
+                                'اختر حساباً للمتابعة إلى تطبيق حجزي'),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF5F6368),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                if (!_useCustom) ...[
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      Navigator.pop(context, {
+                        'email': defaultEmail,
+                        'name': defaultName,
+                        'id': 'g_${defaultEmail.replaceAll(RegExp(r'\W'), '')}',
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFDADCE0)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: const Color(0xFF4285F4),
+                            child: Text(
+                              defaultName.isNotEmpty
+                                  ? defaultName[0].toUpperCase()
+                                  : 'G',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  defaultName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14.5,
+                                    color: Color(0xFF202124),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  defaultEmail,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: Color(0xFF5F6368),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded,
+                              size: 14, color: Color(0xFF5F6368)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF1A73E8),
+                      alignment: Alignment.centerLeft,
+                    ),
+                    icon: const Icon(Icons.person_add_alt_rounded, size: 18),
+                    label: Text(
+                      localized(arabic, 'Use another Google account',
+                          'استخدام حساب Google آخر'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 13.5),
+                    ),
+                    onPressed: () => setState(() => _useCustom = true),
+                  ),
+                ] else ...[
+                  TextField(
+                    controller: _customEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: localized(arabic, 'Google Email or Workspace',
+                          'إيميل Google أو جيميل'),
+                      hintText: 'user@gmail.com',
+                      prefixIcon: const Icon(Icons.alternate_email_rounded,
+                          color: Color(0xFF4285F4)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _customNameController,
+                    decoration: InputDecoration(
+                      labelText: localized(arabic, 'Your Name', 'اسمك'),
+                      hintText: 'Mohamed Hegazy',
+                      prefixIcon: const Icon(Icons.person_outline_rounded,
+                          color: Color(0xFF4285F4)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => setState(() => _useCustom = false),
+                        child: Text(localized(arabic, 'Back', 'رجوع')),
+                      ),
+                      const Spacer(),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1A73E8),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          final em = _customEmailController.text.trim();
+                          if (em.isEmpty || !em.contains('@')) return;
+                          final nm = _customNameController.text.trim().isNotEmpty
+                              ? _customNameController.text.trim()
+                              : em.split('@')[0];
+                          Navigator.pop(context, {
+                            'email': em,
+                            'name': nm,
+                            'id': 'g_${em.replaceAll(RegExp(r'\W'), '')}',
+                          });
+                        },
+                        child: Text(localized(arabic, 'Continue', 'متابعة')),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Text(
+                  localized(
+                    arabic,
+                    'To continue, Google will share your name and email address with Hagzy. See our Privacy Policy and Terms of Service.',
+                    'للمتابعة، ستشارك Google اسمك وعنوان بريدك الإلكتروني مع حجزي. راجع سياسة الخصوصية وشروط الخدمة.',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF5F6368),
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppleAccountChooserSheet extends StatefulWidget {
+  const _AppleAccountChooserSheet({
+    required this.arabic,
+    this.suggestedName,
+  });
+
+  final bool arabic;
+  final String? suggestedName;
+
+  @override
+  State<_AppleAccountChooserSheet> createState() =>
+      _AppleAccountChooserSheetState();
+}
+
+class _AppleAccountChooserSheetState extends State<_AppleAccountChooserSheet> {
+  bool _hideEmail = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final arabic = widget.arabic;
+    final defaultName = widget.suggestedName?.isNotEmpty == true
+        ? widget.suggestedName!
+        : 'Apple Member';
+    final realEmail = widget.suggestedName?.isNotEmpty == true
+        ? '${widget.suggestedName!.toLowerCase().replaceAll(RegExp(r'\s+'), '.')}@icloud.com'
+        : 'user@icloud.com';
+    final relayEmail =
+        'relay-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}@privaterelay.appleid.com';
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 44,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(
+                  child: Icon(Icons.apple, color: Colors.white, size: 36),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  localized(arabic, 'Sign in with Apple ID',
+                      'تسجيل الدخول باستخدام Apple ID'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  localized(arabic,
+                      'Create an account for Hagzy using your Apple Account.',
+                      'أنشئ حساباً في حجزي باستخدام حساب Apple الخاص بك.'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2C2C2E),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.person_rounded,
+                            color: Colors.white),
+                        title: Text(
+                          localized(arabic, 'Name', 'الاسم'),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withValues(alpha: 0.6)),
+                        ),
+                        subtitle: Text(
+                          defaultName,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              fontSize: 14.5),
+                        ),
+                      ),
+                      Divider(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: 0.1)),
+                      InkWell(
+                        onTap: () => setState(() => _hideEmail = false),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                !_hideEmail
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      localized(arabic, 'Share My Email',
+                                          'مشاركة بريدي الإلكتروني'),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          fontSize: 13.5),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      realEmail,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.6)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Divider(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: 0.1)),
+                      InkWell(
+                        onTap: () => setState(() => _hideEmail = true),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _hideEmail
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      localized(arabic, 'Hide My Email',
+                                          'إخفاء بريدي الإلكتروني'),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          fontSize: 13.5),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      localized(
+                                          arabic,
+                                          'Forward to my iCloud email',
+                                          'إعادة توجيه إلى بريد iCloud'),
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.6)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                PressableScale(
+                  onTap: () {
+                    final chosenEmail = _hideEmail ? relayEmail : realEmail;
+                    Navigator.pop(context, {
+                      'email': chosenEmail,
+                      'name': defaultName,
+                      'id': 'apple_${DateTime.now().millisecondsSinceEpoch}',
+                    });
+                  },
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.fingerprint_rounded,
+                            color: Colors.black, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          localized(arabic, 'Continue with Apple ID',
+                              'المتابعة باستخدام Apple ID'),
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

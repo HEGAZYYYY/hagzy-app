@@ -185,4 +185,59 @@ void main() {
     );
     expect(reply['reply'], 'Your Fawry reference is 9481029384.');
   });
+
+  test('signInWithSocial sends expected requests for Google and Apple', () async {
+    final requests = <http.Request>[];
+    final api = HagzyApi(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path.endsWith('/social/google')) {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'token': 'google-jwt-token',
+              'customer': {'name': 'Google User', 'email': 'user@gmail.com'},
+            }),
+            200,
+          );
+        }
+        if (request.url.path.endsWith('/social/apple')) {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'token': 'apple-jwt-token',
+              'customer': {'name': 'Apple User', 'email': 'user@privaterelay.appleid.com'},
+            }),
+            200,
+          );
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    addTearDown(api.close);
+
+    final googleRes = await api.signInWithSocial(
+      provider: 'google',
+      email: 'user@gmail.com',
+      name: 'Google User',
+      providerId: 'g-12345',
+    );
+    expect(googleRes['token'], 'google-jwt-token');
+    expect(requests[0].url.path, '/api/auth/social/google');
+    final googleBody = jsonDecode(requests[0].body) as Map<String, dynamic>;
+    expect(googleBody['email'], 'user@gmail.com');
+    expect(googleBody['googleId'], 'g-12345');
+
+    final appleRes = await api.signInWithSocial(
+      provider: 'apple',
+      email: 'user@privaterelay.appleid.com',
+      name: 'Apple User',
+      providerId: 'a-98765',
+    );
+    expect(appleRes['token'], 'apple-jwt-token');
+    expect(requests[1].url.path, '/api/auth/social/apple');
+    final appleBody = jsonDecode(requests[1].body) as Map<String, dynamic>;
+    expect(appleBody['appleUserId'], 'a-98765');
+  });
 }
