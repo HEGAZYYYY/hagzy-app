@@ -656,55 +656,6 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Test OTP Pill (Auto-fill helper in automated test environment only)
-                      if (_testOtpCode != null &&
-                          WidgetsBinding.instance.runtimeType
-                              .toString()
-                              .toLowerCase()
-                              .contains('test')) ...[
-                        InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            setState(() {
-                              _otpController.text = _testOtpCode!;
-                              _errorMessage = null;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: kGreen.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: kGreen.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.key_rounded,
-                                    size: 18, color: kGreen),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    localized(
-                                      arabic,
-                                      'Verification Code: $_testOtpCode (Tap to fill)',
-                                      'كود التحقق: $_testOtpCode (اضغط للتعبئة)',
-                                    ),
-                                    style: const TextStyle(
-                                      color: kGreen,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-
                       // 6-digit OTP Input Field
                       TextField(
                         controller: _otpController,

@@ -382,8 +382,9 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   }
 
   // Fixed test reviewer credentials bypass for Apple & Google App Store Review
+  const isReviewer = target === '01000000000' || target === 'reviewer@hagzy.app';
   let otp;
-  if (target === '01000000000' || target === 'reviewer@hagzy.app') {
+  if (isReviewer) {
     otp = '123456';
   } else {
     // Generate secure 6-digit OTP
@@ -489,11 +490,21 @@ app.get('/api/auth/google/start', (req, res) => {
           <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24Z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/></svg>
         </div>
         <h1>Sign in with Google</h1>
-        <p>to continue to Hagzy Booking Platform</p>
+        <p>Choose an account to continue to Hagzy</p>
+        <div style="margin-bottom:18px;">
+          <a href="/api/auth/google/start?email=mohamed@gmail.com&name=Mohamed%20Hegazy" class="submit-btn" style="display:block;text-decoration:none;background:#1a73e8;padding:12px 16px;font-size:14px;border-radius:12px;margin-bottom:14px;">
+            Continue as Mohamed Hegazy
+          </a>
+          <div style="display:flex;align-items:center;margin:14px 0;">
+            <div style="flex:1;height:1px;background:#1e293b;"></div>
+            <span style="padding:0 10px;font-size:11px;color:#64748b;text-transform:uppercase;">or enter Google email</span>
+            <div style="flex:1;height:1px;background:#1e293b;"></div>
+          </div>
+        </div>
         <form action="/api/auth/google/start" method="GET">
           <div class="field">
             <label>Google Email</label>
-            <input type="email" name="email" placeholder="you@gmail.com" required autofocus />
+            <input type="email" name="email" placeholder="you@gmail.com" required />
           </div>
           <div class="field">
             <label>Full Name</label>
@@ -666,11 +677,21 @@ app.get('/api/auth/apple/start', (req, res) => {
           <svg width="22" height="22" viewBox="0 0 170 170" fill="#000"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.04-7.59-7.7-11.72-13.98-6.14-9.35-10.9-20.08-14.28-32.2-3.38-12.12-5.07-23.47-5.07-34.05 0-14.02 3.63-25.7 10.9-35.03 7.27-9.33 16.48-14.07 27.63-14.22 4.48 0 9.47 1.13 14.97 3.39 5.5 2.26 9.3 3.44 11.4 3.55 1.88-.22 5.86-1.45 11.95-3.69 6.09-2.24 11.26-3.23 15.51-2.97 11.55.54 20.89 4.7 28.02 12.48-9.91 6.09-14.76 14.57-14.54 25.44.22 8.48 3.52 15.54 9.9 21.19 6.38 5.65 13.98 8.91 22.8 9.78-1.95 6.09-4.35 12.18-7.2 18.27zm-29.4-106.8c0-6.74 2.47-13.06 7.41-18.96 4.94-5.9 10.96-9.47 18.06-10.72.65 2.83.98 5.44.98 7.83 0 6.52-2.58 13-7.73 19.45-5.15 6.45-11.28 10.15-18.39 11.08-.22-2.83-.33-5.72-.33-8.68z"/></svg>
         </div>
         <h1>Sign in with Apple</h1>
-        <p>to continue to Hagzy Booking Platform</p>
+        <p>Choose an account to continue to Hagzy</p>
+        <div style="margin-bottom:18px;">
+          <a href="/api/auth/apple/start?email=mohamed@icloud.com&name=Mohamed%20Hegazy" class="submit-btn" style="display:block;text-decoration:none;background:#fff;color:#000;padding:12px 16px;font-size:14px;border-radius:12px;margin-bottom:14px;">
+            Continue as Mohamed Hegazy (Apple ID)
+          </a>
+          <div style="display:flex;align-items:center;margin:14px 0;">
+            <div style="flex:1;height:1px;background:#27272a;"></div>
+            <span style="padding:0 10px;font-size:11px;color:#71717a;text-transform:uppercase;">or enter Apple ID</span>
+            <div style="flex:1;height:1px;background:#27272a;"></div>
+          </div>
+        </div>
         <form action="/api/auth/apple/start" method="GET">
           <div class="field">
             <label>Apple ID Email</label>
-            <input type="email" name="email" placeholder="name@icloud.com" required autofocus />
+            <input type="email" name="email" placeholder="name@icloud.com" required />
           </div>
           <div class="field">
             <label>Full Name</label>
