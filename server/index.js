@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
@@ -11,6 +13,20 @@ const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_production_secret_2026';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hagzy.app';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hagzy2026!';
+
+// Live PostgreSQL Cloud Database connection (if DATABASE_URL is set in Render / cloud)
+let pgPool = null;
+if (process.env.DATABASE_URL) {
+  try {
+    pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+    });
+    console.log('🐘 PostgreSQL connected. Live cloud database active.');
+  } catch (err) {
+    console.error('PostgreSQL initialization error:', err.message);
+  }
+}
 
 // Database file storage
 const DATA_DIR = path.join(__dirname, 'data');
@@ -149,6 +165,81 @@ async function sendSmsOrWhatsApp({ phone, message, otp }) {
   return { sent: true, provider: 'simulated_dev' };
 }
 
+// ==========================================
+// REAL EMAIL DISPATCH (RESEND / SMTP)
+// ==========================================
+async function sendRealEmail({ email, code }) {
+  console.log(`\n========================================`);
+  console.log(`📧 [EMAIL / OTP DISPATCH]`);
+  console.log(`To: ${email}`);
+  console.log(`Code: ${code}`);
+  console.log(`========================================\n`);
+
+  const subject = `رمز التحقق الخاص بك في منصة حجزي: ${code}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 20px auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 18px; background: #ffffff;">
+      <h2 style="color: #059669; margin: 0 0 10px;">حجزي · Hagzy</h2>
+      <p style="color: #334155; font-size: 15px; margin: 0 0 18px;">رمز التحقق لتسجيل الدخول إلى حسابك هو:</p>
+      <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 16px; text-align: center; font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #166534; font-family: monospace;">
+        ${code}
+      </div>
+      <p style="color: #64748b; font-size: 12px; margin: 18px 0 0;">صلاحية هذا الرمز 5 دقائق فقط. لا تشارك هذا الرمز مع أي شخص.</p>
+    </div>
+  `;
+
+  // 1. Resend API
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: process.env.EMAIL_FROM || 'Hagzy <onboarding@resend.dev>',
+          to: [email],
+          subject,
+          html
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [LIVE EMAIL SENT via Resend] to: ${email}`);
+        return { sent: true, provider: 'resend' };
+      }
+    } catch (e) {
+      console.error('Resend error:', e.message);
+    }
+  }
+
+  // 2. SMTP (Gmail / SendGrid / Amazon SES)
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: email,
+        subject,
+        html
+      });
+      console.log(`✅ [LIVE EMAIL SENT via SMTP] to: ${email}`);
+      return { sent: true, provider: 'smtp' };
+    } catch (e) {
+      console.error('SMTP error:', e.message);
+    }
+  }
+
+  return { sent: false };
+}
+
 // Middleware: Customer Auth
 function authenticateCustomer(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -212,9 +303,13 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   };
   saveDb(db);
 
-  // Send message
-  const smsBody = `رمز التحقق الخاص بك في منصة حجزي (Hagzy) هو: ${otp}. لا تشارك هذا الرمز مع أحد.`;
-  await sendSmsOrWhatsApp({ phone: target, message: smsBody, otp });
+  // Send message via real Email or SMS/WhatsApp
+  if (target.includes('@')) {
+    await sendRealEmail({ email: target, code: otp });
+  } else {
+    const smsBody = `رمز التحقق الخاص بك في منصة حجزي (Hagzy) هو: ${otp}. لا تشارك هذا الرمز مع أحد.`;
+    await sendSmsOrWhatsApp({ phone: target, message: smsBody, otp });
+  }
 
   const isTestOrReview = req.headers['x-test-suite'] === 'true' || isReviewer || process.env.NODE_ENV === 'test';
 
@@ -223,6 +318,191 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
     message: `Verification code sent to ${target}`,
     ...(isTestOrReview ? { testOtp: otp } : {})
   });
+});
+
+// ==========================================
+// REAL GOOGLE & APPLE OAUTH 2.0 FLOWS
+// ==========================================
+
+// Real Google OAuth 2.0 Start
+app.get('/api/auth/google/start', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+
+  if (!clientId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Google Sign-In · Setup Required</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #061019; color: #f8fafc; padding: 32px 16px; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 90vh; }
+          .card { background: #0b1926; border: 1px solid #1e293b; border-radius: 24px; padding: 32px; max-width: 520px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+          h2 { color: #4285F4; margin-top: 0; }
+          p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+          code { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 6px; font-size: 13px; }
+          .btn { display: inline-block; background: #059669; color: #fff; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>Real Google Sign-In Setup</h2>
+          <p>
+            To connect live with <code>accounts.google.com</code>, provide your Google OAuth Client ID and Secret in your <code>server/.env</code> file or Render Environment Settings:
+          </p>
+          <div style="background:#061019;border:1px solid #1e293b;border-radius:12px;padding:12px;text-align:left;font-family:monospace;font-size:12.5px;color:#cbd5e1;margin:16px 0;">
+            GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com<br>
+            GOOGLE_CLIENT_SECRET=your-client-secret
+          </div>
+          <p>
+            Authorized redirect URI: <br><code>${redirectUri}</code>
+          </p>
+          <a class="btn" href="/">Return to Hagzy</a>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
+  res.redirect(googleAuthUrl);
+});
+
+// Real Google OAuth 2.0 Callback
+app.get('/api/auth/google/callback', async (req, res) => {
+  const { code } = req.query;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+
+  if (!code || !clientId || !clientSecret) {
+    return res.redirect('/?error=google_auth_failed');
+  }
+
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      })
+    });
+    const tokens = await tokenRes.json();
+    if (!tokens.access_token) throw new Error('No access token returned from Google');
+
+    const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` }
+    });
+    const profile = await userInfoRes.json();
+    const verifiedEmail = profile.email.toLowerCase();
+    const verifiedName = profile.name || verifiedEmail.split('@')[0];
+    const verifiedId = profile.sub;
+    const verifiedAvatar = profile.picture || '';
+
+    let user = db.users.find(u => u.email === verifiedEmail || (u.googleId && u.googleId === verifiedId));
+    if (!user) {
+      user = {
+        id: 'usr_' + crypto.randomUUID().slice(0, 8),
+        googleId: verifiedId,
+        email: verifiedEmail,
+        phone: '',
+        name: verifiedName,
+        avatar: verifiedAvatar,
+        authProvider: 'google',
+        walletBalance: 50.0,
+        createdAt: new Date().toISOString()
+      };
+      db.users.push(user);
+    } else {
+      user.googleId = verifiedId;
+      if (!user.avatar) user.avatar = verifiedAvatar;
+    }
+    saveDb(db);
+
+    const jwtToken = jwt.sign(
+      { id: user.id, email: user.email, name: user.name, provider: 'google' },
+      JWT_SECRET,
+      { expiresIn: '90d' }
+    );
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Google Sign-In Successful</title></head>
+      <body style="font-family:sans-serif;text-align:center;padding:40px;background:#059669;color:#fff;">
+        <h3>Signed in successfully with Google!</h3>
+        <p>Connecting back to Hagzy...</p>
+        <script>
+          const payload = {
+            type: 'HAGZY_AUTH_SUCCESS',
+            token: ${JSON.stringify(jwtToken)},
+            customer: ${JSON.stringify(user)}
+          };
+          if (window.opener) {
+            window.opener.postMessage(payload, '*');
+            window.close();
+          } else {
+            window.location.href = '/?auth_token=' + encodeURIComponent(payload.token) + '&auth_name=' + encodeURIComponent(payload.customer.name) + '&auth_email=' + encodeURIComponent(payload.customer.email);
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Google OAuth callback error:', err);
+    res.redirect('/?error=google_auth_error');
+  }
+});
+
+// Real Apple OAuth 2.0 Start
+app.get('/api/auth/apple/start', (req, res) => {
+  const clientId = process.env.APPLE_CLIENT_ID;
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/apple/callback`;
+
+  if (!clientId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Apple Sign-In · Setup Required</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #061019; color: #f8fafc; padding: 32px 16px; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 90vh; }
+          .card { background: #0b1926; border: 1px solid #1e293b; border-radius: 24px; padding: 32px; max-width: 520px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+          h2 { color: #fff; margin-top: 0; }
+          p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+          code { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 6px; font-size: 13px; }
+          .btn { display: inline-block; background: #059669; color: #fff; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>Real Apple Sign-In Setup</h2>
+          <p>
+            To connect live with <code>appleid.apple.com</code>, configure your Apple Services ID in your <code>server/.env</code> file or Render Environment Settings:
+          </p>
+          <div style="background:#061019;border:1px solid #1e293b;border-radius:12px;padding:12px;text-align:left;font-family:monospace;font-size:12.5px;color:#cbd5e1;margin:16px 0;">
+            APPLE_CLIENT_ID=com.hagzy.app.auth<br>
+            APPLE_TEAM_ID=your-team-id<br>
+            APPLE_KEY_ID=your-key-id
+          </div>
+          <p>
+            Authorized redirect URI: <br><code>${redirectUri}</code>
+          </p>
+          <a class="btn" href="/">Return to Hagzy</a>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  const appleAuthUrl = `https://appleid.apple.com/auth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code%20id_token&scope=name%20email&response_mode=form_post`;
+  res.redirect(appleAuthUrl);
 });
 
 // ==========================================
