@@ -1087,6 +1087,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final privacyFinder = find.text('Privacy & Security');
+    await tester.ensureVisible(privacyFinder);
+    await tester.pumpAndSettle();
     expect(privacyFinder, findsOneWidget);
     await tester.tap(privacyFinder);
     await tester.pumpAndSettle();
@@ -1101,6 +1103,8 @@ void main() {
 
     // Tap WhatsApp Booking Updates
     final whatsappFinder = find.text('WhatsApp Booking Updates');
+    await tester.ensureVisible(whatsappFinder);
+    await tester.pumpAndSettle();
     expect(whatsappFinder, findsOneWidget);
     await tester.tap(whatsappFinder);
     await tester.pumpAndSettle();
@@ -1136,6 +1140,52 @@ void main() {
     // Tap Continue with Apple
     await tester.tap(appleBtn);
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('customer can sign in or register with email and password in profile', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // Navigate to Profile tab
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    // Verify Password field and buttons are present
+    expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
+    final signInBtn = find.text('Sign In with Password');
+    final createAccountBtn = find.text('Create Account');
+    expect(signInBtn, findsOneWidget);
+    expect(createAccountBtn, findsOneWidget);
+
+    // Fill form
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Full Name (optional)'),
+        'Ahmed Zaki');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Email Address'),
+        'zaki@hagzy.app');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Password'),
+        'securePass123');
+    await tester.pumpAndSettle();
+
+    // Tap Sign In with Password
+    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
+    await tester.pumpAndSettle();
+    await tester.tap(signInBtn, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    // Verify customer is signed in
+    final profileName = find.text('Ahmed Zaki');
+    await tester.scrollUntilVisible(
+      profileName,
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(profileName, findsOneWidget);
+    expect(find.text('zaki@hagzy.app'), findsWidgets);
   });
 }
 

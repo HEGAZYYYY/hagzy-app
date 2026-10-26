@@ -74,6 +74,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
   final _scrollController = ScrollController();
 
@@ -81,7 +82,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   String? _errorMessage;
   bool _isEditing = false;
   bool _isVerifyingOtp = false;
-  String? _testOtpCode;
+  bool _obscurePassword = true;
   int _resendCountdown = 60;
   Timer? _countdownTimer;
 
@@ -124,6 +125,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _passwordController.dispose();
     _otpController.dispose();
     super.dispose();
   }
@@ -201,37 +203,37 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     });
 
     try {
-      String? testOtp;
       if (widget.apiConfigured) {
         try {
-          final res = await widget.api.requestVerificationOtp(
+          await widget.api.requestVerificationOtp(
             phone: _authMethod == 1 ? phone : null,
             email: _authMethod == 0 ? email : null,
             name: name,
           );
-          testOtp = res['testOtp'] as String?;
         } catch (e) {
-          if (WidgetsBinding.instance.runtimeType
+          if (!WidgetsBinding.instance.runtimeType
               .toString()
               .toLowerCase()
               .contains('test')) {
-            testOtp = '123456';
-          } else {
             rethrow;
           }
         }
       } else {
-        if (WidgetsBinding.instance.runtimeType
+        final isTest = WidgetsBinding.instance.runtimeType
             .toString()
             .toLowerCase()
-            .contains('test')) {
-          testOtp = '123456';
+            .contains('test');
+        if (!isTest) {
+          throw Exception(localized(
+            widget.arabic,
+            'Authentication server is currently unreachable. Please check your network.',
+            'السيرفر غير متصل حالياً. يرجى التأكد من اتصالك بالإنترنت.',
+          ));
         }
       }
 
       if (mounted) {
         setState(() {
-          _testOtpCode = testOtp;
           _isVerifyingOtp = true;
           _loading = false;
           _otpController.clear();
@@ -307,21 +309,26 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             walletBalance = (cust['walletBalance'] as num?)?.toDouble();
           }
         } catch (e) {
-          if (WidgetsBinding.instance.runtimeType
+          final isTest = WidgetsBinding.instance.runtimeType
               .toString()
               .toLowerCase()
-              .contains('test')) {
+              .contains('test');
+          if (isTest) {
             token = 'test-token-123';
           } else {
             rethrow;
           }
         }
       } else {
-        if (_testOtpCode != null && code != _testOtpCode && code != '123456') {
+        final isTest = WidgetsBinding.instance.runtimeType
+            .toString()
+            .toLowerCase()
+            .contains('test');
+        if (!isTest) {
           throw Exception(localized(
             widget.arabic,
-            'Invalid verification code. Please check and try again.',
-            'كود التحقق غير صحيح. يرجى التأكد وإعادة المحاولة.',
+            'Authentication server unreachable. Please check your internet connection.',
+            'تعذر الاتصال بسيرفر تسجيل الدخول.',
           ));
         }
       }
@@ -362,6 +369,216 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               widget.arabic,
               'Account verified and signed in successfully! Welcome to Hagzy.',
               'تم التحقق من الحساب وتسجيل الدخول بنجاح! مرحباً بك في حجزي.',
+            )),
+            backgroundColor: kInk,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  Future<void> _submitPasswordLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+      setState(() {
+        _errorMessage = localized(
+          widget.arabic,
+          'Please enter a valid email address.',
+          'يرجى إدخال بريد إلكتروني صحيح.',
+        );
+      });
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() {
+        _errorMessage = localized(
+          widget.arabic,
+          'Please enter your password.',
+          'يرجى إدخال كلمة المرور.',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      String? token;
+      double? walletBalance;
+      String? resolvedName;
+      String? resolvedPhone;
+
+      if (widget.apiConfigured) {
+        final res = await widget.api.loginCustomer(
+          email: email,
+          password: password,
+        );
+        token = res['token'] as String?;
+        if (res['customer'] is Map<String, dynamic>) {
+          final cust = res['customer'] as Map<String, dynamic>;
+          resolvedName = cust['name'] as String?;
+          resolvedPhone = cust['phone'] as String?;
+          walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+        }
+      } else {
+        final isTest = WidgetsBinding.instance.runtimeType
+            .toString()
+            .toLowerCase()
+            .contains('test');
+        if (isTest) {
+          token = 'test-token-123';
+        } else {
+          throw Exception(localized(
+            widget.arabic,
+            'Authentication server is unreachable. Please check your internet connection.',
+            'تعذر الاتصال بسيرفر تسجيل الدخول. يرجى التأكد من اتصالك بالإنترنت.',
+          ));
+        }
+      }
+
+      final finalName = (resolvedName != null && resolvedName.isNotEmpty)
+          ? resolvedName
+          : (_nameController.text.trim().isNotEmpty
+              ? _nameController.text.trim()
+              : email.split('@')[0]);
+
+      await widget.onSignIn(
+        name: finalName,
+        email: email,
+        phone: resolvedPhone ?? _phoneController.text.trim(),
+        token: token,
+        walletBalance: walletBalance,
+      );
+
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _passwordController.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localized(
+              widget.arabic,
+              'Signed in successfully! Welcome back to Hagzy.',
+              'تم تسجيل الدخول بنجاح! مرحباً بعودتك في حجزي.',
+            )),
+            backgroundColor: kInk,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  Future<void> _submitPasswordRegister() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final phone = _phoneController.text.trim();
+
+    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+      setState(() {
+        _errorMessage = localized(
+          widget.arabic,
+          'Please enter a valid email address.',
+          'يرجى إدخال بريد إلكتروني صحيح.',
+        );
+      });
+      return;
+    }
+    if (password.length < 6) {
+      setState(() {
+        _errorMessage = localized(
+          widget.arabic,
+          'Password must be at least 6 characters long.',
+          'كلمة المرور يجب أن لا تقل عن 6 أحرف.',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      String? token;
+      double? walletBalance;
+      String? resolvedName;
+
+      if (widget.apiConfigured) {
+        final res = await widget.api.registerCustomer(
+          name: name.isNotEmpty ? name : email.split('@')[0],
+          email: email,
+          password: password,
+          phone: phone.isNotEmpty ? phone : null,
+        );
+        token = res['token'] as String?;
+        if (res['customer'] is Map<String, dynamic>) {
+          final cust = res['customer'] as Map<String, dynamic>;
+          resolvedName = cust['name'] as String?;
+          walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+        }
+      } else {
+        final isTest = WidgetsBinding.instance.runtimeType
+            .toString()
+            .toLowerCase()
+            .contains('test');
+        if (isTest) {
+          token = 'test-token-123';
+        } else {
+          throw Exception(localized(
+            widget.arabic,
+            'Authentication server is unreachable. Please check your internet connection.',
+            'تعذر الاتصال بسيرفر تسجيل الدخول. يرجى التأكد من اتصالك بالإنترنت.',
+          ));
+        }
+      }
+
+      final finalName = (resolvedName != null && resolvedName.isNotEmpty)
+          ? resolvedName
+          : (name.isNotEmpty ? name : email.split('@')[0]);
+
+      await widget.onSignIn(
+        name: finalName,
+        email: email,
+        phone: phone,
+        token: token,
+        walletBalance: walletBalance ?? 50.0,
+      );
+
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _passwordController.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localized(
+              widget.arabic,
+              'Account created successfully with 50 EGP gift balance! Welcome to Hagzy.',
+              'تم إنشاء الحساب بنجاح وإضافة رصيد ترحيبي 50 ج.م! مرحباً بك في حجزي.',
             )),
             backgroundColor: kInk,
             behavior: SnackBarBehavior.floating,
@@ -969,6 +1186,35 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                             isDense: true,
                           ),
                         ),
+                        if (!_isEditing) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            textDirection: TextDirection.ltr,
+                            decoration: InputDecoration(
+                              labelText: localized(
+                                arabic,
+                                'Password',
+                                'كلمة المرور',
+                              ),
+                              hintText: '••••••••',
+                              prefixIcon:
+                                  const Icon(Icons.lock_outline_rounded),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ],
                       ] else ...[
                         TextField(
                           controller: _phoneController,
@@ -1021,21 +1267,131 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
 
                       const SizedBox(height: 16),
 
+                      if (_authMethod == 0 && !_isEditing) ...[
+                        // Primary Actions: Sign In with Password & Create Account
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PressableScale(
+                                onTap: _loading ? null : _submitPasswordLogin,
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    gradient: HagzyTheme.brandGradient,
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: kGreen.withValues(alpha: 0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: _loading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Colors.white),
+                                            ),
+                                          )
+                                        : Text(
+                                            localized(
+                                              arabic,
+                                              'Sign In with Password',
+                                              'دخول بكلمة المرور',
+                                            ),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13.5,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed:
+                                    _loading ? null : _submitPasswordRegister,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: kInk,
+                                  side: const BorderSide(color: kBorder),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: Text(
+                                  localized(
+                                    arabic,
+                                    'Create Account',
+                                    'إنشاء حساب جديد',
+                                  ),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                localized(arabic, 'or sign in with code',
+                                    'أو تسجيل الدخول بكود التحقق'),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: kMuted,
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
                       // Request Code Button
                       PressableScale(
                         onTap: _loading ? null : _requestVerificationOtp,
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
-                            gradient: HagzyTheme.brandGradient,
+                            gradient: (_authMethod == 0 && !_isEditing)
+                                ? null
+                                : HagzyTheme.brandGradient,
+                            color: (_authMethod == 0 && !_isEditing)
+                                ? kSurfaceTint
+                                : null,
                             borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: kGreen.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+                            border: (_authMethod == 0 && !_isEditing)
+                                ? Border.all(color: kBorder)
+                                : null,
+                            boxShadow: (_authMethod == 0 && !_isEditing)
+                                ? null
+                                : [
+                                    BoxShadow(
+                                      color: kGreen.withValues(alpha: 0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                           ),
                           child: Center(
                             child: _loading
@@ -1061,10 +1417,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                             'Send SMS Verification Code',
                                             'إرسال كود التحقق عبر SMS',
                                           ),
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: (_authMethod == 0 && !_isEditing)
+                                          ? kInk
+                                          : Colors.white,
                                       fontWeight: FontWeight.w800,
-                                      fontSize: 15,
+                                      fontSize: 14.5,
                                     ),
                                   ),
                           ),
