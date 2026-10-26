@@ -794,7 +794,10 @@ void main() {
     await tester.enterText(
         find.widgetWithText(TextField, 'Email Address'),
         'hegazy@example.com');
-    await tester.tap(find.text('Send Verification Code'));
+    final sendCodeBtn = find.text('Send Verification Code');
+    await tester.ensureVisible(sendCodeBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(sendCodeBtn);
     await tester.pumpAndSettle();
 
     // Verify OTP verification view is shown
@@ -1109,6 +1112,36 @@ void main() {
     // Dismiss WhatsApp modal
     Navigator.pop(tester.element(find.text('Instant Digital Match Pass & QR')));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('customer can sign in with Google account and Apple account in profile', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const HagzyApp());
+    await tester.pumpAndSettle();
+
+    // Navigate to Profile tab
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    // Verify Google and Apple buttons are present
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue with Apple'), findsOneWidget);
+
+    // Tap Continue with Google
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    // Verify Google account chooser modal appears
+    expect(find.text('Sign in with Google'), findsOneWidget);
+    expect(find.text('Choose an account to continue to Hagzy'), findsOneWidget);
+
+    // Tap account item to sign in
+    await tester.tap(find.text('Mohamed Hegazy'));
+    await tester.pumpAndSettle();
+
+    // Verify user is signed in with Google
+    expect(find.text('Cloud Synced'), findsOneWidget);
+    expect(find.text('Google Account'), findsOneWidget);
   });
 }
 

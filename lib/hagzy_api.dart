@@ -227,6 +227,34 @@ class HagzyApi {
         },
       );
 
+  /// Authenticates a customer with a social identity provider (Google, Apple).
+  Future<Map<String, dynamic>> signInWithSocial({
+    required String provider, // 'google' | 'apple'
+    required String email,
+    required String name,
+    String? providerId,
+    String? avatar,
+    String? idToken,
+  }) async =>
+      _send(
+        'POST',
+        '/api/auth/social/$provider',
+        body: {
+          'email': email.trim(),
+          'name': name.trim(),
+          if (providerId != null && providerId.trim().isNotEmpty)
+            'providerId': providerId.trim(),
+          if (provider == 'google' && providerId != null)
+            'googleId': providerId.trim(),
+          if (provider == 'apple' && providerId != null)
+            'appleUserId': providerId.trim(),
+          if (avatar != null && avatar.trim().isNotEmpty)
+            'avatar': avatar.trim(),
+          if (idToken != null && idToken.trim().isNotEmpty)
+            provider == 'google' ? 'idToken' : 'identityToken': idToken.trim(),
+        },
+      );
+
   /// Retrieves synced customer profile and cloud wallet balance.
   Future<Map<String, dynamic>> getCustomerProfile({
     String? token,
