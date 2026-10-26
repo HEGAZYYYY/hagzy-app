@@ -1,14 +1,27 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+String resolveDefaultApiUrl() {
+  const envUrl = String.fromEnvironment('HAGZY_API_URL');
+  if (envUrl.isNotEmpty) return envUrl;
+
+  if (kIsWeb) {
+    try {
+      final host = Uri.base.host.toLowerCase();
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        return Uri.base.origin;
+      }
+    } catch (_) {}
+  }
+
+  return 'http://localhost:4000';
+}
 
 class HagzyApi {
   HagzyApi({String? baseUrl, http.Client? client})
-      : baseUrl = (baseUrl ??
-                const String.fromEnvironment(
-                  'HAGZY_API_URL',
-                  defaultValue: 'http://localhost:4000',
-                ))
+      : baseUrl = (baseUrl ?? resolveDefaultApiUrl())
             .trim()
             .replaceFirst(RegExp(r'/$'), ''),
         _client = client ?? http.Client();
