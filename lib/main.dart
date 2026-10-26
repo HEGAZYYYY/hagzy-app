@@ -3467,11 +3467,10 @@ class _HagzyHomeState extends State<HagzyHome> {
     final titles = isCustomer
         ? const ['', '', 'Profile']
         : const [
-            '',
-            '',
-            'Manage Venues',
+            'POS Timeline',
+            'My Venues',
+            'Analytics & Revenue',
             'Payment Settings',
-            'Profile',
           ];
     final venueLabel = _venues.length == 1 ? 'venue' : 'venues';
     final bookingCount =
@@ -3481,7 +3480,12 @@ class _HagzyHomeState extends State<HagzyHome> {
     final appTitles = arabic
         ? (isCustomer
             ? const ['', '', 'حسابي']
-            : const ['', '', 'إدارة الأماكن', 'إعدادات الدفع', 'حسابي'])
+            : const [
+                'المواعيد ونقاط البيع',
+                'ملاعبي وأماكني',
+                'الأرباح والتقارير',
+                'إعدادات الدفع',
+              ])
         : titles;
     final mainApp = Localizations.override(
       context: context,
@@ -3751,57 +3755,17 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           ),
                                       }
                                     : switch (_tab) {
-                                        0 => BookTab(
+                                        0 => PosTab(
                                             venues: _venues,
                                             bookings: _bookings,
-                                            arabic: arabic,
-                                            initialVenueId: _targetVenueId,
-                                            onBook: (venue, item, startsAt) =>
-                                                _createBooking(
-                                              venue: venue,
-                                              item: item,
-                                              initialStart: startsAt,
-                                            ),
-                                            onAddVenue: (type) => _addVenue(
-                                              initialType:
-                                                  type ?? VenueType.sports,
-                                            ),
-                                            onAddReview: _addReview,
-                                          ),
-                                        1 => MyBookingsTab(
-                                            venues: _venues,
-                                            bookings: _customerBookings,
-                                            arabic: arabic,
-                                            onChoosePayment: (booking) =>
-                                                _showPaymentMethods(
-                                              booking,
-                                              booking.dueNow ?? booking.price,
-                                            ),
-                                            onCancelBooking: _cancelBooking,
-                                            onBookAgain: (venueId) => setState(() {
-                                              _tab = 0;
-                                              _targetVenueId = venueId;
-                                            }),
-                                            api: _api,
-                                            apiConfigured: _api.isConfigured,
-                                          ),
-                                        2 => AdminManageWorkspace(
-                                            venues: _venues,
-                                            bookings: _bookings,
-                                            onAddVenue: _addVenue,
-                                            onEditVenue: _editVenue,
-                                            onAddItem: _addItem,
-                                            onAddService: _addService,
-                                            onRemoveService: _removeService,
-                                            onDelete: _deleteVenue,
-                                            onRemoveItem: _removeItem,
                                             onWalkIn: (venue, item) =>
                                                 _createBooking(
                                               venue: venue,
                                               item: item,
                                               walkIn: true,
                                             ),
-                                            onBlockSlot: (venue, item, start, duration, reason) =>
+                                            onBlockSlot: (venue, item, start,
+                                                    duration, reason) =>
                                                 _blockSlot(
                                               venue: venue,
                                               item: item,
@@ -3812,31 +3776,44 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onCancel: _cancelBooking,
                                             onConfirm: _confirmBooking,
                                           ),
+                                        1 => ManageTab(
+                                            venues: _venues,
+                                            onAddVenue: _addVenue,
+                                            onEditVenue: _editVenue,
+                                            onAddItem: _addItem,
+                                            onAddService: _addService,
+                                            onRemoveService: _removeService,
+                                            onDelete: _deleteVenue,
+                                            onRemoveItem: _removeItem,
+                                          ),
+                                        2 => AnalyticsTab(
+                                            venues: _venues,
+                                            bookings: _bookings,
+                                          ),
                                         3 => PaymentTab(
                                             apiConfigured: _api.isConfigured,
                                             localPreview: isPreview,
                                           ),
-                                        _ => CustomerProfileTab(
-                                            arabic: arabic,
-                                            customerName: _savedCustomerName,
-                                            customerEmail: _savedCustomerEmail,
-                                            customerPhone: _savedCustomerPhone,
-                                            isSignedIn: _customerSignedIn,
-                                            bookingCount: _customerBookings.length,
-                                            walletBalance: _walletBalance,
-                                            currentArea: _currentArea,
-                                            api: _api,
-                                            apiConfigured: _api.isConfigured,
-                                            onSignIn: _handleCustomerSignIn,
-                                            onSignOut: _handleCustomerSignOut,
-                                            onDeleteAccount: _handleCustomerDeleteAccount,
-                                            onUpdateProfile: _handleCustomerSignIn,
-                                            onChangeLanguage: () =>
-                                                _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
-                                            onViewBookings: () => setState(() => _tab = 1),
-                                            onSelectArea: () => setState(() => _tab = 0),
-                                            onAutoAssignGps: () => setState(() => _tab = 0),
-                                            onSwitchToAdmin: () => setState(() { _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview'; _tab = 2; }),
+                                        _ => PosTab(
+                                            venues: _venues,
+                                            bookings: _bookings,
+                                            onWalkIn: (venue, item) =>
+                                                _createBooking(
+                                              venue: venue,
+                                              item: item,
+                                              walkIn: true,
+                                            ),
+                                            onBlockSlot: (venue, item, start,
+                                                    duration, reason) =>
+                                                _blockSlot(
+                                              venue: venue,
+                                              item: item,
+                                              start: start,
+                                              duration: duration,
+                                              reason: reason,
+                                            ),
+                                            onCancel: _cancelBooking,
+                                            onConfirm: _confirmBooking,
                                           ),
                                       },
                               ),
