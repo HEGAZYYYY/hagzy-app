@@ -381,7 +381,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   Future<void> _signInWithGoogle() async {
     final baseUrl = widget.api.baseUrl;
     final url = Uri.parse('$baseUrl/api/auth/google/start');
-    if (await canLaunchUrl(url)) {
+    if (kIsWeb) {
+      await launchUrl(url, webOnlyWindowName: '_self');
+    } else if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
@@ -389,7 +391,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   Future<void> _signInWithApple() async {
     final baseUrl = widget.api.baseUrl;
     final url = Uri.parse('$baseUrl/api/auth/apple/start');
-    if (await canLaunchUrl(url)) {
+    if (kIsWeb) {
+      await launchUrl(url, webOnlyWindowName: '_self');
+    } else if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
@@ -1609,6 +1613,193 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     }
   }
 
+  void _showLegalDocumentViewer(BuildContext context,
+      {required bool arabic, required bool isPrivacy}) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+        ),
+        decoration: const BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: kGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      isPrivacy ? Icons.shield_rounded : Icons.gavel_rounded,
+                      color: kGreen,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      isPrivacy
+                          ? localized(arabic, 'Privacy Policy', 'سياسة الخصوصية')
+                          : localized(arabic, 'Terms of Service', 'شروط الاستخدام'),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: kInk,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: kMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isPrivacy) ...[
+                      _buildLegalSection(
+                        title: localized(arabic, '1. Commitment to Privacy & Law No. 151 of 2020', '١. الالتزام بحماية البيانات وفق القانون المصري رقم ١٥١ لسنة ٢٠٢٠'),
+                        body: localized(
+                          arabic,
+                          'Hagzy is committed to protecting your personal data in accordance with the Egyptian Personal Data Protection Law (Law No. 151 of 2020) and international consumer standards. We never sell, rent, or trade your personal information to third parties or advertisers.',
+                          'تلتزم منصة حجزي التزاماً تاماً بحماية بياناتك الشخصية وحرمة حياتك الخاصة وفقاً لأحكام قانون حماية البيانات الشخصية المصري رقم ١٥١ لسنة ٢٠٢٠ والمعايير الدولية. لا نقوم إطلاقاً ببيع أو تأجير أو مشاركة بياناتك مع أي أطراف إعلانية أو جهات خارجية.',
+                        ),
+                      ),
+                      _buildLegalSection(
+                        title: localized(arabic, '2. Financial Security & PCI-DSS Escrow', '٢. الأمان المالي وضمان الحجوزات عبر Paymob'),
+                        body: localized(
+                          arabic,
+                          'All card, InstaPay, and mobile wallet transactions are encrypted and processed through licensed Central Bank of Egypt payment gateways (Paymob). Hagzy servers never store your credit or debit card numbers, CVV codes, or bank passwords.',
+                          'تتم جميع عمليات الدفع الإلكتروني (البطاقات البنكية، إنستاباي، والمحافظ الإلكترونية) عبر بوابات دفع مرخصة من البنك المركزي المصري (Paymob) بأعلى معايير التشفير المصرفي PCI-DSS، ولا يتم تخزين أرقام بطاقاتك أو رموز الأمان على سيرفراتنا نهائياً.',
+                        ),
+                      ),
+                      _buildLegalSection(
+                        title: localized(arabic, '3. Right to Account Deletion', '٣. الحق في الحذف الدائم والنهائي للحساب'),
+                        body: localized(
+                          arabic,
+                          'In strict compliance with Apple App Store Guideline 5.1.1(v) and Google Play Safety policies, you can delete your account and all associated booking logs permanently from your Profile settings at any time with one click.',
+                          'امتثالاً لسياسات آبل (Apple Guideline 5.1.1v) وجوجل، يتيح لك التطبيق في أي وقت ومن شاشة البروفايل مسح حسابك وسجل حجوزاتك وبياناتك الشخصية نهائياً من أجهزتك وسيرفراتنا بضغطة واحدة دون تعقيد.',
+                        ),
+                      ),
+                    ] else ...[
+                      _buildLegalSection(
+                        title: localized(arabic, '1. Reservation Slot Hold Policy', '١. ضمان حجز الموعد المؤقت (١٥ دقيقة)'),
+                        body: localized(
+                          arabic,
+                          'Upon initiating a booking, Hagzy exclusively reserves the court or salon time slot for 15 minutes to allow payment completion. If payment is not submitted within 15 minutes, the slot is automatically released.',
+                          'عند اختيار الموعد، يتم حجز الملعب أو موعد الصالون حصرياً لك لمدة ١٥ دقيقة لإتمام السداد. وفي حال عدم تأكيد السداد خلال تلك المدة يتم إلغاء الحجز تلقائياً وإتاحته لعملاء آخرين.',
+                        ),
+                      ),
+                      _buildLegalSection(
+                        title: localized(arabic, '2. Cancellation & Rescheduling', '٢. الإلغاء وتعديل المواعيد'),
+                        body: localized(
+                          arabic,
+                          'Free cancellation or rescheduling is permitted up to 2 hours prior to the confirmed booking time. Approved refunds are credited directly to your Hagzy Wallet or original payment method.',
+                          'يحق للعميل تعديل موعد الحجز أو الإلغاء واسترداد الرصيد لمحفظة حجزي أو وسيلة الدفع الأصلية وفقاً لسياسة الإلغاء المعلنة للمكان وقبل بدء الموعد بساعتين على الأقل.',
+                        ),
+                      ),
+                      _buildLegalSection(
+                        title: localized(arabic, '3. Venue Etiquette & Rules', '٣. الالتزام بلائحة الأماكن والملاعب'),
+                        body: localized(
+                          arabic,
+                          'Users agree to adhere to all rules, safety guidelines, and dress codes established by the venue partner. Proper athletic footwear is required on padel and football courts.',
+                          'يلتزم العميل بالحضور في الموعد المحدد ومراعاة تعليمات الأمن والسلامة والزي الرياضي المناسب لملاعب البادل وكرة القدم وصالونات الحلاقة والعناية.',
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kGreen,
+                        side: const BorderSide(color: kGreen),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: Text(
+                        localized(
+                          arabic,
+                          'Open Full Web Document in Browser',
+                          'فتح المستند الرسمي بالمتصفح',
+                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openLegalWebPage(
+                          context,
+                          isPrivacy ? 'privacy.html' : 'terms.html',
+                          isPrivacy
+                              ? localized(arabic, 'Privacy Policy', 'سياسة الخصوصية')
+                              : localized(arabic, 'Terms of Service', 'شروط الاستخدام'),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegalSection({required String title, required String body}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14.5,
+                color: kInk,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              body,
+              style: const TextStyle(
+                fontSize: 13,
+                color: kMuted,
+                height: 1.55,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+
   void _showPrivacySecurityModal(BuildContext context, bool arabic) {
     showModalBottomSheet<void>(
       context: context,
@@ -1761,11 +1952,11 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700, fontSize: 13),
                             ),
-                            onPressed: () => _openLegalWebPage(
+                            onPressed: () => _showLegalDocumentViewer(
                                 context,
-                                'privacy.html',
-                                localized(
-                                    arabic, 'Privacy Policy', 'سياسة الخصوصية')),
+                                arabic: arabic,
+                                isPrivacy: true,
+                              ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1787,11 +1978,11 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700, fontSize: 13),
                             ),
-                            onPressed: () => _openLegalWebPage(
+                            onPressed: () => _showLegalDocumentViewer(
                                 context,
-                                'terms.html',
-                                localized(arabic, 'Terms of Service',
-                                    'شروط الاستخدام')),
+                                arabic: arabic,
+                                isPrivacy: false,
+                              ),
                           ),
                         ),
                       ],

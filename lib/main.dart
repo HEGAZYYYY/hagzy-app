@@ -2701,14 +2701,8 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _startPaymobCheckout(Booking booking, {String paymentMethod = 'card'}) async {
     final arabic = _language == 'AR';
-    final defaultGatewayUrl =
-        (Uri.base.scheme == 'http' || Uri.base.scheme == 'https') &&
-                Uri.base.host.isNotEmpty &&
-                Uri.base.port != 5176
-            ? '${Uri.base.scheme}://${Uri.base.host}${Uri.base.hasPort ? ':${Uri.base.port}' : ''}'
-            : 'http://localhost:3000';
     final gatewayApi =
-        _api.isConfigured ? _api : HagzyApi(baseUrl: defaultGatewayUrl);
+        _api.isConfigured ? _api : HagzyApi(baseUrl: resolveDefaultApiUrl());
     final parts = booking.customer.trim().split(RegExp(r'\s+'));
     final firstName = parts.first.isNotEmpty ? parts.first : 'Customer';
     final lastName = parts.length > 1 ? parts.skip(1).join(' ') : 'Hagzy';

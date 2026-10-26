@@ -1,3 +1,10 @@
+databases:
+  - name: hagzy-postgres
+    databaseName: hagzydb
+    user: hagzyuser
+    plan: free
+    region: frankfurt
+
 services:
   # 1. Hagzy Backend API (Node.js & Express)
   - type: web
@@ -20,6 +27,10 @@ services:
         value: admin@hagzy.app
       - key: ADMIN_PASSWORD
         value: hagzy2026!
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hagzy-postgres
+          property: connectionString
 
   # 2. Hagzy Web Client (Flutter Web)
   - type: static
