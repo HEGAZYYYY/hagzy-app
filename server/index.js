@@ -523,7 +523,10 @@ function sanitizeUser(u) {
 
 function normalizeTarget(value) {
   const t = String(value || '').trim();
-  return t.includes('@') ? t.toLowerCase() : t;
+  if (t.includes('@')) {
+    return t.toLowerCase();
+  }
+  return t.replace(/[\s\-\(\)]/g, '');
 }
 
 function escapeForInlineScript(json) {
@@ -981,18 +984,25 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
   let firebaseCustomToken = null;
   if (fbAuth && !IS_TEST) {
     try {
-      let formattedPhone = isEmail ? '' : target;
-      if (formattedPhone && formattedPhone.startsWith('0')) {
-        formattedPhone = '+2' + formattedPhone;
-      } else if (formattedPhone && !formattedPhone.startsWith('+')) {
-        formattedPhone = '+' + formattedPhone;
+      let formattedPhone = '';
+      if (!isEmail) {
+        const digits = target.replace(/\D/g, '');
+        if (digits.startsWith('20') && digits.length >= 12) {
+          formattedPhone = '+' + digits;
+        } else if (digits.startsWith('0') && digits.length >= 11) {
+          formattedPhone = '+2' + digits;
+        } else if (digits.length === 10 && (digits.startsWith('10') || digits.startsWith('11') || digits.startsWith('12') || digits.startsWith('15'))) {
+          formattedPhone = '+20' + digits;
+        } else if (digits.length > 0) {
+          formattedPhone = '+' + digits;
+        }
       }
 
-      let fbUser;
+      let fbUser = null;
       try {
         if (isEmail) {
           fbUser = await fbAuth.getUserByEmail(target);
-        } else {
+        } else if (formattedPhone) {
           fbUser = await fbAuth.getUserByPhoneNumber(formattedPhone);
         }
       } catch (err) {
@@ -1003,10 +1013,17 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
             displayName: user.name || (isEmail ? target.split('@')[0] : 'Hagzy Member')
           });
           console.log('✅ Created user in Firebase Auth:', fbUser.uid, formattedPhone || target);
+        } else {
+          console.warn('Firebase user lookup notice:', err.code, err.message);
         }
       }
 
       if (fbUser) {
+        if (user.name && !fbUser.displayName) {
+          try {
+            await fbAuth.updateUser(fbUser.uid, { displayName: user.name });
+          } catch (_) {}
+        }
         firebaseCustomToken = await fbAuth.createCustomToken(fbUser.uid);
         console.log('✅ Created Firebase Custom Token for:', fbUser.uid);
       }
@@ -1551,6 +1568,7 @@ app.post('/api/bookings/:id/paymob-intention', (req, res) => {
 app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
   return res.status(200).json({
     status: 'healthy',
+    firebaseAdminReady: !!fbAuth,
     time: new Date().toISOString(),
     usersCount: db.users.length,
     venuesCount: db.venues.length,

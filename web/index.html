@@ -214,6 +214,24 @@
         return null;
       };
 
+      window.hagzySignInWithCustomTokenCallback = function(token, onSuccess, onError) {
+        try {
+          if (auth && token) {
+            signInWithCustomToken(auth, token).then(function(userCredential) {
+              console.log("✅ Firebase Web Authenticated Online via Custom Token! UID:", userCredential.user.uid);
+              if (typeof onSuccess === 'function') onSuccess(userCredential.user.uid);
+            }).catch(function(e) {
+              console.warn("Firebase Custom Token sign-in notice:", e);
+              if (typeof onError === 'function') onError(e.message || String(e));
+            });
+          } else {
+            if (typeof onError === 'function') onError("Auth or token missing");
+          }
+        } catch (e) {
+          if (typeof onError === 'function') onError(e.message || String(e));
+        }
+      };
+
     } catch (e) {
       console.warn("Firebase initialization notice:", e);
     }

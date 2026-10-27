@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <script>
+    // Purge any stale service worker caches so updates are immediate
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (let r of regs) r.unregister();
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
+      });
+    }
+  </script>
   <base href="/">
 
   <meta charset="UTF-8">
@@ -51,6 +64,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
@@ -65,8 +79,159 @@
     try {
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
+      const auth = getAuth(app);
+      try { auth.useDeviceLanguage(); } catch (_) {}
       window.firebaseApp = app;
       window.firebaseAnalytics = analytics;
+      window.firebaseAuth = auth;
+
+      // Automatically catch redirect sign-in results from Google or Apple
+      window.hagzyRedirectUser = null;
+      getRedirectResult(auth).then(async function(result) {
+        if (result && result.user) {
+          const user = result.user;
+          const token = await user.getIdToken();
+          const name = user.displayName || (user.email ? user.email.split('@')[0] : 'Hagzy Member');
+          const email = user.email || '';
+          window.hagzyRedirectUser = JSON.stringify({
+            token: token,
+            name: name,
+            email: email,
+            phone: user.phoneNumber || '',
+            avatar: user.photoURL || '',
+            providerId: user.uid
+          });
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('auth_token', token);
+            url.searchParams.set('auth_name', name);
+            url.searchParams.set('auth_email', email);
+            window.history.replaceState({}, '', url.toString());
+          } catch (_) {}
+          if (typeof window.onHagzyRedirectUser === 'function') {
+            window.onHagzyRedirectUser(window.hagzyRedirectUser);
+          }
+        }
+      }).catch(function(err) {
+        console.warn("Firebase Redirect Result notice:", err);
+      });
+
+      window.hagzySignInWithGoogleCallback = function(onSuccess, onError) {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        signInWithPopup(auth, provider).then(async function(result) {
+          const user = result.user;
+          const token = await user.getIdToken();
+          onSuccess(JSON.stringify({
+            token: token,
+            name: user.displayName || (user.email ? user.email.split('@')[0] : 'Hagzy Member'),
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            avatar: user.photoURL || '',
+            providerId: user.uid
+          }));
+        }).catch(async function(err) {
+          console.warn("Google popup notice, testing redirect fallback:", err.code);
+          if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+            try {
+              await signInWithRedirect(auth, provider);
+              onSuccess(JSON.stringify({ redirecting: true }));
+            } catch (redirErr) {
+              onError(redirErr.message || String(redirErr));
+            }
+          } else {
+            onError(err.code || err.message || String(err));
+          }
+        });
+      };
+
+      window.hagzySignInWithAppleCallback = function(onSuccess, onError) {
+        const provider = new OAuthProvider('apple.com');
+        signInWithPopup(auth, provider).then(async function(result) {
+          const user = result.user;
+          const token = await user.getIdToken();
+          onSuccess(JSON.stringify({
+            token: token,
+            name: user.displayName || 'Apple Member',
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            avatar: user.photoURL || '',
+            providerId: user.uid
+          }));
+        }).catch(async function(err) {
+          console.warn("Apple popup notice, testing redirect fallback:", err.code);
+          if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+            try {
+              await signInWithRedirect(auth, provider);
+              onSuccess(JSON.stringify({ redirecting: true }));
+            } catch (redirErr) {
+              onError(redirErr.message || String(redirErr));
+            }
+          } else {
+            onError(err.code || err.message || String(err));
+          }
+        });
+      };
+
+      window.hagzySignInWithGoogle = async function() {
+        return new Promise(function(resolve, reject) {
+          window.hagzySignInWithGoogleCallback(resolve, reject);
+        });
+      };
+
+            window.hagzySignOut = function() {
+        try {
+          if (window.firebaseAuth) {
+            window.firebaseAuth.signOut();
+          }
+          window.hagzyRedirectUser = null;
+          const url = new URL(window.location.href);
+          url.searchParams.delete('auth_token');
+          url.searchParams.delete('auth_name');
+          url.searchParams.delete('auth_email');
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+        } catch (e) {
+          console.warn("Sign out cleanup notice:", e);
+        }
+      };
+
+      window.hagzySignInWithApple = async function() {
+        return new Promise(function(resolve, reject) {
+          window.hagzySignInWithAppleCallback(resolve, reject);
+        });
+      };
+
+      window.hagzySignInWithCustomToken = async function(token) {
+        try {
+          if (auth && token) {
+            const userCredential = await signInWithCustomToken(auth, token);
+            console.log("✅ Firebase Web Authenticated Online via Custom Token! UID:", userCredential.user.uid);
+            return userCredential.user.uid;
+          }
+        } catch (e) {
+          console.warn("Firebase Custom Token sign-in notice:", e);
+        }
+        return null;
+      };
+
+      window.hagzySignInWithCustomTokenCallback = function(token, onSuccess, onError) {
+        try {
+          if (auth && token) {
+            signInWithCustomToken(auth, token).then(function(userCredential) {
+              console.log("✅ Firebase Web Authenticated Online via Custom Token! UID:", userCredential.user.uid);
+              if (typeof onSuccess === 'function') onSuccess(userCredential.user.uid);
+            }).catch(function(e) {
+              console.warn("Firebase Custom Token sign-in notice:", e);
+              if (typeof onError === 'function') onError(e.message || String(e));
+            });
+          } else {
+            if (typeof onError === 'function') onError("Auth or token missing");
+          }
+        } catch (e) {
+          if (typeof onError === 'function') onError(e.message || String(e));
+        }
+      };
+
     } catch (e) {
       console.warn("Firebase initialization notice:", e);
     }
@@ -116,7 +281,18 @@ addEventListener("message", eventListener);
 }
 _flutter.buildConfig = {"engineRevision":"deb287481e3ce9468f3434937ced4240a70539ca","wasmHashes":{"canvaskit.wasm":"fbed517a43e82452404446683f00f2e876d835aed84410695759e67b6bb01cd3","chromium/canvaskit.wasm":"ae8ff1d858140f7b1300ced3fa89fb8c9dce0a400a0f4f1e11f6dcfb3315fdcf","skwasm.wasm":"e540fd5e8303b7b68ec2718cb49e9c421f8ade3075b15e02a7059a62654df9a1","skwasm_heavy.wasm":"565f5cc1cca6ab120f11934b105f01fec4b58b480c82e0889dca93af8e6f8635","webparagraph/canvaskit.wasm":"0ce1b05082efdc8529550e8a01f6ff0593972d55525035010e26f5600aa9f254","wimp.wasm":"e924eaafd801d41e017d178f3fd5cf8a417f641fe35c9ed34a4e1d7582283e0c"},"builds":[{"compileTarget":"dart2js","renderer":"canvaskit","mainJsPath":"main.dart.js"},{}]};
 
+    if (window._flutter && window._flutter.buildConfig && Array.isArray(window._flutter.buildConfig.builds)) {
+      var hagzyBuildBuster = Date.now();
+      window._flutter.buildConfig.builds.forEach(function(b) {
+        if (b && b.mainJsPath) {
+          b.mainJsPath = b.mainJsPath + '?v=' + hagzyBuildBuster;
+        }
+      });
+    }
     _flutter.loader.load({
+      serviceWorkerSettings: {
+        serviceWorkerVersion: null
+      },
       onEntrypointLoaded: async function(engineInitializer) {
         const appRunner = await engineInitializer.initializeEngine();
         await appRunner.runApp();
