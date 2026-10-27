@@ -82,6 +82,82 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
   }
 }
 
+Future<Map<String, dynamic>?> webSendPhoneOtp(String phone) async {
+  try {
+    int attempts = 0;
+    while (!js.context.hasProperty('hagzySendPhoneOtp') && attempts < 25) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      attempts++;
+    }
+
+    if (js.context.hasProperty('hagzySendPhoneOtp')) {
+      final completer = Completer<Map<String, dynamic>?>();
+      js.context.callMethod('hagzySendPhoneOtp', [
+        phone,
+        js.allowInterop((result) {
+          try {
+            if (result != null) {
+              if (result is String) {
+                completer.complete(jsonDecode(result) as Map<String, dynamic>);
+              } else {
+                final str = js.context['JSON'].callMethod('stringify', [result]);
+                completer.complete(jsonDecode(str as String) as Map<String, dynamic>);
+              }
+            } else {
+              completer.complete({'success': true});
+            }
+          } catch (e) {
+            completer.complete({'error': e.toString()});
+          }
+        }),
+        js.allowInterop((error) {
+          completer.complete({'error': error?.toString() ?? 'Phone verification error'});
+        }),
+      ]);
+      return await completer.future;
+    } else {
+      return {'error': 'Firebase Auth is still initializing. Please try again.'};
+    }
+  } catch (e) {
+    return {'error': e.toString()};
+  }
+}
+
+Future<Map<String, dynamic>?> webVerifyPhoneOtp(String code) async {
+  try {
+    if (js.context.hasProperty('hagzyVerifyPhoneOtp')) {
+      final completer = Completer<Map<String, dynamic>?>();
+      js.context.callMethod('hagzyVerifyPhoneOtp', [
+        code,
+        js.allowInterop((result) {
+          try {
+            if (result != null) {
+              if (result is String) {
+                completer.complete(jsonDecode(result) as Map<String, dynamic>);
+              } else {
+                final str = js.context['JSON'].callMethod('stringify', [result]);
+                completer.complete(jsonDecode(str as String) as Map<String, dynamic>);
+              }
+            } else {
+              completer.complete(null);
+            }
+          } catch (e) {
+            completer.complete({'error': e.toString()});
+          }
+        }),
+        js.allowInterop((error) {
+          completer.complete({'error': error?.toString() ?? 'Invalid verification code'});
+        }),
+      ]);
+      return await completer.future;
+    } else {
+      return {'error': 'Phone verification session not found.'};
+    }
+  } catch (e) {
+    return {'error': e.toString()};
+  }
+}
+
 Map<String, dynamic>? webGetRedirectUser() {
   try {
     if (js.context.hasProperty('hagzyRedirectUser')) {

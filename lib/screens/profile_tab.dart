@@ -204,7 +204,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     });
 
     try {
-      if (widget.apiConfigured) {
+      if (kIsWeb && _authMethod == 1) {
+        final phoneRes = await SocialAuthService.sendPhoneOtp(phone);
+        if (phoneRes != null && phoneRes['error'] != null) {
+          throw Exception(phoneRes['error'].toString());
+        }
+      } else if (widget.apiConfigured) {
         try {
           final otpRes = await widget.api.requestVerificationOtp(
             phone: _authMethod == 1 ? phone : null,
@@ -361,7 +366,17 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     try {
       String? token;
       double? walletBalance;
-      if (widget.apiConfigured) {
+      if (kIsWeb && _authMethod == 1) {
+        final phoneRes = await SocialAuthService.verifyPhoneOtp(code);
+        if (phoneRes != null) {
+          if (phoneRes['error'] != null) {
+            throw Exception(phoneRes['error'].toString());
+          }
+          token = phoneRes['token'] as String?;
+          final p = phoneRes['phone'] as String?;
+          if (p != null && p.isNotEmpty) resolvedPhone = p;
+        }
+      } else if (widget.apiConfigured) {
         try {
           final res = await widget.api.verifyVerificationOtp(
             phone: _authMethod == 1 ? phone : null,

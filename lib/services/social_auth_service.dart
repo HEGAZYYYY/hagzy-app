@@ -4,6 +4,8 @@ import 'social_auth_service_stub.dart'
 class SocialAuthService {
   static Future<Map<String, dynamic>?> signInWithGoogle() => webGoogleSignIn();
   static Future<Map<String, dynamic>?> signInWithApple() => webAppleSignIn();
+  static Future<Map<String, dynamic>?> sendPhoneOtp(String phone) => webSendPhoneOtp(phone);
+  static Future<Map<String, dynamic>?> verifyPhoneOtp(String code) => webVerifyPhoneOtp(code);
   static Map<String, dynamic>? getRedirectUser() => webGetRedirectUser();
   static void signOutWeb() => webSignOut();
 }
