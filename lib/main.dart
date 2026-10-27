@@ -3790,6 +3790,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onCancelBooking: _cancelBooking,
                                             onRefresh: () => _syncAccountData(
                                                 showErrors: true),
+                                            onScreenOpened: () =>
+                                              _syncAccountData(),
                                             onBookAgain: (venueId) => setState(() {
                                               _tab = 0;
                                               _targetVenueId = venueId;
