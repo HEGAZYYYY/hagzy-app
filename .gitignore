@@ -49,7 +49,9 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Keystore & Secrets
+# Backup files
+*.bak
+.firebase/
 *.jks
 *.keystore
 **/android/key.properties

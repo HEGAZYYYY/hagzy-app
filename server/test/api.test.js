@@ -123,3 +123,87 @@ test('Google sign-in without a verifiable id token is refused', async () => {
   const r = await call('POST', '/api/auth/social/google', { body: { email: 'victim@test.dev', googleId: '1' } });
   assert.equal(r.status, 400);
 });
+
+test('customer registration grants 0 EGP balance and login works with bcrypt', async () => {
+  const email = `user_${Date.now()}@test.dev`;
+  const reg = await call('POST', '/api/auth/customer/register', {
+    body: { name: 'New User', email, password: 'SecurePassword123', phone: '01011113333' }
+  });
+  assert.equal(reg.status, 201);
+  assert.equal(reg.json.customer.walletBalance, 0);
+
+  // Duplicate email registration rejected
+  const dupEmail = await call('POST', '/api/auth/customer/register', {
+    body: { name: 'Dup', email, password: 'SecurePassword123' }
+  });
+  assert.equal(dupEmail.status, 409);
+
+  // Login with correct credentials
+  const login = await call('POST', '/api/auth/customer/login', {
+    body: { email, password: 'SecurePassword123' }
+  });
+  assert.equal(login.status, 200);
+  assert.equal(login.json.customer.walletBalance, 0);
+
+  // Login with wrong password
+  const wrong = await call('POST', '/api/auth/customer/login', {
+    body: { email, password: 'WrongPassword' }
+  });
+  assert.equal(wrong.status, 401);
+});
+
+test('customer profile editing, duplicate rejection, and logout invalidation', async () => {
+  const email = `profile_${Date.now()}@test.dev`;
+  const reg = await call('POST', '/api/auth/customer/register', {
+    body: { name: 'Original', email, password: 'Password123' }
+  });
+  const token = reg.json.token;
+
+  // Edit profile
+  const put = await call('PUT', '/api/customer/profile', {
+    token,
+    body: { name: 'Updated Name', phone: '01044445555' }
+  });
+  assert.equal(put.status, 200);
+  assert.equal(put.json.customer.name, 'Updated Name');
+  assert.equal(put.json.customer.phone, '01044445555');
+
+  // Logout invalidates session
+  const logout = await call('POST', '/api/auth/customer/logout', { token });
+  assert.equal(logout.status, 200);
+
+  // Subsequent call fails
+  const after = await call('GET', '/api/customer/profile', { token });
+  assert.equal(after.status, 401);
+});
+
+test('customer booking cancellation authorizes owner and rejects non-owners', async () => {
+  const email1 = `owner_${Date.now()}@test.dev`;
+  const reg1 = await call('POST', '/api/auth/customer/register', {
+    body: { name: 'Owner', email: email1, password: 'Password123' }
+  });
+  const token1 = reg1.json.token;
+
+  const email2 = `stranger_${Date.now()}@test.dev`;
+  const reg2 = await call('POST', '/api/auth/customer/register', {
+    body: { name: 'Stranger', email: email2, password: 'Password123' }
+  });
+  const token2 = reg2.json.token;
+
+  // Owner creates booking
+  const b = (await call('POST', '/api/bookings', { token: token1, body: booking({ phone: '01088889999' }) })).json.booking;
+  assert.ok(b && b.id);
+
+  // Stranger attempts to cancel -> 403 Forbidden
+  const forbidden = await call('POST', `/api/bookings/${b.id}/cancel`, { token: token2 });
+  assert.equal(forbidden.status, 403);
+
+  // Owner cancels -> 200 OK
+  const cancelOk = await call('POST', `/api/bookings/${b.id}/cancel`, { token: token1 });
+  assert.equal(cancelOk.status, 200);
+  assert.equal(cancelOk.json.booking.status, 'cancelled');
+
+  // Repeat cancel -> 400 Bad Request
+  const repeat = await call('POST', `/api/bookings/${b.id}/cancel`, { token: token1 });
+  assert.equal(repeat.status, 400);
+});

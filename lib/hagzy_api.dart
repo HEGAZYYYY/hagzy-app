@@ -341,6 +341,18 @@ class HagzyApi {
     return result['bookings'] as List<dynamic>? ?? const [];
   }
 
+  /// Cancels an eligible customer booking using the customer's authenticated session.
+  Future<Map<String, dynamic>> cancelCustomerBooking(
+    String bookingId, {
+    required String token,
+  }) async {
+    return _send(
+      'POST',
+      '/api/bookings/${Uri.encodeComponent(bookingId)}/cancel',
+      token: token,
+    );
+  }
+
   /// Creates a FawryPay reference number for a pending booking deposit.
   Future<Map<String, dynamic>> createFawryCheckout(
     String bookingId, {
