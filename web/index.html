@@ -46,6 +46,31 @@
       touch-action: pan-x pan-y;
     }
   </style>
+
+  <!-- Firebase App & Analytics SDK (hagzy-acea1) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
+      authDomain: "hagzy-acea1.firebaseapp.com",
+      projectId: "hagzy-acea1",
+      storageBucket: "hagzy-acea1.firebasestorage.app",
+      messagingSenderId: "112586231867",
+      appId: "1:112586231867:web:c3df50a6ee9183aa500c1e",
+      measurementId: "G-MNYV0KSVX4"
+    };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      window.firebaseApp = app;
+      window.firebaseAnalytics = analytics;
+    } catch (e) {
+      console.warn("Firebase initialization notice:", e);
+    }
+  </script>
 </head>
 <body>
   <script>
