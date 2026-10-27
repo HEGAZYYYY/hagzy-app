@@ -524,7 +524,7 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   };
   saveDb(db);
 
-  if (!isReviewer) {
+  if (!isReviewer && !IS_TEST) {
     if (target.includes('@')) {
       await sendRealEmail({ email: target, code: otp });
     } else {
