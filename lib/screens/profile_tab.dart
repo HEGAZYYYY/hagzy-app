@@ -71,7 +71,7 @@ class CustomerProfileTab extends StatefulWidget {
 
 class _CustomerProfileTabState extends State<CustomerProfileTab> {
   // 0: Email, 1: Phone
-  int _authMethod = 0;
+  int _authMethod = 1;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -107,6 +107,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   void didUpdateWidget(CustomerProfileTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.isSignedIn && oldWidget.isSignedIn) {
+      _isPhoneSignUp = false;
+      _isEditing = false;
+      _isVerifyingOtp = false;
+      _errorMessage = null;
+      _phoneController.clear();
+      _nameController.clear();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scrollController.hasClients) {
           _scrollController.jumpTo(0);
@@ -1348,8 +1354,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                       'تعديل بيانات حسابك')
                                   : localized(
                                       arabic,
-                                      'Sign in with Email or Phone',
-                                      'تسجيل الدخول بالإيميل أو الموبايل',
+                                      'Sign in to Hagzy',
+                                      'تسجيل الدخول إلى حجزي',
                                     ),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
@@ -1399,8 +1405,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               child: Text(
                                 localized(
                                   arabic,
-                                  'or continue with email or phone',
-                                  'أو المتابعة بالبريد أو رقم الهاتف',
+                                  'or continue with mobile number',
+                                  'أو المتابعة برقم الموبايل',
                                 ),
                                 style: const TextStyle(
                                   fontSize: 12,
@@ -1417,129 +1423,54 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         const SizedBox(height: 16),
                       ],
 
-                      // Method Switcher (Email vs Phone)
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: kSurfaceTint,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _TabButton(
-                                icon: Icons.email_rounded,
-                                title: localized(arabic, 'Email', 'بالإيميل'),
-                                isSelected: _authMethod == 0,
-                                onTap: () => setState(() {
-                                  _authMethod = 0;
-                                  _errorMessage = null;
-                                }),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: _TabButton(
-                                icon: Icons.phone_iphone_rounded,
-                                title: localized(
-                                    arabic, 'Phone Number', 'بالموبايل'),
-                                isSelected: _authMethod == 1,
-                                onTap: () => setState(() {
-                                  _authMethod = 1;
-                                  _errorMessage = null;
-                                }),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
                       // Name Field (Only shown during sign-up or profile editing)
-                      if (_authMethod == 0 || _isPhoneSignUp || _isEditing) ...[
+                      if (_isPhoneSignUp || _isEditing) ...[
                         TextField(
                           controller: _nameController,
-                        textDirection:
-                            arabic ? TextDirection.rtl : TextDirection.ltr,
+                          textDirection:
+                              arabic ? TextDirection.rtl : TextDirection.ltr,
+                          decoration: InputDecoration(
+                            labelText: localized(arabic, 'Full Name (optional)',
+                                'الاسم بالكامل (اختياري)'),
+                            hintText: localized(arabic, 'e.g. Mohamed Hegazy',
+                                'مثال: محمد حجازي'),
+                            prefixIcon: const Icon(Icons.person_outline_rounded),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Phone Number Field
+                      TextField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        textDirection: TextDirection.ltr,
                         decoration: InputDecoration(
-                          labelText: localized(arabic, 'Full Name (optional)',
-                              'الاسم بالكامل (اختياري)'),
-                          hintText: localized(arabic, 'e.g. Mohamed Hegazy',
-                              'مثال: محمد حجازي'),
-                          prefixIcon: const Icon(Icons.person_outline_rounded),
+                          labelText: localized(
+                              arabic, 'Phone Number', 'رقم الموبايل'),
+                          hintText: '010XXXXXXXX / 011XXXXXXXX',
+                          prefixIcon:
+                              const Icon(Icons.phone_android_rounded),
+                          helperText: localized(
+                            arabic,
+                            'Enter 11-digit Egyptian mobile number',
+                            'أدخل رقم موبايل مصري مكون من 11 رقماً',
+                          ),
                           isDense: true,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                    ],
-
-                      // Conditional Field based on Method
-                      if (_authMethod == 0) ...[
+                      if (_isEditing) ...[
+                        const SizedBox(height: 12),
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           textDirection: TextDirection.ltr,
                           decoration: InputDecoration(
-                            labelText: localized(arabic, 'Email Address',
-                                'البريد الإلكتروني (الإيميل)'),
+                            labelText: localized(arabic, 'Email Address (optional)',
+                                'البريد الإلكتروني (اختياري)'),
                             hintText: 'name@example.com',
                             prefixIcon: const Icon(Icons.email_outlined),
-                            isDense: true,
-                          ),
-                        ),
-                        if (!_isEditing) ...[
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: localized(
-                                arabic,
-                                'Password',
-                                'كلمة المرور',
-                              ),
-                              hintText: '••••••••',
-                              prefixIcon:
-                                  const Icon(Icons.lock_outline_rounded),
-                              suffixIcon: IconButton(
-                                tooltip: localized(
-                                    arabic,
-                                    _obscurePassword
-                                        ? 'Show password'
-                                        : 'Hide password',
-                                    _obscurePassword
-                                        ? 'إظهار كلمة المرور'
-                                        : 'إخفاء كلمة المرور'),
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  size: 20,
-                                ),
-                                onPressed: () => setState(
-                                    () => _obscurePassword = !_obscurePassword),
-                              ),
-                              isDense: true,
-                            ),
-                          ),
-                        ],
-                      ] else ...[
-                        TextField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          textDirection: TextDirection.ltr,
-                          decoration: InputDecoration(
-                            labelText: localized(
-                                arabic, 'Phone Number', 'رقم الموبايل'),
-                            hintText: '010XXXXXXXX / 011XXXXXXXX',
-                            prefixIcon:
-                                const Icon(Icons.phone_android_rounded),
-                            helperText: localized(
-                              arabic,
-                              'Enter 11-digit Egyptian mobile number',
-                              'أدخل رقم موبايل مصري مكون من 11 رقماً',
-                            ),
                             isDense: true,
                           ),
                         ),
@@ -1576,107 +1507,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
 
                       const SizedBox(height: 16),
 
-                      if (_authMethod == 0 && !_isEditing) ...[
-                        // Primary Actions: Sign In with Password & Create Account
-                        Row(
-                          children: [
-                            Expanded(
-                              child: PressableScale(
-                                onTap: _loading ? null : _submitPasswordLogin,
-                                child: Container(
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    gradient: HagzyTheme.brandGradient,
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: kGreen.withValues(alpha: 0.3),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: _loading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.white),
-                                            ),
-                                          )
-                                        : Text(
-                                            localized(
-                                              arabic,
-                                              'Sign In with Password',
-                                              'دخول بكلمة المرور',
-                                            ),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 13.5,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed:
-                                    _loading ? null : _submitPasswordRegister,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: kInk,
-                                  side: const BorderSide(color: kBorder),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: Text(
-                                  localized(
-                                    arabic,
-                                    'Create Account',
-                                    'إنشاء حساب جديد',
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13.5,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 10),
-                              child: Text(
-                                localized(arabic, 'or sign in with code',
-                                    'أو تسجيل الدخول بكود التحقق'),
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: kMuted,
-                                ),
-                              ),
-                            ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-
-                      // Save Changes button when editing, or Request Code Button when signing in
+                      // Save Changes button when editing, or Action Button when signing in
                       PressableScale(
                         onTap: _loading
                             ? null
@@ -1686,25 +1517,15 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
-                            gradient: (_authMethod == 0 && !_isEditing)
-                                ? null
-                                : HagzyTheme.brandGradient,
-                            color: (_authMethod == 0 && !_isEditing)
-                                ? kSurfaceTint
-                                : null,
+                            gradient: HagzyTheme.brandGradient,
                             borderRadius: BorderRadius.circular(14),
-                            border: (_authMethod == 0 && !_isEditing)
-                                ? Border.all(color: kBorder)
-                                : null,
-                            boxShadow: (_authMethod == 0 && !_isEditing)
-                                ? null
-                                : [
-                                    BoxShadow(
-                                      color: kGreen.withValues(alpha: 0.3),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
+                            boxShadow: [
+                              BoxShadow(
+                                color: kGreen.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
                           child: Center(
                             child: _loading
@@ -1725,21 +1546,13 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                             'Save Profile Changes',
                                             'حفظ التعديلات',
                                           )
-                                        : (_authMethod == 0
-                                            ? localized(
-                                                arabic,
-                                                'Send Verification Code',
-                                                'إرسال كود التحقق للإيميل',
-                                              )
-                                            : localized(
-                                                arabic,
-                                                _isPhoneSignUp ? 'Create Account' : 'Log In',
-                                                _isPhoneSignUp ? 'إنشاء حساب' : 'تسجيل الدخول',
-                                              )),
-                                    style: TextStyle(
-                                      color: (_authMethod == 0 && !_isEditing)
-                                          ? kInk
-                                          : Colors.white,
+                                        : localized(
+                                            arabic,
+                                            _isPhoneSignUp ? 'Create Account' : 'Log In',
+                                            _isPhoneSignUp ? 'إنشاء حساب' : 'تسجيل الدخول',
+                                          ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
                                       fontWeight: FontWeight.w800,
                                       fontSize: 14.5,
                                     ),
@@ -1747,7 +1560,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           ),
                         ),
                       ),
-                      if (_authMethod == 1 && !_isEditing) ...[
+                      if (!_isEditing) ...[
                         const SizedBox(height: 14),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
