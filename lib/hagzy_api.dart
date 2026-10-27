@@ -175,6 +175,7 @@ class HagzyApi {
     String? phone,
     String? email,
     String? name,
+    bool? isSignUp,
   ]) async =>
       _send(
         'POST',
@@ -183,6 +184,7 @@ class HagzyApi {
           if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
           if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
           if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+          if (isSignUp != null) 'isSignUp': isSignUp,
         },
       );
 
@@ -191,8 +193,9 @@ class HagzyApi {
     String? phone,
     String? email,
     String? name,
+    bool? isSignUp,
   }) async =>
-      requestCustomerOtp(phone, email, name);
+      requestCustomerOtp(phone, email, name, isSignUp);
 
   /// Verifies a customer OTP code (SMS or Email) and returns session token & customer profile.
   Future<Map<String, dynamic>> verifyCustomerOtp([
