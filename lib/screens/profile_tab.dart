@@ -565,7 +565,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         email: email,
         phone: phone,
         token: token,
-        walletBalance: walletBalance ?? 50.0,
+        walletBalance: walletBalance ?? 0.0,
       );
 
       if (mounted) {

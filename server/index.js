@@ -4,6 +4,42 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+
+// Token Revocation Store
+const revokedTokens = new Set();
+function revokeToken(token) {
+  if (typeof token === 'string' && token.trim()) {
+    revokedTokens.add(token.trim());
+  }
+}
+function isTokenRevoked(token) {
+  return typeof token === 'string' && revokedTokens.has(token.trim());
+}
+
+// Dual Password Hashing (Bcrypt primary + Legacy Scrypt fallback)
+async function hashPassword(plain) {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(plain, salt);
+}
+
+async function comparePassword(plain, stored) {
+  if (!plain || !stored) return false;
+  if (stored.includes(':')) {
+    try {
+      const [salt, storedHash] = stored.split(':');
+      if (salt && storedHash) {
+        const computed = crypto.scryptSync(plain, salt, 64).toString('hex');
+        return computed === storedHash;
+      }
+    } catch (_) {}
+  }
+  try {
+    return await bcrypt.compare(plain, stored);
+  } catch (_) {
+    return false;
+  }
+}
 const nodemailer = require('nodemailer');
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
@@ -315,9 +351,13 @@ function authenticateCustomer(req, res, next) {
     return res.status(401).json({ error: 'Missing customer token' });
   }
   const token = authHeader.split(' ')[1];
+  if (isTokenRevoked(token)) {
+    return res.status(401).json({ error: 'Your session has been logged out. Please sign in again.' });
+  }
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    req.token = token;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -644,7 +684,7 @@ app.post('/api/auth/social/google', async (req, res) => {
         name: verifiedName || verifiedEmail.split('@')[0],
         avatar: verifiedAvatar,
         authProvider: 'google',
-        walletBalance: 50.0, // 50 EGP welcome gift balance
+        walletBalance: 0.0, // Initial balance is zero
         createdAt: new Date().toISOString()
       };
       db.users.push(user);
@@ -711,7 +751,7 @@ app.post('/api/auth/social/apple', async (req, res) => {
         phone: '',
         name: verifiedName || 'Apple Member',
         authProvider: 'apple',
-        walletBalance: 50.0, // 50 EGP welcome gift balance
+        walletBalance: 0.0, // Initial balance is zero
         createdAt: new Date().toISOString()
       };
       db.users.push(user);
@@ -806,10 +846,11 @@ app.post('/api/auth/customer-otp/verify', (req, res) => {
 });
 
 // Customer Password Registration
-app.post('/api/auth/customer/register', (req, res) => {
-  const { name, email, password, phone } = req.body;
+app.post('/api/auth/customer/register', async (req, res) => {
+  const { name, email, password, phone } = req.body || {};
   const cleanEmail = (email || '').trim().toLowerCase();
   const cleanName = (name || '').trim();
+  const cleanPhone = (phone || '').trim();
 
   if (!cleanEmail || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -821,21 +862,25 @@ app.post('/api/auth/customer/register', (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters long' });
   }
 
-  const existing = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
-  if (existing) {
-    return res.status(400).json({ error: 'An account with this email already exists. Please sign in.' });
+  const existingEmail = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  if (existingEmail) {
+    return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+  }
+  if (cleanPhone) {
+    const existingPhone = db.users.find(u => u.phone && u.phone.replace(/\D/g, '') === cleanPhone.replace(/\D/g, ''));
+    if (existingPhone) {
+      return res.status(409).json({ error: 'This phone number is already registered to another account.' });
+    }
   }
 
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-
+  const passwordHash = await hashPassword(password);
   const newUser = {
     id: 'usr_' + crypto.randomUUID().slice(0, 8),
     email: cleanEmail,
     name: cleanName || cleanEmail.split('@')[0],
-    phone: (phone || '').trim(),
-    passwordHash: `${salt}:${hash}`,
-    walletBalance: 50.0,
+    phone: cleanPhone,
+    passwordHash,
+    walletBalance: 0.0,
     authProvider: 'email_password',
     createdAt: new Date().toISOString()
   };
@@ -849,7 +894,7 @@ app.post('/api/auth/customer/register', (req, res) => {
     { expiresIn: '90d' }
   );
 
-  return res.json({
+  return res.status(201).json({
     success: true,
     token,
     customer: {
@@ -857,14 +902,14 @@ app.post('/api/auth/customer/register', (req, res) => {
       name: newUser.name,
       email: newUser.email,
       phone: newUser.phone,
-      walletBalance: 50.0
+      walletBalance: 0.0
     }
   });
 });
 
 // Customer Password Login
-app.post('/api/auth/customer/login', (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/auth/customer/login', async (req, res) => {
+  const { email, password } = req.body || {};
   const cleanEmail = (email || '').trim().toLowerCase();
 
   if (!cleanEmail || !password) {
@@ -880,10 +925,15 @@ app.post('/api/auth/customer/login', (req, res) => {
     return res.status(400).json({ error: 'This account was registered via Google or SMS. Please sign in with Google or request a code.' });
   }
 
-  const [salt, storedHash] = user.passwordHash.split(':');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  if (hash !== storedHash) {
+  const match = await comparePassword(password, user.passwordHash);
+  if (!match) {
     return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+  }
+
+  // Transparently upgrade legacy scrypt hash to bcrypt
+  if (user.passwordHash.includes(':')) {
+    user.passwordHash = await hashPassword(password);
+    saveDb(db);
   }
 
   const token = jwt.sign(
@@ -900,9 +950,44 @@ app.post('/api/auth/customer/login', (req, res) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
-      walletBalance: user.walletBalance || 50.0
+      walletBalance: user.walletBalance !== undefined ? user.walletBalance : 0.0
     }
   });
+});
+
+// Customer Logout & Session Invalidation
+app.post(['/api/auth/customer/logout', '/api/auth/logout'], (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    revokeToken(authHeader.split(' ')[1]);
+  }
+  return res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// Update Customer Profile
+app.put('/api/customer/profile', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const { name, phone, email } = req.body || {};
+  if (email) {
+    const cleanEmail = String(email).trim().toLowerCase();
+    const collision = db.users.find(u => u.id !== user.id && u.email && u.email.toLowerCase() === cleanEmail);
+    if (collision) return res.status(409).json({ error: 'This email is already in use by another account.' });
+    user.email = cleanEmail;
+  }
+  if (phone) {
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    const collision = db.users.find(u => u.id !== user.id && u.phone && u.phone.replace(/\D/g, '') === cleanPhone);
+    if (collision) return res.status(409).json({ error: 'This phone number is already in use by another account.' });
+    user.phone = cleanPhone;
+  }
+  if (name && typeof name === 'string') {
+    user.name = name.trim();
+  }
+
+  saveDb(db);
+  return res.json({ success: true, customer: sanitizeUser(user) });
 });
 
 // Fetch Customer Profile
@@ -1077,7 +1162,7 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     booking.status = 'pending_payment';
     booking.paymentStatus = 'unpaid';
     booking.holdExpiresAt = new Date(now + 15 * 60 * 1000).toISOString();
-    if (req.user) booking.ownerId = req.user.id;
+    if (req.user) { booking.ownerId = req.user.id; booking.customerId = req.user.id; }
 
     // Wallet payment is settled here, on the server, atomically with the booking.
     if (body.paymentMethod === 'wallet') {
@@ -1134,6 +1219,40 @@ app.get('/api/bookings', authenticateCustomer, (req, res) => {
   const mine = db.bookings.filter(b =>
     b.ownerId === user.id || (user.phone && b.phone === user.phone && !b.ownerId));
   return res.json({ success: true, bookings: mine });
+});
+
+// Customer Booking Cancellation
+app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
+  const booking = db.bookings.find(b => b.id === req.params.id);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const isOwner = (booking.ownerId === user.id) || (booking.customerId === user.id) ||
+    (user.phone && booking.phone && user.phone.replace(/\D/g, '') === String(booking.phone).replace(/\D/g, '')) ||
+    (user.email && booking.email && user.email.toLowerCase() === String(booking.email).toLowerCase());
+
+  if (!isOwner) {
+    return res.status(403).json({ error: 'You are not authorized to cancel this booking.' });
+  }
+
+  if (booking.status === 'cancelled' || booking.cancelled) {
+    return res.status(400).json({ error: 'This booking has already been cancelled.' });
+  }
+  if (booking.status === 'expired') {
+    return res.status(400).json({ error: 'This reservation hold has already expired.' });
+  }
+  if (new Date(booking.startsAt).getTime() <= Date.now()) {
+    return res.status(400).json({ error: 'Cannot cancel a booking that has already started or elapsed.' });
+  }
+
+  booking.status = 'cancelled';
+  booking.cancelled = true;
+  booking.updatedAt = new Date().toISOString();
+  saveDb(db);
+
+  return res.json({ success: true, message: 'Booking cancelled successfully.', booking });
 });
 
 // Public status poll: no contact details are returned.
