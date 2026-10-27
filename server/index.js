@@ -44,27 +44,50 @@ const nodemailer = require('nodemailer');
 
 // Firebase Admin SDK Initialization
 let fbAuth = null;
+let fbInitStatus = 'not_attempted';
 try {
-  const { initializeApp: initFbAdmin, cert: fbCert, getApps: getFbApps } = require('firebase-admin/app');
-  const { getAuth: getFbAuth } = require('firebase-admin/auth');
-
   let serviceAccount = null;
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
-      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-      : process.env.FIREBASE_SERVICE_ACCOUNT;
-  } else if (fs.existsSync(path.join(__dirname, 'firebase-credentials.js'))) {
-    serviceAccount = require('./firebase-credentials.js');
-  } else if (fs.existsSync(path.join(__dirname, 'firebase-service-account.json'))) {
-    serviceAccount = require('./firebase-service-account.json');
+    try {
+      serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+        : process.env.FIREBASE_SERVICE_ACCOUNT;
+    } catch (parseErr) {
+      fbInitStatus = 'env_parse_error: ' + parseErr.message;
+    }
+  }
+  if (!serviceAccount) {
+    try {
+      serviceAccount = require('./firebase-credentials.js');
+    } catch (reqErr) {
+      fbInitStatus = 'credentials_require_error: ' + reqErr.message;
+    }
+  }
+  if (!serviceAccount) {
+    try {
+      serviceAccount = require('./firebase-service-account.json');
+    } catch (_) {}
   }
 
-  if (serviceAccount && getFbApps().length === 0) {
-    const fbApp = initFbAdmin({ credential: fbCert(serviceAccount) });
-    fbAuth = getFbAuth(fbApp);
-    console.log('✅ Firebase Admin SDK initialized for project:', serviceAccount.project_id);
+  if (!serviceAccount) {
+    fbInitStatus = fbInitStatus !== 'not_attempted' ? fbInitStatus : 'no_service_account_found';
+    console.warn('⚠️ Firebase Admin init notice:', fbInitStatus);
+  } else {
+    const admin = require('firebase-admin');
+    const { getAuth: getFbAuth } = require('firebase-admin/auth');
+    if (admin.getApps().length === 0) {
+      const fbApp = admin.initializeApp({ credential: admin.cert(serviceAccount) });
+      fbAuth = getFbAuth(fbApp);
+      fbInitStatus = 'ready:' + serviceAccount.project_id;
+      console.log('✅ Firebase Admin SDK initialized for project:', serviceAccount.project_id);
+    } else {
+      const fbApp = admin.getApp();
+      fbAuth = getFbAuth(fbApp);
+      fbInitStatus = 'ready_existing:' + serviceAccount.project_id;
+    }
   }
 } catch (e) {
+  fbInitStatus = 'init_failed: ' + e.message;
   console.warn('⚠️ Firebase Admin init notice:', e.message);
 }
 const rateLimit = require('express-rate-limit');
@@ -1569,6 +1592,7 @@ app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
   return res.status(200).json({
     status: 'healthy',
     firebaseAdminReady: !!fbAuth,
+    firebaseAdminStatus: fbInitStatus,
     time: new Date().toISOString(),
     usersCount: db.users.length,
     venuesCount: db.venues.length,
