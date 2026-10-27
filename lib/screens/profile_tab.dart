@@ -207,7 +207,15 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
       if (kIsWeb && _authMethod == 1) {
         final phoneRes = await SocialAuthService.sendPhoneOtp(phone);
         if (phoneRes != null && phoneRes['error'] != null) {
-          throw Exception(phoneRes['error'].toString());
+          final err = phoneRes['error'].toString();
+          if (err.contains('operation-not-allowed') || err.contains('OPERATION_NOT_ALLOWED')) {
+            throw Exception(localized(
+              widget.arabic,
+              'Firebase SMS Region Policy: SMS to Egypt (+20) is blocked by default. In Firebase Console > Authentication > Settings > SMS Region Policy, allow Egypt (+20), or add your number under Phone numbers for testing.',
+              'سياسة رسائل Firebase: إرسال الرسائل لمصر مقيد افتراضياً. يرجى السماح لمصر (+20) من Firebase Console > Authentication > Settings > SMS Region Policy أو إضافة رقمك في Phone numbers for testing.',
+            ));
+          }
+          throw Exception(err);
         }
       } else if (widget.apiConfigured) {
         try {
