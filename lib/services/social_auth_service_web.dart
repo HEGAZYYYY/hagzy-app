@@ -112,6 +112,21 @@ void webSignOut() {
 
 Future<void> webSignInWithCustomToken(String token) async {
   try {
+    if (js.context.hasProperty('hagzySignInWithCustomTokenCallback')) {
+      final completer = Completer<void>();
+      js.context.callMethod('hagzySignInWithCustomTokenCallback', [
+        token,
+        js.allowInterop((result) {
+          if (!completer.isCompleted) completer.complete();
+        }),
+        js.allowInterop((err) {
+          print('Firebase custom token error: $err');
+          if (!completer.isCompleted) completer.complete();
+        }),
+      ]);
+      await completer.future.timeout(const Duration(seconds: 8), onTimeout: () {});
+      return;
+    }
     if (js.context.hasProperty('hagzySignInWithCustomToken')) {
       js.context.callMethod('hagzySignInWithCustomToken', [token]);
     }

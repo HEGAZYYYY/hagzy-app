@@ -373,7 +373,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
           token = res['token'] as String?;
           final fbCustomToken = res['firebaseCustomToken'] as String?;
           if (fbCustomToken != null && fbCustomToken.isNotEmpty) {
-            SocialAuthService.signInWithCustomToken(fbCustomToken);
+            await SocialAuthService.signInWithCustomToken(fbCustomToken);
           }
           if (res['customer'] is Map<String, dynamic>) {
             final cust = res['customer'] as Map<String, dynamic>;
