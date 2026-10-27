@@ -211,6 +211,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             phone: _authMethod == 1 ? phone : null,
             email: _authMethod == 0 ? email : null,
             name: name,
+            isSignUp: _authMethod == 1 ? _isPhoneSignUp : null,
           );
           final testOtp = otpRes['testOtp'] as String?;
           if (testOtp != null && testOtp.isNotEmpty) {
@@ -268,9 +269,25 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
       }
     } catch (e) {
       if (mounted) {
+        final rawErr = e.toString().replaceFirst('Exception: ', '');
+        String displayErr = rawErr;
+        final lower = rawErr.toLowerCase();
+        if (lower.contains('no account found') || lower.contains('not found')) {
+          displayErr = localized(
+            widget.arabic,
+            'No account found with this phone number. Please click "Create Account" below to register.',
+            'لا يوجد حساب مسجل بهذا الرقم. يرجى الضغط على "إنشاء حساب جديد" بالأسفل للتسجيل.',
+          );
+        } else if (lower.contains('already registered') || lower.contains('already exists')) {
+          displayErr = localized(
+            widget.arabic,
+            'This phone number is already registered. Please click "Log In" to access your account.',
+            'هذا الرقم مسجل بالفعل. يرجى الضغط على "تسجيل الدخول".',
+          );
+        }
         setState(() {
           _loading = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = displayErr;
         });
       }
     }

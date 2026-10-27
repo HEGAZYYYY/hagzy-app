@@ -552,6 +552,21 @@ function normalizeTarget(value) {
   return t.replace(/[\s\-\(\)]/g, '');
 }
 
+function formatE164Phone(rawPhone) {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (digits.startsWith('20') && digits.length >= 12) {
+    return '+' + digits;
+  } else if (digits.startsWith('0') && digits.length >= 11) {
+    return '+2' + digits;
+  } else if (digits.length === 10 && (digits.startsWith('10') || digits.startsWith('11') || digits.startsWith('12') || digits.startsWith('15'))) {
+    return '+20' + digits;
+  } else if (digits.length > 0) {
+    return '+' + digits;
+  }
+  return '';
+}
+
 function escapeForInlineScript(json) {
   return json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
@@ -584,11 +599,48 @@ async function verifyAppleIdentityToken(identityToken) {
 
 // Request 6-digit OTP via SMS or Email
 app.post('/api/auth/customer-otp/request', async (req, res) => {
-  const { phone, email, name } = req.body || {};
+  const { phone, email, name, isSignUp } = req.body || {};
   const target = normalizeTarget(phone || email);
 
   if (!target || target.length > 120) {
     return res.status(400).json({ error: 'Phone number or email is required' });
+  }
+
+  const isEmail = target.includes('@');
+  const formattedPhone = isEmail ? '' : formatE164Phone(target);
+
+  // Check if account already exists locally or in Firebase Auth
+  const existingLocalUser = db.users.find(u => isEmail
+    ? (u.email && u.email.toLowerCase() === target)
+    : (u.phone && (u.phone === target || (formattedPhone && formatE164Phone(u.phone) === formattedPhone))));
+
+  let existingFbUser = null;
+  if (fbAuth && !IS_TEST) {
+    try {
+      if (isEmail) {
+        existingFbUser = await fbAuth.getUserByEmail(target);
+      } else if (formattedPhone) {
+        existingFbUser = await fbAuth.getUserByPhoneNumber(formattedPhone);
+      }
+    } catch (_) {}
+  }
+
+  const accountExists = !!(existingLocalUser || existingFbUser);
+
+  // If client specified Log In mode (isSignUp === false) and account does NOT exist anywhere:
+  if (isSignUp === false && !accountExists) {
+    return res.status(404).json({
+      error: 'No account found with this phone number. Please click "Create Account" below to register.',
+      notFound: true
+    });
+  }
+
+  // If client specified Sign Up mode (isSignUp === true) and account ALREADY exists:
+  if (isSignUp === true && accountExists) {
+    return res.status(409).json({
+      error: 'This phone number is already registered. Please click "Log In" to access your account.',
+      alreadyExists: true
+    });
   }
 
   // Optional fixed credentials for App Store / Play review. Off unless configured.
@@ -599,7 +651,8 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
     code: otp,
     expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
-    name: String(name || '').slice(0, 80)
+    name: String(name || '').slice(0, 80),
+    isSignUp: isSignUp === true
   };
   saveDb(db);
 
