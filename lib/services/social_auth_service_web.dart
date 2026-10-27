@@ -109,3 +109,13 @@ void webSignOut() {
     }
   } catch (_) {}
 }
+
+Future<void> webSignInWithCustomToken(String token) async {
+  try {
+    if (js.context.hasProperty('hagzySignInWithCustomToken')) {
+      js.context.callMethod('hagzySignInWithCustomToken', [token]);
+    }
+  } catch (e) {
+    print('Custom token error: $e');
+  }
+}

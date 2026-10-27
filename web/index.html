@@ -64,7 +64,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
-    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
@@ -199,6 +199,19 @@
         return new Promise(function(resolve, reject) {
           window.hagzySignInWithAppleCallback(resolve, reject);
         });
+      };
+
+      window.hagzySignInWithCustomToken = async function(token) {
+        try {
+          if (auth && token) {
+            const userCredential = await signInWithCustomToken(auth, token);
+            console.log("✅ Firebase Web Authenticated Online via Custom Token! UID:", userCredential.user.uid);
+            return userCredential.user.uid;
+          }
+        } catch (e) {
+          console.warn("Firebase Custom Token sign-in notice:", e);
+        }
+        return null;
       };
 
     } catch (e) {
