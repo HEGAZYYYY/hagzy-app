@@ -204,20 +204,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     });
 
     try {
-      if (kIsWeb && _authMethod == 1) {
-        final phoneRes = await SocialAuthService.sendPhoneOtp(phone);
-        if (phoneRes != null && phoneRes['error'] != null) {
-          final err = phoneRes['error'].toString();
-          if (err.contains('operation-not-allowed') || err.contains('OPERATION_NOT_ALLOWED')) {
-            throw Exception(localized(
-              widget.arabic,
-              'Firebase SMS Region Policy: SMS to Egypt (+20) is blocked by default. In Firebase Console > Authentication > Settings > SMS Region Policy, allow Egypt (+20), or add your number under Phone numbers for testing.',
-              'سياسة رسائل Firebase: إرسال الرسائل لمصر مقيد افتراضياً. يرجى السماح لمصر (+20) من Firebase Console > Authentication > Settings > SMS Region Policy أو إضافة رقمك في Phone numbers for testing.',
-            ));
-          }
-          throw Exception(err);
-        }
-      } else if (widget.apiConfigured) {
+      if (widget.apiConfigured) {
         try {
           final otpRes = await widget.api.requestVerificationOtp(
             phone: _authMethod == 1 ? phone : null,
@@ -267,8 +254,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               )
             : localized(
                 widget.arabic,
-                'Verification code sent via SMS to $target',
-                'تم إرسال كود التحقق عبر رسالة SMS إلى $target',
+                'Verification code sent via WhatsApp to $target',
+                'تم إرسال كود التحقق عبر واتساب إلى $target',
               );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -374,17 +361,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     try {
       String? token;
       double? walletBalance;
-      if (kIsWeb && _authMethod == 1) {
-        final phoneRes = await SocialAuthService.verifyPhoneOtp(code);
-        if (phoneRes != null) {
-          if (phoneRes['error'] != null) {
-            throw Exception(phoneRes['error'].toString());
-          }
-          token = phoneRes['token'] as String?;
-          final p = phoneRes['phone'] as String?;
-          if (p != null && p.isNotEmpty) resolvedPhone = p;
-        }
-      } else if (widget.apiConfigured) {
+      if (widget.apiConfigured) {
         try {
           final res = await widget.api.verifyVerificationOtp(
             phone: _authMethod == 1 ? phone : null,
