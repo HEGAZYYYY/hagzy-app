@@ -198,7 +198,14 @@ const activeWebDir = fs.existsSync(buildWebDir)
 if (activeWebDir) {
   app.use(express.static(activeWebDir));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/partner') || req.path.startsWith('/admin')) return next();
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/partner') ||
+      req.path.startsWith('/admin') ||
+      req.path === '/health' ||
+      req.path === '/healthz' ||
+      req.path === '/ping'
+    ) return next();
     const indexPath = path.join(activeWebDir, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
