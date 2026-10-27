@@ -979,7 +979,7 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
   );
 
   let firebaseCustomToken = null;
-  if (fbAuth) {
+  if (fbAuth && !IS_TEST) {
     try {
       let formattedPhone = isEmail ? '' : target;
       if (formattedPhone && formattedPhone.startsWith('0')) {
