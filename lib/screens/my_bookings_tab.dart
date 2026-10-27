@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,10 +21,12 @@ class MyBookingsTab extends StatefulWidget {
     this.onCancelBooking,
     this.onBookAgain,
     this.onRefresh,
+    this.onScreenOpened,
   });
 
   /// Pull-to-refresh handler (re-syncs bookings from the server).
   final Future<void> Function()? onRefresh;
+  final Future<void> Function()? onScreenOpened;
   final List<Venue> venues;
   final List<Booking> bookings;
   final double walletBalance;
@@ -40,6 +44,13 @@ class MyBookingsTab extends StatefulWidget {
 class _MyBookingsTabState extends State<MyBookingsTab> {
   bool _lookingUp = false;
   String? _lookupError;
+
+  @override
+  void initState() {
+    super.initState();
+    final onScreenOpened = widget.onScreenOpened;
+    if (onScreenOpened != null) unawaited(onScreenOpened());
+  }
 
   Future<void> _topUpWalletDialog(double currentBalance) async {
     final arabic = widget.arabic;

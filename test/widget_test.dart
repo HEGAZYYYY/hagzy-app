@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hagzy_app/hagzy_api.dart';
 import 'package:hagzy_app/main.dart';
+import 'package:hagzy_app/screens/my_bookings_tab.dart';
 import 'package:hagzy_app/screens/profile_tab.dart';
 import 'package:hagzy_app/widgets/map_explorer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +19,31 @@ Future<void> enterAdminPreview(WidgetTester tester) async {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('opening bookings triggers one automatic refresh',
+      (tester) async {
+    var openCount = 0;
+    final api = HagzyApi(baseUrl: '');
+    addTearDown(api.close);
+
+    Widget buildBookingsScreen() => MaterialApp(
+          home: MyBookingsTab(
+            venues: const [],
+            bookings: const [],
+            arabic: false,
+            onChoosePayment: (_) async {},
+            api: api,
+            apiConfigured: false,
+            onScreenOpened: () async => openCount++,
+          ),
+        );
+
+    await tester.pumpWidget(buildBookingsScreen());
+    expect(openCount, 1);
+
+    await tester.pumpWidget(buildBookingsScreen());
+    expect(openCount, 1);
   });
 
   test('unpaid reservations are temporary holds, never confirmed bookings', () {
