@@ -3611,6 +3611,12 @@ class _HagzyHomeState extends State<HagzyHome> {
       await prefs.remove(HagzyWallet.keyWallet);
       await prefs.remove('hagzy_customer_wallet');
       await prefs.remove('hagzy_customer_bookings');
+      final raw = prefs.getString(kStorageKey);
+      if (raw != null) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        data['bookings'] = <dynamic>[];
+        await prefs.setString(kStorageKey, jsonEncode(data));
+      }
     } catch (_) {}
     if (kIsWeb) {
       SocialAuthService.signOutWeb();
