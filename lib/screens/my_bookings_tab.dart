@@ -15,6 +15,7 @@ class MyBookingsTab extends StatefulWidget {
     required this.onChoosePayment,
     required this.api,
     required this.apiConfigured,
+    this.walletBalance = HagzyWallet.defaultWelcomeBalance,
     this.onCancelBooking,
     this.onBookAgain,
     this.onRefresh,
@@ -24,6 +25,7 @@ class MyBookingsTab extends StatefulWidget {
   final Future<void> Function()? onRefresh;
   final List<Venue> venues;
   final List<Booking> bookings;
+  final double walletBalance;
   final bool arabic;
   final Future<void> Function(Booking booking) onChoosePayment;
   final HagzyApi api;
@@ -108,11 +110,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   }
 
   Widget _buildWalletCard(bool arabic) {
-    return FutureBuilder<double>(
-      future: HagzyWallet.getBalance(),
-      builder: (context, snapshot) {
-        final balance = snapshot.data ?? HagzyWallet.defaultWelcomeBalance;
-        return Container(
+    final balance = widget.walletBalance;
+    return Container(
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -184,8 +183,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             ],
           ),
         );
-      },
-    );
   }
 
   Future<void> _lookupByPhone() async {
