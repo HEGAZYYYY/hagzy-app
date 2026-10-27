@@ -877,6 +877,12 @@ void main() {
     await tester.tap(phoneToggle);
     await tester.pumpAndSettle();
 
+    final createAccountLink = find.text('Create Account');
+    if (createAccountLink.evaluate().isNotEmpty) {
+      await tester.tap(createAccountLink);
+      await tester.pumpAndSettle();
+    }
+
     await tester.enterText(
         find.widgetWithText(TextField, 'Full Name (optional)'),
         'Captain Hegazy');
@@ -884,7 +890,7 @@ void main() {
         find.widgetWithText(TextField, 'Phone Number'),
         '01012345678');
 
-    final sendSmsBtn = find.text('Send WhatsApp Verification Code');
+    final sendSmsBtn = find.text('Create Account').last;
     await tester.ensureVisible(sendSmsBtn);
     await tester.pumpAndSettle();
     await tester.tap(sendSmsBtn);
