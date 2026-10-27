@@ -18,6 +18,9 @@ class MyBookingsTab extends StatefulWidget {
     required this.api,
     required this.apiConfigured,
     this.walletBalance = HagzyWallet.defaultWelcomeBalance,
+    this.isSignedIn = false,
+    this.onSignIn,
+    this.onGoToSignIn,
     this.onCancelBooking,
     this.onBookAgain,
     this.onRefresh,
@@ -31,6 +34,15 @@ class MyBookingsTab extends StatefulWidget {
   final List<Booking> bookings;
   final double walletBalance;
   final bool arabic;
+  final bool isSignedIn;
+  final Future<void> Function({
+    required String name,
+    required String email,
+    required String phone,
+    String? token,
+    double? walletBalance,
+  })? onSignIn;
+  final VoidCallback? onGoToSignIn;
   final Future<void> Function(Booking booking) onChoosePayment;
   final HagzyApi api;
   final bool apiConfigured;
@@ -266,6 +278,20 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       if (otpConfirmed != true || otpCode.trim().isEmpty) return;
       final verified = await widget.api.verifyCustomerOtp(phone, otpCode);
       final customerToken = verified['token'] as String?;
+      final cust = verified['customer'] as Map<String, dynamic>?;
+      final custName = cust?['name'] as String? ?? '';
+      final custEmail = cust?['email'] as String? ?? '';
+      final custBalance = (cust?['walletBalance'] as num?)?.toDouble();
+
+      if (widget.onSignIn != null) {
+        await widget.onSignIn!(
+          name: custName,
+          email: custEmail,
+          phone: phone,
+          token: customerToken,
+          walletBalance: custBalance,
+        );
+      }
       final results = await widget.api.bookingsByPhone(
         phone,
         customerToken: customerToken,
@@ -386,6 +412,56 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           ),
           const SizedBox(height: 14),
           _buildWalletCard(arabic),
+          if (!widget.isSignedIn) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: kSurfaceTint,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kGreen.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.account_circle_outlined, color: kGreen, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localized(arabic, 'Sign in to see all your bookings', 'سجل دخولك لعرض جميع حجوزاتك'),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kInk),
+                        ),
+                        Text(
+                          localized(arabic, 'Sync wallet balance & active reservations', 'مزامنة رصيد المحفظة والحجوزات'),
+                          style: const TextStyle(fontSize: 11, color: kMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (widget.onGoToSignIn != null)
+                    FilledButton(
+                      onPressed: widget.onGoToSignIn,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: kGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(localized(arabic, 'Sign In', 'دخول'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                    ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 2),
           EmptyCard(
             icon: Icons.event_available_outlined,

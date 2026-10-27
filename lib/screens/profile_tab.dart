@@ -7,6 +7,7 @@ import '../hagzy_api.dart';
 import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../services/social_auth_service.dart';
 
 class CustomerProfileTab extends StatefulWidget {
   const CustomerProfileTab({
@@ -205,11 +206,15 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     try {
       if (widget.apiConfigured) {
         try {
-          await widget.api.requestVerificationOtp(
+          final otpRes = await widget.api.requestVerificationOtp(
             phone: _authMethod == 1 ? phone : null,
             email: _authMethod == 0 ? email : null,
             name: name,
           );
+          final testOtp = otpRes['testOtp'] as String?;
+          if (testOtp != null && testOtp.isNotEmpty) {
+            _otpController.text = testOtp;
+          }
         } catch (e) {
           if (!WidgetsBinding.instance.runtimeType
               .toString()
@@ -236,7 +241,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         setState(() {
           _isVerifyingOtp = true;
           _loading = false;
-          _otpController.clear();
+          if (_otpController.text.isEmpty) _otpController.clear();
         });
         _startCountdown();
 
@@ -255,6 +260,61 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
+            backgroundColor: kInk,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  Future<void> _submitProfileUpdate() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+
+    if (email.isNotEmpty && !email.contains('@')) {
+      setState(() {
+        _errorMessage = localized(
+          widget.arabic,
+          'Please enter a valid email address.',
+          'يرجى إدخال بريد إلكتروني صحيح.',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onUpdateProfile(
+        name: name,
+        email: email,
+        phone: phone,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isEditing = false;
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localized(
+              widget.arabic,
+              'Profile updated successfully!',
+              'تم تحديث البيانات بنجاح!',
+            )),
             backgroundColor: kInk,
             behavior: SnackBarBehavior.floating,
           ),
@@ -292,6 +352,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
 
+    String resolvedName = name.isEmpty
+        ? (_authMethod == 0 ? email.split('@')[0] : 'Customer')
+        : name;
+    String resolvedEmail = email;
+    String resolvedPhone = phone;
+
     try {
       String? token;
       double? walletBalance;
@@ -307,6 +373,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
           if (res['customer'] is Map<String, dynamic>) {
             final cust = res['customer'] as Map<String, dynamic>;
             walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+            final serverName = cust['name'] as String?;
+            if (serverName != null && serverName.isNotEmpty) resolvedName = serverName;
+            final serverEmail = cust['email'] as String?;
+            if (serverEmail != null && serverEmail.isNotEmpty) resolvedEmail = serverEmail;
+            final serverPhone = cust['phone'] as String?;
+            if (serverPhone != null && serverPhone.isNotEmpty) resolvedPhone = serverPhone;
           }
         } catch (e) {
           final isTest = WidgetsBinding.instance.runtimeType
@@ -333,23 +405,19 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         }
       }
 
-      final resolvedName = name.isEmpty
-          ? (_authMethod == 0 ? email.split('@')[0] : 'Customer')
-          : name;
-
       if (widget.isSignedIn && _isEditing) {
         await widget.onUpdateProfile(
           name: resolvedName,
-          email: email,
-          phone: phone,
+          email: resolvedEmail,
+          phone: resolvedPhone,
           token: token,
           walletBalance: walletBalance,
         );
       } else {
         await widget.onSignIn(
           name: resolvedName,
-          email: email,
-          phone: phone,
+          email: resolvedEmail,
+          phone: resolvedPhone,
           token: token,
           walletBalance: walletBalance,
         );
@@ -596,23 +664,217 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   }
 
   Future<void> _signInWithGoogle() async {
-    final baseUrl = widget.api.baseUrl;
-    final url = Uri.parse('$baseUrl/api/auth/google/start');
-    if (kIsWeb) {
-      await launchUrl(url, webOnlyWindowName: '_self');
-    } else if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
+    try {
+      if (kIsWeb) {
+        final res = await SocialAuthService.signInWithGoogle();
+        if (res != null) {
+          if (res['redirecting'] == true) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(localized(
+                    widget.arabic,
+                    'Redirecting to Google Sign-In...',
+                    'جاري الانتقال لتسجيل الدخول بجوجل...',
+                  )),
+                  backgroundColor: kInk,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+            return;
+          }
+          if (res['error'] != null) {
+            final err = res['error'].toString();
+            if (!err.contains('popup-closed-by-user') &&
+                !err.contains('cancelled') &&
+                mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(localized(
+                    widget.arabic,
+                    'Google Sign-In notice: $err',
+                    'تنبيه تسجيل الدخول بجوجل: $err',
+                  )),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+            return;
+          }
+          final token = res['token'] as String?;
+          final name = res['name'] as String? ?? 'Hagzy Member';
+          final email = res['email'] as String? ?? '';
+          final phone = res['phone'] as String? ?? '';
+          final avatar = res['avatar'] as String? ?? '';
+          final providerId = res['providerId'] as String?;
+
+          double? walletBalance;
+          String? sessionToken = token;
+          if (widget.apiConfigured && token != null) {
+            try {
+              final backendRes = await widget.api.signInWithSocial(
+                provider: 'google',
+                email: email,
+                name: name,
+                avatar: avatar,
+                providerId: providerId,
+                idToken: token,
+              );
+              if (backendRes['customer'] is Map<String, dynamic>) {
+                final cust = backendRes['customer'] as Map<String, dynamic>;
+                walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+              }
+              if (backendRes['token'] is String && (backendRes['token'] as String).isNotEmpty) {
+                sessionToken = backendRes['token'] as String;
+              }
+            } catch (_) {}
+          }
+
+          await widget.onSignIn(
+            name: name,
+            email: email,
+            phone: phone,
+            token: sessionToken,
+            walletBalance: walletBalance,
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localized(
+                  widget.arabic,
+                  'Signed in with Google successfully!',
+                  'تم تسجيل الدخول بجوجل بنجاح!',
+                )),
+                backgroundColor: kInk,
+              ),
+            );
+          }
+          return;
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(localized(
+                widget.arabic,
+                'Google sign-in is enabled on Hagzy Web. Please sign in using Email or Phone.',
+                'تسجيل الدخول بجوجل متاح عبر المتصفح. يرجى تسجيل الدخول بالبريد أو الهاتف.',
+              )),
+              backgroundColor: kInk,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _signInWithApple() async {
-    final baseUrl = widget.api.baseUrl;
-    final url = Uri.parse('$baseUrl/api/auth/apple/start');
-    if (kIsWeb) {
-      await launchUrl(url, webOnlyWindowName: '_self');
-    } else if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
+    try {
+      if (kIsWeb) {
+        final res = await SocialAuthService.signInWithApple();
+        if (res != null) {
+          if (res['redirecting'] == true) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(localized(
+                    widget.arabic,
+                    'Redirecting to Apple Sign-In...',
+                    'جاري الانتقال لتسجيل الدخول بحساب أبل...',
+                  )),
+                  backgroundColor: kInk,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+            return;
+          }
+          if (res['error'] != null) {
+            final err = res['error'].toString();
+            if (!err.contains('popup-closed-by-user') &&
+                !err.contains('cancelled') &&
+                mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(localized(
+                    widget.arabic,
+                    'Apple Sign-In notice: $err',
+                    'تنبيه تسجيل الدخول بحساب أبل: $err',
+                  )),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+            return;
+          }
+          final token = res['token'] as String?;
+          final name = res['name'] as String? ?? 'Apple Member';
+          final email = res['email'] as String? ?? '';
+          final phone = res['phone'] as String? ?? '';
+          final avatar = res['avatar'] as String? ?? '';
+          final providerId = res['providerId'] as String?;
+
+          double? walletBalance;
+          String? sessionToken = token;
+          if (widget.apiConfigured && token != null) {
+            try {
+              final backendRes = await widget.api.signInWithSocial(
+                provider: 'apple',
+                email: email,
+                name: name,
+                avatar: avatar,
+                providerId: providerId,
+                idToken: token,
+              );
+              if (backendRes['customer'] is Map<String, dynamic>) {
+                final cust = backendRes['customer'] as Map<String, dynamic>;
+                walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+              }
+              if (backendRes['token'] is String && (backendRes['token'] as String).isNotEmpty) {
+                sessionToken = backendRes['token'] as String;
+              }
+            } catch (_) {}
+          }
+
+          await widget.onSignIn(
+            name: name,
+            email: email,
+            phone: phone,
+            token: sessionToken,
+            walletBalance: walletBalance,
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localized(
+                  widget.arabic,
+                  'Signed in with Apple successfully!',
+                  'تم تسجيل الدخول بحساب أبل بنجاح!',
+                )),
+                backgroundColor: kInk,
+              ),
+            );
+          }
+          return;
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(localized(
+                widget.arabic,
+                'Apple sign-in is enabled on Hagzy Web. Please sign in using Email or Phone.',
+                'تسجيل الدخول بحساب أبل متاح عبر المتصفح. يرجى تسجيل الدخول بالبريد أو الهاتف.',
+              )),
+              backgroundColor: kInk,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   String _getInitials(String name) {
@@ -1079,17 +1341,32 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       if (!_isEditing) ...[
                         const SizedBox(height: 14),
                         // Social Sign-In (Apple & Google)
-                        _SocialSignInButton(
-                          provider: 'apple',
-                          arabic: arabic,
-                          onTap: _signInWithApple,
-                        ),
-                        const SizedBox(height: 10),
-                        _SocialSignInButton(
-                          provider: 'google',
-                          arabic: arabic,
-                          onTap: _signInWithGoogle,
-                        ),
+                        if (defaultTargetPlatform == TargetPlatform.iOS ||
+                            defaultTargetPlatform == TargetPlatform.macOS) ...[
+                          _SocialSignInButton(
+                            provider: 'apple',
+                            arabic: arabic,
+                            onTap: _signInWithApple,
+                          ),
+                          const SizedBox(height: 10),
+                          _SocialSignInButton(
+                            provider: 'google',
+                            arabic: arabic,
+                            onTap: _signInWithGoogle,
+                          ),
+                        ] else ...[
+                          _SocialSignInButton(
+                            provider: 'google',
+                            arabic: arabic,
+                            onTap: _signInWithGoogle,
+                          ),
+                          const SizedBox(height: 10),
+                          _SocialSignInButton(
+                            provider: 'apple',
+                            arabic: arabic,
+                            onTap: _signInWithApple,
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         Row(
                           children: [
@@ -1375,9 +1652,13 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         const SizedBox(height: 12),
                       ],
 
-                      // Request Code Button
+                      // Save Changes button when editing, or Request Code Button when signing in
                       PressableScale(
-                        onTap: _loading ? null : _requestVerificationOtp,
+                        onTap: _loading
+                            ? null
+                            : (_isEditing
+                                ? _submitProfileUpdate
+                                : _requestVerificationOtp),
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
@@ -1414,17 +1695,23 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                     ),
                                   )
                                 : Text(
-                                    _authMethod == 0
+                                    _isEditing
                                         ? localized(
                                             arabic,
-                                            'Send Verification Code',
-                                            'إرسال كود التحقق للإيميل',
+                                            'Save Profile Changes',
+                                            'حفظ التعديلات',
                                           )
-                                        : localized(
-                                            arabic,
-                                            'Send SMS Verification Code',
-                                            'إرسال كود التحقق عبر SMS',
-                                          ),
+                                        : (_authMethod == 0
+                                            ? localized(
+                                                arabic,
+                                                'Send Verification Code',
+                                                'إرسال كود التحقق للإيميل',
+                                              )
+                                            : localized(
+                                                arabic,
+                                                'Send SMS Verification Code',
+                                                'إرسال كود التحقق عبر SMS',
+                                              )),
                                     style: TextStyle(
                                       color: (_authMethod == 0 && !_isEditing)
                                           ? kInk

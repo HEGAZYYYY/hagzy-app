@@ -14,24 +14,31 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|wasm|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|otf)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "max-age=31536000"
-          }
-        ]
-      },
-      {
-        "source": "index.html",
+        "source": "**@(main.dart.js*|flutter*|index.html)",
         "headers": [
           {
             "key": "Cache-Control",
             "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Pragma",
+            "value": "no-cache"
+          },
+          {
+            "key": "Expires",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(wasm|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|otf)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
           }
         ]
       }
     ]
   }
 }
-
