@@ -382,15 +382,22 @@ function authenticateCustomer(req, res, next) {
   } catch (err) {
     try {
       const decodedWithoutVerify = jwt.decode(token);
-      if (decodedWithoutVerify && (decodedWithoutVerify.email || decodedWithoutVerify.user_id || decodedWithoutVerify.sub)) {
+      if (decodedWithoutVerify && (decodedWithoutVerify.email || decodedWithoutVerify.user_id || decodedWithoutVerify.sub || decodedWithoutVerify.phone_number)) {
         const email = (decodedWithoutVerify.email || '').toLowerCase();
+        const phone = (decodedWithoutVerify.phone_number || '').replace(/\D/g, '');
         const sub = decodedWithoutVerify.user_id || decodedWithoutVerify.sub;
-        let user = db.users.find(u => (email && u.email && u.email.toLowerCase() === email) || (u.googleId && u.googleId === sub) || u.id === sub);
-        if (!user && email) {
+        let user = db.users.find(u => 
+          (email && u.email && u.email.toLowerCase() === email) || 
+          (phone && u.phone && u.phone.replace(/\D/g, '') === phone) ||
+          (u.googleId && u.googleId === sub) || 
+          u.id === sub
+        );
+        if (!user && (email || phone || sub)) {
           user = {
             id: 'usr_' + crypto.randomUUID().slice(0, 8),
-            email: email,
-            name: decodedWithoutVerify.name || email.split('@')[0],
+            email: email || (phone ? `${phone}@hagzy.phone` : ''),
+            phone: phone || '',
+            name: decodedWithoutVerify.name || (phone ? `Member ${phone.slice(-4)}` : (email ? email.split('@')[0] : 'Hagzy Member')),
             googleId: sub,
             walletBalance: 0.0,
             createdAt: new Date().toISOString()
@@ -399,7 +406,7 @@ function authenticateCustomer(req, res, next) {
           saveDb(db);
         }
         if (user) {
-          req.user = { id: user.id, email: user.email, name: user.name };
+          req.user = { id: user.id, email: user.email, name: user.name, phone: user.phone };
           req.token = token;
           return next();
         }
