@@ -239,7 +239,34 @@ async function sendSmsOrWhatsApp({ phone, message, otp }) {
   console.log(`Message: ${message}`);
   console.log(`========================================\n`);
 
-  // 1. UltraMsg WhatsApp Integration
+  // 1. SMS Misr (Official Egyptian Telecom SMS with branded Sender ID 'HAGZY')
+  if (process.env.SMSMISR_USERNAME && process.env.SMSMISR_PASSWORD) {
+    try {
+      const clean = phone.replace(/\D/g, '');
+      const formatted = clean.startsWith('0') ? '2' + clean : (clean.startsWith('20') ? clean : '20' + clean);
+      const payload = new URLSearchParams({
+        environment: process.env.SMSMISR_ENV || '1',
+        username: process.env.SMSMISR_USERNAME,
+        password: process.env.SMSMISR_PASSWORD,
+        sender: process.env.SMSMISR_SENDER || 'HAGZY',
+        mobile: formatted,
+        language: '2', // Arabic
+        message: message
+      });
+      const resp = await fetch('https://smsmisr.com/api/SMS/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload
+      });
+      const data = await resp.json().catch(() => ({}));
+      console.log('✅ SMS Misr response:', resp.status, data);
+      return { sent: resp.ok, provider: 'smsmisr', data };
+    } catch (e) {
+      console.error('SMS Misr error:', e.message);
+    }
+  }
+
+  // 2. UltraMsg WhatsApp Integration (Fallback)
   const instanceId = process.env.ULTRAMSG_INSTANCE_ID || 'instance195537';
   const token = process.env.ULTRAMSG_TOKEN || 'nr7aw9vr4u9hoefq';
 
