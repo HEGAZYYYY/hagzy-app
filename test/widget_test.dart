@@ -797,7 +797,7 @@ void main() {
   });
 
   testWidgets(
-      'customer can navigate to profile section and sign in with email or phone',
+      'customer can navigate to profile section and sign in with phone number',
       (tester) async {
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
@@ -810,26 +810,33 @@ void main() {
 
     // Verify Profile section welcome & form
     expect(find.text('Welcome to Hagzy'), findsOneWidget);
-    expect(find.text('Sign in with Email or Phone'), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Sign in to Hagzy'), findsOneWidget);
     expect(find.text('Phone Number'), findsOneWidget);
 
-    // 2. Sign in with Email via verification code
+    // Switch to Create Account mode
+    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
+    await tester.pumpAndSettle();
+    final createAccountToggle = find.text('Create Account');
+    expect(createAccountToggle, findsOneWidget);
+    await tester.tap(createAccountToggle, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    // 2. Register with Full Name & Phone Number
     await tester.enterText(
         find.widgetWithText(TextField, 'Full Name (optional)'),
         'Mohamed Hegazy');
     await tester.enterText(
-        find.widgetWithText(TextField, 'Email Address'),
-        'hegazy@example.com');
-    final sendCodeBtn = find.text('Send Verification Code');
-    await tester.ensureVisible(sendCodeBtn);
+        find.widgetWithText(TextField, 'Phone Number'),
+        '01024129393');
+    final createAccountBtn = find.text('Create Account').first;
+    await tester.ensureVisible(createAccountBtn);
     await tester.pumpAndSettle();
-    await tester.tap(sendCodeBtn);
+    await tester.tap(createAccountBtn);
     await tester.pumpAndSettle();
 
     // Verify OTP verification view is shown
     expect(find.text('Enter Verification Code'), findsOneWidget);
-    expect(find.textContaining('hegazy@example.com'), findsWidgets);
+    expect(find.textContaining('01024129393'), findsWidgets);
 
     // Enter 6-digit OTP and complete verification
     await tester.enterText(find.byType(TextField).last, '123456');
@@ -849,7 +856,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(profileName, findsOneWidget);
-    expect(find.text('hegazy@example.com'), findsWidgets);
+    expect(find.text('01024129393'), findsWidgets);
 
     // 3. Sign out
     await tester.scrollUntilVisible(
@@ -865,35 +872,21 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Out'));
     await tester.pumpAndSettle();
 
-    // 4. Scroll back up and sign in with Phone Number via SMS verification code
-    final phoneToggle = find.text('Phone Number');
+    // 4. Scroll back up and log in with existing Phone Number
+    final phoneField = find.widgetWithText(TextField, 'Phone Number');
     await tester.scrollUntilVisible(
-      phoneToggle,
+      phoneField,
       -200,
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    expect(phoneToggle, findsOneWidget);
-    await tester.tap(phoneToggle);
+    expect(phoneField, findsOneWidget);
+
+    await tester.enterText(phoneField, '01012345678');
+    final logInBtn = find.text('Log In');
+    await tester.ensureVisible(logInBtn);
     await tester.pumpAndSettle();
-
-    final createAccountLink = find.text('Create Account');
-    if (createAccountLink.evaluate().isNotEmpty) {
-      await tester.tap(createAccountLink);
-      await tester.pumpAndSettle();
-    }
-
-    await tester.enterText(
-        find.widgetWithText(TextField, 'Full Name (optional)'),
-        'Captain Hegazy');
-    await tester.enterText(
-        find.widgetWithText(TextField, 'Phone Number'),
-        '01012345678');
-
-    final sendSmsBtn = find.text('Create Account').last;
-    await tester.ensureVisible(sendSmsBtn);
-    await tester.pumpAndSettle();
-    await tester.tap(sendSmsBtn);
+    await tester.tap(logInBtn);
     await tester.pumpAndSettle();
 
     // Verify OTP verification view is shown for SMS
@@ -910,15 +903,14 @@ void main() {
     await tester.pumpAndSettle();
 
     // Scroll up to view the signed-in profile card
-    final captainName = find.text('Captain Hegazy');
+    final customerName = find.text('Customer');
     await tester.scrollUntilVisible(
-      captainName,
+      customerName,
       -200,
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-
-    expect(captainName, findsOneWidget);
+    expect(customerName, findsOneWidget);
     expect(find.text('01012345678'), findsWidgets);
   });
 
@@ -1175,7 +1167,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('customer can sign in or register with email and password in profile', (tester) async {
+  testWidgets('customer can toggle between Log In and Create Account with phone', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
@@ -1184,29 +1176,41 @@ void main() {
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
 
-    // Verify Password field and buttons are present
-    expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
-    final signInBtn = find.text('Sign In with Password');
-    final createAccountBtn = find.text('Create Account');
-    expect(signInBtn, findsOneWidget);
-    expect(createAccountBtn, findsOneWidget);
+    // Verify Phone field and Action button are present
+    expect(find.widgetWithText(TextField, 'Phone Number'), findsOneWidget);
+    expect(find.text('Log In'), findsOneWidget);
+    expect(find.text('Create Account'), findsOneWidget);
+
+    // Toggle to Create Account
+    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create Account'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    // Full name field is now revealed
+    expect(find.widgetWithText(TextField, 'Full Name (optional)'), findsOneWidget);
 
     // Fill form
     await tester.enterText(
         find.widgetWithText(TextField, 'Full Name (optional)'),
         'Ahmed Zaki');
     await tester.enterText(
-        find.widgetWithText(TextField, 'Email Address'),
-        'zaki@hagzy.app');
-    await tester.enterText(
-        find.widgetWithText(TextField, 'Password'),
-        'securePass123');
+        find.widgetWithText(TextField, 'Phone Number'),
+        '01099887766');
     await tester.pumpAndSettle();
 
-    // Tap Sign In with Password
+    // Tap Create Account button
+    final submitBtn = find.text('Create Account').first;
     await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
     await tester.pumpAndSettle();
-    await tester.tap(signInBtn, warnIfMissed: false);
+    await tester.tap(submitBtn, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    // Verify OTP screen
+    expect(find.text('Enter Verification Code'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '123456');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verify & Sign In'));
     await tester.pumpAndSettle();
 
     // Verify customer is signed in
@@ -1218,7 +1222,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(profileName, findsOneWidget);
-    expect(find.text('zaki@hagzy.app'), findsWidgets);
+    expect(find.text('01099887766'), findsWidgets);
   });
 }
 
