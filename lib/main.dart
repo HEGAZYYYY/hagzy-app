@@ -3449,7 +3449,9 @@ class _HagzyHomeState extends State<HagzyHome> {
           .where(_bookingHasNotExpired)
           .toList();
 
-      if (parsedRemote.isNotEmpty) {
+      if (_customerSignedIn) {
+        await _commit(_venues, parsedRemote);
+      } else if (parsedRemote.isNotEmpty) {
         final merged = [..._bookings];
         for (final remote in parsedRemote) {
           final idx = merged.indexWhere((b) => b.id == remote.id);
@@ -3791,6 +3793,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                         1 => MyBookingsTab(
                                             venues: _venues,
                                             bookings: _bookings,
+                                            walletBalance: _walletBalance,
                                             arabic: arabic,
                                             onChoosePayment: (booking) =>
                                                 _showPaymentMethods(
@@ -3824,7 +3827,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onUpdateProfile: _handleCustomerSignIn,
                                             onChangeLanguage: () =>
                                                 _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
-                                            onViewBookings: () => setState(() => _tab = 1),
+                                            onViewBookings: () {
+                                                setState(() => _tab = 1);
+                                                unawaited(_syncAccountData());
+                                              },
                                             onSelectArea: () => setState(() => _tab = 0),
                                             onAutoAssignGps: () => setState(() => _tab = 0),
                                             onSwitchToAdmin: () => setState(() { _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview'; _tab = 2; }),
@@ -3988,7 +3994,12 @@ class _HagzyHomeState extends State<HagzyHome> {
               previewMode: isPreview,
               arabic: arabic,
               badgeCount: bookingCount,
-              onDestinationSelected: (value) => setState(() => _tab = value),
+              onDestinationSelected: (value) {
+                setState(() => _tab = value);
+                if (value == 1 && (_customerSignedIn || _savedCustomerPhone.isNotEmpty || _savedCustomerEmail.isNotEmpty)) {
+                  unawaited(_syncAccountData());
+                }
+              },
             ),
           ),
         ),

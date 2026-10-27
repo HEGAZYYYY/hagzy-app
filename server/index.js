@@ -83,6 +83,8 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_FILE = path.join(DATA_DIR, 'hagzy_db.json');
 
+let isHydrated = false;
+
 function loadDb() {
   if (fs.existsSync(DB_FILE)) {
     try {
@@ -101,14 +103,12 @@ function loadDb() {
     } catch (_) {}
   }
 
-  const initialData = {
+  return {
     users: [],
     venues: initialVenues,
     bookings: [],
     otps: {}
   };
-  saveDb(initialData);
-  return initialData;
 }
 
 function saveDb(data) {
@@ -118,8 +118,8 @@ function saveDb(data) {
     console.error('File DB write error:', err.message);
   }
 
-  // Asynchronous sync to live PostgreSQL database if connected
-  if (pgPool) {
+  // Asynchronous sync to live PostgreSQL database if connected and hydrated
+  if (pgPool && isHydrated) {
     persistToPostgres(data).catch(e => console.error('Postgres sync error:', e.message));
   }
 }
@@ -129,7 +129,7 @@ function saveDb(data) {
 // restarts on hosts with an ephemeral disk (e.g. Render free tier).
 let pgWriteChain = Promise.resolve();
 function persistToPostgres(data) {
-  if (!pgPool) return Promise.resolve();
+  if (!pgPool || !isHydrated) return Promise.resolve();
   const snapshot = JSON.stringify(data);
   // Serialise writes so an older snapshot can never overwrite a newer one.
   pgWriteChain = pgWriteChain
@@ -142,18 +142,31 @@ function persistToPostgres(data) {
 }
 
 async function hydratePostgres() {
-  if (!pgPool) return;
-  await pgPool.query(`CREATE TABLE IF NOT EXISTS hagzy_state (
-    id INT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())`);
-  const { rows } = await pgPool.query('SELECT data FROM hagzy_state WHERE id = 1');
-  if (rows.length) {
-    db = rows[0].data;
-    db.users = db.users || []; db.venues = db.venues || [];
-    db.bookings = db.bookings || []; db.otps = db.otps || {};
-    console.log('🐘 State restored from PostgreSQL.');
-  } else {
-    await persistToPostgres(db);
-    console.log('🐘 PostgreSQL initialised with the current state.');
+  if (!pgPool) {
+    isHydrated = true;
+    return;
+  }
+  try {
+    await pgPool.query(`CREATE TABLE IF NOT EXISTS hagzy_state (
+      id INT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())`);
+    const { rows } = await pgPool.query('SELECT data FROM hagzy_state WHERE id = 1');
+    if (rows.length && rows[0].data) {
+      const cloudData = rows[0].data;
+      db.users = Array.isArray(cloudData.users) ? cloudData.users : [];
+      db.venues = Array.isArray(cloudData.venues) && cloudData.venues.length ? cloudData.venues : db.venues;
+      db.bookings = Array.isArray(cloudData.bookings) ? cloudData.bookings : [];
+      db.otps = cloudData.otps || {};
+      try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); } catch (_) {}
+      console.log(`🐘 State restored from PostgreSQL: ${db.users.length} users, ${db.bookings.length} bookings.`);
+    } else {
+      isHydrated = true;
+      await persistToPostgres(db);
+      console.log('🐘 PostgreSQL initialised with current state.');
+    }
+  } catch (err) {
+    console.error('PostgreSQL hydrate error:', err.message);
+  } finally {
+    isHydrated = true;
   }
 }
 
@@ -852,6 +865,26 @@ app.post('/api/auth/customer-otp/verify', (req, res) => {
   return res.json({ success: true, token, customer: sanitizeUser(user) });
 });
 
+function claimCustomerBookings(user) {
+  if (!user || !user.id) return;
+  const userPhone = user.phone ? String(user.phone).replace(/\D/g, '') : '';
+  const userEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+  let changed = false;
+  for (const b of db.bookings) {
+    const bPhone = (b.phone || b.customerPhone) ? String(b.phone || b.customerPhone).replace(/\D/g, '') : '';
+    const bEmail = b.email ? String(b.email).trim().toLowerCase() : '';
+    const isMine = (b.ownerId === user.id) || (b.customerId === user.id) ||
+      (userPhone && bPhone && userPhone === bPhone) ||
+      (userEmail && bEmail && userEmail === bEmail);
+    if (isMine && (!b.ownerId || !b.customerId)) {
+      b.ownerId = user.id;
+      b.customerId = user.id;
+      changed = true;
+    }
+  }
+  if (changed) saveDb(db);
+}
+
 // Customer Password Registration
 app.post('/api/auth/customer/register', async (req, res) => {
   const { name, email, password, phone } = req.body || {};
@@ -893,6 +926,7 @@ app.post('/api/auth/customer/register', async (req, res) => {
   };
 
   db.users.push(newUser);
+  claimCustomerBookings(newUser);
   saveDb(db);
 
   const token = jwt.sign(
@@ -940,8 +974,9 @@ app.post('/api/auth/customer/login', async (req, res) => {
   // Transparently upgrade legacy scrypt hash to bcrypt
   if (user.passwordHash.includes(':')) {
     user.passwordHash = await hashPassword(password);
-    saveDb(db);
   }
+  claimCustomerBookings(user);
+  saveDb(db);
 
   const token = jwt.sign(
     { id: user.id, email: user.email, name: user.name, phone: user.phone },
@@ -1169,7 +1204,19 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     booking.status = 'pending_payment';
     booking.paymentStatus = 'unpaid';
     booking.holdExpiresAt = new Date(now + 15 * 60 * 1000).toISOString();
-    if (req.user) { booking.ownerId = req.user.id; booking.customerId = req.user.id; }
+    let owner = req.user;
+    if (!owner) {
+      const cleanPhone = (body.phone || body.customerPhone) ? String(body.phone || body.customerPhone).replace(/\D/g, '') : '';
+      const cleanEmail = body.email ? String(body.email).trim().toLowerCase() : '';
+      owner = db.users.find(u =>
+        (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail) ||
+        (cleanPhone && u.phone && u.phone.replace(/\D/g, '') === cleanPhone)
+      );
+    }
+    if (owner) {
+      booking.ownerId = owner.id;
+      booking.customerId = owner.id;
+    }
 
     // Wallet payment is settled here, on the server, atomically with the booking.
     if (body.paymentMethod === 'wallet') {
@@ -1219,12 +1266,23 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
   });
 });
 
-// Customer: own bookings (matched by account, or by the phone verified on the account)
+// Customer: own bookings (matched by account, phone, or email)
 app.get('/api/bookings', authenticateCustomer, (req, res) => {
   const user = db.users.find(u => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  const mine = db.bookings.filter(b =>
-    b.ownerId === user.id || (user.phone && b.phone === user.phone && !b.ownerId));
+  claimCustomerBookings(user);
+
+  const userPhone = user.phone ? String(user.phone).replace(/\D/g, '') : '';
+  const userEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+
+  const mine = db.bookings.filter(b => {
+    if (b.ownerId === user.id || b.customerId === user.id) return true;
+    const bPhone = (b.phone || b.customerPhone) ? String(b.phone || b.customerPhone).replace(/\D/g, '') : '';
+    const bEmail = b.email ? String(b.email).trim().toLowerCase() : '';
+    if (userPhone && bPhone && userPhone === bPhone) return true;
+    if (userEmail && bEmail && userEmail === bEmail) return true;
+    return false;
+  });
   return res.json({ success: true, bookings: mine });
 });
 
