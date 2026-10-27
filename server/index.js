@@ -243,18 +243,26 @@ async function sendSmsOrWhatsApp({ phone, message, otp }) {
   if (process.env.ULTRAMSG_INSTANCE_ID && process.env.ULTRAMSG_TOKEN) {
     try {
       const clean = phone.replace(/\D/g, '');
-      const formatted = clean.startsWith('0') ? '2' + clean : clean;
+      let formatted = clean;
+      if (formatted.startsWith('0')) {
+        formatted = '2' + formatted;
+      } else if (!formatted.startsWith('20') && formatted.length === 10) {
+        formatted = '20' + formatted;
+      }
       const url = `https://api.ultramsg.com/${process.env.ULTRAMSG_INSTANCE_ID}/messages/chat`;
-      await fetch(url, {
+      const params = new URLSearchParams();
+      params.append('token', process.env.ULTRAMSG_TOKEN);
+      params.append('to', formatted);
+      params.append('body', message);
+
+      const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: process.env.ULTRAMSG_TOKEN,
-          to: formatted,
-          body: message
-        })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params
       });
-      return { sent: true, provider: 'ultramsg' };
+      const data = await resp.json().catch(() => ({}));
+      console.log('✅ UltraMsg response:', resp.status, data);
+      return { sent: resp.ok, provider: 'ultramsg', data };
     } catch (e) {
       console.error('UltraMsg error:', e.message);
     }

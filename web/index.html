@@ -201,84 +201,12 @@
         });
       };
 
-      window.hagzySendPhoneOtp = function(phoneNumber, onSuccess, onError) {
-        try {
-          let formatted = String(phoneNumber || '').trim().replace(/\s+/g, '');
-          if (!formatted.startsWith('+')) {
-            if (formatted.startsWith('01')) {
-              formatted = '+2' + formatted;
-            } else if (formatted.startsWith('00')) {
-              formatted = '+' + formatted.slice(2);
-            } else {
-              formatted = '+20' + formatted;
-            }
-          }
-
-          if (window.hagzyRecaptchaVerifier) {
-            try { window.hagzyRecaptchaVerifier.clear(); } catch (_) {}
-            window.hagzyRecaptchaVerifier = null;
-          }
-
-          window.hagzyRecaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            size: 'invisible',
-            callback: function(response) {
-              console.log("reCAPTCHA solved successfully.");
-            },
-            'expired-callback': function() {
-              console.warn("reCAPTCHA expired. Resetting verifier.");
-              if (window.hagzyRecaptchaVerifier) {
-                try { window.hagzyRecaptchaVerifier.clear(); } catch (_) {}
-                window.hagzyRecaptchaVerifier = null;
-              }
-            }
-          });
-
-          signInWithPhoneNumber(auth, formatted, window.hagzyRecaptchaVerifier)
-            .then(function(confirmationResult) {
-              window.hagzyPhoneConfirmationResult = confirmationResult;
-              onSuccess(JSON.stringify({ success: true, formattedPhone: formatted }));
-            })
-            .catch(function(err) {
-              console.error("Firebase Phone Auth error:", err);
-              if (window.hagzyRecaptchaVerifier) {
-                try { window.hagzyRecaptchaVerifier.clear(); } catch (_) {}
-                window.hagzyRecaptchaVerifier = null;
-              }
-              onError(err.code || err.message || String(err));
-            });
-        } catch (e) {
-          onError(e.message || String(e));
-        }
-      };
-
-      window.hagzyVerifyPhoneOtp = function(smsCode, onSuccess, onError) {
-        if (!window.hagzyPhoneConfirmationResult) {
-          return onError("No active phone verification request found. Please request a new code.");
-        }
-        window.hagzyPhoneConfirmationResult.confirm(smsCode)
-          .then(async function(result) {
-            const user = result.user;
-            const token = await user.getIdToken();
-            onSuccess(JSON.stringify({
-              token: token,
-              phone: user.phoneNumber || '',
-              name: user.displayName || 'Customer',
-              email: user.email || '',
-              providerId: user.uid
-            }));
-          })
-          .catch(function(err) {
-            console.error("Firebase Phone verification error:", err);
-            onError(err.code || err.message || String(err));
-          });
-      };
     } catch (e) {
       console.warn("Firebase initialization notice:", e);
     }
   </script>
 </head>
 <body>
-  <div id="recaptcha-container" style="position: fixed; bottom: 0; right: 0; z-index: 9999999;"></div>
   <script>
     {{flutter_js}}
     {{flutter_build_config}}
