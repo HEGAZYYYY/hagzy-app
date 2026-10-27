@@ -884,7 +884,7 @@ void main() {
         find.widgetWithText(TextField, 'Phone Number'),
         '01012345678');
 
-    final sendSmsBtn = find.text('Send SMS Verification Code');
+    final sendSmsBtn = find.text('Send WhatsApp Verification Code');
     await tester.ensureVisible(sendSmsBtn);
     await tester.pumpAndSettle();
     await tester.tap(sendSmsBtn);
