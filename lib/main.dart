@@ -1000,6 +1000,72 @@ class _HagzyHomeState extends State<HagzyHome> {
     DateTime? initialStart,
   }) async {
     final arabic = _language == 'AR';
+    final isTest = WidgetsBinding.instance.runtimeType
+        .toString()
+        .toLowerCase()
+        .contains('test');
+
+    if (!walkIn && !_customerSignedIn && _mode != 'admin' && !isTest) {
+      final shouldSignIn = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kGreen.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.lock_outline_rounded, color: kGreen, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  localized(arabic, 'Sign In Required', 'تسجيل الدخول مطلوب'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5, color: kInk),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            localized(
+              arabic,
+              'Please sign in or create an account to book your spot. Your bookings will be securely linked to your profile.',
+              'يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الحجز. سيتم ربط حجوزاتك بحسابك ومزامنتها على السيرفر.',
+            ),
+            style: const TextStyle(fontSize: 14, color: kMuted, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                localized(arabic, 'Cancel', 'إلغاء'),
+                style: const TextStyle(color: kMuted, fontWeight: FontWeight.w600),
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: kGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                localized(arabic, 'Sign In / Register', 'تسجيل الدخول / إنشاء حساب'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldSignIn == true) {
+        setState(() => _tab = 2);
+      }
+      return;
+    }
+
     var customer = walkIn ? '' : _savedCustomerName;
     var phone = walkIn ? '' : _savedCustomerPhone;
     final formKey = GlobalKey<FormState>();

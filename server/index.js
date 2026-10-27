@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+const IS_TEST = process.env.NODE_ENV === 'test';
+
 // Token Revocation Store
 const revokedTokens = new Set();
 function revokeToken(token) {
@@ -90,14 +93,46 @@ try {
   fbInitStatus = 'init_failed: ' + e.message;
   console.warn('⚠️ Firebase Admin init notice:', e.message);
 }
+
+let fbFirestore = null;
+try {
+  const { getFirestore } = require('firebase-admin/firestore');
+  fbFirestore = getFirestore();
+} catch (_) {}
+
+async function syncBookingToFirebase(booking, user) {
+  if (!fbFirestore || IS_TEST || !booking) return;
+  try {
+    const bookingDoc = {
+      id: String(booking.id),
+      venueId: String(booking.venueId || ''),
+      itemId: String(booking.itemId || ''),
+      customer: String(booking.customer || ''),
+      phone: String(booking.phone || (user && user.phone) || ''),
+      email: String(booking.email || (user && user.email) || ''),
+      startsAt: String(booking.startsAt || ''),
+      durationMinutes: Number(booking.durationMinutes) || 0,
+      price: Number(booking.price) || 0,
+      dueNow: Number(booking.dueNow !== undefined ? booking.dueNow : 0),
+      status: String(booking.status || 'pending_payment'),
+      paymentStatus: String(booking.paymentStatus || 'unpaid'),
+      paymentMethod: String(booking.paymentMethod || ''),
+      userId: String((user && user.id) || booking.ownerId || ''),
+      createdAt: String(booking.createdAt || new Date().toISOString()),
+      updatedAt: new Date().toISOString()
+    };
+    await fbFirestore.collection('bookings').doc(String(booking.id)).set(bookingDoc, { merge: true });
+    console.log('✅ Synced booking to Cloud Firestore in Firebase:', booking.id);
+  } catch (err) {
+    console.warn('Firebase Firestore sync notice:', err.message);
+  }
+}
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const IS_PROD = process.env.NODE_ENV === 'production';
-const IS_TEST = process.env.NODE_ENV === 'test';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_production_secret_2026';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hagzy.app';
@@ -1439,6 +1474,7 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
 
   booking.createdAt = new Date().toISOString();
   booking.cancelled = false;
+  let owner = req.user;
 
   if (isAdmin) {
     // Venue staff may create walk-ins and blocks.
@@ -1450,7 +1486,6 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     booking.status = 'pending_payment';
     booking.paymentStatus = 'unpaid';
     booking.holdExpiresAt = new Date(now + 15 * 60 * 1000).toISOString();
-    let owner = req.user;
     if (!owner) {
       const cleanPhone = (body.phone || body.customerPhone) ? String(body.phone || body.customerPhone).replace(/\D/g, '') : '';
       const cleanEmail = body.email ? String(body.email).trim().toLowerCase() : '';
@@ -1492,6 +1527,7 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
   }
   db.bookings.push(booking);
   saveDb(db);
+  syncBookingToFirebase(booking, owner);
 
   const phone = booking.phone || booking.customerPhone;
   if (phone) {
@@ -1562,6 +1598,7 @@ app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
   booking.cancelled = true;
   booking.updatedAt = new Date().toISOString();
   saveDb(db);
+  syncBookingToFirebase(booking, user);
 
   return res.json({ success: true, message: 'Booking cancelled successfully.', booking });
 });
@@ -1583,6 +1620,7 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
   booking.isPendingPayment = false;
   booking.status = 'confirmed';
   saveDb(db);
+  syncBookingToFirebase(booking);
 
   if (booking.customerPhone) {
     sendSmsOrWhatsApp({
