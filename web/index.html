@@ -80,6 +80,7 @@
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
       const auth = getAuth(app);
+      try { auth.useDeviceLanguage(); } catch (_) {}
       window.firebaseApp = app;
       window.firebaseAnalytics = analytics;
       window.firebaseAuth = auth;
@@ -213,11 +214,24 @@
             }
           }
 
-          if (!window.hagzyRecaptchaVerifier) {
-            window.hagzyRecaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-              size: 'invisible'
-            });
+          if (window.hagzyRecaptchaVerifier) {
+            try { window.hagzyRecaptchaVerifier.clear(); } catch (_) {}
+            window.hagzyRecaptchaVerifier = null;
           }
+
+          window.hagzyRecaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible',
+            callback: function(response) {
+              console.log("reCAPTCHA solved successfully.");
+            },
+            'expired-callback': function() {
+              console.warn("reCAPTCHA expired. Resetting verifier.");
+              if (window.hagzyRecaptchaVerifier) {
+                try { window.hagzyRecaptchaVerifier.clear(); } catch (_) {}
+                window.hagzyRecaptchaVerifier = null;
+              }
+            }
+          });
 
           signInWithPhoneNumber(auth, formatted, window.hagzyRecaptchaVerifier)
             .then(function(confirmationResult) {
@@ -264,7 +278,7 @@
   </script>
 </head>
 <body>
-  <div id="recaptcha-container"></div>
+  <div id="recaptcha-container" style="position: fixed; bottom: 0; right: 0; z-index: 9999999;"></div>
   <script>
     {{flutter_js}}
     {{flutter_build_config}}
