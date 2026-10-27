@@ -41,6 +41,32 @@ async function comparePassword(plain, stored) {
   }
 }
 const nodemailer = require('nodemailer');
+
+// Firebase Admin SDK Initialization
+let fbAuth = null;
+try {
+  const { initializeApp: initFbAdmin, cert: fbCert, getApps: getFbApps } = require('firebase-admin/app');
+  const { getAuth: getFbAuth } = require('firebase-admin/auth');
+
+  let serviceAccount = null;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      : process.env.FIREBASE_SERVICE_ACCOUNT;
+  } else if (fs.existsSync(path.join(__dirname, 'firebase-credentials.js'))) {
+    serviceAccount = require('./firebase-credentials.js');
+  } else if (fs.existsSync(path.join(__dirname, 'firebase-service-account.json'))) {
+    serviceAccount = require('./firebase-service-account.json');
+  }
+
+  if (serviceAccount && getFbApps().length === 0) {
+    const fbApp = initFbAdmin({ credential: fbCert(serviceAccount) });
+    fbAuth = getFbAuth(fbApp);
+    console.log('✅ Firebase Admin SDK initialized for project:', serviceAccount.project_id);
+  }
+} catch (e) {
+  console.warn('⚠️ Firebase Admin init notice:', e.message);
+}
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 require('dotenv').config();
@@ -896,7 +922,7 @@ app.post('/api/auth/social/apple', async (req, res) => {
 });
 
 // Verify OTP & Log In / Register User in Database
-app.post('/api/auth/customer-otp/verify', (req, res) => {
+app.post('/api/auth/customer-otp/verify', async (req, res) => {
   const { phone, email, code, name } = req.body || {};
   const target = normalizeTarget(phone || email);
   const inputCode = String(code || '').trim();
@@ -952,7 +978,44 @@ app.post('/api/auth/customer-otp/verify', (req, res) => {
     { expiresIn: '30d' }
   );
 
-  return res.json({ success: true, token, customer: sanitizeUser(user) });
+  let firebaseCustomToken = null;
+  if (fbAuth) {
+    try {
+      let formattedPhone = isEmail ? '' : target;
+      if (formattedPhone && formattedPhone.startsWith('0')) {
+        formattedPhone = '+2' + formattedPhone;
+      } else if (formattedPhone && !formattedPhone.startsWith('+')) {
+        formattedPhone = '+' + formattedPhone;
+      }
+
+      let fbUser;
+      try {
+        if (isEmail) {
+          fbUser = await fbAuth.getUserByEmail(target);
+        } else {
+          fbUser = await fbAuth.getUserByPhoneNumber(formattedPhone);
+        }
+      } catch (err) {
+        if (err.code === 'auth/user-not-found') {
+          fbUser = await fbAuth.createUser({
+            ...(formattedPhone ? { phoneNumber: formattedPhone } : {}),
+            ...(isEmail ? { email: target } : {}),
+            displayName: user.name || (isEmail ? target.split('@')[0] : 'Hagzy Member')
+          });
+          console.log('✅ Created user in Firebase Auth:', fbUser.uid, formattedPhone || target);
+        }
+      }
+
+      if (fbUser) {
+        firebaseCustomToken = await fbAuth.createCustomToken(fbUser.uid);
+        console.log('✅ Created Firebase Custom Token for:', fbUser.uid);
+      }
+    } catch (fbErr) {
+      console.warn('Firebase Custom Token generation notice:', fbErr.message);
+    }
+  }
+
+  return res.json({ success: true, token, firebaseCustomToken, customer: sanitizeUser(user) });
 });
 
 function claimCustomerBookings(user) {
