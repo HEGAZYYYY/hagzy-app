@@ -54,6 +54,40 @@ void main() {
     );
   });
 
+  test('customer account refresh requests use authenticated customer routes',
+      () async {
+    final requests = <http.Request>[];
+    final api = HagzyApi(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path == '/api/customer/profile') {
+          return http.Response(
+            '{"customer":{"name":"Server Name","email":"user@example.com","phone":"01012345678","walletBalance":175}}',
+            200,
+          );
+        }
+        return http.Response('{"bookings":[]}', 200);
+      }),
+    );
+    addTearDown(api.close);
+
+    final profile = await api.getCustomerProfile(token: 'customer-session');
+    final bookings = await api.customerBookings(token: 'customer-session');
+
+    expect(profile['customer']['walletBalance'], 175);
+    expect(bookings, isEmpty);
+    expect(requests.map((request) => request.url.path), [
+      '/api/customer/profile',
+      '/api/bookings',
+    ]);
+    expect(
+      requests.every((request) =>
+          request.headers['authorization'] == 'Bearer customer-session'),
+      isTrue,
+    );
+  });
+
   test('Paymob checkout does not require or send an email address', () async {
     http.Request? captured;
     final api = HagzyApi(

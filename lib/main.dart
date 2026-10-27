@@ -3368,22 +3368,8 @@ class _HagzyHomeState extends State<HagzyHome> {
     String? token,
     double? walletBalance,
   }) async {
-    double? remoteBalance = walletBalance;
     if (token != null && token.isNotEmpty) {
       _customerToken = token;
-    }
-    if (_api.isConfigured && remoteBalance == null) {
-      try {
-        final res = await _api.getCustomerProfile(
-          token: _customerToken,
-          email: email,
-          phone: phone,
-        );
-        if (res['customer'] is Map<String, dynamic>) {
-          final cust = res['customer'] as Map<String, dynamic>;
-          remoteBalance = (cust['walletBalance'] as num?)?.toDouble();
-        }
-      } catch (_) {}
     }
     await _saveCustomerProfile(
       name: name,
@@ -3392,17 +3378,21 @@ class _HagzyHomeState extends State<HagzyHome> {
       isSignedIn: true,
       token: _customerToken,
     );
-    if (remoteBalance != null) {
+    if (walletBalance != null) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(HagzyWallet.keyWallet, remoteBalance);
-      if (mounted) setState(() => _walletBalance = remoteBalance!);
+      await prefs.setDouble(HagzyWallet.keyWallet, walletBalance);
+      if (mounted) setState(() => _walletBalance = walletBalance);
     }
-    await _syncAccountData();
+    await _syncAccountData(showErrors: true);
   }
 
   Future<void> _syncAccountData({bool showErrors = false}) async {
     if (!_api.isConfigured) return;
-    if (_savedCustomerPhone.isEmpty && _savedCustomerEmail.isEmpty) return;
+    if (_customerToken == null &&
+        _savedCustomerPhone.isEmpty &&
+        _savedCustomerEmail.isEmpty) {
+      return;
+    }
 
     try {
       // 1. Sync Customer Profile & Cloud Wallet Balance
@@ -3418,22 +3408,19 @@ class _HagzyHomeState extends State<HagzyHome> {
         final cloudEmail = cust['email'] as String? ?? '';
         final cloudPhone = cust['phone'] as String? ?? '';
 
+        await _saveCustomerProfile(
+          name: cloudName.isNotEmpty ? cloudName : _savedCustomerName,
+          email: cloudEmail.isNotEmpty ? cloudEmail : _savedCustomerEmail,
+          phone: cloudPhone.isNotEmpty ? cloudPhone : _savedCustomerPhone,
+          isSignedIn: _customerSignedIn,
+          token: _customerToken,
+        );
+
         if (cloudBalance != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setDouble(HagzyWallet.keyWallet, cloudBalance);
           if (mounted) {
-            setState(() {
-              _walletBalance = cloudBalance;
-              if (_savedCustomerName.isEmpty && cloudName.isNotEmpty) {
-                _savedCustomerName = cloudName;
-              }
-              if (_savedCustomerEmail.isEmpty && cloudEmail.isNotEmpty) {
-                _savedCustomerEmail = cloudEmail;
-              }
-              if (_savedCustomerPhone.isEmpty && cloudPhone.isNotEmpty) {
-                _savedCustomerPhone = cloudPhone;
-              }
-            });
+            setState(() => _walletBalance = cloudBalance);
           }
         }
       }
