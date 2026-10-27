@@ -16,6 +16,7 @@ import 'screens/my_bookings_tab.dart';
 import 'screens/profile_tab.dart';
 import 'theme/hagzy_theme.dart';
 import 'widgets/common_widgets.dart';
+import 'services/social_auth_service.dart';
 
 export 'models/models.dart';
 
@@ -104,13 +105,21 @@ class _HagzyHomeState extends State<HagzyHome> {
     _mode = widget.adminMode ? 'adminLogin' : 'customer';
     _load();
 
-    // Check for real OAuth 2.0 callback credentials in URL query parameters
+    // Check for real OAuth 2.0 callback credentials in URL query parameters or Firebase redirect result
     if (kIsWeb) {
       try {
         final params = Uri.base.queryParameters;
-        final token = params['auth_token'];
-        final name = params['auth_name'];
-        final email = params['auth_email'];
+        String? token = params['auth_token'];
+        String? name = params['auth_name'];
+        String? email = params['auth_email'];
+        if (token == null || token.isEmpty) {
+          final redirectUser = SocialAuthService.getRedirectUser();
+          if (redirectUser != null) {
+            token = redirectUser['token'] as String?;
+            name = redirectUser['name'] as String?;
+            email = redirectUser['email'] as String?;
+          }
+        }
         if (token != null && token.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _handleCustomerSignIn(
@@ -163,9 +172,18 @@ class _HagzyHomeState extends State<HagzyHome> {
           _savedCustomerPhone = profile['phone'] as String? ?? '';
           _savedCustomerEmail = profile['email'] as String? ?? '';
           _customerToken = profile['token'] as String?;
-          _customerSignedIn = profile['isSignedIn'] as bool? ??
-              (_savedCustomerPhone.isNotEmpty ||
-                  _savedCustomerEmail.isNotEmpty);
+          _customerSignedIn = (profile['isSignedIn'] as bool? ?? false) &&
+              _customerToken != null &&
+              _customerToken!.isNotEmpty;
+          if (kIsWeb) {
+            try {
+              final tokenParam = Uri.base.queryParameters['token'];
+              if (tokenParam != null && tokenParam.isNotEmpty) {
+                _customerToken = tokenParam;
+                _customerSignedIn = true;
+              }
+            } catch (_) {}
+          }
         } catch (_) {}
       }
       _currentArea = prefs.getString('hagzy_customer_area') ?? 'Cairo';
@@ -1464,6 +1482,67 @@ class _HagzyHomeState extends State<HagzyHome> {
                           );
                         }),
                       ],
+                      if (!_customerSignedIn) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: kSurfaceTint,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: kGreen.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                  size: 18,
+                                  color: kGreen,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  localized(arabic,
+                                      'Sign in to pay from your Hagzy wallet and track booking',
+                                      'سجل دخولك للدفع من محفظة حجزي وتتبع حجزك'),
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: kInk,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  setState(() => _tab = 2);
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: kGreen,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  localized(arabic, 'Sign In', 'تسجيل الدخول'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (walletBalance > 0) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -1783,7 +1862,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       splitCount: split,
                       multiController: multi,
                       phone: phone.trim(),
-                      email: '',
+                      email: walkIn ? '' : _savedCustomerEmail.trim(),
                       dueNow: walkIn || isWalletPaid ? 0 : remainingDue,
                       status: walkIn || isWalletPaid
                           ? 'confirmed'
@@ -1834,7 +1913,8 @@ class _HagzyHomeState extends State<HagzyHome> {
         name: _savedCustomerName,
         email: _savedCustomerEmail,
         phone: _savedCustomerPhone,
-        isSignedIn: _customerSignedIn || _savedCustomerPhone.isNotEmpty,
+        isSignedIn: _customerSignedIn,
+        token: _customerToken,
       );
     }
     var savedBooking = booking;
@@ -3383,7 +3463,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       await prefs.setDouble(HagzyWallet.keyWallet, walletBalance);
       if (mounted) setState(() => _walletBalance = walletBalance);
     }
-    await _syncAccountData(showErrors: true);
+    await _syncAccountData(showErrors: false);
   }
 
   Future<void> _syncAccountData({bool showErrors = false}) async {
@@ -3458,18 +3538,83 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
   }
 
+  Future<void> _handleCustomerUpdateProfile({
+    required String name,
+    required String email,
+    required String phone,
+    String? token,
+    double? walletBalance,
+  }) async {
+    final activeToken = token ?? _customerToken;
+    if (_api.isConfigured && activeToken != null && activeToken.isNotEmpty) {
+      try {
+        final res = await _api.updateCustomerProfile(
+          token: activeToken,
+          name: name,
+          email: email,
+          phone: phone,
+        );
+        if (res['customer'] is Map<String, dynamic>) {
+          final cust = res['customer'] as Map<String, dynamic>;
+          final updatedName = cust['name'] as String? ?? name;
+          final updatedEmail = cust['email'] as String? ?? email;
+          final updatedPhone = cust['phone'] as String? ?? phone;
+          final updatedBalance =
+              (cust['walletBalance'] as num?)?.toDouble() ?? walletBalance;
+          await _saveCustomerProfile(
+            name: updatedName,
+            email: updatedEmail,
+            phone: updatedPhone,
+            isSignedIn: true,
+            token: activeToken,
+          );
+          if (updatedBalance != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setDouble(HagzyWallet.keyWallet, updatedBalance);
+            if (mounted) setState(() => _walletBalance = updatedBalance);
+          }
+          await _syncAccountData();
+          return;
+        }
+      } catch (_) {}
+    }
+    await _handleCustomerSignIn(
+      name: name,
+      email: email,
+      phone: phone,
+      token: token,
+      walletBalance: walletBalance,
+    );
+  }
+
   Future<void> _handleCustomerSignOut() async {
+    if (_api.isConfigured &&
+        _customerToken != null &&
+        _customerToken!.isNotEmpty) {
+      try {
+        await _api.logoutCustomer(_customerToken!);
+      } catch (_) {}
+    }
     setState(() {
       _savedCustomerName = '';
       _savedCustomerEmail = '';
       _savedCustomerPhone = '';
       _customerSignedIn = false;
       _customerToken = null;
+      _walletBalance = 0.0;
+      _customerBookings = [];
+      _bookings = [];
     });
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(kCustomerProfileStorageKey);
+      await prefs.remove(HagzyWallet.keyWallet);
+      await prefs.remove('hagzy_customer_wallet');
+      await prefs.remove('hagzy_customer_bookings');
     } catch (_) {}
+    if (kIsWeb) {
+      SocialAuthService.signOutWeb();
+    }
   }
 
   Future<void> _handleCustomerDeleteAccount() async {
@@ -3782,6 +3927,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             bookings: _bookings,
                                             walletBalance: _walletBalance,
                                             arabic: arabic,
+                                            isSignedIn: _customerSignedIn,
+                                            onSignIn: _handleCustomerSignIn,
+                                            onGoToSignIn: () => setState(() => _tab = 2),
                                             onChoosePayment: (booking) =>
                                                 _showPaymentMethods(
                                               booking,
@@ -3813,7 +3961,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onSignIn: _handleCustomerSignIn,
                                             onSignOut: _handleCustomerSignOut,
                                             onDeleteAccount: _handleCustomerDeleteAccount,
-                                            onUpdateProfile: _handleCustomerSignIn,
+                                            onUpdateProfile: _handleCustomerUpdateProfile,
                                             onChangeLanguage: () =>
                                                 _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
                                             onViewBookings: () {

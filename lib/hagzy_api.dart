@@ -11,12 +11,17 @@ String resolveDefaultApiUrl() {
     try {
       final host = Uri.base.host.toLowerCase();
       if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        if (host.contains('web.app') ||
+            host.contains('firebaseapp.com') ||
+            host.contains('hagzy')) {
+          return 'https://hagzy-api.onrender.com';
+        }
         return Uri.base.origin;
       }
     } catch (_) {}
   }
 
-  return 'http://localhost:4000';
+  return 'https://hagzy-api.onrender.com';
 }
 
 class HagzyApi {
@@ -289,6 +294,28 @@ class HagzyApi {
     final uri = Uri(path: '/api/customer/profile', queryParameters: queryParams.isEmpty ? null : queryParams);
     return _send('GET', uri.toString(), token: token);
   }
+
+  /// Updates authenticated customer profile details on the server.
+  Future<Map<String, dynamic>> updateCustomerProfile({
+    required String token,
+    String? name,
+    String? phone,
+    String? email,
+  }) async =>
+      _send(
+        'PUT',
+        '/api/customer/profile',
+        token: token,
+        body: {
+          if (name != null) 'name': name.trim(),
+          if (phone != null) 'phone': phone.trim(),
+          if (email != null) 'email': email.trim(),
+        },
+      );
+
+  /// Revokes an active customer session on the backend.
+  Future<Map<String, dynamic>> logoutCustomer(String token) async =>
+      _send('POST', '/api/auth/customer/logout', token: token);
 
   /// Atomically deducts customer wallet balance on the cloud server.
   Future<Map<String, dynamic>> deductWalletFunds({

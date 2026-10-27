@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <script>
+    // Purge any stale service worker caches so updates are immediate
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (let r of regs) r.unregister();
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
+      });
+    }
+  </script>
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -51,6 +64,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
@@ -65,8 +79,126 @@
     try {
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
+      const auth = getAuth(app);
       window.firebaseApp = app;
       window.firebaseAnalytics = analytics;
+      window.firebaseAuth = auth;
+
+      // Automatically catch redirect sign-in results from Google or Apple
+      window.hagzyRedirectUser = null;
+      getRedirectResult(auth).then(async function(result) {
+        if (result && result.user) {
+          const user = result.user;
+          const token = await user.getIdToken();
+          const name = user.displayName || (user.email ? user.email.split('@')[0] : 'Hagzy Member');
+          const email = user.email || '';
+          window.hagzyRedirectUser = JSON.stringify({
+            token: token,
+            name: name,
+            email: email,
+            phone: user.phoneNumber || '',
+            avatar: user.photoURL || '',
+            providerId: user.uid
+          });
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('auth_token', token);
+            url.searchParams.set('auth_name', name);
+            url.searchParams.set('auth_email', email);
+            window.history.replaceState({}, '', url.toString());
+          } catch (_) {}
+          if (typeof window.onHagzyRedirectUser === 'function') {
+            window.onHagzyRedirectUser(window.hagzyRedirectUser);
+          }
+        }
+      }).catch(function(err) {
+        console.warn("Firebase Redirect Result notice:", err);
+      });
+
+      window.hagzySignInWithGoogleCallback = function(onSuccess, onError) {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        signInWithPopup(auth, provider).then(async function(result) {
+          const user = result.user;
+          const token = await user.getIdToken();
+          onSuccess(JSON.stringify({
+            token: token,
+            name: user.displayName || (user.email ? user.email.split('@')[0] : 'Hagzy Member'),
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            avatar: user.photoURL || '',
+            providerId: user.uid
+          }));
+        }).catch(async function(err) {
+          console.warn("Google popup notice, testing redirect fallback:", err.code);
+          if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+            try {
+              await signInWithRedirect(auth, provider);
+              onSuccess(JSON.stringify({ redirecting: true }));
+            } catch (redirErr) {
+              onError(redirErr.message || String(redirErr));
+            }
+          } else {
+            onError(err.code || err.message || String(err));
+          }
+        });
+      };
+
+      window.hagzySignInWithAppleCallback = function(onSuccess, onError) {
+        const provider = new OAuthProvider('apple.com');
+        signInWithPopup(auth, provider).then(async function(result) {
+          const user = result.user;
+          const token = await user.getIdToken();
+          onSuccess(JSON.stringify({
+            token: token,
+            name: user.displayName || 'Apple Member',
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            avatar: user.photoURL || '',
+            providerId: user.uid
+          }));
+        }).catch(async function(err) {
+          console.warn("Apple popup notice, testing redirect fallback:", err.code);
+          if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+            try {
+              await signInWithRedirect(auth, provider);
+              onSuccess(JSON.stringify({ redirecting: true }));
+            } catch (redirErr) {
+              onError(redirErr.message || String(redirErr));
+            }
+          } else {
+            onError(err.code || err.message || String(err));
+          }
+        });
+      };
+
+      window.hagzySignInWithGoogle = async function() {
+        return new Promise(function(resolve, reject) {
+          window.hagzySignInWithGoogleCallback(resolve, reject);
+        });
+      };
+
+            window.hagzySignOut = function() {
+        try {
+          if (window.firebaseAuth) {
+            window.firebaseAuth.signOut();
+          }
+          window.hagzyRedirectUser = null;
+          const url = new URL(window.location.href);
+          url.searchParams.delete('auth_token');
+          url.searchParams.delete('auth_name');
+          url.searchParams.delete('auth_email');
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+        } catch (e) {
+          console.warn("Sign out cleanup notice:", e);
+        }
+      };
+
+      window.hagzySignInWithApple = async function() {
+        return new Promise(function(resolve, reject) {
+          window.hagzySignInWithAppleCallback(resolve, reject);
+        });
+      };
     } catch (e) {
       console.warn("Firebase initialization notice:", e);
     }
@@ -76,7 +208,18 @@
   <script>
     {{flutter_js}}
     {{flutter_build_config}}
+    if (window._flutter && window._flutter.buildConfig && Array.isArray(window._flutter.buildConfig.builds)) {
+      var hagzyBuildBuster = Date.now();
+      window._flutter.buildConfig.builds.forEach(function(b) {
+        if (b && b.mainJsPath) {
+          b.mainJsPath = b.mainJsPath + '?v=' + hagzyBuildBuster;
+        }
+      });
+    }
     _flutter.loader.load({
+      serviceWorkerSettings: {
+        serviceWorkerVersion: null
+      },
       onEntrypointLoaded: async function(engineInitializer) {
         const appRunner = await engineInitializer.initializeEngine();
         await appRunner.runApp();
