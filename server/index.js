@@ -239,8 +239,11 @@ async function sendSmsOrWhatsApp({ phone, message, otp }) {
   console.log(`Message: ${message}`);
   console.log(`========================================\n`);
 
-  // 1. UltraMsg WhatsApp Integration (if env vars provided)
-  if (process.env.ULTRAMSG_INSTANCE_ID && process.env.ULTRAMSG_TOKEN) {
+  // 1. UltraMsg WhatsApp Integration
+  const instanceId = process.env.ULTRAMSG_INSTANCE_ID || 'instance195537';
+  const token = process.env.ULTRAMSG_TOKEN || 'nr7aw9vr4u9hoefq';
+
+  if (instanceId && token) {
     try {
       const clean = phone.replace(/\D/g, '');
       let formatted = clean;
@@ -249,9 +252,12 @@ async function sendSmsOrWhatsApp({ phone, message, otp }) {
       } else if (!formatted.startsWith('20') && formatted.length === 10) {
         formatted = '20' + formatted;
       }
-      const url = `https://api.ultramsg.com/${process.env.ULTRAMSG_INSTANCE_ID}/messages/chat`;
+      if (!formatted.startsWith('+')) {
+        formatted = '+' + formatted;
+      }
+      const url = `https://api.ultramsg.com/${instanceId}/messages/chat`;
       const params = new URLSearchParams();
-      params.append('token', process.env.ULTRAMSG_TOKEN);
+      params.append('token', token);
       params.append('to', formatted);
       params.append('body', message);
 

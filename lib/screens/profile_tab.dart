@@ -1092,7 +1092,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                             child: Icon(
                               _authMethod == 0
                                   ? Icons.mark_email_read_rounded
-                                  : Icons.sms_rounded,
+                                  : Icons.chat_bubble_rounded,
                               color: kGreen,
                               size: 20,
                             ),
@@ -1124,8 +1124,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               )
                             : localized(
                                 arabic,
-                                'We sent a 6-digit verification code via SMS to ${_phoneController.text}',
-                                'أرسلنا كود التحقق المكون من 6 أرقام عبر رسالة SMS إلى ${_phoneController.text}',
+                                'We sent a 6-digit verification code via WhatsApp to ${_phoneController.text}',
+                                'أرسلنا كود التحقق المكون من 6 أرقام عبر واتساب إلى ${_phoneController.text}',
                               ),
                         style: const TextStyle(
                           fontSize: 13,
@@ -1709,8 +1709,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                               )
                                             : localized(
                                                 arabic,
-                                                'Send SMS Verification Code',
-                                                'إرسال كود التحقق عبر SMS',
+                                                'Send WhatsApp Verification Code',
+                                                'إرسال كود التحقق عبر واتساب',
                                               )),
                                     style: TextStyle(
                                       color: (_authMethod == 0 && !_isEditing)
