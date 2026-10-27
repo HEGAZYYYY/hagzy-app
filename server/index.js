@@ -1329,9 +1329,9 @@ app.post('/api/bookings/:id/paymob-intention', (req, res) => {
   return res.status(501).json({ error: 'Online card payments are not enabled yet. Please use InstaPay or Vodafone Cash.' });
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  return res.json({
+// Health check: handles /health, /api/health, /healthz, and /ping
+app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
+  return res.status(200).json({
     status: 'healthy',
     time: new Date().toISOString(),
     usersCount: db.users.length,
@@ -1346,8 +1346,8 @@ if (pgPool) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 Hagzy server is live on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 Hagzy server is live on port ${PORT} (bound to 0.0.0.0)`);
   console.log(`📡 Venues loaded: ${db.venues.length} · 👥 Users: ${db.users.length}\n`);
 });
 
