@@ -82,6 +82,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   bool _loading = false;
   String? _errorMessage;
   bool _isEditing = false;
+  bool _isPhoneSignUp = false;
   bool _isVerifyingOtp = false;
   bool _obscurePassword = true;
   int _resendCountdown = 60;
@@ -1433,9 +1434,10 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Name Field
-                      TextField(
-                        controller: _nameController,
+                      // Name Field (Only shown during sign-up or profile editing)
+                      if (_authMethod == 0 || _isPhoneSignUp || _isEditing) ...[
+                        TextField(
+                          controller: _nameController,
                         textDirection:
                             arabic ? TextDirection.rtl : TextDirection.ltr,
                         decoration: InputDecoration(
@@ -1448,6 +1450,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                    ],
 
                       // Conditional Field based on Method
                       if (_authMethod == 0) ...[
@@ -1709,8 +1712,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                               )
                                             : localized(
                                                 arabic,
-                                                'Send WhatsApp Verification Code',
-                                                'إرسال كود التحقق عبر واتساب',
+                                                _isPhoneSignUp ? 'Create Account' : 'Log In',
+                                                _isPhoneSignUp ? 'إنشاء حساب' : 'تسجيل الدخول',
                                               )),
                                     style: TextStyle(
                                       color: (_authMethod == 0 && !_isEditing)
@@ -1723,6 +1726,36 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           ),
                         ),
                       ),
+                      if (_authMethod == 1 && !_isEditing) ...[
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _isPhoneSignUp
+                                  ? localized(arabic, 'Already have an account? ', 'لديك حساب بالفعل؟ ')
+                                  : localized(arabic, "Don't have an account? ", 'ليس لديك حساب؟ '),
+                              style: const TextStyle(fontSize: 13, color: kMuted),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() {
+                                _isPhoneSignUp = !_isPhoneSignUp;
+                                _errorMessage = null;
+                              }),
+                              child: Text(
+                                _isPhoneSignUp
+                                    ? localized(arabic, 'Log In', 'تسجيل الدخول')
+                                    : localized(arabic, 'Create Account', 'إنشاء حساب جديد'),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: kGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
           ),
