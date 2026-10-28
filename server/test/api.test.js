@@ -207,3 +207,38 @@ test('customer booking cancellation authorizes owner and rejects non-owners', as
   const repeat = await call('POST', `/api/bookings/${b.id}/cancel`, { token: token1 });
   assert.equal(repeat.status, 400);
 });
+
+test('WhatsApp webhook and chatbot message handler process questions and booking lookups', async () => {
+  // 1. In-app chatbot message
+  const chat = await call('POST', '/api/chatbot/message', {
+    body: { message: 'طرق الدفع والعربون' }
+  });
+  assert.equal(chat.status, 200);
+  assert.ok(chat.json.reply.includes('فوري') || chat.json.reply.includes('InstaPay'));
+
+  // 2. UltraMsg inbound WhatsApp webhook with own message (fromMe: true -> ignored)
+  const webhookOwn = await call('POST', '/api/whatsapp/webhook', {
+    body: {
+      data: {
+        fromMe: true,
+        from: '201024129393@c.us',
+        body: 'Hello'
+      }
+    }
+  });
+  assert.equal(webhookOwn.status, 200);
+  assert.equal(webhookOwn.json.status, 'ignored_own_message');
+
+  // 3. UltraMsg inbound WhatsApp message from customer
+  const webhookCust = await call('POST', '/api/whatsapp/webhook', {
+    body: {
+      data: {
+        fromMe: false,
+        from: '201024129393@c.us',
+        body: 'عايز أعرف حالة حجزي'
+      }
+    }
+  });
+  assert.equal(webhookCust.status, 200);
+  assert.equal(webhookCust.json.replied, true);
+});
