@@ -438,6 +438,194 @@ class LanguageOption extends StatelessWidget {
       );
 }
 
+class HagzyThemeModeIcon extends StatelessWidget {
+  const HagzyThemeModeIcon({
+    super.key,
+    required this.isDark,
+    this.size = 20,
+    this.color,
+  });
+
+  final bool isDark;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor =
+        color ?? (isDark ? kGold : kGreen);
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _ThemeModeIconPainter(
+          isDark: isDark,
+          color: activeColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeModeIconPainter extends CustomPainter {
+  _ThemeModeIconPainter({required this.isDark, required this.color});
+
+  final bool isDark;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final r = size.width * 0.36;
+
+    if (isDark) {
+      // Crescent Moon + Sparkle Star
+      final moonPath = Path()
+        ..addOval(Rect.fromCircle(center: center, radius: r));
+      final cutout = Path()
+        ..addOval(Rect.fromCircle(
+          center: Offset(center.dx + r * 0.48, center.dy - r * 0.32),
+          radius: r * 0.85,
+        ));
+      final crescent = Path.combine(PathOperation.difference, moonPath, cutout);
+      final fillPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(crescent, fillPaint);
+
+      // Small star in upper right
+      final starCenter = Offset(center.dx + r * 0.55, center.dy - r * 0.45);
+      final sr = size.width * 0.10;
+      final starPaint = Paint()
+        ..color = color
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(
+        Offset(starCenter.dx - sr, starCenter.dy),
+        Offset(starCenter.dx + sr, starCenter.dy),
+        starPaint,
+      );
+      canvas.drawLine(
+        Offset(starCenter.dx, starCenter.dy - sr),
+        Offset(starCenter.dx, starCenter.dy + sr),
+        starPaint,
+      );
+    } else {
+      // Sun + 8 Rays
+      final fillPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(center, size.width * 0.22, fillPaint);
+
+      final rayPaint = Paint()
+        ..color = color
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round;
+      final innerR = size.width * 0.31;
+      final outerR = size.width * 0.44;
+      const dirs = [
+        Offset(1, 0),
+        Offset(-1, 0),
+        Offset(0, 1),
+        Offset(0, -1),
+        Offset(0.7071, 0.7071),
+        Offset(-0.7071, 0.7071),
+        Offset(0.7071, -0.7071),
+        Offset(-0.7071, -0.7071),
+      ];
+      for (final d in dirs) {
+        canvas.drawLine(
+          Offset(center.dx + d.dx * innerR, center.dy + d.dy * innerR),
+          Offset(center.dx + d.dx * outerR, center.dy + d.dy * outerR),
+          rayPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThemeModeIconPainter oldDelegate) =>
+      oldDelegate.isDark != isDark || oldDelegate.color != color;
+}
+
+class HagzyVenueControlIcon extends StatelessWidget {
+  const HagzyVenueControlIcon({
+    super.key,
+    this.size = 20,
+    this.color = kGreen,
+  });
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _VenueControlIconPainter(color: color),
+      ),
+    );
+  }
+}
+
+class _VenueControlIconPainter extends CustomPainter {
+  _VenueControlIconPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final gap = w * 0.08;
+    final boxW = (w - gap * 3) / 2;
+    final boxH = (h - gap * 3) / 2;
+    final radius = Radius.circular(w * 0.12);
+
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.7;
+
+    // Top-left filled tile
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(gap, gap, boxW, boxH), radius),
+      fillPaint,
+    );
+    // Top-right outlined tile
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          Rect.fromLTWH(gap * 2 + boxW, gap, boxW, boxH), radius),
+      strokePaint,
+    );
+    // Bottom-left outlined tile
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          Rect.fromLTWH(gap, gap * 2 + boxH, boxW, boxH), radius),
+      strokePaint,
+    );
+    // Bottom-right plus sign (Add/Control Venue)
+    final cx = gap * 2 + boxW + boxW / 2;
+    final cy = gap * 2 + boxH + boxH / 2;
+    final arm = boxW * 0.38;
+    final plusPaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx - arm, cy), Offset(cx + arm, cy), plusPaint);
+    canvas.drawLine(Offset(cx, cy - arm), Offset(cx, cy + arm), plusPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _VenueControlIconPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
 class FloatingDock extends StatelessWidget {
   const FloatingDock({
     super.key,

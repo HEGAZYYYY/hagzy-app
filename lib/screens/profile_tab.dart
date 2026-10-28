@@ -573,6 +573,10 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 icon: kDarkMode.value
                     ? Icons.dark_mode_rounded
                     : Icons.light_mode_rounded,
+                iconWidget: HagzyThemeModeIcon(
+                  isDark: kDarkMode.value,
+                  size: 19,
+                ),
                 title: localized(arabic, 'Dark Mode', 'الوضع الليلي'),
                 subtitle: kDarkMode.value
                     ? localized(arabic, 'Enabled (Obsidian Emerald)',
@@ -1674,6 +1678,7 @@ class _StatCard extends StatelessWidget {
 class _SettingTile extends StatelessWidget {
   const _SettingTile({
     required this.icon,
+    this.iconWidget,
     required this.title,
     required this.subtitle,
     required this.trailing,
@@ -1681,6 +1686,7 @@ class _SettingTile extends StatelessWidget {
   });
 
   final IconData icon;
+  final Widget? iconWidget;
   final String title;
   final String subtitle;
   final Widget trailing;
@@ -1698,13 +1704,20 @@ class _SettingTile extends StatelessWidget {
             Container(
               width: 36,
               height: 36,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF19243D) : kSurfaceTint,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF283552) : kBorder,
+                ),
               ),
-              child: Icon(icon,
-                  size: 18,
-                  color: isDark ? kGreenLight : kInk),
+              child: iconWidget ??
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: isDark ? kGreenLight : kInk,
+                  ),
             ),
             const SizedBox(width: 14),
             Expanded(

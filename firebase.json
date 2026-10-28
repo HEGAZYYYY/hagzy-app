@@ -14,7 +14,7 @@
     ],
     "headers": [
       {
-        "source": "**@(main.dart.js*|flutter*|index.html)",
+        "source": "**@(main.dart.js*|flutter*|index.html|*.otf|*.ttf)",
         "headers": [
           {
             "key": "Cache-Control",
@@ -31,7 +31,7 @@
         ]
       },
       {
-        "source": "**/*.@(wasm|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|otf)",
+        "source": "**/*.@(wasm|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
         "headers": [
           {
             "key": "Cache-Control",

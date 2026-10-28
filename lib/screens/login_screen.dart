@@ -654,10 +654,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 kDarkMode.value ? kGold : kGreen,
                             side: BorderSide(color: kBorder),
                           ),
-                          icon: Icon(
-                            kDarkMode.value
-                                ? Icons.light_mode_rounded
-                                : Icons.dark_mode_rounded,
+                          icon: HagzyThemeModeIcon(
+                            isDark: kDarkMode.value,
                             size: 20,
                           ),
                         ),
