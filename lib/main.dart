@@ -12,6 +12,7 @@ import 'hagzy_api.dart';
 import 'models/models.dart';
 import 'screens/admin_workspace.dart';
 import 'screens/book_tab.dart';
+import 'screens/login_screen.dart';
 import 'screens/my_bookings_tab.dart';
 import 'screens/profile_tab.dart';
 import 'theme/hagzy_theme.dart';
@@ -19,6 +20,7 @@ import 'widgets/common_widgets.dart';
 import 'services/social_auth_service.dart';
 
 export 'models/models.dart';
+export 'screens/login_screen.dart';
 
 void main() {
   runApp(const HagzyApp());
@@ -82,6 +84,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   String _savedCustomerEmail = '';
   String? _customerToken;
   bool _customerSignedIn = false;
+  bool _prefsLoaded = false;
   String _currentArea = 'Cairo';
   double _walletBalance = HagzyWallet.defaultWelcomeBalance;
   bool _working = false;
@@ -208,6 +211,8 @@ class _HagzyHomeState extends State<HagzyHome> {
             .toList();
         _customerBookings = List.of(_bookings);
       }
+      _prefsLoaded = true;
+      if (mounted) setState(() {});
       if (!widget.adminMode && _api.isConfigured) {
         try {
           final remoteVenues = await _api.venues();
@@ -244,6 +249,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
       if (mounted) setState(() {});
     } catch (error) {
+      _prefsLoaded = true;
       if (mounted) {
         setState(() {
           _loadError = 'Could not load saved app data: $error';
@@ -3523,7 +3529,10 @@ class _HagzyHomeState extends State<HagzyHome> {
   }) async {
     if (token != null && token.isNotEmpty) {
       _customerToken = token;
+    } else if (_customerToken == null || _customerToken!.isEmpty) {
+      _customerToken = 'local-session-token';
     }
+    _tab = 0;
     await _saveCustomerProfile(
       name: name,
       email: email,
@@ -3688,6 +3697,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _walletBalance = 0.0;
       _customerBookings = [];
       _bookings = [];
+      _tab = 0;
     });
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -3716,6 +3726,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _customerToken = null;
       _walletBalance = 0;
       _customerBookings = [];
+      _tab = 0;
     });
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -3789,7 +3800,20 @@ class _HagzyHomeState extends State<HagzyHome> {
         ),
         child: Directionality(
           textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
-          child: Scaffold(
+          child: _prefsLoaded && isCustomer && !_customerSignedIn
+              ? CustomerLoginScreen(
+                  arabic: arabic,
+                  language: _language,
+                  api: _api,
+                  apiConfigured: _api.isConfigured,
+                  onSignIn: _handleCustomerSignIn,
+                  onChangeLanguage: _changeLanguage,
+                  onSwitchToAdmin: () => setState(() {
+                    _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview';
+                    _tab = 2;
+                  }),
+                )
+              : Scaffold(
             appBar: AppBar(
               toolbarHeight: 68,
               titleSpacing: 16,
