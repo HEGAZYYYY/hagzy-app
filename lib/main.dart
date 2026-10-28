@@ -131,6 +131,13 @@ class _HagzyHomeState extends State<HagzyHome> {
           });
         }
       } catch (_) {}
+
+      // Listen for Firebase account deletion/sign-out in real time
+      SocialAuthService.registerSignOutListener(() {
+        if (mounted && _customerSignedIn) {
+          _handleCustomerSignOut();
+        }
+      });
     }
   }
 
@@ -3597,6 +3604,17 @@ class _HagzyHomeState extends State<HagzyHome> {
         await _commit(_venues, merged);
       }
     } catch (error) {
+      final errStr = error.toString().toLowerCase();
+      if (errStr.contains('401') ||
+          errStr.contains('404') ||
+          errStr.contains('deleted') ||
+          errStr.contains('user not found') ||
+          errStr.contains('logged out') ||
+          errStr.contains('invalid or expired')) {
+        // Account was deleted in Firebase / revoked on server
+        await _handleCustomerSignOut();
+        return;
+      }
       // Background syncs stay quiet; an explicit pull-to-refresh must not.
       if (showErrors) {
         _message(friendlyError(error, arabic: _language == 'AR'), error: true);

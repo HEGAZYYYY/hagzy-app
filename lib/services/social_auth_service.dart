@@ -9,4 +9,6 @@ class SocialAuthService {
   static Future<void> signInWithCustomToken(String token) => webSignInWithCustomToken(token);
   static Map<String, dynamic>? getRedirectUser() => webGetRedirectUser();
   static void signOutWeb() => webSignOut();
+  static void registerSignOutListener(void Function() onSignOut) =>
+      webRegisterSignOutListener(onSignOut);
 }

@@ -64,7 +64,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
-    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
@@ -87,6 +87,30 @@
 
       // Automatically catch redirect sign-in results from Google or Apple
       window.hagzyRedirectUser = null;
+      window.hagzyOnSignOutCallback = null;
+      window.registerHagzySignOutCallback = function(cb) {
+        window.hagzyOnSignOutCallback = cb;
+      };
+
+      onAuthStateChanged(auth, async function(user) {
+        if (!user) {
+          if (typeof window.hagzyOnSignOutCallback === 'function') {
+            window.hagzyOnSignOutCallback();
+          }
+        } else {
+          try {
+            await user.getIdToken(true);
+          } catch (err) {
+            if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/user-disabled' || err.code === 'auth/user-token-expired')) {
+              console.warn("Firebase account no longer valid or was deleted:", err.code);
+              try { await signOut(auth); } catch (_) {}
+              if (typeof window.hagzyOnSignOutCallback === 'function') {
+                window.hagzyOnSignOutCallback();
+              }
+            }
+          }
+        }
+      });
       getRedirectResult(auth).then(async function(result) {
         if (result && result.user) {
           const user = result.user;
@@ -179,11 +203,9 @@
         });
       };
 
-            window.hagzySignOut = function() {
+      window.hagzySignOut = async function() {
         try {
-          if (window.firebaseAuth) {
-            window.firebaseAuth.signOut();
-          }
+          await signOut(auth);
           window.hagzyRedirectUser = null;
           const url = new URL(window.location.href);
           url.searchParams.delete('auth_token');
