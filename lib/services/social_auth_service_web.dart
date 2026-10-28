@@ -110,6 +110,18 @@ void webSignOut() {
   } catch (_) {}
 }
 
+void webRegisterSignOutListener(void Function() onSignOut) {
+  try {
+    if (js.context.hasProperty('registerHagzySignOutCallback')) {
+      js.context.callMethod('registerHagzySignOutCallback', [
+        js.allowInterop(() {
+          onSignOut();
+        }),
+      ]);
+    }
+  } catch (_) {}
+}
+
 Future<void> webSignInWithCustomToken(String token) async {
   try {
     if (js.context.hasProperty('hagzySignInWithCustomTokenCallback')) {

@@ -5,3 +5,4 @@ Future<Map<String, dynamic>?> webVerifyPhoneOtp(String code) async => null;
 Map<String, dynamic>? webGetRedirectUser() => null;
 Future<void> webSignInWithCustomToken(String token) async {}
 void webSignOut() {}
+void webRegisterSignOutListener(void Function() onSignOut) {}

@@ -489,8 +489,23 @@ async function sendRealEmail({ email, code }) {
   return { sent: false };
 }
 
+function formatE164Phone(rawPhone) {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (digits.startsWith('20') && digits.length >= 12) {
+    return '+' + digits;
+  } else if (digits.startsWith('0') && digits.length >= 11) {
+    return '+2' + digits;
+  } else if (digits.length === 10 && (digits.startsWith('10') || digits.startsWith('11') || digits.startsWith('12') || digits.startsWith('15'))) {
+    return '+20' + digits;
+  } else if (digits.length > 0) {
+    return '+' + digits;
+  }
+  return '';
+}
+
 // Middleware: Customer Auth
-function authenticateCustomer(req, res, next) {
+async function authenticateCustomer(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing customer token' });
@@ -503,7 +518,52 @@ function authenticateCustomer(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     req.token = token;
-    next();
+
+    // Verify user exists in local database
+    const localUser = db.users.find(u => u.id === decoded.id);
+    if (!localUser) {
+      revokeToken(token);
+      return res.status(401).json({ error: 'Account not found or has been deleted. Please sign in again.' });
+    }
+
+    // Verify user still exists in Firebase Auth if Firebase Admin is active
+    if (fbAuth && !IS_TEST) {
+      let deletedFromFb = false;
+      try {
+        if (localUser.firebaseUid) {
+          await fbAuth.getUser(localUser.firebaseUid);
+        } else if (localUser.phone) {
+          const formattedPhone = formatE164Phone(localUser.phone);
+          if (formattedPhone) {
+            const fbU = await fbAuth.getUserByPhoneNumber(formattedPhone);
+            if (fbU) {
+              localUser.firebaseUid = fbU.uid;
+              saveDb(db);
+            }
+          }
+        } else if (localUser.email) {
+          const fbU = await fbAuth.getUserByEmail(localUser.email);
+          if (fbU) {
+            localUser.firebaseUid = fbU.uid;
+            saveDb(db);
+          }
+        }
+      } catch (fbErr) {
+        if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/user-disabled') {
+          deletedFromFb = true;
+        }
+      }
+
+      if (deletedFromFb) {
+        console.log(`⚠️ User ${localUser.id} (${localUser.phone || localUser.email}) was deleted from Firebase. Purging.`);
+        db.users = db.users.filter(u => u.id !== localUser.id);
+        saveDb(db);
+        revokeToken(token);
+        return res.status(401).json({ error: 'Account has been deleted from Firebase. Please sign up again.' });
+      }
+    }
+
+    return next();
   } catch (err) {
     try {
       const decodedWithoutVerify = jwt.decode(token);
@@ -657,10 +717,20 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
       } else if (formattedPhone) {
         existingFbUser = await fbAuth.getUserByPhoneNumber(formattedPhone);
       }
-    } catch (_) {}
+    } catch (fbErr) {
+      if ((fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/user-disabled') && existingLocalUser) {
+        // User was deleted in Firebase Console! Purge local shadow user so it stays in sync.
+        console.log(`⚠️ User was deleted from Firebase Auth. Purging local user ${existingLocalUser.id}`);
+        db.users = db.users.filter(u => u.id !== existingLocalUser.id);
+        saveDb(db);
+      }
+    }
   }
 
-  const accountExists = !!(existingLocalUser || existingFbUser);
+  // When Firebase Auth is active, Firebase is the source of truth
+  const accountExists = (fbAuth && !IS_TEST)
+    ? !!existingFbUser
+    : !!(existingLocalUser || existingFbUser);
 
   // If client specified Log In mode (isSignUp === false) and account does NOT exist anywhere:
   if (isSignUp === false && !accountExists) {
@@ -1130,6 +1200,8 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
       }
 
       if (fbUser) {
+        user.firebaseUid = fbUser.uid;
+        saveDb(db);
         if (user.name && !fbUser.displayName) {
           try {
             await fbAuth.updateUser(fbUser.uid, { displayName: user.name });
