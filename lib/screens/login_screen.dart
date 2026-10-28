@@ -554,7 +554,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 localized(
                                   arabic,
                                   'Smart Instant Bookings',
-                                  'احجز ملعبك وموعدك في ثواني',
+                                  'حجوزات ذكية وفورية في ثواني',
                                 ),
                                 style: const TextStyle(
                                   fontSize: 11.5,
@@ -645,8 +645,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 Text(
                                   localized(
                                     arabic,
-                                    'Sign in to book Padel, football, barbers & gaming in 1-tap',
-                                    'سجّل دخولك لحجز الملاعب والحلاقة والألعاب بضغطة واحدة',
+                                    'Booking made easier — reserve your favorite venues in 1-tap',
+                                    'حجوزات أسهل — احجز مكانك وموعدك المفضل بضغطة واحدة',
                                   ),
                                   style: TextStyle(
                                     fontSize: 12,

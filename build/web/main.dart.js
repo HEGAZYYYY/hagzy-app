@@ -121811,7 +121811,7 @@ case 6:case 1:return A.u(q,r)
 case 2:return A.t(o.at(-1),r)}})
 return A.v($async$vb,r)},
 H(a){var s,r,q,p,o,n,m,l,k,j,i=this,h=null,g="Create Account",f="\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",e=i.a.c,d=A.m(e?"\u062d\u062c\u0632\u064a":"Hagzy",h,h,h,h,B.Og,h,h,h),c=t.p
-d=A.aT(A.aF(A.b([d,A.m(e?"\u0627\u062d\u062c\u0632 \u0645\u0644\u0639\u0628\u0643 \u0648\u0645\u0648\u0639\u062f\u0643 \u0641\u064a \u062b\u0648\u0627\u0646\u064a":"Smart Instant Bookings",h,h,h,h,B.km,h,h,h)],c),B.H,B.f,B.k,0,B.r),1)
+d=A.aT(A.aF(A.b([d,A.m(e?"\u062d\u062c\u0648\u0632\u0627\u062a \u0630\u0643\u064a\u0629 \u0648\u0641\u0648\u0631\u064a\u0629 \u0641\u064a \u062b\u0648\u0627\u0646\u064a":"Smart Instant Bookings",h,h,h,h,B.km,h,h,h)],c),B.H,B.f,B.k,0,B.r),1)
 s=A.Y(999)
 r=A.bm(B.T,1)
 q=A.ee()
@@ -121822,7 +121822,7 @@ r=A.ee()
 p=t.V
 d=A.a3(h,B.Zc,B.j,h,h,new A.a_(h,h,h,h,A.b([new A.bf(0,B.L,B.l.a5(0.35),B.fR,12)],p),B.bx,B.bo),h,48,h,h,h,h,h,48)
 o=A.m(e?"\u0623\u0647\u0644\u0627\u064b \u0628\u0643 \u0641\u064a \u062d\u062c\u0632\u064a":"Welcome to Hagzy",h,h,h,h,B.arb,h,h,h)
-n=e?"\u0633\u062c\u0651\u0644 \u062f\u062e\u0648\u0644\u0643 \u0644\u062d\u062c\u0632 \u0627\u0644\u0645\u0644\u0627\u0639\u0628 \u0648\u0627\u0644\u062d\u0644\u0627\u0642\u0629 \u0648\u0627\u0644\u0623\u0644\u0639\u0627\u0628 \u0628\u0636\u063a\u0637\u0629 \u0648\u0627\u062d\u062f\u0629":"Sign in to book Padel, football, barbers & gaming in 1-tap"
+n=e?"\u062d\u062c\u0648\u0632\u0627\u062a \u0623\u0633\u0647\u0644 \u2014 \u0627\u062d\u062c\u0632 \u0645\u0643\u0627\u0646\u0643 \u0648\u0645\u0648\u0639\u062f\u0643 \u0627\u0644\u0645\u0641\u0636\u0644 \u0628\u0636\u063a\u0637\u0629 \u0648\u0627\u062d\u062f\u0629":"Booking made easier \u2014 reserve your favorite venues in 1-tap"
 r=A.a3(h,A.aa(A.b([d,B.dG,A.aT(A.aF(A.b([o,B.di,A.m(n,h,h,h,h,A.bT(h,h,B.h.a5(0.78),h,h,h,h,h,h,h,h,12,h,h,B.az,h,1.35,!0,h,h,h,h,h,h,h,h),h,h,h)],c),B.H,B.f,B.k,0,B.r),1)],c),B.m,B.f,B.k,0,h),B.j,h,h,new A.a_(h,h,h,s,r,B.eT,B.o),h,h,h,h,B.hu,h,h,h)
 s=A.Y(26)
 n=A.bm(B.T,1)
