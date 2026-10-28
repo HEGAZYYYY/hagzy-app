@@ -1807,6 +1807,7 @@ class _BookTabState extends State<BookTab> {
             child: VenueBrowseCard(
               key: _venueCardKeys.putIfAbsent(value.id, () => GlobalKey()),
               venue: value,
+              bookings: widget.bookings,
               arabic: widget.arabic,
               selected: selected,
               favorite: _favoriteIds.contains(value.id),
@@ -3360,6 +3361,7 @@ class VenueBrowseCard extends StatelessWidget {
   const VenueBrowseCard({
     super.key,
     required this.venue,
+    this.bookings = const [],
     required this.arabic,
     required this.selected,
     required this.favorite,
@@ -3369,12 +3371,115 @@ class VenueBrowseCard extends StatelessWidget {
   });
 
   final Venue venue;
+  final List<Booking> bookings;
   final bool arabic;
   final bool selected;
   final bool favorite;
   final VoidCallback onTap;
   final VoidCallback onFavorite;
   final VoidCallback? onDetails;
+
+  ({String label, bool isAvailableNow}) _computeLiveAvailability() {
+    final now = DateTime.now();
+    final openH = venue.openHour;
+    final closeH = venue.closeHour <= openH ? 23 : venue.closeHour;
+    String fmtHour(int h, int m) {
+      final period = h >= 12
+          ? (arabic ? 'م' : 'PM')
+          : (arabic ? 'ص' : 'AM');
+      final h12 = h % 12 == 0 ? 12 : h % 12;
+      final mm = m == 0 ? '00' : m.toString().padLeft(2, '0');
+      return '$h12:$mm $period';
+    }
+
+    if (now.hour < openH || now.hour >= closeH) {
+      final openStr = fmtHour(openH, 0);
+      return (
+        label: localized(arabic, 'Opens $openStr', 'يفتح $openStr'),
+        isAvailableNow: false,
+      );
+    }
+
+    if (venue.items.isEmpty) {
+      return (
+        label: localized(arabic, 'Available Now', 'متاح الآن'),
+        isAvailableNow: true,
+      );
+    }
+
+    final activeVenueBookings = bookings
+        .where((b) => b.venueId == venue.id && !b.cancelled)
+        .toList();
+
+    bool isItemFreeAt(String itemId, DateTime slotStart) {
+      final slotEnd = slotStart.add(const Duration(minutes: 60));
+      for (final b in activeVenueBookings) {
+        if (b.itemId != itemId) continue;
+        final bEnd = b.startsAt.add(Duration(minutes: b.durationMinutes));
+        if (b.startsAt.isBefore(slotEnd) && bEnd.isAfter(slotStart)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    final roundedMin = now.minute < 30 ? 30 : 0;
+    final roundedHour = now.minute < 30 ? now.hour : now.hour + 1;
+    final currentSlot = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      roundedHour.clamp(openH, closeH),
+      roundedMin,
+    );
+
+    int freeNow = 0;
+    for (final it in venue.items) {
+      if (isItemFreeAt(it.id, now)) {
+        freeNow++;
+      }
+    }
+
+    if (freeNow > 0) {
+      return (
+        label: localized(
+          arabic,
+          'Available Now · $freeNow free',
+          'متاح الآن · $freeNow شاغر',
+        ),
+        isAvailableNow: true,
+      );
+    }
+
+    var probe = currentSlot;
+    final closeTime = DateTime(now.year, now.month, now.day, closeH, 0);
+    while (probe.isBefore(closeTime)) {
+      for (final it in venue.items) {
+        if (isItemFreeAt(it.id, probe)) {
+          final slotText = fmtHour(probe.hour, probe.minute);
+          return (
+            label: localized(
+              arabic,
+              'Next slot $slotText',
+              'أقرب موعد $slotText',
+            ),
+            isAvailableNow: false,
+          );
+        }
+      }
+      probe = probe.add(const Duration(minutes: 30));
+    }
+
+    final openStr = fmtHour(openH, 0);
+    return (
+      label: localized(
+        arabic,
+        'Next slot tomorrow $openStr',
+        'أقرب موعد غداً $openStr',
+      ),
+      isAvailableNow: false,
+    );
+  }
 
   Color get _accent => switch (venue.type) {
         VenueType.sports => kGreen,
@@ -3462,6 +3567,14 @@ class VenueBrowseCard extends StatelessWidget {
                           _image,
                           fit: BoxFit.cover,
                           cacheWidth: 640,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const HagzyShimmerBox(
+                              width: double.infinity,
+                              height: 162,
+                              borderRadius: 0,
+                            );
+                          },
                           errorBuilder: (context, error, stackTrace) =>
                               const SizedBox.shrink(),
                         ),
@@ -3677,6 +3790,48 @@ class VenueBrowseCard extends StatelessWidget {
                                   ),
                                 ],
                               ),
+                            )
+                          else
+                            Builder(
+                              builder: (context) {
+                                final avail = _computeLiveAvailability();
+                                final badgeColor = avail.isAvailableNow
+                                    ? kGreen
+                                    : const Color(0xFFD97706);
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: badgeColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: badgeColor.withValues(alpha: 0.28),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6.5,
+                                        height: 6.5,
+                                        decoration: BoxDecoration(
+                                          color: badgeColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        avail.label,
+                                        style: TextStyle(
+                                          color: badgeColor,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                         ],
                       ),

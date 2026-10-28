@@ -8,6 +8,7 @@ void webSignOut() {}
 void webRegisterSignOutListener(void Function() onSignOut) {}
 void webRegisterRedirectAuthListener(void Function(Map<String, dynamic>) onRedirectUser) {}
 void webRegisterVenuesListener(void Function(List<Map<String, dynamic>>) onVenues) {}
+void webRegisterUsersListener(void Function(List<Map<String, dynamic>>) onUsers) {}
 void webSaveVenueToFirestore(Map<String, dynamic> venueJson) {}
 void webDeleteVenueFromFirestore(String venueId) {}
 void webSyncUserToFirestore(Map<String, dynamic> userJson) {}

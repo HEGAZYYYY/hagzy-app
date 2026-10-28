@@ -2018,3 +2018,125 @@ class _HagzySplashOverlayState extends State<HagzySplashOverlay>
     );
   }
 }
+
+class HagzyShimmerBox extends StatefulWidget {
+  const HagzyShimmerBox({
+    super.key,
+    required this.width,
+    required this.height,
+    this.borderRadius = 12,
+  });
+
+  final double width;
+  final double height;
+  final double borderRadius;
+
+  @override
+  State<HagzyShimmerBox> createState() => _HagzyShimmerBoxState();
+}
+
+class _HagzyShimmerBoxState extends State<HagzyShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1350),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = kDarkMode.value;
+    final baseColor =
+        isDark ? const Color(0xFF19243D) : const Color(0xFFE2E8F0);
+    final highlightColor =
+        isDark ? const Color(0xFF283552) : const Color(0xFFF8FAFC);
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final slide = _controller.value * 2.0 - 0.5;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            gradient: LinearGradient(
+              begin: Alignment(-1.0 + slide, -0.2),
+              end: Alignment(0.2 + slide, 0.2),
+              colors: [baseColor, highlightColor, baseColor],
+              stops: const [0.1, 0.5, 0.9],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class VenueCardSkeleton extends StatelessWidget {
+  const VenueCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = kDarkMode.value;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131C31) : kPanel,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? const Color(0xFF283552) : kBorder,
+        ),
+        boxShadow: HagzyTheme.softShadow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HagzyShimmerBox(
+            width: double.infinity,
+            height: 162,
+            borderRadius: 0,
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(18, 15, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    HagzyShimmerBox(width: 170, height: 18, borderRadius: 6),
+                    HagzyShimmerBox(width: 84, height: 22, borderRadius: 999),
+                  ],
+                ),
+                SizedBox(height: 10),
+                HagzyShimmerBox(width: 220, height: 13, borderRadius: 5),
+                SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    HagzyShimmerBox(width: 100, height: 24, borderRadius: 8),
+                    HagzyShimmerBox(width: 110, height: 34, borderRadius: 999),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
