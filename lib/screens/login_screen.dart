@@ -175,6 +175,13 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             'This phone number is already registered. Please click "Log In" to access your account.',
             'هذا الرقم مسجل بالفعل. يرجى الضغط على "تسجيل الدخول".',
           );
+        } else if (lower.contains('429') ||
+            lower.contains('too many')) {
+          displayErr = localized(
+            widget.arabic,
+            'Too many verification attempts. Please wait a minute and try again.',
+            'محاولات كثيرة متتالية. يرجى الانتظار دقيقة والمحاولة مرة أخرى.',
+          );
         }
         setState(() {
           _loading = false;
