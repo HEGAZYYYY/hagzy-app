@@ -146,3 +146,42 @@ Future<void> webSignInWithCustomToken(String token) async {
     print('Custom token error: $e');
   }
 }
+
+void webRegisterVenuesListener(void Function(List<Map<String, dynamic>>) onVenues) {
+  try {
+    if (js.context.hasProperty('registerHagzyVenuesListener')) {
+      js.context.callMethod('registerHagzyVenuesListener', [
+        js.allowInterop((dynamic rawJson) {
+          try {
+            if (rawJson is String && rawJson.isNotEmpty) {
+              final decoded = jsonDecode(rawJson);
+              if (decoded is List) {
+                final list = decoded
+                    .whereType<Map>()
+                    .map((m) => Map<String, dynamic>.from(m))
+                    .toList();
+                onVenues(list);
+              }
+            }
+          } catch (_) {}
+        }),
+      ]);
+    }
+  } catch (_) {}
+}
+
+void webSaveVenueToFirestore(Map<String, dynamic> venueJson) {
+  try {
+    if (js.context.hasProperty('hagzySaveVenueToFirestore')) {
+      js.context.callMethod('hagzySaveVenueToFirestore', [jsonEncode(venueJson)]);
+    }
+  } catch (_) {}
+}
+
+void webDeleteVenueFromFirestore(String venueId) {
+  try {
+    if (js.context.hasProperty('hagzyDeleteVenueFromFirestore')) {
+      js.context.callMethod('hagzyDeleteVenueFromFirestore', [venueId]);
+    }
+  } catch (_) {}
+}

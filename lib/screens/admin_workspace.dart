@@ -19,6 +19,7 @@ class AdminManageWorkspace extends StatefulWidget {
     required this.onRemoveItem,
     required this.onWalkIn,
     this.onBlockSlot,
+    this.onSyncFirebase,
     required this.onCancel,
     required this.onConfirm,
   });
@@ -34,6 +35,7 @@ class AdminManageWorkspace extends StatefulWidget {
   final void Function(Venue venue, VenueItem item) onRemoveItem;
   final void Function(Venue venue, VenueItem item) onWalkIn;
   final void Function(Venue venue, VenueItem item, DateTime start, int duration, String reason)? onBlockSlot;
+  final VoidCallback? onSyncFirebase;
   final ValueChanged<Booking> onCancel;
   final ValueChanged<Booking> onConfirm;
 
@@ -90,6 +92,7 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                 onRemoveService: widget.onRemoveService,
                 onDelete: widget.onDelete,
                 onRemoveItem: widget.onRemoveItem,
+                onSyncFirebase: widget.onSyncFirebase,
               ),
             1 => PosTab(
                 venues: widget.venues,
@@ -110,7 +113,7 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
   }
 }
 
-class ManageTab extends StatelessWidget {
+class ManageTab extends StatefulWidget {
   const ManageTab({
     super.key,
     required this.venues,
@@ -121,6 +124,7 @@ class ManageTab extends StatelessWidget {
     required this.onRemoveService,
     required this.onDelete,
     required this.onRemoveItem,
+    this.onSyncFirebase,
   });
 
   final List<Venue> venues;
@@ -131,157 +135,290 @@ class ManageTab extends StatelessWidget {
   final void Function(Venue venue, SalonService service) onRemoveService;
   final ValueChanged<Venue> onDelete;
   final void Function(Venue venue, VenueItem item) onRemoveItem;
+  final VoidCallback? onSyncFirebase;
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          IntroCard(
-            title: 'Your self-service builder',
-            subtitle:
-                'Add a venue after contacting its owner, then list bookable spaces and services.',
-            icon: Icons.add_business_outlined,
-            action: FilledButton.icon(
-              onPressed: onAddVenue,
-              icon: const Icon(Icons.add),
-              label: const Text('Add venue'),
+  State<ManageTab> createState() => _ManageTabState();
+}
+
+class _ManageTabState extends State<ManageTab> {
+  VenueType? _filterType;
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredVenues = _filterType == null
+        ? widget.venues
+        : widget.venues.where((v) => v.type == _filterType).toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: [
+        IntroCard(
+          title: 'Your self-service builder',
+          subtitle:
+              'Add a venue after contacting its owner, then list bookable spaces and services.',
+          icon: Icons.add_business_outlined,
+          action: FilledButton.icon(
+            onPressed: widget.onAddVenue,
+            icon: const Icon(Icons.add),
+            label: const Text('Add venue'),
+          ),
+        ),
+        if (widget.venues.length > 1) ...[
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                CustomPill(
+                  label: 'All (${widget.venues.length})',
+                  selected: _filterType == null,
+                  onTap: () => setState(() => _filterType = null),
+                ),
+                const SizedBox(width: 6),
+                ...VenueType.values.map((t) {
+                  final count = widget.venues.where((v) => v.type == t).length;
+                  if (count == 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: CustomPill(
+                      label: '${t.label} ($count)',
+                      icon: t.icon,
+                      selected: _filterType == t,
+                      onTap: () => setState(() =>
+                          _filterType = _filterType == t ? null : t),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          if (venues.isEmpty)
-            const EmptyCard(
-              icon: Icons.add_business_outlined,
-              title: 'Build your first venue',
-              body:
-                  'Choose a venue type, add spaces or chairs, then set prices.',
-            ),
-          ...venues.map((venue) => Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          IconBox(icon: venue.type.icon),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(venue.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 17)),
-                                Text(venue.type.label,
-                                    style: const TextStyle(color: kMuted)),
-                              ],
-                            ),
+        ],
+        const SizedBox(height: 14),
+        if (filteredVenues.isEmpty)
+          const EmptyCard(
+            icon: Icons.add_business_outlined,
+            title: 'Build your first venue',
+            body:
+                'Choose a venue type, add spaces or chairs, then set prices.',
+          ),
+        ...filteredVenues.map((venue) => Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconBox(icon: venue.type.icon),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(venue.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 17)),
+                              Text(venue.type.label,
+                                  style: const TextStyle(color: kMuted)),
+                            ],
                           ),
-                          IconButton(
-                            tooltip: 'Edit venue',
-                            onPressed: () => onEditVenue(venue),
-                            icon: const Icon(Icons.edit_outlined, color: kGreen),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete venue',
-                            onPressed: () => onDelete(venue),
-                            icon: const Icon(Icons.delete_outline,
-                                color: Colors.red),
-                          ),
-                        ],
-                      ),
-                      if (venue.location.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(venue.location,
-                              style: const TextStyle(color: kMuted)),
                         ),
+                        IconButton(
+                          tooltip: 'Edit venue',
+                          onPressed: () => widget.onEditVenue(venue),
+                          icon: const Icon(Icons.edit_outlined, color: kGreen),
+                        ),
+                        IconButton(
+                          tooltip: 'Delete venue',
+                          onPressed: () => widget.onDelete(venue),
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red),
+                        ),
+                      ],
+                    ),
+                    if (venue.location.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(venue.location,
+                            style: const TextStyle(color: kMuted)),
+                      ),
+                    if (venue.description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          'Owner phone: ${venue.ownerPhone.isEmpty ? 'Not provided' : venue.ownerPhone} · '
-                          'Deposit policy: ${formatMoney(venue.depositPercent)}% · '
-                          'Hours: ${venue.openHour}:00–${venue.closeHour}:00',
-                          style: const TextStyle(color: kMuted, fontSize: 12.5),
+                          venue.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: kMuted, fontSize: 12),
                         ),
                       ),
-                      if (venue.instaPayAddress.isNotEmpty ||
-                          venue.vodafoneCashNumber.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            [
-                              if (venue.instaPayAddress.isNotEmpty)
-                                'InstaPay: ${venue.instaPayAddress}',
-                              if (venue.vodafoneCashNumber.isNotEmpty)
-                                'Vodafone Cash: ${venue.vodafoneCashNumber}',
-                            ].join(' · '),
-                            style: const TextStyle(
-                              color: kGreen,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Owner phone: ${venue.ownerPhone.isEmpty ? 'Not provided' : venue.ownerPhone} · '
+                        'Deposit policy: ${formatMoney(venue.depositPercent)}% · '
+                        'Hours: ${venue.openHour}:00–${venue.closeHour}:00',
+                        style: const TextStyle(color: kMuted, fontSize: 12.5),
+                      ),
+                    ),
+                    if (venue.instaPayAddress.isNotEmpty ||
+                        venue.vodafoneCashNumber.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          [
+                            if (venue.instaPayAddress.isNotEmpty)
+                              'InstaPay: ${venue.instaPayAddress}',
+                            if (venue.vodafoneCashNumber.isNotEmpty)
+                              'Vodafone Cash: ${venue.vodafoneCashNumber}',
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: kGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      const Divider(height: 24),
-                      Text(
-                          '${venue.items.length} bookable spaces · ${venue.services.length} services'),
-                      ...venue.items.map((item) => ListTile(
+                      ),
+                    if (venue.amenities.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: venue.amenities
+                              .map((a) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: kGreen.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      a,
+                                      style: const TextStyle(
+                                        color: kGreen,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    const Divider(height: 24),
+                    Text(
+                        '${venue.items.length} bookable spaces · ${venue.services.length} services'),
+                    ...venue.items.map((item) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('${item.name} · ${item.kind}'),
+                          subtitle: Text(
+                              '${formatMoney(item.hourlyRate)} EGP${item.multiRate > 0 ? ' / ${formatMoney(item.multiRate)} multi' : ''}'),
+                          trailing: IconButton(
+                            tooltip: 'Remove space',
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: () => widget.onRemoveItem(venue, item),
+                          ),
+                        )),
+                    if (venue.services.isNotEmpty)
+                      ...venue.services.map((service) => ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            title: Text('${item.name} · ${item.kind}'),
+                            leading: const Icon(Icons.content_cut, size: 18),
+                            title: Text(service.name),
                             subtitle: Text(
-                                '${formatMoney(item.hourlyRate)} EGP${item.multiRate > 0 ? ' / ${formatMoney(item.multiRate)} multi' : ''}'),
+                                '${service.minutes} minutes · ${formatMoney(service.price)} EGP'),
                             trailing: IconButton(
-                              tooltip: 'Remove space',
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () => onRemoveItem(venue, item),
+                              tooltip: 'Remove service',
+                              icon: const Icon(Icons.remove_circle_outline,
+                                  size: 18),
+                              onPressed: () =>
+                                  widget.onRemoveService(venue, service),
                             ),
                           )),
-                      if (venue.services.isNotEmpty)
-                        ...venue.services.map((service) => ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.content_cut, size: 18),
-                              title: Text(service.name),
-                              subtitle: Text(
-                                  '${service.minutes} minutes · ${formatMoney(service.price)} EGP'),
-                              trailing: IconButton(
-                                tooltip: 'Remove service',
-                                icon: const Icon(Icons.remove_circle_outline,
-                                    size: 18),
-                                onPressed: () =>
-                                    onRemoveService(venue, service),
-                              ),
-                            )),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => widget.onAddItem(venue),
+                          icon: const Icon(Icons.add_box_outlined),
+                          label: Text(venue.type == VenueType.salon
+                              ? 'Add chair'
+                              : 'Add court / table'),
+                        ),
+                        if (venue.type == VenueType.salon)
                           OutlinedButton.icon(
-                            onPressed: () => onAddItem(venue),
-                            icon: const Icon(Icons.add_box_outlined),
-                            label: Text(venue.type == VenueType.salon
-                                ? 'Add chair'
-                                : 'Add court / table'),
+                            onPressed: () => widget.onAddService(venue),
+                            icon: const Icon(Icons.content_cut),
+                            label: const Text('Add service'),
                           ),
-                          if (venue.type == VenueType.salon)
-                            OutlinedButton.icon(
-                              onPressed: () => onAddService(venue),
-                              icon: const Icon(Icons.content_cut),
-                              label: const Text('Add service'),
-                            ),
-                        ],
-                      ),
-                    ],
+                        OutlinedButton.icon(
+                          onPressed: () => widget.onEditVenue(venue),
+                          icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                          label: const Text('Renovate / Edit'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: kGreen.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kGreen.withValues(alpha: 0.28)),
+          ),
+          child: Row(
+            children: [
+              const LivePulseDot(color: kGreen, size: 8),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Cloud Firebase Sync Active · ${widget.venues.length} venues online',
+                  style: const TextStyle(
+                    color: kGreen,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
                   ),
                 ),
-              )),
-        ],
-      );
+              ),
+              if (widget.onSyncFirebase != null)
+                InkWell(
+                  onTap: widget.onSyncFirebase,
+                  borderRadius: BorderRadius.circular(999),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_sync_rounded, size: 15, color: kGreen),
+                        SizedBox(width: 4),
+                        Text(
+                          'Sync Firebase',
+                          style: TextStyle(
+                            color: kGreen,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class PosTab extends StatefulWidget {

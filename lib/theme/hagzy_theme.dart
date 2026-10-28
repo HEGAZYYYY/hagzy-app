@@ -27,6 +27,7 @@ const kBorder = Color(0xFFE2E8F0);
 const kStorageKey = 'hagzy_app_data_v1';
 const kFavoriteStorageKey = 'hagzy_favorite_venues_v1';
 const kLanguageStorageKey = 'hagzy_language_v1';
+const kDarkModeStorageKey = 'hagzy_dark_mode_v1';
 const kCustomerProfileStorageKey = 'hagzy_customer_profile_v1';
 const kAllEgyptAreas = 'All Egypt';
 const kWhatsappBusinessNumber = '201024129393';
@@ -34,6 +35,8 @@ const kSeedNaderSalon = bool.fromEnvironment(
   'HAGZY_SEED_NADER_SALON',
   defaultValue: false,
 );
+
+final ValueNotifier<bool> kDarkMode = ValueNotifier<bool>(false);
 
 class HagzyTheme {
   static bool get _isTest => WidgetsBinding.instance.runtimeType
@@ -100,15 +103,17 @@ class HagzyTheme {
 
   static TextTheme buildTextTheme(BuildContext context, bool arabic) {
     final base = Theme.of(context).textTheme;
+    final isDark = kDarkMode.value;
+    final textColor = isDark ? const Color(0xFFF8FAFC) : kInk;
     if (_isTest) {
-      return base.apply(bodyColor: kInk, displayColor: kInk);
+      return base.apply(bodyColor: textColor, displayColor: textColor);
     }
     return (arabic
             ? GoogleFonts.cairoTextTheme(base)
             : GoogleFonts.plusJakartaSansTextTheme(base))
         .apply(
-          bodyColor: kInk,
-          displayColor: kInk,
+          bodyColor: textColor,
+          displayColor: textColor,
           fontFamilyFallback: emojiFontFallbacks,
         );
   }
@@ -223,6 +228,151 @@ class HagzyTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: kInk,
           side: const BorderSide(color: kBorder),
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 14.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  static ThemeData darkTheme() {
+    const darkPage = Color(0xFF0B1120);
+    const darkPanel = Color(0xFF131C31);
+    const darkInput = Color(0xFF19243D);
+    const darkBorder = Color(0xFF283552);
+    const darkText = Color(0xFFF8FAFC);
+    final baseScheme = ColorScheme.fromSeed(
+      seedColor: kGreen,
+      primary: kGreenLight,
+      secondary: kGreen,
+      tertiary: kGold,
+      surface: darkPanel,
+      onSurface: darkText,
+      brightness: Brightness.dark,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: baseScheme,
+      scaffoldBackgroundColor: darkPage,
+      canvasColor: darkPanel,
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkPanel,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: darkBorder),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: darkPanel,
+        surfaceTintColor: Colors.transparent,
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
+      textTheme: _isTest
+          ? null
+          : GoogleFonts.plusJakartaSansTextTheme(const TextTheme()).apply(
+              bodyColor: darkText,
+              displayColor: darkText,
+              fontFamilyFallback: emojiFontFallbacks,
+            ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkPanel,
+        foregroundColor: darkText,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      cardTheme: CardThemeData(
+        color: darkPanel,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: darkBorder),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkInput,
+        labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+        hintStyle: const TextStyle(color: Color(0xFF64748B)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: darkBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: darkBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: kGreenLight, width: 1.5),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: kGreen,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          elevation: 0,
+          backgroundColor: kGreen,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentTextStyle: const TextStyle(
+            color: Colors.white, fontWeight: FontWeight.w600, height: 1.35),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: kGreenLight),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: darkText,
+          side: const BorderSide(color: darkBorder),
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shape: RoundedRectangleBorder(

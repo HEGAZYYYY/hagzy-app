@@ -65,6 +65,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
     import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
@@ -80,10 +81,66 @@
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
       const auth = getAuth(app);
+      const fbDb = getFirestore(app);
       try { auth.useDeviceLanguage(); } catch (_) {}
       window.firebaseApp = app;
       window.firebaseAnalytics = analytics;
       window.firebaseAuth = auth;
+      window.firebaseFirestore = fbDb;
+
+      // Real-time Cloud Firestore Venues Listener & Sync
+      window.hagzyVenuesCallback = null;
+      window.registerHagzyVenuesListener = function(callback) {
+        window.hagzyVenuesCallback = callback;
+        try {
+          onSnapshot(collection(fbDb, 'venues'), function(snapshot) {
+            const venues = [];
+            snapshot.forEach(function(docSnap) {
+              const d = docSnap.data();
+              if (d && (d.id || docSnap.id)) {
+                venues.push(Object.assign({}, d, { id: d.id || docSnap.id }));
+              }
+            });
+            if (venues.length > 0 && typeof window.hagzyVenuesCallback === 'function') {
+              window.hagzyVenuesCallback(JSON.stringify(venues));
+            }
+          }, function(err) {
+            console.warn("Firestore venues listener notice:", err.message || err);
+          });
+        } catch (err) {
+          console.warn("Firestore listener setup notice:", err);
+        }
+      };
+
+      window.hagzySaveVenueToFirestore = function(venueJson) {
+        try {
+          const v = JSON.parse(venueJson);
+          if (v && v.id) {
+            v.updatedAt = new Date().toISOString();
+            setDoc(doc(fbDb, 'venues', String(v.id)), v, { merge: true }).then(function() {
+              console.log("🔥 Synced venue to Cloud Firestore:", v.id);
+            }).catch(function(e) {
+              console.warn("Firestore venue save notice:", e.message || e);
+            });
+          }
+        } catch (e) {
+          console.warn("Firestore save parse notice:", e);
+        }
+      };
+
+      window.hagzyDeleteVenueFromFirestore = function(venueId) {
+        try {
+          if (venueId) {
+            deleteDoc(doc(fbDb, 'venues', String(venueId))).then(function() {
+              console.log("🗑️ Deleted venue from Cloud Firestore:", venueId);
+            }).catch(function(e) {
+              console.warn("Firestore venue delete notice:", e.message || e);
+            });
+          }
+        } catch (e) {
+          console.warn("Firestore delete notice:", e);
+        }
+      };
 
       // Automatically catch redirect sign-in results from Google or Apple
       window.hagzyRedirectUser = null;

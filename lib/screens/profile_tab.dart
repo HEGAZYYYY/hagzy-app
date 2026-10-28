@@ -29,6 +29,8 @@ class CustomerProfileTab extends StatefulWidget {
     required this.onSelectArea,
     required this.onAutoAssignGps,
     this.onSwitchToAdmin,
+    this.onToggleDarkMode,
+    this.onOpenVenueDashboard,
   });
 
   final bool arabic;
@@ -62,6 +64,8 @@ class CustomerProfileTab extends StatefulWidget {
   final VoidCallback onSelectArea;
   final VoidCallback onAutoAssignGps;
   final VoidCallback? onSwitchToAdmin;
+  final VoidCallback? onToggleDarkMode;
+  final VoidCallback? onOpenVenueDashboard;
 
   @override
   State<CustomerProfileTab> createState() => _CustomerProfileTabState();
@@ -559,13 +563,62 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         // Settings & Options Card
         Container(
           decoration: BoxDecoration(
-            color: kPanel,
+            color: kDarkMode.value ? const Color(0xFF131C31) : kPanel,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: kBorder),
+            border: Border.all(
+                color: kDarkMode.value ? const Color(0xFF283552) : kBorder),
             boxShadow: HagzyTheme.softShadow,
           ),
           child: Column(
             children: [
+              _SettingTile(
+                icon: kDarkMode.value
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                title: localized(arabic, 'Dark Mode', 'الوضع الليلي'),
+                subtitle: kDarkMode.value
+                    ? localized(arabic, 'Enabled (Obsidian Emerald)',
+                        'مُفعّل (مريح للعين)')
+                    : localized(
+                        arabic, 'Light Mode Active', 'الوضع النهاري مُفعّل'),
+                trailing: Switch.adaptive(
+                  value: kDarkMode.value,
+                  activeThumbColor: kGreenLight,
+                  onChanged: (_) => widget.onToggleDarkMode?.call(),
+                ),
+                onTap: widget.onToggleDarkMode,
+              ),
+              const Divider(height: 1),
+              if (widget.onOpenVenueDashboard != null) ...[
+                _SettingTile(
+                  icon: Icons.dashboard_customize_rounded,
+                  title: localized(arabic, 'Venue Control Dashboard',
+                      'لوحة التحكم في الأماكن (Firebase)'),
+                  subtitle: localized(
+                    arabic,
+                    'Add, remove, or renovate venues synced live to Cloud Firebase',
+                    'إضافة أو حذف أو تجديد الملاعب والأماكن مع مزامنة فورية لـ Firebase',
+                  ),
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: HagzyTheme.brandGradient,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      localized(arabic, 'Open', 'فتح'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  onTap: widget.onOpenVenueDashboard,
+                ),
+                const Divider(height: 1),
+              ],
               _SettingTile(
                 icon: Icons.language_rounded,
                 title: localized(arabic, 'Language', 'اللغة'),
@@ -574,16 +627,22 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: kSurfaceTint,
+                    color: kDarkMode.value
+                        ? const Color(0xFF19243D)
+                        : kSurfaceTint,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: kBorder),
+                    border: Border.all(
+                        color: kDarkMode.value
+                            ? const Color(0xFF283552)
+                            : kBorder),
                   ),
                   child: Text(
                     arabic ? 'English' : 'عربي',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
-                      color: kInk,
+                      color:
+                          kDarkMode.value ? const Color(0xFFF8FAFC) : kInk,
                     ),
                   ),
                 ),
@@ -1578,66 +1637,70 @@ class _StatCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => PressableScale(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          decoration: BoxDecoration(
-            color: kPanel,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: kBorder),
-            boxShadow: HagzyTheme.softShadow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Icon(icon, size: 18, color: kGreen),
-                  if (badge != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: kGreen.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        badge!,
-                        style: const TextStyle(
-                          color: kGreen,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                        ),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF131C31) : kPanel,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+              color: isDark ? const Color(0xFF283552) : kBorder),
+          boxShadow: HagzyTheme.softShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, size: 18, color: isDark ? kGreenLight : kGreen),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: kGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: TextStyle(
+                        color: isDark ? kGreenLight : kGreen,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14.5,
+                color: isDark ? const Color(0xFFF8FAFC) : kInk,
               ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14.5,
-                  color: kInk,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF94A3B8) : kMuted,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: kMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _SettingTile extends StatelessWidget {
@@ -1656,49 +1719,54 @@ class _SettingTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: kSurfaceTint,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 18, color: kInk),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF19243D) : kSurfaceTint,
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
-                        color: kInk,
-                      ),
+              child: Icon(icon,
+                  size: 18,
+                  color: isDark ? kGreenLight : kInk),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      color: isDark ? const Color(0xFFF8FAFC) : kInk,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: kMuted,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? const Color(0xFF94A3B8) : kMuted,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              trailing,
-            ],
-          ),
+            ),
+            trailing,
+          ],
         ),
-      );
+      ),
+    );
+  }
 }

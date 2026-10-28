@@ -11,4 +11,11 @@ class SocialAuthService {
   static void signOutWeb() => webSignOut();
   static void registerSignOutListener(void Function() onSignOut) =>
       webRegisterSignOutListener(onSignOut);
+  static void registerVenuesListener(
+          void Function(List<Map<String, dynamic>>) onVenues) =>
+      webRegisterVenuesListener(onVenues);
+  static void saveVenueToFirestore(Map<String, dynamic> venueJson) =>
+      webSaveVenueToFirestore(venueJson);
+  static void deleteVenueFromFirestore(String venueId) =>
+      webDeleteVenueFromFirestore(venueId);
 }

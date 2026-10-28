@@ -14,44 +14,53 @@ class HagzyAmbientBackground extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFF4FBF7),
-                  Color(0xFFF8FAFC),
-                  Color(0xFFF8FAFC),
-                ],
-              ),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? const [
+                      Color(0xFF0A1622),
+                      Color(0xFF0B1120),
+                      Color(0xFF0B1120),
+                    ]
+                  : const [
+                      Color(0xFFF4FBF7),
+                      Color(0xFFF8FAFC),
+                      Color(0xFFF8FAFC),
+                    ],
             ),
           ),
-          Positioned(
-            top: -120,
-            right: -100,
-            child: IgnorePointer(
-              child: Container(
-                width: 360,
-                height: 360,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      kGreen.withValues(alpha: 0.05),
-                      kGreen.withValues(alpha: 0.0),
-                    ],
-                  ),
+        ),
+        Positioned(
+          top: -120,
+          right: -100,
+          child: IgnorePointer(
+            child: Container(
+              width: 360,
+              height: 360,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    kGreen.withValues(alpha: isDark ? 0.12 : 0.05),
+                    kGreen.withValues(alpha: 0.0),
+                  ],
                 ),
               ),
             ),
           ),
-          child,
-        ],
-      );
+        ),
+        child,
+      ],
+    );
+  }
 }
 
 /// Tactile press-to-scale physics wrapper inspired by Breadfast / Talabat.
@@ -223,37 +232,40 @@ class SectionHeading extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.45,
-                    color: kInk,
-                  ),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.45,
+                  color: isDark ? const Color(0xFFF8FAFC) : kInk,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: kMuted,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : kMuted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          if (trailing != null) trailing!,
-        ],
-      );
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
 }
 
 /// Renders in-app emojis using native iOS (Apple Color Emoji) or system emoji font stacks.
@@ -292,89 +304,96 @@ class CustomPill extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => PressableScale(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            gradient: selected ? HagzyTheme.brandGradient : null,
-            color: selected ? null : kPanel,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected ? kGreen : kBorder,
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: kGreen.withValues(alpha: 0.22),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : [
-                    BoxShadow(
-                      color: kInk.withValues(alpha: 0.03),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    )
-                  ],
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return PressableScale(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          gradient: selected ? HagzyTheme.brandGradient : null,
+          color: selected
+              ? null
+              : (isDark ? const Color(0xFF131C31) : kPanel),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? kGreen
+                : (isDark ? const Color(0xFF283552) : kBorder),
+            width: selected ? 1.5 : 1,
           ),
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-            child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (icon != null) ...[
-                      Icon(
-                        icon,
-                        size: 16,
-                        color: selected ? Colors.white : kGreen,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: selected ? Colors.white : kInk,
-                          fontWeight:
-                              selected ? FontWeight.w800 : FontWeight.w700,
-                          fontSize: 12.5,
-                          letterSpacing: -0.1,
-                        ),
-                      ),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? Colors.white.withValues(alpha: 0.25)
-                              : kGreen.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          badge!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: selected ? Colors.white : kGreen,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: kGreen.withValues(alpha: 0.22),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : [
+                  BoxShadow(
+                    color: kInk.withValues(alpha: 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? Colors.white : (isDark ? kGreenLight : kGreen),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected
+                        ? Colors.white
+                        : (isDark ? const Color(0xFFF8FAFC) : kInk),
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                    fontSize: 12.5,
+                    letterSpacing: -0.1,
+                  ),
                 ),
               ),
-            ),
-          );
+              if (badge != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.25)
+                        : kGreen.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badge!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: selected ? Colors.white : (isDark ? kGreenLight : kGreen),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class LanguageOption extends StatelessWidget {
@@ -487,114 +506,124 @@ class FloatingDock extends StatelessWidget {
           heightFactor: 1.0,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
-            child: Container(
-              height: 58,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: kPanel,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: kBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: kInk.withValues(alpha: 0.09),
-                    blurRadius: 24,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: List.generate(localizedItems.length, (index) {
-                  final selected = selectedIndex == index;
-                  final showBadge = index == 1 && badgeCount > 0;
-                  return Expanded(
-                    child: PressableScale(
-                      scaleDown: 0.96,
-                      onTap: () => onDestinationSelected(index),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(999),
+            child: Builder(builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+              return Container(
+                height: 58,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF131C31) : kPanel,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                      color: isDark ? const Color(0xFF283552) : kBorder,
+                      width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isDark ? Colors.black : kInk)
+                          .withValues(alpha: isDark ? 0.35 : 0.09),
+                      blurRadius: 24,
+                      spreadRadius: -2,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: List.generate(localizedItems.length, (index) {
+                    final selected = selectedIndex == index;
+                    final showBadge = index == 1 && badgeCount > 0;
+                    return Expanded(
+                      child: PressableScale(
+                        scaleDown: 0.96,
                         onTap: () => onDestinationSelected(index),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: selected ? kGreen : Colors.transparent,
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: selected
-                                ? [
-                                    BoxShadow(
-                                      color: kGreen.withValues(alpha: 0.35),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: () => onDestinationSelected(index),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: selected ? kGreen : Colors.transparent,
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: selected
+                                  ? [
+                                      BoxShadow(
+                                        color: kGreen.withValues(alpha: 0.35),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Icon(
+                                      localizedItems[index].$1,
+                                      size: 19,
+                                      color: selected
+                                          ? Colors.white
+                                          : (isDark ? const Color(0xFF94A3B8) : kMuted),
                                     ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Icon(
-                                    localizedItems[index].$1,
-                                    size: 19,
-                                    color: selected ? Colors.white : kMuted,
-                                  ),
-                                  if (showBadge)
-                                    Positioned(
-                                      right: -7,
-                                      top: -5,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: selected
-                                              ? Colors.white
-                                              : kGreen,
-                                          borderRadius:
-                                              BorderRadius.circular(999),
-                                        ),
-                                        child: Text(
-                                          '$badgeCount',
-                                          style: TextStyle(
+                                    if (showBadge)
+                                      Positioned(
+                                        right: -7,
+                                        top: -5,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
                                             color: selected
-                                                ? kGreen
-                                                : Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w900,
+                                                ? Colors.white
+                                                : kGreen,
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            '$badgeCount',
+                                            style: TextStyle(
+                                              color: selected
+                                                  ? kGreen
+                                                  : Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                            ),
                                           ),
                                         ),
                                       ),
+                                  ],
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    localizedItems[index].$2,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? Colors.white
+                                          : (isDark ? const Color(0xFF94A3B8) : kMuted),
+                                      fontSize: 13,
+                                      fontWeight: selected
+                                          ? FontWeight.w800
+                                          : FontWeight.w700,
                                     ),
-                                ],
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  localizedItems[index].$2,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: selected ? Colors.white : kMuted,
-                                    fontSize: 13,
-                                    fontWeight: selected
-                                        ? FontWeight.w800
-                                        : FontWeight.w700,
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              ),
-            ),
+                    );
+                  }),
+                ),
+              );
+            }),
           ),
         ),
       ),
