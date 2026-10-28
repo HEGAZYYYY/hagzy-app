@@ -171,12 +171,15 @@
 
       window.hagzySignInWithAppleCallback = function(onSuccess, onError) {
         const provider = new OAuthProvider('apple.com');
+        provider.addScope('email');
+        provider.addScope('name');
         signInWithPopup(auth, provider).then(async function(result) {
           const user = result.user;
           const token = await user.getIdToken();
+          const name = user.displayName || (user.email ? user.email.split('@')[0] : 'Apple Member');
           onSuccess(JSON.stringify({
             token: token,
-            name: user.displayName || 'Apple Member',
+            name: name,
             email: user.email || '',
             phone: user.phoneNumber || '',
             avatar: user.photoURL || '',
