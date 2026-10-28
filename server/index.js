@@ -127,6 +127,69 @@ async function syncBookingToFirebase(booking, user) {
     console.warn('Firebase Firestore sync notice:', err.message);
   }
 }
+
+async function syncVenueToFirebase(venue) {
+  if (!fbFirestore || IS_TEST || !venue || !venue.id) return false;
+  try {
+    const cleanVenue = JSON.parse(JSON.stringify(venue));
+    cleanVenue.updatedAt = new Date().toISOString();
+    await fbFirestore.collection('venues').doc(String(venue.id)).set(cleanVenue, { merge: true });
+    console.log('✅ Synced venue to Cloud Firestore in Firebase:', venue.id);
+    return true;
+  } catch (err) {
+    console.warn('Firebase Firestore venue sync notice:', err.message);
+    return false;
+  }
+}
+
+async function deleteVenueFromFirebase(venueId) {
+  if (!fbFirestore || IS_TEST || !venueId) return false;
+  try {
+    await fbFirestore.collection('venues').doc(String(venueId)).delete();
+    console.log('🗑️ Deleted venue from Cloud Firestore in Firebase:', venueId);
+    return true;
+  } catch (err) {
+    console.warn('Firebase Firestore venue delete notice:', err.message);
+    return false;
+  }
+}
+
+async function hydrateVenuesFromFirebase() {
+  if (!fbFirestore || IS_TEST) return;
+  try {
+    const snap = await fbFirestore.collection('venues').get();
+    if (!snap.empty) {
+      const fbVenues = [];
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (data && (data.id || doc.id)) {
+          fbVenues.push({ ...data, id: data.id || doc.id });
+        }
+      });
+      if (fbVenues.length > 0) {
+        const merged = [...db.venues];
+        for (const fv of fbVenues) {
+          const idx = merged.findIndex(v => v.id === fv.id);
+          if (idx >= 0) {
+            merged[idx] = { ...merged[idx], ...fv };
+          } else {
+            merged.push(fv);
+          }
+        }
+        db.venues = merged;
+        saveDb(db);
+        console.log(`🔥 Hydrated ${fbVenues.length} venues from Cloud Firestore.`);
+      }
+    } else if (Array.isArray(db.venues) && db.venues.length > 0) {
+      for (const v of db.venues) {
+        await syncVenueToFirebase(v);
+      }
+      console.log(`🔥 Seeded ${db.venues.length} initial venues into Cloud Firestore.`);
+    }
+  } catch (err) {
+    console.warn('Firebase Firestore hydrate notice:', err.message);
+  }
+}
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 require('dotenv').config();
@@ -1449,6 +1512,35 @@ app.get('/api/customer/profile', authenticateCustomer, (req, res) => {
   return res.json({ success: true, customer: sanitizeUser(user) });
 });
 
+// Delete Customer Account (purges local user, revokes session, and deletes Firebase Auth user)
+app.delete('/api/customer/account', authenticateCustomer, async (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  if (fbAuth && !IS_TEST) {
+    try {
+      if (user.firebaseUid) {
+        await fbAuth.deleteUser(user.firebaseUid);
+      } else if (user.phone) {
+        const formatted = formatE164Phone(user.phone);
+        if (formatted) {
+          const fbU = await fbAuth.getUserByPhoneNumber(formatted);
+          if (fbU) await fbAuth.deleteUser(fbU.uid);
+        }
+      } else if (user.email) {
+        const fbU = await fbAuth.getUserByEmail(user.email);
+        if (fbU) await fbAuth.deleteUser(fbU.uid);
+      }
+    } catch (_) {}
+  }
+
+  db.users = db.users.filter(u => u.id !== user.id);
+  saveDb(db);
+  if (req.token) revokeToken(req.token);
+
+  return res.json({ success: true, message: 'Account deleted permanently.' });
+});
+
 // Wallet Operations
 app.post('/api/customer/wallet/deduct', authenticateCustomer, (req, res) => {
   const user = db.users.find(u => u.id === req.user.id);
@@ -1512,27 +1604,77 @@ app.get('/api/admin/venues', authenticateAdmin, (req, res) => {
 });
 
 // Add / Update Venue
-app.put('/api/admin/venues/:id', authenticateAdmin, (req, res) => {
+app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
   const venueId = req.params.id;
-  const venueData = req.body;
+  const venueData = req.body || {};
   const index = db.venues.findIndex(v => v.id === venueId);
 
+  let savedVenue;
   if (index >= 0) {
-    db.venues[index] = { ...db.venues[index], ...venueData };
+    savedVenue = { ...db.venues[index], ...venueData, id: venueId };
+    db.venues[index] = savedVenue;
   } else {
-    db.venues.push({ id: venueId, ...venueData });
+    savedVenue = { id: venueId, ...venueData };
+    db.venues.push(savedVenue);
   }
   saveDb(db);
-  return res.json({ success: true, venue: venueData });
+  await syncVenueToFirebase(savedVenue);
+  return res.json({ success: true, venue: savedVenue });
 });
 
 // Delete Venue
-app.delete('/api/admin/venues/:id', authenticateAdmin, (req, res) => {
+app.delete('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
   const venueId = req.params.id;
   db.venues = db.venues.filter(v => v.id !== venueId);
   db.bookings = db.bookings.filter(b => b.venueId !== venueId);
   saveDb(db);
+  await deleteVenueFromFirebase(venueId);
   return res.json({ success: true, message: 'Venue deleted' });
+});
+
+// Bulk Sync All Venues to Cloud Firestore
+app.post('/api/admin/venues/sync-firebase', authenticateAdmin, async (req, res) => {
+  let syncedCount = 0;
+  for (const v of db.venues) {
+    const ok = await syncVenueToFirebase(v);
+    if (ok) syncedCount++;
+  }
+  return res.json({
+    success: true,
+    syncedCount,
+    totalVenues: db.venues.length,
+    firebaseReady: !!fbFirestore
+  });
+});
+
+// Customer Venue Review Submission (syncs to Firebase)
+app.post('/api/venues/:id/reviews', optionalAuth, async (req, res) => {
+  const venueId = req.params.id;
+  const venue = db.venues.find(v => v.id === venueId);
+  if (!venue) return res.status(404).json({ error: 'Venue not found' });
+
+  const { authorName, rating, comment } = req.body || {};
+  const numRating = Number(rating);
+  if (!Number.isFinite(numRating) || numRating < 1 || numRating > 5) {
+    return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+  }
+  const review = {
+    id: 'rev_' + crypto.randomUUID().slice(0, 8),
+    authorName: String(authorName || (req.user && req.user.name) || 'Member').slice(0, 60),
+    rating: numRating,
+    comment: String(comment || '').slice(0, 500),
+    date: new Date().toISOString().split('T')[0],
+    verifiedBooking: true
+  };
+  if (!Array.isArray(venue.reviewsList)) venue.reviewsList = [];
+  venue.reviewsList.unshift(review);
+  const count = venue.reviewsList.length;
+  const avg = venue.reviewsList.reduce((acc, r) => acc + (Number(r.rating) || 5), 0) / count;
+  venue.reviews = count;
+  venue.rating = Math.round(avg * 10) / 10;
+  saveDb(db);
+  await syncVenueToFirebase(venue);
+  return res.json({ success: true, review, venue });
 });
 
 // ==========================================
@@ -1852,9 +1994,9 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
       matchedBooking.proofSubmitted = true;
       matchedBooking.status = 'pending_confirmation';
       saveDb(db);
-      if (fbDb) {
+      if (fbFirestore) {
         try {
-          await fbDb.collection('bookings').doc(matchedBooking.id).set({
+          await fbFirestore.collection('bookings').doc(matchedBooking.id).set({
             paymentReference: rawRef,
             proofSubmitted: true,
             status: 'pending_confirmation',
@@ -2040,6 +2182,12 @@ app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
 if (pgPool) {
   hydratePostgres().catch(err => {
     console.warn('PostgreSQL hydrate notice (running on local state):', err.message);
+  });
+}
+
+if (fbFirestore && !IS_TEST) {
+  hydrateVenuesFromFirebase().catch(err => {
+    console.warn('Firebase venues hydrate notice:', err.message);
   });
 }
 

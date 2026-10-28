@@ -220,6 +220,18 @@ class _BookTabState extends State<BookTab> {
     });
   }
 
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.15,
+      );
+    }
+  }
+
   Future<void> _loadCustomerPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -973,7 +985,7 @@ class _BookTabState extends State<BookTab> {
                     icon: const Icon(Icons.close),
                   ),
             filled: true,
-            fillColor: kPanel,
+            fillColor: kDarkMode.value ? const Color(0xFF131C31) : kPanel,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -1788,16 +1800,20 @@ class _BookTabState extends State<BookTab> {
     return [
       Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: RepaintBoundary(
-          child: VenueBrowseCard(
-            key: _venueCardKeys.putIfAbsent(value.id, () => GlobalKey()),
-            venue: value,
-            arabic: widget.arabic,
-            selected: selected,
-            favorite: _favoriteIds.contains(value.id),
-            onTap: () => _selectVenue(value),
-            onFavorite: () => _toggleFavorite(value),
-            onDetails: () => _openVenueDetails(value),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 240),
+          opacity: (selectedVenue != null && !selected) ? 0.52 : 1.0,
+          child: RepaintBoundary(
+            child: VenueBrowseCard(
+              key: _venueCardKeys.putIfAbsent(value.id, () => GlobalKey()),
+              venue: value,
+              arabic: widget.arabic,
+              selected: selected,
+              favorite: _favoriteIds.contains(value.id),
+              onTap: () => _selectVenue(value),
+              onFavorite: () => _toggleFavorite(value),
+              onDetails: () => _openVenueDetails(value),
+            ),
           ),
         ),
       ),
@@ -1817,17 +1833,27 @@ class _BookTabState extends State<BookTab> {
     VenueItem? item,
     int estimatedMinutes,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final activeStep = item == null ? 1 : (_selectedStart == null ? 2 : 3);
     return Container(
       key: _bookingSectionKey,
       margin: const EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
-        color: kPanel,
+        color: isDark ? const Color(0xFF131C31) : kPanel,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: kGreen.withValues(alpha: 0.28),
-          width: 1.5,
+          color: kGreen.withValues(alpha: 0.45),
+          width: 1.8,
         ),
-        boxShadow: HagzyTheme.softShadow,
+        boxShadow: [
+          ...HagzyTheme.softShadow,
+          BoxShadow(
+            color: kGreen.withValues(alpha: isDark ? 0.22 : 0.12),
+            blurRadius: 28,
+            spreadRadius: -2,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -1839,8 +1865,8 @@ class _BookTabState extends State<BookTab> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    kGreen.withValues(alpha: 0.08),
-                                    kGreenLight.withValues(alpha: 0.05),
+                                    kGreen.withValues(alpha: isDark ? 0.18 : 0.08),
+                                    kGreenLight.withValues(alpha: isDark ? 0.10 : 0.05),
                                   ],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
@@ -1961,6 +1987,81 @@ class _BookTabState extends State<BookTab> {
                                           fontSize: 12,
                                         ),
                                       ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Visual 3-Step Eye-Guide Progression Bar
+                            Container(
+                              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? const Color(0xFF0B1120).withValues(alpha: 0.55)
+                                    : kSurfaceTint.withValues(alpha: 0.65),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: isDark ? const Color(0xFF283552) : kBorder,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _BookingStepPill(
+                                      stepNumber: '1',
+                                      title: localized(widget.arabic, 'Space', 'المساحة'),
+                                      subtitle: item?.name ??
+                                          localized(widget.arabic, 'Select', 'اختر'),
+                                      done: item != null,
+                                      active: activeStep == 1,
+                                      onTap: () => _scrollToKey(_spaceStepKey),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: Icon(
+                                      widget.arabic
+                                          ? Icons.chevron_left_rounded
+                                          : Icons.chevron_right_rounded,
+                                      size: 16,
+                                      color: kGreen.withValues(alpha: 0.65),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _BookingStepPill(
+                                      stepNumber: '2',
+                                      title: localized(widget.arabic, 'Time', 'الموعد'),
+                                      subtitle: _selectedStart != null
+                                          ? '${_selectedStart!.hour.toString().padLeft(2, '0')}:${_selectedStart!.minute.toString().padLeft(2, '0')}'
+                                          : localized(widget.arabic, 'Pick slot', 'اختر وقتاً'),
+                                      done: _selectedStart != null,
+                                      active: activeStep == 2,
+                                      onTap: () => _scrollToKey(_timeStepKey),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: Icon(
+                                      widget.arabic
+                                          ? Icons.chevron_left_rounded
+                                          : Icons.chevron_right_rounded,
+                                      size: 16,
+                                      color: kGreen.withValues(alpha: 0.65),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _BookingStepPill(
+                                      stepNumber: '3',
+                                      title: localized(widget.arabic, 'Reserve', 'تأكيد'),
+                                      subtitle: _selectedStart != null
+                                          ? localized(widget.arabic, 'Ready ✓', 'جاهز ✓')
+                                          : localized(widget.arabic, 'Confirm', 'احجز'),
+                                      done: false,
+                                      active: activeStep == 3,
+                                      onTap: () => _scrollToKey(
+                                          _selectedStart != null ? _quoteStepKey : _timeStepKey),
                                     ),
                                   ),
                                 ],
@@ -4614,6 +4715,115 @@ class _SubCategoryVisualPill extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BookingStepPill extends StatelessWidget {
+  const _BookingStepPill({
+    required this.stepNumber,
+    required this.title,
+    required this.subtitle,
+    required this.done,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String stepNumber;
+  final String title;
+  final String subtitle;
+  final bool done;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: active ? HagzyTheme.brandGradient : null,
+          color: active
+              ? null
+              : (done
+                  ? kGreen.withValues(alpha: 0.12)
+                  : (isDark ? const Color(0xFF19243D) : Colors.white)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active
+                ? kGreen
+                : (done
+                    ? kGreen.withValues(alpha: 0.35)
+                    : (isDark ? const Color(0xFF283552) : kBorder)),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active
+                    ? Colors.white.withValues(alpha: 0.24)
+                    : (done ? kGreen : kMuted.withValues(alpha: 0.18)),
+                shape: BoxShape.circle,
+              ),
+              child: done && !active
+                  ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
+                  : Text(
+                      stepNumber,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: active || done
+                            ? Colors.white
+                            : (isDark ? const Color(0xFF94A3B8) : kInk),
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: active
+                          ? Colors.white
+                          : (isDark ? const Color(0xFFF8FAFC) : kInk),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      color: active
+                          ? Colors.white.withValues(alpha: 0.88)
+                          : (done
+                              ? (isDark ? kGreenLight : kGreenDark)
+                              : (isDark ? const Color(0xFF94A3B8) : kMuted)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

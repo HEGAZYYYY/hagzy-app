@@ -320,6 +320,14 @@ class HagzyApi {
   Future<Map<String, dynamic>> logoutCustomer(String token) async =>
       _send('POST', '/api/auth/customer/logout', token: token);
 
+  /// Permanently deletes the authenticated customer account on the backend & Firebase Auth.
+  Future<Map<String, dynamic>> deleteCustomerAccount(String token) async =>
+      _send('DELETE', '/api/customer/account', token: token);
+
+  /// Bulk syncs all backend venues to Cloud Firestore.
+  Future<Map<String, dynamic>> syncVenuesToCloud(String token) async =>
+      _send('POST', '/api/admin/venues/sync-firebase', token: token);
+
   /// Atomically deducts customer wallet balance on the cloud server.
   Future<Map<String, dynamic>> deductWalletFunds({
     required double amount,

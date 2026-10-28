@@ -42,21 +42,26 @@ class HagzyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<String>(
         valueListenable: kAppLanguage,
-        builder: (context, language, _) => MaterialApp(
-          title: 'Hagzy',
-          debugShowCheckedModeBanner: false,
-          locale: Locale(language == 'AR' ? 'ar' : 'en'),
-          supportedLocales: const [Locale('en'), Locale('ar')],
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          theme: HagzyTheme.lightTheme(),
-          // Respect the user's font size, but cap it so fixed-size cards
-          // don't overflow at extreme accessibility sizes.
-          builder: (context, child) => MediaQuery.withClampedTextScaling(
-            minScaleFactor: 1.0,
-            maxScaleFactor: 1.35,
-            child: child ?? const SizedBox.shrink(),
+        builder: (context, language, _) => ValueListenableBuilder<bool>(
+          valueListenable: kDarkMode,
+          builder: (context, isDark, _) => MaterialApp(
+            title: 'Hagzy',
+            debugShowCheckedModeBanner: false,
+            locale: Locale(language == 'AR' ? 'ar' : 'en'),
+            supportedLocales: const [Locale('en'), Locale('ar')],
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            theme: HagzyTheme.lightTheme(),
+            darkTheme: HagzyTheme.darkTheme(),
+            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+            // Respect the user's font size, but cap it so fixed-size cards
+            // don't overflow at extreme accessibility sizes.
+            builder: (context, child) => MediaQuery.withClampedTextScaling(
+              minScaleFactor: 1.0,
+              maxScaleFactor: 1.35,
+              child: child ?? const SizedBox.shrink(),
+            ),
+            home: HagzyHome(adminMode: adminMode),
           ),
-          home: HagzyHome(adminMode: adminMode),
         ),
       );
 }
@@ -141,6 +146,30 @@ class _HagzyHomeState extends State<HagzyHome> {
           _handleCustomerSignOut();
         }
       });
+
+      // Listen for real-time Cloud Firestore venue updates
+      SocialAuthService.registerVenuesListener((fbVenuesJson) {
+        if (!mounted || fbVenuesJson.isEmpty) return;
+        try {
+          final incoming = fbVenuesJson
+              .map((m) => Venue.fromJson(m))
+              .toList();
+          if (incoming.isNotEmpty) {
+            final merged = List<Venue>.of(_venues);
+            for (final fv in incoming) {
+              final idx = merged.indexWhere((v) => v.id == fv.id);
+              if (idx >= 0) {
+                merged[idx] = fv;
+              } else {
+                merged.add(fv);
+              }
+            }
+            setState(() {
+              _venues = merged;
+            });
+          }
+        } catch (_) {}
+      });
     }
   }
 
@@ -174,6 +203,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       final prefs = await SharedPreferences.getInstance();
       _language = prefs.getString(kLanguageStorageKey) == 'AR' ? 'AR' : 'EN';
       kAppLanguage.value = _language;
+      kDarkMode.value = prefs.getBool(kDarkModeStorageKey) ?? false;
       final profileRaw = prefs.getString(kCustomerProfileStorageKey);
       if (profileRaw != null) {
         try {
@@ -331,6 +361,43 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
   }
 
+  Future<void> _toggleDarkMode() async {
+    final next = !kDarkMode.value;
+    kDarkMode.value = next;
+    setState(() {});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(kDarkModeStorageKey, next);
+    } catch (_) {}
+  }
+
+  Future<void> _syncAllVenuesToFirebase() async {
+    final arabic = _language == 'AR';
+    try {
+      if (kIsWeb) {
+        for (final v in _venues) {
+          SocialAuthService.saveVenueToFirestore(v.toJson());
+        }
+      }
+      if (_api.isConfigured && _adminToken != null) {
+        await _api.syncVenuesToCloud(_adminToken!);
+      }
+      _message(localized(
+        arabic,
+        'Synced ${_venues.length} venues to Cloud Firebase!',
+        'تمت مزامنة ${_venues.length} أماكن مع سحابة Firebase بنجاح!',
+      ));
+    } catch (e) {
+      _message(
+        localized(
+          arabic,
+          'Synced locally & queued for Cloud Firebase.',
+          'تم الحفظ والمزامنة مع Firebase.',
+        ),
+      );
+    }
+  }
+
   Future<void> _loginAdmin() async {
     setState(() {
       _working = true;
@@ -387,6 +454,9 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _saveAdminVenue(Venue venue) async {
+    if (kIsWeb) {
+      SocialAuthService.saveVenueToFirestore(venue.toJson());
+    }
     if (!_api.isConfigured || _mode == 'adminPreview') return;
     final token = _adminToken;
     if (token == null) return;
@@ -543,6 +613,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _editVenue(Venue venue) async {
+    var type = venue.type;
     var name = venue.name;
     var location = venue.location;
     var ownerPhone = venue.ownerPhone;
@@ -550,6 +621,8 @@ class _HagzyHomeState extends State<HagzyHome> {
     var instaPay = venue.instaPayAddress;
     var vodafoneCash = venue.vodafoneCashNumber;
     var description = venue.description;
+    var imageUrl = venue.imageUrl ?? '';
+    var amenitiesText = venue.amenities.join(', ');
     var googleMapsUrl = venue.googleMapsUrl;
     var openHour = venue.openHour;
     var closeHour = venue.closeHour;
@@ -559,15 +632,27 @@ class _HagzyHomeState extends State<HagzyHome> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text('Edit ${venue.name}'),
+          title: Text('Renovate / Edit ${venue.name}'),
           content: SizedBox(
-            width: 440,
+            width: 460,
             child: Form(
               key: formKey,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    DropdownButtonFormField<VenueType>(
+                      initialValue: type,
+                      decoration: const InputDecoration(labelText: 'Venue category'),
+                      items: VenueType.values
+                          .map((t) => DropdownMenuItem(
+                                value: t,
+                                child: Text(t.label, overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setDialogState(() => type = v ?? type),
+                    ),
+                    const SizedBox(height: 10),
                     TextFormField(
                       initialValue: name,
                       onChanged: (v) => name = v,
@@ -588,7 +673,25 @@ class _HagzyHomeState extends State<HagzyHome> {
                       onChanged: (v) => description = v,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                          labelText: 'Description / bio'),
+                          labelText: 'Description / renovation notes'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      initialValue: imageUrl,
+                      onChanged: (v) => imageUrl = v,
+                      decoration: const InputDecoration(
+                        labelText: 'Cover Image URL (optional)',
+                        hintText: 'https://images.unsplash.com/...',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      initialValue: amenitiesText,
+                      onChanged: (v) => amenitiesText = v,
+                      decoration: const InputDecoration(
+                        labelText: 'Amenities (comma-separated)',
+                        hintText: 'Parking, Wi-Fi, AC, VIP Lounge, Showers',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextFormField(
@@ -689,12 +792,20 @@ class _HagzyHomeState extends State<HagzyHome> {
             FilledButton(
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
+                final parsedAmenities = amenitiesText
+                    .split(',')
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList();
                 Navigator.pop(
                   ctx,
                   venue.copyWith(
+                    type: type,
                     name: name.trim(),
                     location: location.trim(),
                     description: description.trim(),
+                    imageUrl: imageUrl.trim(),
+                    amenities: parsedAmenities,
                     ownerPhone: ownerPhone.trim(),
                     depositPercent: double.parse(depositPercent.trim()),
                     instaPayAddress: instaPay.trim(),
@@ -722,6 +833,9 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _deleteVenue(Venue venue) async {
     await _runSave(() async {
+      if (kIsWeb) {
+        SocialAuthService.deleteVenueFromFirestore(venue.id);
+      }
       if (_api.isConfigured && _adminToken != null) {
         await _api.deleteVenue(_adminToken!, venue.id);
       }
@@ -2449,9 +2563,31 @@ class _HagzyHomeState extends State<HagzyHome> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-          localized(arabic, '$methodLabel Deposit Transfer',
-              'تحويل العربون عبر $methodLabel'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: kGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                method == 'instapay'
+                    ? Icons.bolt_rounded
+                    : Icons.phone_iphone_rounded,
+                color: kGreen,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                localized(arabic, '$methodLabel Deposit Transfer',
+                    'تحويل العربون عبر $methodLabel'),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
         ),
         content: Form(
           key: formKey,
@@ -2463,46 +2599,103 @@ class _HagzyHomeState extends State<HagzyHome> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: kPage,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: kBorder),
+                    color: kDarkMode.value ? const Color(0xFF19243D) : kPage,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: kGreen.withValues(alpha: 0.35),
+                      width: 1.2,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        localized(
-                            arabic,
-                            '1. Transfer ${formatMoney(dueNow)} EGP to:',
-                            '١. حوّل مبلغ ${formatMoney(dueNow)} جنيه إلى:'),
-                        style:
-                            const TextStyle(color: kMuted, fontSize: 12),
-                      ),
-                      const SizedBox(height: 6),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: SelectableText(
-                              destination,
+                            child: Text(
+                              localized(
+                                  arabic,
+                                  '1. Transfer ${formatMoney(dueNow)} EGP to:',
+                                  '١. حوّل مبلغ ${formatMoney(dueNow)} جنيه إلى:'),
                               style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                                color: kGreen,
+                                color: kMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                          IconButton(
-                            tooltip: localized(arabic, 'Copy', 'نسخ'),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
                               Clipboard.setData(
-                                  ClipboardData(text: destination));
+                                  ClipboardData(text: formatMoney(dueNow)));
                               _message(localized(
-                                  arabic, 'Copied to clipboard', 'تم النسخ'));
+                                  arabic,
+                                  'Deposit amount copied (${formatMoney(dueNow)} EGP)',
+                                  'تم نسخ مبلغ العربون (${formatMoney(dueNow)} ج.م)'));
                             },
-                            icon: const Icon(Icons.copy_rounded, size: 17),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: kGreen.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                localized(arabic, 'Copy ${formatMoney(dueNow)} EGP',
+                                    'نسخ المبلغ'),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: kGreen,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: kDarkMode.value
+                              ? const Color(0xFF131C31)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: kDarkMode.value
+                                ? const Color(0xFF283552)
+                                : kBorder,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: SelectableText(
+                                destination,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                  color: kGreen,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: localized(arabic, 'Copy', 'نسخ'),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () {
+                                Clipboard.setData(
+                                    ClipboardData(text: destination));
+                                _message(localized(
+                                    arabic, 'Copied to clipboard', 'تم النسخ'));
+                              },
+                              icon: const Icon(Icons.copy_rounded,
+                                  size: 17, color: kGreen),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 10),
                       if (method == 'instapay')
@@ -2512,7 +2705,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             style: FilledButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
+                                  horizontal: 12, vertical: 10),
                             ),
                             onPressed: () async {
                               Clipboard.setData(
@@ -2521,7 +2714,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   arabic,
                                   'InstaPay handle copied! Opening app...',
                                   'تم نسخ العنوان! جارٍ فتح إنستاباي...'));
-                              final uri = Uri.parse('https://www.instapay.eg/');
+                              final uri = Uri.parse('https://ipn.eg/');
                               if (await canLaunchUrl(uri)) {
                                 await launchUrl(uri,
                                     mode: LaunchMode.externalApplication);
@@ -2529,8 +2722,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                             },
                             icon:
                                 const Icon(Icons.open_in_new_rounded, size: 16),
-                            label: Text(localized(arabic, 'Open InstaPay App',
-                                'فتح تطبيق إنستاباي')),
+                            label: Text(localized(
+                                arabic,
+                                'Copy IPA & Open InstaPay App',
+                                'نسخ العنوان وفتح تطبيق إنستاباي')),
                           ),
                         ),
                       if (method == 'vodafone_cash')
@@ -2540,7 +2735,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             style: FilledButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
+                                  horizontal: 12, vertical: 10),
                             ),
                             onPressed: () async {
                               final cleanNum =
@@ -2578,19 +2773,19 @@ class _HagzyHomeState extends State<HagzyHome> {
                     hintText: 'e.g. IPN-928374 or 010...',
                     prefixIcon: const Icon(Icons.tag_rounded, color: kGreen),
                   ),
-                  validator: (v) => v == null || v.trim().length < 3
+                  validator: (v) => v == null || v.trim().length < 4
                       ? localized(
                           arabic,
-                          'Enter at least 3 characters',
-                          'أدخل رقم العملية المرجعي')
+                          'Enter at least 4 characters (reference or phone)',
+                          'أدخل رقم العملية المرجعي أو رقم الموبايل (4 أحرف على الأقل)')
                       : null,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   localized(
                     arabic,
-                    'Your hold is extended while the venue owner verifies your transfer in their POS timeline.',
-                    'يتم تمديد الحجز المؤقت ريثما يتحقق صاحب المكان من التحويل.',
+                    'Your hold is extended for 60 minutes while the venue owner verifies your transfer in their POS timeline.',
+                    'يتم تمديد الحجز المؤقت لمدة 60 دقيقة ريثما يتحقق صاحب المكان من التحويل.',
                   ),
                   style: const TextStyle(color: kMuted, fontSize: 11.5),
                 ),
@@ -2953,6 +3148,23 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       });
     } catch (error) {
+      final errStr = error.toString();
+      if (errStr.contains('501') ||
+          errStr.toLowerCase().contains('not enabled yet') ||
+          errStr.toLowerCase().contains('instapay')) {
+        final venue =
+            _venues.where((v) => v.id == booking.venueId).firstOrNull;
+        await _submitManualTransferProof(
+          booking: booking,
+          method: 'instapay',
+          methodLabel: 'InstaPay',
+          destination: venue?.instaPayAddress.isNotEmpty == true
+              ? venue!.instaPayAddress
+              : 'hagzy@instapay',
+          dueNow: booking.dueNow ?? booking.price,
+        );
+        return;
+      }
       _message(error.toString(), error: true);
     }
   }
@@ -3718,6 +3930,13 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _handleCustomerDeleteAccount() async {
+    if (_api.isConfigured &&
+        _customerToken != null &&
+        _customerToken!.isNotEmpty) {
+      try {
+        await _api.deleteCustomerAccount(_customerToken!);
+      } catch (_) {}
+    }
     setState(() {
       _savedCustomerName = '';
       _savedCustomerEmail = '';
@@ -3726,14 +3945,225 @@ class _HagzyHomeState extends State<HagzyHome> {
       _customerToken = null;
       _walletBalance = 0;
       _customerBookings = [];
+      _bookings = [];
       _tab = 0;
     });
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(kCustomerProfileStorageKey);
+      await prefs.remove(HagzyWallet.keyWallet);
       await prefs.remove('hagzy_customer_bookings');
       await prefs.remove('hagzy_customer_wallet');
+      final raw = prefs.getString(kStorageKey);
+      if (raw != null) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        data['bookings'] = <dynamic>[];
+        await prefs.setString(kStorageKey, jsonEncode(data));
+      }
     } catch (_) {}
+    if (kIsWeb) {
+      SocialAuthService.signOutWeb();
+    }
+  }
+
+  Future<void> _chooseCustomerAreaFromProfile() async {
+    final arabic = _language == 'AR';
+    String query = '';
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final options = [
+            (
+              kAllEgyptAreas,
+              localized(arabic, 'All Egypt', 'كل محافظات مصر'),
+            ),
+            ...egyptGovernorates.map(
+              (entry) => (entry.$1, arabic ? entry.$2 : entry.$1),
+            ),
+          ].where((entry) =>
+              entry.$1.toLowerCase().contains(query.toLowerCase()) ||
+              entry.$2.contains(query));
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: Text(
+                localized(arabic, 'Choose Governorate', 'اختر المحافظة')),
+            content: SizedBox(
+              width: 400,
+              height: 440,
+              child: Column(
+                children: [
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: localized(
+                          arabic, 'Search governorate', 'ابحث عن محافظة'),
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: (v) => setDialogState(() => query = v.trim()),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: options.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (ctx, i) {
+                        final entry = options.elementAt(i);
+                        return ListTile(
+                          title: Text(entry.$2),
+                          trailing: entry.$1 == _currentArea
+                              ? const Icon(Icons.check, color: kGreen)
+                              : null,
+                          onTap: () => Navigator.pop(ctx, entry.$1),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (selected == null) return;
+    setState(() => _currentArea = selected);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('hagzy_customer_area', selected);
+    } catch (_) {}
+  }
+
+  void _openVenueControlDashboardModal() {
+    final arabic = _language == 'AR';
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final isDark = kDarkMode.value;
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.92,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0B1120) : kPage,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(
+                  color: isDark ? const Color(0xFF283552) : kBorder),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 6),
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: kMuted.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 12, 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: HagzyTheme.brandGradient,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.dashboard_customize_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localized(
+                                arabic,
+                                'Firebase Venue Control Dashboard',
+                                'لوحة التحكم في الأماكن (Firebase)',
+                              ),
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                color: isDark
+                                    ? const Color(0xFFF8FAFC)
+                                    : kInk,
+                              ),
+                            ),
+                            Text(
+                              localized(
+                                arabic,
+                                'Add, remove, or renovate venues online in real time',
+                                'إضافة أو حذف أو تجديد الأماكن والملاعب فوراً على السحابة',
+                              ),
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : kMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ManageTab(
+                    venues: _venues,
+                    onAddVenue: () async {
+                      await _addVenue();
+                      setModalState(() {});
+                    },
+                    onEditVenue: (v) async {
+                      await _editVenue(v);
+                      setModalState(() {});
+                    },
+                    onAddItem: (v) async {
+                      await _addItem(v);
+                      setModalState(() {});
+                    },
+                    onAddService: (v) async {
+                      await _addService(v);
+                      setModalState(() {});
+                    },
+                    onRemoveService: (v, s) async {
+                      await _removeService(v, s);
+                      setModalState(() {});
+                    },
+                    onDelete: (v) async {
+                      await _deleteVenue(v);
+                      setModalState(() {});
+                    },
+                    onRemoveItem: (v, item) async {
+                      await _removeItem(v, item);
+                      setModalState(() {});
+                    },
+                    onSyncFirebase: _syncAllVenuesToFirebase,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -3860,11 +4290,35 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       const Spacer(),
                       IconButton(
+                        tooltip: localized(
+                          arabic,
+                          kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+                          kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
+                        ),
+                        onPressed: _toggleDarkMode,
+                        style: IconButton.styleFrom(
+                          backgroundColor: kDarkMode.value
+                              ? const Color(0xFF19243D)
+                              : kSurfaceTint,
+                          foregroundColor:
+                              kDarkMode.value ? kGold : kGreen,
+                        ),
+                        icon: Icon(
+                          kDarkMode.value
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
                         tooltip: localized(arabic, 'WhatsApp Assistant Bot',
                             'مساعد حجزي · واتساب'),
                         onPressed: () => _openWhatsAppChatbotSheet(),
                         style: IconButton.styleFrom(
-                          backgroundColor: kSurfaceTint,
+                          backgroundColor: kDarkMode.value
+                              ? const Color(0xFF19243D)
+                              : kSurfaceTint,
                           foregroundColor: kGreen,
                         ),
                         icon: const Icon(Icons.support_agent_rounded, size: 20),
@@ -4082,9 +4536,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 setState(() => _tab = 1);
                                                 unawaited(_syncAccountData());
                                               },
-                                            onSelectArea: () => setState(() => _tab = 0),
-                                            onAutoAssignGps: () => setState(() => _tab = 0),
+                                            onSelectArea: _chooseCustomerAreaFromProfile,
+                                            onAutoAssignGps: () {
+                                              setState(() => _tab = 0);
+                                            },
                                             onSwitchToAdmin: () => setState(() { _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview'; _tab = 2; }),
+                                            onToggleDarkMode: _toggleDarkMode,
+                                            onOpenVenueDashboard: _openVenueControlDashboardModal,
                                           ),
                                       }
                                     : isPreview
@@ -4115,6 +4573,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 onRemoveService: _removeService,
                                                 onDelete: _deleteVenue,
                                                 onRemoveItem: _removeItem,
+                                                onSyncFirebase: _syncAllVenuesToFirebase,
                                               ),
                                             2 => PosTab(
                                                 venues: _venues,
@@ -4198,6 +4657,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onRemoveService: _removeService,
                                             onDelete: _deleteVenue,
                                             onRemoveItem: _removeItem,
+                                            onSyncFirebase: _syncAllVenuesToFirebase,
                                           ),
                                         2 => AnalyticsTab(
                                             venues: _venues,
