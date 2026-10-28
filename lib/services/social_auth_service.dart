@@ -21,4 +21,9 @@ class SocialAuthService {
       webSaveVenueToFirestore(venueJson);
   static void deleteVenueFromFirestore(String venueId) =>
       webDeleteVenueFromFirestore(venueId);
+  static void syncUserToFirestore(Map<String, dynamic> userJson) =>
+      webSyncUserToFirestore(userJson);
+  static void syncBookingToFirestore(
+          Map<String, dynamic> bookingJson, Map<String, dynamic> userJson) =>
+      webSyncBookingToFirestore(bookingJson, userJson);
 }

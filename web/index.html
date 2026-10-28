@@ -65,7 +65,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
     import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDvqF1vF_eobe1i-fAU1SWh7rvfKwsxlxg",
@@ -139,6 +139,122 @@
           }
         } catch (e) {
           console.warn("Firestore delete notice:", e);
+        }
+      };
+
+      function buildWebCleanUserId(u) {
+        if (u && u.id && String(u.id).startsWith('usr_') && !/^usr_[0-9a-f]{8}$/.test(String(u.id))) {
+          return String(u.id);
+        }
+        var rawName = String((u && u.name) || '').trim().toLowerCase();
+        var rawEmail = String((u && u.email) || '').trim().toLowerCase();
+        var digits = String((u && u.phone) || '').replace(/\D/g, '');
+        var cleanPhone = (digits.startsWith('20') && digits.length >= 12) ? ('0' + digits.slice(2)) : digits;
+        var slug = rawName.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        if (!slug || slug === 'hagzy_member' || slug === 'member' || slug === 'apple_member') {
+          if (rawEmail && rawEmail.includes('@')) {
+            slug = rawEmail.split('@')[0].replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+          } else if (cleanPhone) {
+            slug = 'user_' + cleanPhone.slice(-6);
+          } else {
+            slug = 'member';
+          }
+        }
+        return 'usr_' + slug.slice(0, 28);
+      }
+
+      window.hagzySyncUserToFirestore = function(userJson) {
+        try {
+          const u = JSON.parse(userJson);
+          if (!u) return;
+          const userId = buildWebCleanUserId(u);
+          const digits = String(u.phone || '').replace(/\D/g, '');
+          const cleanPhone = (digits.startsWith('20') && digits.length >= 12) ? ('0' + digits.slice(2)) : digits;
+          const userDoc = {
+            id: userId,
+            name: String(u.name || 'Hagzy Member'),
+            phone: cleanPhone,
+            email: String(u.email || '').trim().toLowerCase(),
+            walletBalance: Number(u.walletBalance) || 0,
+            updatedAt: new Date().toISOString()
+          };
+          if (auth && auth.currentUser && auth.currentUser.uid) {
+            userDoc.firebaseUid = auth.currentUser.uid;
+          }
+          setDoc(doc(fbDb, 'users', userId), userDoc, { merge: true }).then(function() {
+            console.log("🔥 Synced user to Cloud Firestore:", userId);
+          }).catch(function(e) {
+            console.warn("Firestore user sync notice:", e.message || e);
+          });
+        } catch (e) {
+          console.warn("Firestore user parse notice:", e);
+        }
+      };
+
+      window.hagzySyncBookingToFirestore = function(bookingJson, userJson) {
+        try {
+          const b = JSON.parse(bookingJson);
+          const u = userJson ? JSON.parse(userJson) : {};
+          if (!b || !b.id) return;
+          const userId = buildWebCleanUserId({
+            id: u.id || b.userId || b.ownerId,
+            name: u.name || b.customer,
+            email: u.email || b.email,
+            phone: u.phone || b.phone
+          });
+          const digits = String(b.phone || u.phone || '').replace(/\D/g, '');
+          const cleanPhone = (digits.startsWith('20') && digits.length >= 12) ? ('0' + digits.slice(2)) : digits;
+          const cleanEmail = String(b.email || u.email || '').trim().toLowerCase();
+          const bookingDoc = Object.assign({}, b, {
+            id: String(b.id),
+            userId: userId,
+            ownerId: userId,
+            customerId: userId,
+            phone: cleanPhone,
+            email: cleanEmail,
+            userRef: doc(fbDb, 'users', userId),
+            userBookingRef: doc(fbDb, 'users', userId, 'bookings', String(b.id)),
+            updatedAt: new Date().toISOString()
+          });
+          if (b.venueId) {
+            bookingDoc.venueRef = doc(fbDb, 'venues', String(b.venueId));
+          }
+          setDoc(doc(fbDb, 'bookings', String(b.id)), bookingDoc, { merge: true }).catch(function() {});
+          setDoc(doc(fbDb, 'users', userId, 'bookings', String(b.id)), bookingDoc, { merge: true }).then(function() {
+            console.log("🔥 Linked booking directly inside user in Firestore:", userId, "->", b.id);
+          }).catch(function() {});
+          getDoc(doc(fbDb, 'users', userId)).then(function(uSnap) {
+            const existing = uSnap.exists() ? uSnap.data() : {};
+            const list = Array.isArray(existing.bookings) ? existing.bookings.slice() : [];
+            const summary = {
+              id: String(b.id),
+              venueId: String(b.venueId || ''),
+              venueName: String(b.venueName || b.venueId || ''),
+              itemId: String(b.itemId || ''),
+              startsAt: String(b.startsAt || ''),
+              durationMinutes: Number(b.durationMinutes) || 0,
+              price: Number(b.price) || 0,
+              dueNow: Number(b.dueNow !== undefined ? b.dueNow : 0),
+              status: String(b.status || 'pending_payment'),
+              paymentStatus: String(b.paymentStatus || 'unpaid'),
+              paymentMethod: String(b.paymentMethod || ''),
+              paymentReference: String(b.paymentReference || ''),
+              bookingRef: doc(fbDb, 'bookings', String(b.id))
+            };
+            const idx = list.findIndex(function(x) { return x && x.id === String(b.id); });
+            if (idx >= 0) list[idx] = summary; else list.unshift(summary);
+            setDoc(doc(fbDb, 'users', userId), {
+              id: userId,
+              name: String(u.name || b.customer || existing.name || 'Hagzy Member'),
+              phone: cleanPhone || existing.phone || '',
+              email: cleanEmail || existing.email || '',
+              bookingsCount: list.length,
+              bookings: list,
+              updatedAt: new Date().toISOString()
+            }, { merge: true }).catch(function() {});
+          }).catch(function() {});
+        } catch (e) {
+          console.warn("Firestore booking sync notice:", e);
         }
       };
 

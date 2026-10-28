@@ -205,3 +205,23 @@ void webDeleteVenueFromFirestore(String venueId) {
     }
   } catch (_) {}
 }
+
+void webSyncUserToFirestore(Map<String, dynamic> userJson) {
+  try {
+    if (js.context.hasProperty('hagzySyncUserToFirestore')) {
+      js.context.callMethod('hagzySyncUserToFirestore', [jsonEncode(userJson)]);
+    }
+  } catch (_) {}
+}
+
+void webSyncBookingToFirestore(
+    Map<String, dynamic> bookingJson, Map<String, dynamic> userJson) {
+  try {
+    if (js.context.hasProperty('hagzySyncBookingToFirestore')) {
+      js.context.callMethod('hagzySyncBookingToFirestore', [
+        jsonEncode(bookingJson),
+        jsonEncode(userJson),
+      ]);
+    }
+  } catch (_) {}
+}

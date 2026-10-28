@@ -10,3 +10,6 @@ void webRegisterRedirectAuthListener(void Function(Map<String, dynamic>) onRedir
 void webRegisterVenuesListener(void Function(List<Map<String, dynamic>>) onVenues) {}
 void webSaveVenueToFirestore(Map<String, dynamic> venueJson) {}
 void webDeleteVenueFromFirestore(String venueId) {}
+void webSyncUserToFirestore(Map<String, dynamic> userJson) {}
+void webSyncBookingToFirestore(
+    Map<String, dynamic> bookingJson, Map<String, dynamic> userJson) {}
