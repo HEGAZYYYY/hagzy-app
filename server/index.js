@@ -155,11 +155,12 @@ function getBookingsForUser(user) {
     .sort((a, b) => String(b.startsAt || b.createdAt || '').localeCompare(String(a.startsAt || a.createdAt || '')));
 }
 
-function buildBookingSummaryForUser(booking) {
+function buildBookingSummaryForUser(booking, userId) {
   const venue = (typeof db !== 'undefined' && Array.isArray(db.venues))
     ? db.venues.find(v => v.id === booking.venueId)
     : null;
   const venueName = String((venue && venue.name) || booking.venueName || booking.venueId || '');
+  const uid = String(userId || booking.userId || booking.ownerId || '');
   return {
     id: String(booking.id),
     venueId: String(booking.venueId || ''),
@@ -174,7 +175,7 @@ function buildBookingSummaryForUser(booking) {
     paymentMethod: String(booking.paymentMethod || ''),
     paymentReference: String(booking.paymentReference || ''),
     createdAt: String(booking.createdAt || ''),
-    ...(fbFirestore ? { bookingRef: fbFirestore.doc(`bookings/${booking.id}`) } : {})
+    ...(fbFirestore && uid ? { bookingRef: fbFirestore.doc(`users/${uid}/bookings/${booking.id}`) } : {})
   };
 }
 
@@ -198,7 +199,7 @@ async function syncUserToFirebase(user) {
       bookingsCount: userBookings.length,
       confirmedBookingsCount: confirmedCount,
       pendingBookingsCount: pendingCount,
-      bookings: userBookings.map(buildBookingSummaryForUser),
+      bookings: userBookings.map(b => buildBookingSummaryForUser(b, user.id)),
       createdAt: String(user.createdAt || new Date().toISOString()),
       updatedAt: new Date().toISOString()
     };
@@ -250,13 +251,19 @@ function resolveUserForBooking(booking, explicitUser) {
 async function syncBookingToFirebase(booking, user) {
   if (!fbFirestore || IS_TEST || !booking || !booking.id) return;
   try {
-    const resolvedUser = resolveUserForBooking(booking, user);
-    const resolvedUserId = String((resolvedUser && resolvedUser.id) || booking.userId || booking.ownerId || booking.customerId || '');
-    if (resolvedUserId) {
-      booking.userId = resolvedUserId;
-      booking.ownerId = resolvedUserId;
-      booking.customerId = resolvedUserId;
+    let resolvedUser = resolveUserForBooking(booking, user);
+    let resolvedUserId = String((resolvedUser && resolvedUser.id) || booking.userId || booking.ownerId || booking.customerId || '');
+    if (!resolvedUserId) {
+      resolvedUserId = buildCleanUserId({
+        name: booking.customer || 'Hagzy Member',
+        email: booking.email || '',
+        phone: booking.phone || booking.customerPhone || ''
+      });
     }
+    booking.userId = resolvedUserId;
+    booking.ownerId = resolvedUserId;
+    booking.customerId = resolvedUserId;
+
     const venue = (typeof db !== 'undefined' && Array.isArray(db.venues))
       ? db.venues.find(v => v.id === booking.venueId)
       : null;
@@ -285,10 +292,7 @@ async function syncBookingToFirebase(booking, user) {
       userId: resolvedUserId,
       ownerId: resolvedUserId,
       customerId: resolvedUserId,
-      ...(resolvedUserId ? {
-        userRef: fbFirestore.doc(`users/${resolvedUserId}`),
-        userBookingRef: fbFirestore.doc(`users/${resolvedUserId}/bookings/${booking.id}`)
-      } : {}),
+      userRef: fbFirestore.doc(`users/${resolvedUserId}`),
       ...(booking.venueId ? {
         venueRef: fbFirestore.doc(`venues/${booking.venueId}`)
       } : {}),
@@ -296,25 +300,28 @@ async function syncBookingToFirebase(booking, user) {
       updatedAt: new Date().toISOString()
     };
 
-    // 1. Write to top-level bookings collection
-    await fbFirestore.collection('bookings').doc(String(booking.id)).set(bookingDoc, { merge: true });
+    // 1. Write directly inside the user's subcollection: users/{userId}/bookings/{bookingId}
+    await fbFirestore
+      .collection('users')
+      .doc(resolvedUserId)
+      .collection('bookings')
+      .doc(String(booking.id))
+      .set(bookingDoc, { merge: true });
 
-    // 2. Write directly inside the user's subcollection: users/{userId}/bookings/{bookingId}
-    if (resolvedUserId) {
-      await fbFirestore
-        .collection('users')
-        .doc(resolvedUserId)
-        .collection('bookings')
-        .doc(String(booking.id))
-        .set(bookingDoc, { merge: true });
-    }
-
-    // 3. Update parent user document with refreshed bookings summary & counts
+    // 2. Update parent user document with refreshed bookings summary & counts
     if (resolvedUser) {
       await syncUserToFirebase(resolvedUser);
+    } else {
+      await syncUserToFirebase({
+        id: resolvedUserId,
+        name: bookingDoc.customer || 'Hagzy Member',
+        phone: cleanPhone,
+        email: cleanEmail,
+        walletBalance: 0
+      });
     }
 
-    console.log('✅ Synced booking to Cloud Firestore (top-level + user subcollection):', booking.id, '->', resolvedUserId || 'guest');
+    console.log('✅ Synced booking inside user in Cloud Firestore:', `users/${resolvedUserId}/bookings/${booking.id}`);
   } catch (err) {
     console.warn('Firebase Firestore sync notice:', err.message);
   }
@@ -392,17 +399,25 @@ async function hydrateVenuesFromFirebase() {
       console.log(`🔥 Seeded ${db.venues.length} initial venues into Cloud Firestore.`);
     }
 
-    // 2. Hydrate Users from Cloud Firestore
+    // 2. Hydrate Users and their nested Bookings subcollections from Cloud Firestore
     const usersSnap = await fbFirestore.collection('users').get();
     if (!usersSnap.empty) {
       const fbUsers = [];
-      usersSnap.forEach(doc => {
+      const fbBookings = [];
+      for (const doc of usersSnap.docs) {
         const data = stripFirestoreRefs(doc.data());
         if (data && (data.id || doc.id)) {
           const { bookings, bookingsCount, confirmedBookingsCount, pendingBookingsCount, ...userFields } = data;
           fbUsers.push({ ...userFields, id: data.id || doc.id });
         }
-      });
+        const subBookingsSnap = await doc.ref.collection('bookings').get();
+        subBookingsSnap.forEach(bDoc => {
+          const bData = stripFirestoreRefs(bDoc.data());
+          if (bData && (bData.id || bDoc.id)) {
+            fbBookings.push({ ...bData, id: bData.id || bDoc.id });
+          }
+        });
+      }
       if (fbUsers.length > 0) {
         const mergedUsers = [...db.users];
         for (const fu of fbUsers) {
@@ -422,18 +437,6 @@ async function hydrateVenuesFromFirebase() {
         db.users = mergedUsers;
         console.log(`🔥 Hydrated ${fbUsers.length} users from Cloud Firestore.`);
       }
-    }
-
-    // 3. Hydrate Bookings from Cloud Firestore
-    const bookingsSnap = await fbFirestore.collection('bookings').get();
-    if (!bookingsSnap.empty) {
-      const fbBookings = [];
-      bookingsSnap.forEach(doc => {
-        const data = stripFirestoreRefs(doc.data());
-        if (data && (data.id || doc.id)) {
-          fbBookings.push({ ...data, id: data.id || doc.id });
-        }
-      });
       if (fbBookings.length > 0) {
         const mergedBookings = [...db.bookings];
         for (const fb of fbBookings) {
@@ -445,7 +448,7 @@ async function hydrateVenuesFromFirebase() {
           }
         }
         db.bookings = mergedBookings;
-        console.log(`🔥 Hydrated ${fbBookings.length} bookings from Cloud Firestore.`);
+        console.log(`🔥 Hydrated ${fbBookings.length} bookings from users/{userId}/bookings in Cloud Firestore.`);
       }
     }
 

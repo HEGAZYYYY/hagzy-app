@@ -213,13 +213,11 @@
             phone: cleanPhone,
             email: cleanEmail,
             userRef: doc(fbDb, 'users', userId),
-            userBookingRef: doc(fbDb, 'users', userId, 'bookings', String(b.id)),
             updatedAt: new Date().toISOString()
           });
           if (b.venueId) {
             bookingDoc.venueRef = doc(fbDb, 'venues', String(b.venueId));
           }
-          setDoc(doc(fbDb, 'bookings', String(b.id)), bookingDoc, { merge: true }).catch(function() {});
           setDoc(doc(fbDb, 'users', userId, 'bookings', String(b.id)), bookingDoc, { merge: true }).then(function() {
             console.log("🔥 Linked booking directly inside user in Firestore:", userId, "->", b.id);
           }).catch(function() {});
@@ -239,7 +237,7 @@
               paymentStatus: String(b.paymentStatus || 'unpaid'),
               paymentMethod: String(b.paymentMethod || ''),
               paymentReference: String(b.paymentReference || ''),
-              bookingRef: doc(fbDb, 'bookings', String(b.id))
+              bookingRef: doc(fbDb, 'users', userId, 'bookings', String(b.id))
             };
             const idx = list.findIndex(function(x) { return x && x.id === String(b.id); });
             if (idx >= 0) list[idx] = summary; else list.unshift(summary);

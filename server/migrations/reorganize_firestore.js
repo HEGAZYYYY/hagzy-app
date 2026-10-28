@@ -180,7 +180,6 @@ async function run() {
       ownerId: userId,
       customerId: userId,
       userRef: db.doc(`users/${userId}`),
-      userBookingRef: db.doc(`users/${userId}/bookings/${bId}`),
       venueId: String(b.venueId || ''),
       venueName: String(venueName),
       ...(b.venueId ? { venueRef: db.doc(`venues/${b.venueId}`) } : {}),
@@ -202,11 +201,11 @@ async function run() {
       updatedAt: new Date().toISOString()
     };
 
-    // Update top-level bookings/{bookingId}
-    await db.collection('bookings').doc(bId).set(cleanBookingDoc);
-
     // Write directly inside users/{userId}/bookings/{bookingId} subcollection
     await db.collection('users').doc(userId).collection('bookings').doc(bId).set(cleanBookingDoc);
+
+    // Remove the redundant top-level bookings/{bookingId} document
+    await db.collection('bookings').doc(bId).delete();
 
     if (matchedUser) {
       matchedUser.bookings.push({
@@ -223,11 +222,11 @@ async function run() {
         paymentMethod: cleanBookingDoc.paymentMethod,
         paymentReference: cleanBookingDoc.paymentReference,
         createdAt: cleanBookingDoc.createdAt,
-        bookingRef: db.doc(`bookings/${bId}`)
+        bookingRef: db.doc(`users/${userId}/bookings/${bId}`)
       });
     }
     linkedBookingsCount++;
-    console.log(`🔗 Linked booking ${bId} -> users/${userId}/bookings/${bId}`);
+    console.log(`🔗 Linked booking ${bId} -> users/${userId}/bookings/${bId} (removed from root bookings)`);
   }
 
   // 4. Write all canonical users to users/{userId} with their embedded bookings summary & counts
