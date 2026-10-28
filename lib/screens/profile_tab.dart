@@ -30,7 +30,6 @@ class CustomerProfileTab extends StatefulWidget {
     required this.onAutoAssignGps,
     this.onSwitchToAdmin,
     this.onToggleDarkMode,
-    this.onOpenVenueDashboard,
   });
 
   final bool arabic;
@@ -65,7 +64,6 @@ class CustomerProfileTab extends StatefulWidget {
   final VoidCallback onAutoAssignGps;
   final VoidCallback? onSwitchToAdmin;
   final VoidCallback? onToggleDarkMode;
-  final VoidCallback? onOpenVenueDashboard;
 
   @override
   State<CustomerProfileTab> createState() => _CustomerProfileTabState();
@@ -589,36 +587,6 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 onTap: widget.onToggleDarkMode,
               ),
               const Divider(height: 1),
-              if (widget.onOpenVenueDashboard != null) ...[
-                _SettingTile(
-                  icon: Icons.dashboard_customize_rounded,
-                  title: localized(arabic, 'Venue Control Dashboard',
-                      'لوحة التحكم في الأماكن (Firebase)'),
-                  subtitle: localized(
-                    arabic,
-                    'Add, remove, or renovate venues synced live to Cloud Firebase',
-                    'إضافة أو حذف أو تجديد الملاعب والأماكن مع مزامنة فورية لـ Firebase',
-                  ),
-                  trailing: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: HagzyTheme.brandGradient,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      localized(arabic, 'Open', 'فتح'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11.5,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  onTap: widget.onOpenVenueDashboard,
-                ),
-                const Divider(height: 1),
-              ],
               _SettingTile(
                 icon: Icons.language_rounded,
                 title: localized(arabic, 'Language', 'اللغة'),

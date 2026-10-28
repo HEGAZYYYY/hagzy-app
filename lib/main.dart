@@ -39,6 +39,21 @@ class HagzyApp extends StatelessWidget {
 
   final bool adminMode;
 
+  static bool get _isWebPortalPath {
+    if (!kIsWeb) return false;
+    try {
+      final path = Uri.base.path.toLowerCase();
+      final frag = Uri.base.fragment.toLowerCase();
+      return path.startsWith('/partner') ||
+          path.startsWith('/admin') ||
+          frag.startsWith('/partner') ||
+          frag.startsWith('/admin') ||
+          Uri.base.queryParameters['portal'] == '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<String>(
         valueListenable: kAppLanguage,
@@ -60,7 +75,7 @@ class HagzyApp extends StatelessWidget {
               maxScaleFactor: 1.35,
               child: child ?? const SizedBox.shrink(),
             ),
-            home: HagzyHome(adminMode: adminMode),
+            home: HagzyHome(adminMode: adminMode || _isWebPortalPath),
           ),
         ),
       );
@@ -4400,39 +4415,60 @@ class _HagzyHomeState extends State<HagzyHome> {
                           size: 20,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: localized(
-                          arabic,
-                          _customerSignedIn ? 'My Profile' : 'Sign In',
-                          _customerSignedIn ? 'الملف الشخصي' : 'تسجيل الدخول',
+                      if (!isCustomer) ...[
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: localized(
+                            arabic,
+                            'Venue Control Dashboard',
+                            'لوحة التحكم في الأماكن',
+                          ),
+                          onPressed: _openVenueControlDashboardModal,
+                          style: IconButton.styleFrom(
+                            backgroundColor: kDarkMode.value
+                                ? const Color(0xFF19243D)
+                                : kSurfaceTint,
+                            foregroundColor: kGreen,
+                            side: BorderSide(color: kBorder),
+                          ),
+                          icon: const Icon(
+                            Icons.dashboard_customize_rounded,
+                            size: 20,
+                          ),
                         ),
-                        onPressed: () =>
-                            setState(() => _tab = isCustomer ? 2 : 4),
-                        style: IconButton.styleFrom(
-                          backgroundColor: _tab == (isCustomer ? 2 : 4)
-                              ? kGreen
-                              : kSurfaceTint,
-                          foregroundColor: _tab == (isCustomer ? 2 : 4)
-                              ? Colors.white
-                              : kInk,
+                      ],
+                      if (isCustomer) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: localized(
+                            arabic,
+                            _customerSignedIn ? 'My Profile' : 'Sign In',
+                            _customerSignedIn ? 'الملف الشخصي' : 'تسجيل الدخول',
+                          ),
+                          onPressed: () => setState(() => _tab = 2),
+                          style: IconButton.styleFrom(
+                            backgroundColor: _tab == 2 ? kGreen : kSurfaceTint,
+                            foregroundColor:
+                                _tab == 2 ? Colors.white : kInk,
+                          ),
+                          icon:
+                              _customerSignedIn && _savedCustomerName.isNotEmpty
+                                  ? Text(
+                                      _savedCustomerName
+                                          .trim()
+                                          .substring(0, 1)
+                                          .toUpperCase(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 13,
+                                        color: _tab == 2
+                                            ? Colors.white
+                                            : kGreen,
+                                      ),
+                                    )
+                                  : const Icon(Icons.person_rounded, size: 20),
                         ),
-                        icon: _customerSignedIn && _savedCustomerName.isNotEmpty
-                            ? Text(
-                                _savedCustomerName
-                                    .trim()
-                                    .substring(0, 1)
-                                    .toUpperCase(),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  color: _tab == (isCustomer ? 2 : 4)
-                                      ? Colors.white
-                                      : kGreen,
-                                ),
-                              )
-                            : const Icon(Icons.person_rounded, size: 20),
-                      ),
+                      ],
                       const SizedBox(width: 10),
                       if (!isCustomer && MediaQuery.sizeOf(context).width >= 840)
                         Container(
@@ -4591,9 +4627,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onAutoAssignGps: () {
                                               setState(() => _tab = 0);
                                             },
-                                            onSwitchToAdmin: () => setState(() { _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview'; _tab = 2; }),
                                             onToggleDarkMode: _toggleDarkMode,
-                                            onOpenVenueDashboard: _openVenueControlDashboardModal,
                                           ),
                                       }
                                     : isPreview
@@ -4804,6 +4838,22 @@ class _HagzyHomeState extends State<HagzyHome> {
                 kDarkMode.value
                     ? Icons.light_mode_rounded
                     : Icons.dark_mode_rounded,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              tooltip: 'Venue Control Dashboard',
+              onPressed: _openVenueControlDashboardModal,
+              style: IconButton.styleFrom(
+                backgroundColor: kDarkMode.value
+                    ? const Color(0xFF19243D)
+                    : kSurfaceTint,
+                foregroundColor: kGreen,
+                side: BorderSide(color: kBorder),
+              ),
+              icon: const Icon(
+                Icons.dashboard_customize_rounded,
                 size: 20,
               ),
             ),
