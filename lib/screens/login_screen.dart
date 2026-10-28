@@ -408,6 +408,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     } catch (_) {}
   }
 
+  // Apple Sign-In paused pending Apple Developer Services ID setup.
+  /*
   Future<void> _signInWithApple() async {
     try {
       if (kIsWeb) {
@@ -515,6 +517,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       }
     } catch (_) {}
   }
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -924,34 +927,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                if (defaultTargetPlatform ==
-                                        TargetPlatform.iOS ||
-                                    defaultTargetPlatform ==
-                                        TargetPlatform.macOS) ...[
-                                  _SocialSignInButton(
-                                    provider: 'apple',
-                                    arabic: arabic,
-                                    onTap: _signInWithApple,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _SocialSignInButton(
-                                    provider: 'google',
-                                    arabic: arabic,
-                                    onTap: _signInWithGoogle,
-                                  ),
-                                ] else ...[
-                                  _SocialSignInButton(
-                                    provider: 'google',
-                                    arabic: arabic,
-                                    onTap: _signInWithGoogle,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _SocialSignInButton(
-                                    provider: 'apple',
-                                    arabic: arabic,
-                                    onTap: _signInWithApple,
-                                  ),
-                                ],
+                                _SocialSignInButton(
+                                  provider: 'google',
+                                  arabic: arabic,
+                                  onTap: _signInWithGoogle,
+                                ),
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [
