@@ -847,17 +847,39 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         ],
 
         Center(
-          child: Text(
-            localized(
-              arabic,
-              'Hagzy v2.4 · Made with ❤️ in Kafr El-Sheikh',
-              'حجزي v2.4 · صُنع بـ ❤️ في كفر الشيخ',
+          child: Text.rich(
+            TextSpan(
+              style: TextStyle(
+                color: kMuted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+              children: [
+                TextSpan(
+                  text: localized(
+                    arabic,
+                    'Hagzy v2.4 · Made with ',
+                    'حجزي v2.4 · صُنع بـ ',
+                  ),
+                ),
+                const WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Icon(
+                    Icons.favorite_rounded,
+                    size: 13,
+                    color: Color(0xFFE11D48),
+                  ),
+                ),
+                TextSpan(
+                  text: localized(
+                    arabic,
+                    ' in Kafr El-Sheikh',
+                    ' في كفر الشيخ',
+                  ),
+                ),
+              ],
             ),
-            style: TextStyle(
-              color: kMuted,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ],

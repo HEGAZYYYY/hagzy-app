@@ -1342,8 +1342,8 @@ class _BookTabState extends State<BookTab> {
             body: _favoritesOnly
                 ? localized(
                     widget.arabic,
-                    'Tap the heart icon (🤍) on any venue to save it to your favorites for quick booking.',
-                    'اضغط على أيقونة القلب (🤍) في أي مكان لحفظه في المفضلة وسهولة حجزه لاحقاً.')
+                    'Tap the heart icon on any venue to save it to your favorites for quick booking.',
+                    'اضغط على أيقونة القلب في أي مكان لحفظه في المفضلة وسهولة حجزه لاحقاً.')
                 : _area != kAllEgyptAreas
                     ? localized(
                         widget.arabic,
@@ -1428,17 +1428,40 @@ class _BookTabState extends State<BookTab> {
                       color: kGreen,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      localized(
-                        widget.arabic,
-                        'Made with ❤️ in Kafr El-Sheikh',
-                        'صُنع بـ ❤️ في كفر الشيخ',
-                      ),
-                      style: TextStyle(
-                        color: kMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.2,
+                    Flexible(
+                      child: Text.rich(
+                        TextSpan(
+                          style: TextStyle(
+                            color: kMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: localized(
+                                widget.arabic,
+                                'Made with ',
+                                'صُنع بـ ',
+                              ),
+                            ),
+                            const WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Icon(
+                                Icons.favorite_rounded,
+                                size: 13,
+                                color: Color(0xFFE11D48),
+                              ),
+                            ),
+                            TextSpan(
+                              text: localized(
+                                widget.arabic,
+                                ' in Kafr El-Sheikh',
+                                ' في كفر الشيخ',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1521,7 +1544,7 @@ class _BookTabState extends State<BookTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SystemEmoji(activeSubDef.emoji, size: 11),
+                        Icon(activeSubDef.icon, size: 13, color: color),
                         const SizedBox(width: 4),
                         Text(
                           activeSubDef.title(widget.arabic),
@@ -1601,7 +1624,7 @@ class _BookTabState extends State<BookTab> {
             children: [
               _SubCategoryVisualPill(
                 label: allLabel,
-                emoji: '✨',
+                emoji: 'all',
                 icon: Icons.auto_awesome_rounded,
                 isSelected: _subCategory == null,
                 count: allVenuesInArea.length,
@@ -1669,7 +1692,7 @@ class _BookTabState extends State<BookTab> {
       ),
       child: Row(
         children: [
-          SystemEmoji(def.emoji, size: 16),
+          Icon(def.icon, size: 17, color: accentColor),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -3932,7 +3955,7 @@ class VenueBrowseCard extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  SystemEmoji(def.emoji, size: 11),
+                                  Icon(def.icon, size: 13, color: _accent),
                                   const SizedBox(width: 4),
                                   Text(
                                     def.title(arabic),
@@ -4839,7 +4862,11 @@ class _SubCategoryVisualPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SystemEmoji(emoji, size: 13),
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? Colors.white : accentColor,
+            ),
             const SizedBox(width: 6),
             Text(
               label,

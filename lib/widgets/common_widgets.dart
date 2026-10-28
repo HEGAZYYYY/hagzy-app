@@ -268,21 +268,50 @@ class SectionHeading extends StatelessWidget {
   }
 }
 
-/// Renders in-app emojis using native iOS (Apple Color Emoji) or system emoji font stacks.
+/// Renders a crisp vector icon in place of legacy in-app emojis.
 class SystemEmoji extends StatelessWidget {
-  const SystemEmoji(this.emoji, {super.key, this.size = 14});
+  const SystemEmoji(
+    this.emoji, {
+    super.key,
+    this.size = 14,
+    this.icon,
+    this.color,
+  });
 
   final String emoji;
   final double size;
+  final IconData? icon;
+  final Color? color;
+
+  static IconData _resolveIcon(String key) {
+    switch (key) {
+      case 'barbers':
+        return Icons.content_cut_rounded;
+      case 'salons':
+        return Icons.spa_rounded;
+      case 'padel':
+        return Icons.sports_tennis_rounded;
+      case 'soccer':
+        return Icons.sports_soccer_rounded;
+      case 'playstation':
+        return Icons.sports_esports_rounded;
+      case 'billiards':
+        return Icons.sports_baseball_rounded;
+      case 'table_tennis':
+        return Icons.sports_cricket_rounded;
+      case 'escape_rooms':
+        return Icons.vpn_key_rounded;
+      default:
+        return Icons.auto_awesome_rounded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      emoji,
-      style: TextStyle(
-        fontSize: size,
-        fontFamilyFallback: HagzyTheme.emojiFontFallbacks,
-      ),
+    return Icon(
+      icon ?? _resolveIcon(emoji),
+      size: size + 2,
+      color: color ?? kGreen,
     );
   }
 }

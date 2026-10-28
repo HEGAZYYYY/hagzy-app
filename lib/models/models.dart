@@ -378,7 +378,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Barbers',
     arabicTitle: 'صالونات حلاقة',
     icon: Icons.content_cut_rounded,
-    emoji: '💈',
+    emoji: 'barbers',
   ),
   SubCategoryDef(
     id: 'salons',
@@ -386,7 +386,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Salons & Spa',
     arabicTitle: 'صالونات وبيوتي سنتر',
     icon: Icons.spa_rounded,
-    emoji: '💇',
+    emoji: 'salons',
   ),
 
   // Sports
@@ -396,7 +396,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Padel Courts',
     arabicTitle: 'ملاعب بادل',
     icon: Icons.sports_tennis_rounded,
-    emoji: '🎾',
+    emoji: 'padel',
   ),
   SubCategoryDef(
     id: 'soccer',
@@ -404,7 +404,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Soccer & Football',
     arabicTitle: 'ملاعب كرة قدم',
     icon: Icons.sports_soccer_rounded,
-    emoji: '⚽',
+    emoji: 'soccer',
   ),
 
   // Entertainment
@@ -414,7 +414,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'PlayStations',
     arabicTitle: 'بلايستيشن',
     icon: Icons.sports_esports_rounded,
-    emoji: '🎮',
+    emoji: 'playstation',
   ),
   SubCategoryDef(
     id: 'billiards',
@@ -422,7 +422,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Billiards & Pool',
     arabicTitle: 'بلياردو',
     icon: Icons.sports_baseball_rounded,
-    emoji: '🎱',
+    emoji: 'billiards',
   ),
   SubCategoryDef(
     id: 'table_tennis',
@@ -430,7 +430,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Table Tennis',
     arabicTitle: 'بينج بونج',
     icon: Icons.sports_cricket_rounded,
-    emoji: '🏓',
+    emoji: 'table_tennis',
   ),
   SubCategoryDef(
     id: 'escape_rooms',
@@ -438,7 +438,7 @@ const List<SubCategoryDef> kAllSubCategories = [
     englishTitle: 'Escape Rooms',
     arabicTitle: 'غرف هروب',
     icon: Icons.vpn_key_rounded,
-    emoji: '🗝️',
+    emoji: 'escape_rooms',
   ),
 ];
 
