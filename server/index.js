@@ -316,6 +316,8 @@ if (activeWebDir) {
 // SMS / WHATSAPP DISPATCH HELPER
 // ==========================================
 async function sendSmsOrWhatsApp({ phone, message, otp }) {
+  if (IS_TEST) return { sent: true, provider: 'test' };
+
   console.log(`\n========================================`);
   console.log(`📲 [SMS / OTP DISPATCH]`);
   console.log(`To: ${phone}`);
@@ -1748,6 +1750,223 @@ app.post('/api/bookings/:id/paymob-intention', (req, res) => {
   // TODO: create a real Paymob intention with PAYMOB_SECRET_KEY and confirm bookings
   // from a signed (HMAC-verified) webhook. Until then, don't hand customers a fake URL.
   return res.status(501).json({ error: 'Online card payments are not enabled yet. Please use InstaPay or Vodafone Cash.' });
+});
+
+// ==========================================
+// HAGZY WHATSAPP & IN-APP CHATBOT ENGINE
+// ==========================================
+async function processChatbotMessage({ message = '', senderPhone = '', bookingId = '', language = 'AR' }) {
+  const arabic = language !== 'EN';
+  const cleanMsg = String(message || '').trim();
+  const lower = cleanMsg.toLowerCase();
+  const cleanPhone = senderPhone.replace(/\D/g, '');
+
+  // 1. Find matching booking by ID or phone number
+  let matchedBooking = null;
+  if (bookingId) {
+    matchedBooking = db.bookings.find(b => b.id === bookingId && !b.cancelled);
+  }
+  if (!matchedBooking && cleanPhone) {
+    matchedBooking = db.bookings
+      .filter(b => !b.cancelled)
+      .find(b => {
+        const bp = String(b.phone || '').replace(/\D/g, '');
+        return bp && (bp === cleanPhone || cleanPhone.endsWith(bp) || bp.endsWith(cleanPhone));
+      });
+  }
+
+  // Also check if user typed an exact booking ID (e.g. 1793... or bk_...)
+  const idMatch = cleanMsg.match(/(?:bk_[a-zA-Z0-9_]+|\b17\d{14,}\b)/i);
+  if (idMatch && !matchedBooking) {
+    const extractedId = idMatch[0];
+    matchedBooking = db.bookings.find(b => b.id === extractedId && !b.cancelled);
+  }
+
+  let venue = null;
+  if (matchedBooking) {
+    venue = db.venues.find(v => v.id === matchedBooking.venueId);
+  }
+
+  // 2. Reference Number Submission (e.g. 6-24 digits or "ref 123456")
+  const isLikelyRefNumber = /^(?:ref\s*[:=]?\s*)?[0-9]{6,24}$/i.test(cleanMsg) || 
+                            /(?:رقم العملية|المرجعي|كود التحويل)\s*[:=]?\s*([0-9]{6,24})/i.test(cleanMsg);
+  if (isLikelyRefNumber && matchedBooking) {
+    const rawRef = cleanMsg.replace(/\D/g, '');
+    if (rawRef.length >= 6) {
+      matchedBooking.paymentReference = rawRef;
+      matchedBooking.proofSubmitted = true;
+      matchedBooking.status = 'pending_confirmation';
+      saveDb(db);
+      if (fbDb) {
+        try {
+          await fbDb.collection('bookings').doc(matchedBooking.id).set({
+            paymentReference: rawRef,
+            proofSubmitted: true,
+            status: 'pending_confirmation',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (_) {}
+      }
+      return arabic
+        ? `✅ تم استلام رقم العملية بنجاح (${rawRef})!\n\n📌 حجزك في "${venue?.name || matchedBooking.venueId}" تم تحديثه إلى: "بانتظار المراجعة والتأكيد".\nسيتم إشعارك فور اكتمال مراجعة التحويل. شكراً لك! 🏆`
+        : `✅ Payment reference (${rawRef}) recorded successfully!\n\nYour reservation at "${venue?.name || matchedBooking.venueId}" is now under review. We will notify you once confirmed. Thank you! 🏆`;
+    }
+  }
+
+  // 3. Deposit / Payment methods ("دفع", "عربون", "انستاباي", "فودافون كاش", "فوري", "pay", "deposit")
+  if (lower.includes('pay') || lower.includes('deposit') || lower.includes('دفع') || lower.includes('عربون') || lower.includes('انستاباي') || lower.includes('فودافون')) {
+    const insta = venue?.instaPayAddress || 'hagzy@instapay';
+    const vf = venue?.vodafoneCashNumber || '01024129393';
+    return arabic
+      ? `💳 طرق دفع العربون المتاحة في حجزي:\n\n` +
+        `١. فوري باي (FawryPay): كود الخدمة 78890\n` +
+        `٢. إنستا باي (InstaPay): حوّل إلى ${insta}\n` +
+        `٣. فودافون كاش (Vodafone Cash): ${vf}\n` +
+        `٤. فيزا / ماستركارد / ميزة: عبر تطبيق وموقع حجزي مباشرة\n\n` +
+        `💡 بعد إتمام التحويل، يمكنك إرسال رقم العملية المرجعي هنا مباشرة لتسجيله وتأكيد الحجز فوراً!`
+      : `💳 Deposit Payment Options:\n\n` +
+        `1. FawryPay: Service Code 78890\n` +
+        `2. InstaPay: Transfer to ${insta}\n` +
+        `3. Vodafone Cash: Transfer to ${vf}\n` +
+        `4. Visa / Mastercard / Meeza: Online via Hagzy app\n\n` +
+        `💡 After payment, simply reply with your transaction reference number here to verify your booking!`;
+  }
+
+  // 4. Booking status ("حجز", "حجزي", "حالة", "تأكيد", "status", "booking")
+  if (lower.includes('status') || lower.includes('booking') || lower.includes('حجز') || lower.includes('حالة') || idMatch) {
+    if (matchedBooking) {
+      const isConfirmed = matchedBooking.status === 'confirmed';
+      const venueName = venue?.name || matchedBooking.venueId;
+      const startsAt = matchedBooking.startsAt || matchedBooking.date || 'اليوم';
+      const price = matchedBooking.price || matchedBooking.dueNow || 0;
+      return arabic
+        ? `📌 تفاصيل حجزك في حجزي:\n\n` +
+          `• المكان: ${venueName}\n` +
+          `• الموعد: ${startsAt}\n` +
+          `• الحالة: ${isConfirmed ? 'مؤكد رسمياً ✓' : 'حجز مؤقت (بانتظار العربون) ⏳'}\n` +
+          `• المبلغ: ${price} جنيه\n` +
+          `• رقم الحجز: ${matchedBooking.id}\n\n` +
+          `🎫 يمكنك إدارة حجزك وتذكرتك من الرابط: https://hagzy-acea1.web.app`
+        : `📌 Your Hagzy Reservation Details:\n\n` +
+          `• Venue: ${venueName}\n` +
+          `• Date & Time: ${startsAt}\n` +
+          `• Status: ${isConfirmed ? 'Confirmed ✓' : 'Temporary Hold (Pending Deposit) ⏳'}\n` +
+          `• Amount: ${price} EGP\n` +
+          `• Booking ID: ${matchedBooking.id}\n\n` +
+          `🎫 Manage your booking: https://hagzy-acea1.web.app`;
+    } else {
+      return arabic
+        ? `لم نتمكن من العثور على حجز نشط مرتبط برقمك حالياً.\n\nإذا كان لديك رقم حجز محدد، أرسل الرقم فقط (مثال: 1793...).\nأو يمكنك تصفح الملاعب والأنشطة وحجز موعدك فوراً:\n👉 https://hagzy-acea1.web.app`
+        : `No active reservation was found for your phone number.\n\nIf you have a Booking ID, please reply with it directly.\nOr explore and book venues now at:\n👉 https://hagzy-acea1.web.app`;
+    }
+  }
+
+  // 5. Cancel request ("إلغاء", "cancel")
+  if (lower.includes('cancel') || lower.includes('إلغاء') || lower.includes('الغاء')) {
+    if (matchedBooking) {
+      return arabic
+        ? `⚠️ بخصوص إلغاء الحجز رقم (${matchedBooking.id}) في ${venue?.name || matchedBooking.venueId}:\n\n` +
+          `يمكنك إلغاء الحجز واسترداد العربون لمحفظتك قبل الموعد بـ 6 ساعات مباشرة من التطبيق:\n` +
+          `👉 https://hagzy-acea1.web.app\n` +
+          `أو أرسل "خدمة العملاء" للمساعدة الفورية.`
+        : `⚠️ To cancel booking (${matchedBooking.id}) at ${venue?.name || matchedBooking.venueId}:\n\n` +
+          `You can cancel directly on the app up to 6 hours before your slot to receive a wallet refund:\n` +
+          `👉 https://hagzy-acea1.web.app\n` +
+          `Or reply "support" for customer assistance.`;
+    }
+    return arabic
+      ? `لإلغاء أي حجز، يرجى الدخول إلى صفحة "حجوزاتي" عبر الرابط https://hagzy-acea1.web.app واختيار "إلغاء الحجز".`
+      : `To cancel a booking, please open your Reservations page at https://hagzy-acea1.web.app and tap Cancel.`;
+  }
+
+  // 6. Live Agent / Human Support ("خدمة العملاء", "موظف", "support", "human")
+  if (lower.includes('support') || lower.includes('human') || lower.includes('خدمة العملاء') || lower.includes('موظف') || lower.includes('مساعدة')) {
+    return arabic
+      ? `💬 تم تحويل استفسارك إلى فريق الدعم الفني في حجزي!\nسيقوم أحد ممثلينا بالرد عليك ومساعدتك في أقرب وقت. يمكنك كتابة استفسارك بالتفصيل هنا.`
+      : `💬 Your request has been forwarded to Hagzy customer support. A representative will get back to you shortly!`;
+  }
+
+  // 7. Default Interactive Menu
+  return arabic
+    ? `أهلاً بك في خدمة عملاء منصة حجزي! 🏆👋\n\n` +
+      `يسعدنا مساعدتك:\n` +
+      `1️⃣ لمعرفة تفاصيل وحالة حجزك، أرسل: "حجزي" أو رقم الحجز.\n` +
+      `2️⃣ لدفع العربون وطرق التحويل، أرسل: "دفع" أو "عربون".\n` +
+      `3️⃣ لإلغاء حجز، أرسل: "إلغاء".\n` +
+      `4️⃣ للتحدث مع خدمة العملاء، أرسل: "خدمة العملاء".\n\n` +
+      `👉 لتصفح وحجز الملاعب: https://hagzy-acea1.web.app`
+    : `Welcome to Hagzy Assistant! 🏆👋\n\n` +
+      `How can we help you today?\n` +
+      `1️⃣ Check booking status: Reply "status" or your Booking ID.\n` +
+      `2️⃣ Deposit payment options: Reply "pay" or "deposit".\n` +
+      `3️⃣ Cancel a reservation: Reply "cancel".\n` +
+      `4️⃣ Talk to human support: Reply "support".\n\n` +
+      `👉 Book venues: https://hagzy-acea1.web.app`;
+}
+
+// UltraMsg Inbound WhatsApp Webhook
+app.post(['/api/whatsapp/webhook', '/api/webhook/whatsapp'], async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const data = payload.data || payload;
+
+    // Ignore messages sent by the bot itself to prevent infinite message loops!
+    if (data.fromMe === true || data.fromMe === 'true') {
+      return res.status(200).json({ status: 'ignored_own_message' });
+    }
+
+    const rawFrom = String(data.from || '');
+    const messageBody = String(data.body || '').trim();
+
+    if (!rawFrom || !messageBody) {
+      return res.status(200).json({ status: 'no_content' });
+    }
+
+    // Clean phone number from WhatsApp ID (e.g. 201024129393@c.us -> 01024129393)
+    const phoneDigits = rawFrom.replace(/@.*$/, '').replace(/\D/g, '');
+    let localPhone = phoneDigits;
+    if (phoneDigits.startsWith('20') && phoneDigits.length >= 12) {
+      localPhone = '0' + phoneDigits.slice(2);
+    }
+
+    console.log(`💬 [WHATSAPP INBOUND] From: ${rawFrom} (${localPhone}) -> "${messageBody}"`);
+
+    // Process the message with the chatbot engine
+    const reply = await processChatbotMessage({
+      message: messageBody,
+      senderPhone: localPhone,
+      language: 'AR'
+    });
+
+    // Send reply back via UltraMsg
+    if (reply) {
+      await sendSmsOrWhatsApp({
+        phone: rawFrom.replace(/@.*$/, ''),
+        message: reply,
+        otp: ''
+      });
+    }
+
+    return res.status(200).json({ status: 'success', replied: true });
+  } catch (err) {
+    console.error('WhatsApp webhook error:', err);
+    return res.status(200).json({ status: 'error', error: err.message });
+  }
+});
+
+// In-App Chatbot Endpoint (Flutter client)
+app.post('/api/chatbot/message', async (req, res) => {
+  const { message, phone, bookingId, language } = req.body || {};
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+  const reply = await processChatbotMessage({
+    message,
+    senderPhone: phone || '',
+    bookingId: bookingId || '',
+    language: language || 'AR'
+  });
+  return res.json({ success: true, reply });
 });
 
 // Health check: handles /health, /api/health, /healthz, and /ping
