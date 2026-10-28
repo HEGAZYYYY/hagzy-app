@@ -1486,22 +1486,44 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                 runSpacing: 4,
                                 children: [
                                   if (user.phone.isNotEmpty)
-                                    Text(
-                                      '📱 ${user.phone}',
-                                      style: TextStyle(
-                                        color: kMuted,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.phone_iphone_rounded,
+                                          size: 14,
+                                          color: kMuted,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          user.phone,
+                                          style: TextStyle(
+                                            color: kMuted,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   if (user.email.isNotEmpty)
-                                    Text(
-                                      '✉️ ${user.email}',
-                                      style: TextStyle(
-                                        color: kMuted,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.mail_outline_rounded,
+                                          size: 14,
+                                          color: kMuted,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          user.email,
+                                          style: TextStyle(
+                                            color: kMuted,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                 ],
                               ),
@@ -1636,26 +1658,68 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                         ],
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        '📅 ${formatDateTime(b.startsAt)} (${b.durationMinutes} min) · 💵 ${b.price.toStringAsFixed(0)} EGP',
-                                        style: TextStyle(
-                                          color: kMuted,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_today_rounded,
+                                            size: 13,
+                                            color: kMuted,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              '${formatDateTime(b.startsAt)} (${b.durationMinutes} min)',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: kMuted,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.payments_outlined,
+                                            size: 14,
+                                            color: kMuted,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${b.price.toStringAsFixed(0)} EGP',
+                                            style: TextStyle(
+                                              color: kMuted,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                       if (b.paymentReference.isNotEmpty ||
                                           b.paymentMethod.isNotEmpty)
                                         Padding(
                                           padding:
                                               const EdgeInsets.only(top: 3),
-                                          child: Text(
-                                            '💳 ${b.paymentMethod.isEmpty ? "Transfer" : b.paymentMethod.toUpperCase()}${b.paymentReference.isEmpty ? "" : " · Ref: ${b.paymentReference}"}',
-                                            style: const TextStyle(
-                                              color: kGreen,
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.account_balance_wallet_outlined,
+                                                size: 13,
+                                                color: kGreen,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  '${b.paymentMethod.isEmpty ? "Transfer" : b.paymentMethod.toUpperCase()}${b.paymentReference.isEmpty ? "" : " · Ref: ${b.paymentReference}"}',
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: kGreen,
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                     ],

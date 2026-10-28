@@ -3253,8 +3253,8 @@ class _HagzyHomeState extends State<HagzyHome> {
         true,
         localized(
           arabic,
-          'Welcome to Hagzy WhatsApp Assistant! 👋\nI can help you pay your deposit (Paymob, Fawry, InstaPay, Vodafone Cash), check your booking status, or connect you to live WhatsApp.',
-          'مرحباً بك في مساعد حجزي الذكي عبر واتساب! 👋\nيمكنني مساعدتك في دفع العربون (Paymob أو فوري أو إنستا باي أو فودافون كاش)، أو متابعة حالة حجزك.',
+          'Welcome to Hagzy WhatsApp Assistant!\nI can help you pay your deposit (Paymob, Fawry, InstaPay, Vodafone Cash), check your booking status, or connect you to live WhatsApp.',
+          'مرحباً بك في مساعد حجزي الذكي عبر واتساب!\nيمكنني مساعدتك في دفع العربون (Paymob أو فوري أو إنستا باي أو فودافون كاش)، أو متابعة حالة حجزك.',
         ),
       ),
       if (activeBooking != null)
@@ -3262,8 +3262,8 @@ class _HagzyHomeState extends State<HagzyHome> {
           true,
           localized(
             arabic,
-            '📌 Active Reservation:\n• Venue: ${venue?.name ?? activeBooking.venueId}\n• Time: ${formatDateTime(activeBooking.startsAt)}\n• Deposit Due: ${formatMoney(activeBooking.dueNow ?? activeBooking.price)} EGP\n• Status: ${activeBooking.isConfirmed ? 'Confirmed ✓' : '15-min Hold (Pending Deposit)'}',
-            '📌 حجزك النشط:\n• المكان: ${venue?.name ?? activeBooking.venueId}\n• الموعد: ${formatDateTime(activeBooking.startsAt)}\n• العربون: ${formatMoney(activeBooking.dueNow ?? activeBooking.price)} جنيه\n• الحالة: ${activeBooking.isConfirmed ? 'مؤكد ✓' : 'حجز مؤقت بانتظار العربون'}',
+            'Active Reservation:\n• Venue: ${venue?.name ?? activeBooking.venueId}\n• Time: ${formatDateTime(activeBooking.startsAt)}\n• Deposit Due: ${formatMoney(activeBooking.dueNow ?? activeBooking.price)} EGP\n• Status: ${activeBooking.isConfirmed ? 'Confirmed' : '15-min Hold (Pending Deposit)'}',
+            'حجزك النشط:\n• المكان: ${venue?.name ?? activeBooking.venueId}\n• الموعد: ${formatDateTime(activeBooking.startsAt)}\n• العربون: ${formatMoney(activeBooking.dueNow ?? activeBooking.price)} جنيه\n• الحالة: ${activeBooking.isConfirmed ? 'مؤكد' : 'حجز مؤقت بانتظار العربون'}',
           ),
         ),
     ];
@@ -3296,8 +3296,8 @@ class _HagzyHomeState extends State<HagzyHome> {
             : '01024129393';
         return localized(
           arabic,
-          '💳 Deposit Payment Options:\n1. Paymob: Instant Visa, Mastercard & Meeza checkout.\n2. FawryPay: Service Code 78890 (generate your 10-digit code in 1 tap).\n3. InstaPay: Send to $insta\n4. Vodafone Cash: Send to $vf\n\nTip: You can also paste your transfer reference code right here in the chat!',
-          '💳 طرق دفع العربون:\n١. Paymob: بطاقات فيزا وماستركارد وميزة.\n٢. فوري باي: كود الخدمة 78890.\n٣. إنستا باي: حوّل إلى $insta\n٤. فودافون كاش: حوّل إلى $vf\n\nيمكنك أيضاً إرسال رقم العملية المرجعي هنا في المحادثة مباشرة!',
+          'Deposit Payment Options:\n1. Paymob: Instant Visa, Mastercard & Meeza checkout.\n2. FawryPay: Service Code 78890 (generate your 10-digit code in 1 tap).\n3. InstaPay: Send to $insta\n4. Vodafone Cash: Send to $vf\n\nTip: You can also paste your transfer reference code right here in the chat!',
+          'طرق دفع العربون:\n١. Paymob: بطاقات فيزا وماستركارد وميزة.\n٢. فوري باي: كود الخدمة 78890.\n٣. إنستا باي: حوّل إلى $insta\n٤. فودافون كاش: حوّل إلى $vf\n\nيمكنك أيضاً إرسال رقم العملية المرجعي هنا في المحادثة مباشرة!',
         );
       }
       if (lower.contains('status') ||
@@ -3351,8 +3351,8 @@ class _HagzyHomeState extends State<HagzyHome> {
         await _commit(_venues, next);
         return localized(
           arabic,
-          '✅ Reference "$ref" attached to your reservation (${venue?.name ?? activeBooking.venueId})! Your hold is extended while the venue verifies your payment.',
-          '✅ تم ربط رقم العملية "$ref" بحجزك في (${venue?.name ?? activeBooking.venueId})! تم تمديد الحجز ريثما يتحقق المكان من الدفع.',
+          'Reference "$ref" attached to your reservation (${venue?.name ?? activeBooking.venueId})! Your hold is extended while the venue verifies your payment.',
+          'تم ربط رقم العملية "$ref" بحجزك في (${venue?.name ?? activeBooking.venueId})! تم تمديد الحجز ريثما يتحقق المكان من الدفع.',
         );
       }
       return localized(
