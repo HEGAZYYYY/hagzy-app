@@ -331,7 +331,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
-    Color color = kInk,
+    Color? color,
   }) {
     return Tooltip(
       message: tooltip,
@@ -342,7 +342,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.96),
+            color: kPanel.withValues(alpha: 0.96),
             shape: BoxShape.circle,
             border: Border.all(color: kBorder),
             boxShadow: const [
@@ -350,7 +350,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                   color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
             ],
           ),
-          child: Icon(icon, size: 18, color: color),
+          child: Icon(icon, size: 18, color: color ?? kInk),
         ),
       ),
     );
@@ -731,7 +731,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                               Expanded(
                                 child: Text(
                                   activeVenue.name,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w900,
                                     fontSize: 16.5,
                                     color: kInk,

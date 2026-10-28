@@ -7,7 +7,7 @@ import 'google_fonts_stub.dart' if (dart.library.html) 'google_fonts_web.dart';
 // to match the original Hagzy logo.
 // ---------------------------------------------------------------------------
 
-const kInk = Color(0xFF0F172A);
+Color get kInk => kDarkMode.value ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 const kDark = Color(0xFF064E3B);
 
 const kGreen = Color(0xFF059669);
@@ -18,11 +18,11 @@ const kGold = Color(0xFFF59E0B);
 const kCobalt = Color(0xFF059669);
 const kTerracotta = Color(0xFF047857);
 
-const kPage = Color(0xFFF8FAFC);
-const kPanel = Color(0xFFFFFFFF);
-const kSurfaceTint = Color(0xFFF0FDF4);
-const kMuted = Color(0xFF64748B);
-const kBorder = Color(0xFFE2E8F0);
+Color get kPage => kDarkMode.value ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC);
+Color get kPanel => kDarkMode.value ? const Color(0xFF131C31) : const Color(0xFFFFFFFF);
+Color get kSurfaceTint => kDarkMode.value ? const Color(0xFF16253A) : const Color(0xFFF0FDF4);
+Color get kMuted => kDarkMode.value ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+Color get kBorder => kDarkMode.value ? const Color(0xFF283552) : const Color(0xFFE2E8F0);
 
 const kStorageKey = 'hagzy_app_data_v1';
 const kFavoriteStorageKey = 'hagzy_favorite_venues_v1';
@@ -68,19 +68,7 @@ class HagzyTheme {
     end: Alignment.bottomRight,
   );
 
-  static List<BoxShadow> get softShadow => [
-        BoxShadow(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.06),
-          blurRadius: 24,
-          spreadRadius: -3,
-          offset: const Offset(0, 10),
-        ),
-        BoxShadow(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.02),
-          blurRadius: 8,
-          offset: const Offset(0, 3),
-        ),
-      ];
+  static List<BoxShadow> get softShadow => kDarkMode.value ? [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 24, spreadRadius: -3, offset: const Offset(0, 10)), BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 3))] : [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.06), blurRadius: 24, spreadRadius: -3, offset: const Offset(0, 10)), BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 3))];
 
   static List<BoxShadow> get emeraldGlowShadow => [
         BoxShadow(
@@ -147,7 +135,7 @@ class HagzyTheme {
               displayColor: kInk,
               fontFamilyFallback: emojiFontFallbacks,
             ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: kPanel,
         foregroundColor: kInk,
         elevation: 0,
@@ -160,7 +148,7 @@ class HagzyTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: kBorder),
+          side: BorderSide(color: kBorder),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -170,11 +158,11 @@ class HagzyTheme {
             const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: kBorder),
+          borderSide: BorderSide(color: kBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: kBorder),
+          borderSide: BorderSide(color: kBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
@@ -227,7 +215,7 @@ class HagzyTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: kInk,
-          side: const BorderSide(color: kBorder),
+          side: BorderSide(color: kBorder),
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shape: RoundedRectangleBorder(

@@ -222,7 +222,7 @@ class _ManageTabState extends State<ManageTab> {
                                       fontWeight: FontWeight.bold,
                                       fontSize: 17)),
                               Text(venue.type.label,
-                                  style: const TextStyle(color: kMuted)),
+                                  style: TextStyle(color: kMuted)),
                             ],
                           ),
                         ),
@@ -243,7 +243,7 @@ class _ManageTabState extends State<ManageTab> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(venue.location,
-                            style: const TextStyle(color: kMuted)),
+                            style: TextStyle(color: kMuted)),
                       ),
                     if (venue.description.isNotEmpty)
                       Padding(
@@ -252,7 +252,7 @@ class _ManageTabState extends State<ManageTab> {
                           venue.description,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: kMuted, fontSize: 12),
+                          style: TextStyle(color: kMuted, fontSize: 12),
                         ),
                       ),
                     Padding(
@@ -261,7 +261,7 @@ class _ManageTabState extends State<ManageTab> {
                         'Owner phone: ${venue.ownerPhone.isEmpty ? 'Not provided' : venue.ownerPhone} · '
                         'Deposit policy: ${formatMoney(venue.depositPercent)}% · '
                         'Hours: ${venue.openHour}:00–${venue.closeHour}:00',
-                        style: const TextStyle(color: kMuted, fontSize: 12.5),
+                        style: TextStyle(color: kMuted, fontSize: 12.5),
                       ),
                     ),
                     if (venue.instaPayAddress.isNotEmpty ||
@@ -489,13 +489,13 @@ class _PosTabState extends State<PosTab> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                     'Prevent online customers from reserving this time slot:',
                     style: TextStyle(fontSize: 12, color: kMuted)),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: chosenReason,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Block Reason / سبب الإغلاق',
                     filled: true,
                     fillColor: kPage,
@@ -539,7 +539,7 @@ class _PosTabState extends State<PosTab> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text('Duration:',
+                Text('Duration:',
                     style: TextStyle(fontSize: 12, color: kMuted)),
                 const SizedBox(height: 6),
                 Wrap(
@@ -756,7 +756,7 @@ class _PosTabState extends State<PosTab> {
                         if (booking.phone.isNotEmpty)
                           Text(
                             booking.phone,
-                            style: const TextStyle(fontSize: 12, color: kMuted),
+                            style: TextStyle(fontSize: 12, color: kMuted),
                           ),
                       ],
                     ),
@@ -915,7 +915,7 @@ class AnalyticsTab extends StatelessWidget {
                     ListTile(
                       leading: IconBox(icon: v.type.icon),
                       title: Text(v.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w800, color: kInk)),
                       subtitle: Text(
                         '${vConfirmed.length} confirmed · ${vBookings.where((b) => b.isPendingPayment).length} pending holds',
@@ -994,7 +994,7 @@ class _MetricCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: kMuted,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -1016,7 +1016,7 @@ class _MetricCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(
+              style: TextStyle(
                 color: kMuted,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
@@ -1059,16 +1059,16 @@ class PaymentTab extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 12),
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(18),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Paymob',
+                  const Text('Paymob',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                       'The API can create a Paymob intention through the backend. Set PAYMOB_SECRET_KEY, PAYMOB_PUBLIC_KEY, and PAYMOB_INTEGRATION_ID on the server. A checkout is not marked paid until a verified provider callback is implemented.',
                       style: TextStyle(color: kMuted)),
@@ -1077,16 +1077,16 @@ class PaymentTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(18),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('InstaPay & Vodafone Cash',
+                  const Text('InstaPay & Vodafone Cash',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                       'InstaPay and Vodafone Cash transfers require manual instructions and verification. Configure your venue InstaPay address or Vodafone Cash wallet in Manage Venues; customers can submit their transfer reference, and you can verify and confirm their deposit in the POS timeline.',
                       style: TextStyle(color: kMuted)),
@@ -1095,16 +1095,16 @@ class PaymentTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(18),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Fawry',
+                  const Text('Fawry',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                       'Fawry checkout is not connected to the shared backend yet. Do not treat a signed reference or customer screenshot as confirmed payment.',
                       style: TextStyle(color: kMuted)),
@@ -1113,7 +1113,7 @@ class PaymentTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
               'Reservations remain unpaid/pending until a trusted provider confirmation or venue owner verification updates their status.',
               style: TextStyle(color: kMuted, fontSize: 12)),
         ],

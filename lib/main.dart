@@ -1191,7 +1191,7 @@ class _HagzyHomeState extends State<HagzyHome> {
               Expanded(
                 child: Text(
                   localized(arabic, 'Sign In Required', 'تسجيل الدخول مطلوب'),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5, color: kInk),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5, color: kInk),
                 ),
               ),
             ],
@@ -1202,14 +1202,14 @@ class _HagzyHomeState extends State<HagzyHome> {
               'Please sign in or create an account to book your spot. Your bookings will be securely linked to your profile.',
               'يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الحجز. سيتم ربط حجوزاتك بحسابك ومزامنتها على السيرفر.',
             ),
-            style: const TextStyle(fontSize: 14, color: kMuted, height: 1.5),
+            style: TextStyle(fontSize: 14, color: kMuted, height: 1.5),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text(
                 localized(arabic, 'Cancel', 'إلغاء'),
-                style: const TextStyle(color: kMuted, fontWeight: FontWeight.w600),
+                style: TextStyle(color: kMuted, fontWeight: FontWeight.w600),
               ),
             ),
             FilledButton(
@@ -1360,7 +1360,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       walkIn
                           ? localized(arabic, 'Add Walk-in', 'إضافة حجز مباشر')
                           : localized(arabic, 'Book Your Time', 'احجز موعدك'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 21,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -1390,7 +1390,7 @@ class _HagzyHomeState extends State<HagzyHome> {
               IconButton(
                 tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded, color: kMuted),
+                icon: Icon(Icons.close_rounded, color: kMuted),
               ),
             ],
           ),
@@ -1455,7 +1455,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   Text(
                                     localized(arabic, 'DATE & TIME',
                                         'التاريخ والوقت'),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: kMuted,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
@@ -1465,7 +1465,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   const SizedBox(height: 2),
                                   Text(
                                     '${date.day}/${date.month}/${date.year} · ${time.format(context)}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 13.5,
                                       color: kInk,
@@ -1579,7 +1579,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     fontWeight: FontWeight.w700)),
                             subtitle: Text(
                                 '${service.minutes} min · ${formatMoney(service.price)} EGP',
-                                style: const TextStyle(color: kMuted)),
+                                style: TextStyle(color: kMuted)),
                             onChanged: (checked) => setDialogState(() {
                               if (checked == true) {
                                 selectedServices.add(service.id);
@@ -1594,7 +1594,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       const SizedBox(height: 14),
                       Text(
                         localized(arabic, 'Duration', 'المدة'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: kMuted,
@@ -1640,7 +1640,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       Text(
                         localized(arabic, 'Split Pitch Payment',
                             'تقسيم دفع الملعب'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: kMuted,
@@ -1668,7 +1668,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       Text(
                         localized(arabic, 'Promo Offers (Tap to Apply)',
                             'عروض الخصم (اضغط للتطبيق)'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: kMuted,
@@ -1745,7 +1745,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   localized(arabic,
                                       'Sign in to pay from your Hagzy wallet and track booking',
                                       'سجل دخولك للدفع من محفظة حجزي وتتبع حجزك'),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w600,
                                     color: kInk,
@@ -1933,7 +1933,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   Text(
                                     localized(arabic, 'Total Amount',
                                         'المبلغ الإجمالي'),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: kMuted),
                                   ),
@@ -1943,7 +1943,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       '${formatMoney(amount)} EGP${split > 1 ? ' (${formatMoney(parts)}/person)' : ''}',
                                       '${formatMoney(amount)} جنيه${split > 1 ? ' (${formatMoney(parts)} للفرد)' : ''}',
                                     ),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontWeight: FontWeight.w900,
                                         fontSize: 15,
                                         color: kInk),
@@ -1958,7 +1958,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   Text(
                                     localized(arabic, 'Deposit Due Now',
                                         'العربون المستحق الآن'),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         color: kInk),
                                   ),
@@ -2006,7 +2006,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           arabic,
                                           'Your time is held for 15 minutes while you pay. It is not confirmed until the deposit is verified.',
                                           'نحتفظ بالموعد لمدة ١٥ دقيقة. لا يتأكد الحجز إلا بعد التحقق من دفع العربون.'),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           color: kMuted,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600),
@@ -2269,7 +2269,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         children: [
                           Text(
                             localized(arabic, 'Secure Your Time', 'أكّد موعدك'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                               letterSpacing: -0.4,
@@ -2283,7 +2283,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               'Choose a payment method for your deposit.',
                               'اختر طريقة دفع العربون.',
                             ),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: kMuted,
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
@@ -2388,7 +2388,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     'محفوظ على هذا الجهاز فقط',
                   ),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: kMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -2418,7 +2418,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             'Cancellation policy: Free cancellation or reschedule up to 6 hours before your slot. Within 6 hours, the deposit is kept.',
                             'سياسة الإلغاء: إلغاء أو تعديل مجاني حتى ٦ ساعات قبل الموعد، وبعدها يُحتفظ بالعربون.',
                           ),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: kInk,
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
@@ -2522,7 +2522,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       'سيفتح واتساب رسالة إلى حجزي. المحادثة لا تؤكد الحجز ولا تتحقق من الدفع.',
                     ),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: kMuted,
                       fontSize: 11,
                       height: 1.35,
@@ -2534,7 +2534,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   onPressed: () => Navigator.pop(context, 'later'),
                   child: Text(
                     localized(arabic, 'Pay later', 'ادفع لاحقاً'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: kMuted,
                       fontWeight: FontWeight.w700,
                     ),
@@ -2658,7 +2658,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   arabic,
                                   '1. Transfer ${formatMoney(dueNow)} EGP to:',
                                   '١. حوّل مبلغ ${formatMoney(dueNow)} جنيه إلى:'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: kMuted,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -2827,7 +2827,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     'Your hold is extended for 60 minutes while the venue owner verifies your transfer in their POS timeline.',
                     'يتم تمديد الحجز المؤقت لمدة 60 دقيقة ريثما يتحقق صاحب المكان من التحويل.',
                   ),
-                  style: const TextStyle(color: kMuted, fontSize: 11.5),
+                  style: TextStyle(color: kMuted, fontSize: 11.5),
                 ),
               ],
             ),
@@ -3042,12 +3042,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                 children: [
                   Text(
                     localized(arabic, 'Deposit Due:', 'العربون المستحق:'),
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: kMuted, fontWeight: FontWeight.w700),
                   ),
                   Text(
                     '${formatMoney(dueNow)} EGP',
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: kInk,
                         fontWeight: FontWeight.w900,
                         fontSize: 16),
@@ -3061,7 +3061,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   'Pay with this reference number at any Fawry POS machine or inside the MyFawry app under "FawryPay (78890)", then tap Confirm below.',
                   'ادفع بهذا الرقم في أي ماكينة فوري أو عبر تطبيق MyFawry تحت خدمة "فوري باي (78890)" ثم اضغط تأكيد أدناه.',
                 ),
-                style: const TextStyle(
+                style: TextStyle(
                     color: kMuted, fontSize: 12, height: 1.4),
               ),
             ],
@@ -3537,7 +3537,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: kPanel,
                         border: Border(top: BorderSide(color: kBorder)),
                       ),
@@ -4288,6 +4288,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   apiConfigured: _api.isConfigured,
                   onSignIn: _handleCustomerSignIn,
                   onChangeLanguage: _changeLanguage,
+                  onToggleDarkMode: _toggleDarkMode,
                   onSwitchToAdmin: () => setState(() {
                     _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview';
                     _tab = 2;
@@ -4318,7 +4319,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         children: [
                           Text(
                             arabic ? 'حجزي' : 'Hagzy',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 19,
                               letterSpacing: -0.5,
@@ -4330,7 +4331,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               appTitles[_tab].isNotEmpty)
                             Text(
                               appTitles[_tab],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11.5,
                                 color: kMuted,
                                 fontWeight: FontWeight.w600,
@@ -4339,28 +4340,6 @@ class _HagzyHomeState extends State<HagzyHome> {
                         ],
                       ),
                       const Spacer(),
-                      IconButton(
-                        tooltip: localized(
-                          arabic,
-                          kDarkMode.value ? 'Light Mode' : 'Dark Mode',
-                          kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
-                        ),
-                        onPressed: _toggleDarkMode,
-                        style: IconButton.styleFrom(
-                          backgroundColor: kDarkMode.value
-                              ? const Color(0xFF19243D)
-                              : kSurfaceTint,
-                          foregroundColor:
-                              kDarkMode.value ? kGold : kGreen,
-                        ),
-                        icon: Icon(
-                          kDarkMode.value
-                              ? Icons.light_mode_rounded
-                              : Icons.dark_mode_rounded,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
                       IconButton(
                         tooltip: localized(arabic, 'WhatsApp Assistant Bot',
                             'مساعد حجزي · واتساب'),
@@ -4374,31 +4353,53 @@ class _HagzyHomeState extends State<HagzyHome> {
                         icon: const Icon(Icons.support_agent_rounded, size: 20),
                       ),
                       const SizedBox(width: 8),
-                      if (MediaQuery.sizeOf(context).width >= 360)
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: kPanel,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: kBorder),
-                            boxShadow: HagzyTheme.softShadow,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              LanguageOption(
-                                label: 'EN',
-                                selected: _language == 'EN',
-                                onTap: () => _changeLanguage('EN'),
-                              ),
-                              LanguageOption(
-                                label: 'AR',
-                                selected: _language == 'AR',
-                                onTap: () => _changeLanguage('AR'),
-                              ),
-                            ],
-                          ),
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: kPanel,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: kBorder),
+                          boxShadow: HagzyTheme.softShadow,
                         ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            LanguageOption(
+                              label: 'EN',
+                              selected: _language == 'EN',
+                              onTap: () => _changeLanguage('EN'),
+                            ),
+                            LanguageOption(
+                              label: 'AR',
+                              selected: _language == 'AR',
+                              onTap: () => _changeLanguage('AR'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: localized(
+                          arabic,
+                          kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+                          kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
+                        ),
+                        onPressed: _toggleDarkMode,
+                        style: IconButton.styleFrom(
+                          backgroundColor: kDarkMode.value
+                              ? const Color(0xFF19243D)
+                              : kSurfaceTint,
+                          foregroundColor:
+                              kDarkMode.value ? kGold : kGreen,
+                          side: BorderSide(color: kBorder),
+                        ),
+                        icon: Icon(
+                          kDarkMode.value
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
+                          size: 20,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       IconButton(
                         tooltip: localized(
@@ -4471,8 +4472,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                   ),
                 ),
               ),
-              bottom: const PreferredSize(
-                preferredSize: Size.fromHeight(1),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
                 child: Divider(height: 1, thickness: 1, color: kBorder),
               ),
             ),
@@ -4789,6 +4790,24 @@ class _HagzyHomeState extends State<HagzyHome> {
           automaticallyImplyLeading: false,
           title: const Text('Venue owner sign in'),
           actions: [
+            IconButton(
+              tooltip: kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+              onPressed: _toggleDarkMode,
+              style: IconButton.styleFrom(
+                backgroundColor: kDarkMode.value
+                    ? const Color(0xFF19243D)
+                    : kSurfaceTint,
+                foregroundColor: kDarkMode.value ? kGold : kGreen,
+                side: BorderSide(color: kBorder),
+              ),
+              icon: Icon(
+                kDarkMode.value
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 6),
             TextButton.icon(
               onPressed: () => setState(() => _mode = 'customer'),
               icon: const Icon(Icons.arrow_back_rounded),
@@ -4818,7 +4837,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         child: HagzyLogoMark(size: 54, withGlow: true),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         'Welcome back',
                         style: TextStyle(
                           fontSize: 28,
@@ -4832,7 +4851,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         _api.isConfigured
                             ? 'Sign in with the admin account created for your Hagzy server.'
                             : 'Connect your Hagzy API to sign in and sync venue data across devices.',
-                        style: const TextStyle(color: kMuted, height: 1.4),
+                        style: TextStyle(color: kMuted, height: 1.4),
                       ),
                       const SizedBox(height: 22),
                       if (_api.isConfigured) ...[
@@ -4896,7 +4915,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                           label: const Text('Open local preview'),
                         ),
                         const SizedBox(height: 10),
-                        const Text(
+                        Text(
                           'Local preview data stays on this device and is not shared with customers on other phones.',
                           style: TextStyle(color: kMuted, fontSize: 12),
                         ),
