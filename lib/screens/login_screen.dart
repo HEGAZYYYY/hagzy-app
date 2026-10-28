@@ -116,11 +116,45 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           .contains('test');
       if (widget.apiConfigured) {
         try {
-          final otpRes = await widget.api.requestVerificationOtp(
-            phone: phone,
-            name: name,
-            isSignUp: _isPhoneSignUp,
-          );
+          Map<String, dynamic> otpRes;
+          try {
+            otpRes = await widget.api.requestVerificationOtp(
+              phone: phone,
+              name: name,
+              isSignUp: _isPhoneSignUp,
+            );
+          } catch (firstErr) {
+            final errStr = firstErr.toString().toLowerCase();
+            if (!_isPhoneSignUp &&
+                (errStr.contains('no account found') ||
+                    errStr.contains('not found') ||
+                    errStr.contains('404'))) {
+              // Automatically transition to Create Account mode so user isn't blocked
+              if (mounted) {
+                setState(() => _isPhoneSignUp = true);
+              }
+              otpRes = await widget.api.requestVerificationOtp(
+                phone: phone,
+                name: name.isNotEmpty ? name : 'Hagzy Member',
+                isSignUp: true,
+              );
+            } else if (_isPhoneSignUp &&
+                (errStr.contains('already registered') ||
+                    errStr.contains('already exists') ||
+                    errStr.contains('409'))) {
+              // Automatically transition to Log In mode so existing user isn't blocked
+              if (mounted) {
+                setState(() => _isPhoneSignUp = false);
+              }
+              otpRes = await widget.api.requestVerificationOtp(
+                phone: phone,
+                name: name,
+                isSignUp: false,
+              );
+            } else {
+              rethrow;
+            }
+          }
           final testOtp = otpRes['testOtp'] as String?;
           if (testOtp != null && testOtp.isNotEmpty) {
             _otpController.text = testOtp;
@@ -234,7 +268,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           token = res['token'] as String?;
           final fbCustomToken = res['firebaseCustomToken'] as String?;
           if (fbCustomToken != null && fbCustomToken.isNotEmpty) {
-            await SocialAuthService.signInWithCustomToken(fbCustomToken);
+            unawaited(SocialAuthService.signInWithCustomToken(fbCustomToken));
           }
           if (res['customer'] is Map<String, dynamic>) {
             final cust = res['customer'] as Map<String, dynamic>;
@@ -737,6 +771,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   textAlign: TextAlign.center,
                                   maxLength: 6,
                                   keyboardType: TextInputType.number,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) {
+                                    if (!_loading) _verifyOtpAndSubmit();
+                                  },
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.w900,
@@ -988,6 +1026,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 TextField(
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) {
+                                    if (!_loading) _requestVerificationOtp();
+                                  },
                                   textDirection: TextDirection.ltr,
                                   decoration: InputDecoration(
                                     labelText: localized(

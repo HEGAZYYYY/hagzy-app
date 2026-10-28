@@ -145,21 +145,32 @@
       // Automatically catch redirect sign-in results from Google or Apple
       window.hagzyRedirectUser = null;
       window.hagzyOnSignOutCallback = null;
+      window.hagzyOnRedirectUserCallback = null;
+      window.hagzyHadFirebaseUser = false;
       window.registerHagzySignOutCallback = function(cb) {
         window.hagzyOnSignOutCallback = cb;
+      };
+      window.registerHagzyRedirectAuthCallback = function(cb) {
+        window.hagzyOnRedirectUserCallback = cb;
+        if (window.hagzyRedirectUser && typeof cb === 'function') {
+          cb(window.hagzyRedirectUser);
+        }
       };
 
       onAuthStateChanged(auth, async function(user) {
         if (!user) {
-          if (typeof window.hagzyOnSignOutCallback === 'function') {
+          if (window.hagzyHadFirebaseUser && typeof window.hagzyOnSignOutCallback === 'function') {
+            window.hagzyHadFirebaseUser = false;
             window.hagzyOnSignOutCallback();
           }
         } else {
+          window.hagzyHadFirebaseUser = true;
           try {
             await user.getIdToken(true);
           } catch (err) {
             if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/user-disabled' || err.code === 'auth/user-token-expired')) {
               console.warn("Firebase account no longer valid or was deleted:", err.code);
+              window.hagzyHadFirebaseUser = false;
               try { await signOut(auth); } catch (_) {}
               if (typeof window.hagzyOnSignOutCallback === 'function') {
                 window.hagzyOnSignOutCallback();
@@ -191,6 +202,9 @@
           } catch (_) {}
           if (typeof window.onHagzyRedirectUser === 'function') {
             window.onHagzyRedirectUser(window.hagzyRedirectUser);
+          }
+          if (typeof window.hagzyOnRedirectUserCallback === 'function') {
+            window.hagzyOnRedirectUserCallback(window.hagzyRedirectUser);
           }
         }
       }).catch(function(err) {

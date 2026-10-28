@@ -122,6 +122,26 @@ void webRegisterSignOutListener(void Function() onSignOut) {
   } catch (_) {}
 }
 
+void webRegisterRedirectAuthListener(
+    void Function(Map<String, dynamic>) onRedirectUser) {
+  try {
+    if (js.context.hasProperty('registerHagzyRedirectAuthCallback')) {
+      js.context.callMethod('registerHagzyRedirectAuthCallback', [
+        js.allowInterop((dynamic rawJson) {
+          try {
+            if (rawJson is String && rawJson.isNotEmpty) {
+              final decoded = jsonDecode(rawJson);
+              if (decoded is Map) {
+                onRedirectUser(Map<String, dynamic>.from(decoded));
+              }
+            }
+          } catch (_) {}
+        }),
+      ]);
+    }
+  } catch (_) {}
+}
+
 Future<void> webSignInWithCustomToken(String token) async {
   try {
     if (js.context.hasProperty('hagzySignInWithCustomTokenCallback')) {

@@ -11,6 +11,9 @@ class SocialAuthService {
   static void signOutWeb() => webSignOut();
   static void registerSignOutListener(void Function() onSignOut) =>
       webRegisterSignOutListener(onSignOut);
+  static void registerRedirectAuthListener(
+          void Function(Map<String, dynamic>) onRedirectUser) =>
+      webRegisterRedirectAuthListener(onRedirectUser);
   static void registerVenuesListener(
           void Function(List<Map<String, dynamic>>) onVenues) =>
       webRegisterVenuesListener(onVenues);
