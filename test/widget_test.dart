@@ -16,9 +16,14 @@ Future<void> enterAdminPreview(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+const kSignedInCustomerProfile =
+    '{"name":"","email":"","phone":"","isSignedIn":true,"token":"test-token-123"}';
+
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
+    });
   });
 
   testWidgets('opening bookings triggers one automatic refresh',
@@ -423,6 +428,7 @@ void main() {
           DateTime.now().subtract(const Duration(minutes: 1)).toIso8601String(),
     };
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': <dynamic>[],
         'bookings': [expiredBooking],
@@ -458,6 +464,7 @@ void main() {
       ],
     );
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': [venue.toJson()],
         'bookings': <dynamic>[],
@@ -548,6 +555,7 @@ void main() {
       holdExpiresAt: DateTime.now().add(const Duration(minutes: 15)),
     );
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': [venue.toJson()],
         'bookings': [hold.toJson()],
@@ -637,6 +645,7 @@ void main() {
     );
 
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': [venue.toJson()],
         'bookings': [booking.toJson()],
@@ -737,6 +746,7 @@ void main() {
 
   testWidgets('customer can toggle Interactive Map View in BookTab', (tester) async {
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': defaultPrototypeVenues().map((v) => v.toJson()).toList(),
         'bookings': [],
@@ -797,28 +807,23 @@ void main() {
   });
 
   testWidgets(
-      'customer can navigate to profile section and sign in with phone number',
+      'login screen appears on app open and customer can sign in with phone number',
       (tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
-    // 1. Navigate to Profile tab via FloatingDock
-    final profileTab = find.text('Profile');
-    expect(profileTab, findsOneWidget);
-    await tester.tap(profileTab);
-    await tester.pumpAndSettle();
-
-    // Verify Profile section welcome & form
+    // 1. Login screen appears immediately after opening the app
+    expect(find.byType(CustomerLoginScreen), findsOneWidget);
     expect(find.text('Welcome to Hagzy'), findsOneWidget);
     expect(find.text('Sign in to Hagzy'), findsOneWidget);
     expect(find.text('Phone Number'), findsOneWidget);
 
-    // Switch to Create Account mode
-    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
-    await tester.pumpAndSettle();
+    // Switch to Create Account mode on Login Screen
     final createAccountToggle = find.text('Create Account');
-    expect(createAccountToggle, findsOneWidget);
-    await tester.tap(createAccountToggle, warnIfMissed: false);
+    await tester.ensureVisible(createAccountToggle);
+    await tester.pumpAndSettle();
+    await tester.tap(createAccountToggle);
     await tester.pumpAndSettle();
 
     // 2. Register with Full Name & Phone Number
@@ -847,18 +852,16 @@ void main() {
     await tester.tap(verifyBtn);
     await tester.pumpAndSettle();
 
-    // Verify user is now signed in with profile card
-    final profileName = find.text('Mohamed Hegazy');
-    await tester.scrollUntilVisible(
-      profileName,
-      -200,
-      scrollable: find.byType(Scrollable).last,
-    );
+    // Verify user enters main app and Profile tab shows signed-in profile without login form
+    expect(find.byType(CustomerLoginScreen), findsNothing);
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
-    expect(profileName, findsOneWidget);
+
+    expect(find.text('Sign in to Hagzy'), findsNothing);
+    expect(find.text('Mohamed Hegazy'), findsOneWidget);
     expect(find.text('01024129393'), findsWidgets);
 
-    // 3. Sign out
+    // 3. Sign out from Profile returns to Login Screen
     await tester.scrollUntilVisible(
       find.text('Sign Out'),
       200,
@@ -872,13 +875,10 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Out'));
     await tester.pumpAndSettle();
 
-    // 4. Scroll back up and log in with existing Phone Number
+    // 4. App is back on Login Screen; log in with existing Phone Number
+    expect(find.byType(CustomerLoginScreen), findsOneWidget);
     final phoneField = find.widgetWithText(TextField, 'Phone Number');
-    await tester.scrollUntilVisible(
-      phoneField,
-      -200,
-      scrollable: find.byType(Scrollable).last,
-    );
+    await tester.ensureVisible(phoneField);
     await tester.pumpAndSettle();
     expect(phoneField, findsOneWidget);
 
@@ -889,7 +889,7 @@ void main() {
     await tester.tap(logInBtn);
     await tester.pumpAndSettle();
 
-    // Verify OTP verification view is shown for SMS
+    // Verify OTP verification view is shown
     expect(find.text('Enter Verification Code'), findsOneWidget);
     expect(find.textContaining('01012345678'), findsWidgets);
 
@@ -902,15 +902,10 @@ void main() {
     await tester.tap(verifyPhoneBtn);
     await tester.pumpAndSettle();
 
-    // Scroll up to view the signed-in profile card
-    final customerName = find.text('Customer');
-    await tester.scrollUntilVisible(
-      customerName,
-      -200,
-      scrollable: find.byType(Scrollable).last,
-    );
+    // Navigate to Profile tab to view the signed-in profile card
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
-    expect(customerName, findsOneWidget);
+    expect(find.text('Customer'), findsOneWidget);
     expect(find.text('01012345678'), findsWidgets);
   });
 
@@ -955,6 +950,7 @@ void main() {
 
   testWidgets('customer can filter by subcategory pills with active banner and clear', (tester) async {
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': defaultPrototypeVenues().map((v) => v.toJson()).toList(),
         'bookings': [],
@@ -993,6 +989,7 @@ void main() {
   testWidgets('when no places found in an area, customer can change area or explore all governorates', (tester) async {
     // Seed with a venue in Cairo, but user area is Aswan where there are 0 venues
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': [
           {
@@ -1064,6 +1061,7 @@ void main() {
     );
 
     SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
       'hagzy_app_data_v1': jsonEncode({
         'venues': [v1.toJson()],
         'bookings': [b1.toJson()],
@@ -1099,7 +1097,9 @@ void main() {
   });
 
   testWidgets('customer can tap Privacy & Security and WhatsApp Updates in profile', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'hagzy_customer_profile_v1': kSignedInCustomerProfile,
+    });
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
@@ -1108,7 +1108,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Drag down to reveal settings
-    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -600));
+    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -300));
     await tester.pumpAndSettle();
 
     final privacyFinder = find.text('Privacy & Security');
@@ -1143,16 +1143,13 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('customer can sign in with Google account and Apple account in profile', (tester) async {
+  testWidgets('customer can sign in with Google account and Apple account on login screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
-    // Navigate to Profile tab
-    await tester.tap(find.text('Profile'));
-    await tester.pumpAndSettle();
-
-    // Verify Google and Apple buttons are present
+    // Verify Login Screen appears on app open with Google and Apple buttons
+    expect(find.byType(CustomerLoginScreen), findsOneWidget);
     final googleBtn = find.text('Continue with Google');
     final appleBtn = find.text('Continue with Apple');
     expect(googleBtn, findsOneWidget);
@@ -1167,24 +1164,21 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('customer can toggle between Log In and Create Account with phone', (tester) async {
+  testWidgets('customer can toggle between Log In and Create Account with phone on login screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
-    // Navigate to Profile tab
-    await tester.tap(find.text('Profile'));
-    await tester.pumpAndSettle();
-
-    // Verify Phone field and Action button are present
+    // Verify Login Screen is shown immediately on app open
+    expect(find.byType(CustomerLoginScreen), findsOneWidget);
     expect(find.widgetWithText(TextField, 'Phone Number'), findsOneWidget);
     expect(find.text('Log In'), findsOneWidget);
     expect(find.text('Create Account'), findsOneWidget);
 
     // Toggle to Create Account
-    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
+    await tester.ensureVisible(find.text('Create Account'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create Account'), warnIfMissed: false);
+    await tester.tap(find.text('Create Account'));
     await tester.pumpAndSettle();
 
     // Full name field is now revealed
@@ -1201,9 +1195,9 @@ void main() {
 
     // Tap Create Account button
     final submitBtn = find.text('Create Account').first;
-    await tester.drag(find.byType(CustomerProfileTab), const Offset(0, -100));
+    await tester.ensureVisible(submitBtn);
     await tester.pumpAndSettle();
-    await tester.tap(submitBtn, warnIfMissed: false);
+    await tester.tap(submitBtn);
     await tester.pumpAndSettle();
 
     // Verify OTP screen
@@ -1213,15 +1207,11 @@ void main() {
     await tester.tap(find.text('Verify & Sign In'));
     await tester.pumpAndSettle();
 
-    // Verify customer is signed in
-    final profileName = find.text('Ahmed Zaki');
-    await tester.scrollUntilVisible(
-      profileName,
-      -200,
-      scrollable: find.byType(Scrollable).last,
-    );
+    // Verify customer enters main app and Profile tab shows their profile
+    expect(find.byType(CustomerLoginScreen), findsNothing);
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
-    expect(profileName, findsOneWidget);
+    expect(find.text('Ahmed Zaki'), findsOneWidget);
     expect(find.text('01099887766'), findsWidgets);
   });
 }
