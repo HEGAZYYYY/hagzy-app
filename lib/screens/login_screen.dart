@@ -1139,28 +1139,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Partner Portal & Footer
-                    if (widget.onSwitchToAdmin != null)
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: widget.onSwitchToAdmin,
-                          icon: const Icon(Icons.storefront_rounded,
-                              size: 16, color: kMuted),
-                          label: Text(
-                            localized(
-                              arabic,
-                              'Partner & Owner Portal',
-                              'بوابة الشركاء وأصحاب الأماكن',
-                            ),
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: kMuted,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 4),
+                    // Footer
                     Center(
                       child: Text(
                         localized(
