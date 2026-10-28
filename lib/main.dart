@@ -2196,6 +2196,21 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       await _commit(_venues, [..._bookings, savedBooking]);
+      if (kIsWeb) {
+        final matchedVenue =
+            _venues.where((v) => v.id == savedBooking.venueId).firstOrNull;
+        SocialAuthService.syncBookingToFirestore(
+          {
+            ...savedBooking.toJson(),
+            if (matchedVenue != null) 'venueName': matchedVenue.name,
+          },
+          {
+            'name': _savedCustomerName,
+            'email': _savedCustomerEmail,
+            'phone': _savedCustomerPhone,
+          },
+        );
+      }
       if (!walkIn) {
         if (dueNow <= 0 || savedBooking.paymentStatus == 'paid') {
           _message(localized(
@@ -3735,6 +3750,21 @@ class _HagzyHomeState extends State<HagzyHome> {
           .map((value) => value.id == booking.id ? confirmedBooking : value)
           .toList();
       await _commit(_venues, updated);
+      if (kIsWeb) {
+        final matchedVenue =
+            _venues.where((v) => v.id == confirmedBooking.venueId).firstOrNull;
+        SocialAuthService.syncBookingToFirestore(
+          {
+            ...confirmedBooking.toJson(),
+            if (matchedVenue != null) 'venueName': matchedVenue.name,
+          },
+          {
+            'name': confirmedBooking.customer,
+            'email': confirmedBooking.email,
+            'phone': confirmedBooking.phone,
+          },
+        );
+      }
       _message('Deposit verified & booking confirmed!');
     });
   }
@@ -3753,6 +3783,25 @@ class _HagzyHomeState extends State<HagzyHome> {
         await _api.cancelBooking(_adminToken!, booking.id);
       }
       await _commit(_venues, updated);
+      if (kIsWeb) {
+        final cancelledBooking = booking.copyWith(
+          cancelled: true,
+          status: 'cancelled',
+        );
+        final matchedVenue =
+            _venues.where((v) => v.id == cancelledBooking.venueId).firstOrNull;
+        SocialAuthService.syncBookingToFirestore(
+          {
+            ...cancelledBooking.toJson(),
+            if (matchedVenue != null) 'venueName': matchedVenue.name,
+          },
+          {
+            'name': cancelledBooking.customer,
+            'email': cancelledBooking.email,
+            'phone': cancelledBooking.phone,
+          },
+        );
+      }
     });
   }
 
@@ -3784,6 +3833,18 @@ class _HagzyHomeState extends State<HagzyHome> {
           'token': _customerToken,
         }),
       );
+      if (kIsWeb &&
+          _customerSignedIn &&
+          (_savedCustomerName.isNotEmpty ||
+              _savedCustomerEmail.isNotEmpty ||
+              _savedCustomerPhone.isNotEmpty)) {
+        SocialAuthService.syncUserToFirestore({
+          'name': _savedCustomerName,
+          'email': _savedCustomerEmail,
+          'phone': _savedCustomerPhone,
+          'walletBalance': _walletBalance,
+        });
+      }
     } catch (_) {}
   }
 

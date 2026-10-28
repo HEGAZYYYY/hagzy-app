@@ -100,16 +100,178 @@ try {
   fbFirestore = getFirestore();
 } catch (_) {}
 
-async function syncBookingToFirebase(booking, user) {
-  if (!fbFirestore || IS_TEST || !booking) return;
+function normalizeLocalPhone(rawPhone) {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('20') && digits.length >= 12) {
+    return '0' + digits.slice(2);
+  }
+  if (digits.length === 10 && /^(10|11|12|15)/.test(digits)) {
+    return '0' + digits;
+  }
+  return digits;
+}
+
+function buildCleanUserId({ name, email, phone }) {
+  const rawName = String(name || '').trim().toLowerCase();
+  const rawEmail = String(email || '').trim().toLowerCase();
+  const cleanPhone = normalizeLocalPhone(phone);
+  let slug = rawName
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!slug || slug === 'hagzy_member' || slug === 'member' || slug === 'apple_member') {
+    if (rawEmail && rawEmail.includes('@')) {
+      slug = rawEmail.split('@')[0].replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    } else if (cleanPhone) {
+      slug = 'user_' + cleanPhone.slice(-6);
+    } else {
+      slug = 'user_' + crypto.randomUUID().slice(0, 6);
+    }
+  }
+  const baseId = 'usr_' + slug.slice(0, 28);
+  if (typeof db !== 'undefined' && Array.isArray(db.users)) {
+    const existing = db.users.find(u => u.id === baseId);
+    if (!existing) return baseId;
+    const suffix = cleanPhone ? cleanPhone.slice(-4) : crypto.randomUUID().slice(0, 4);
+    return `${baseId}_${suffix}`;
+  }
+  return baseId;
+}
+
+function getBookingsForUser(user) {
+  if (!user || typeof db === 'undefined' || !Array.isArray(db.bookings)) return [];
+  const uPhone = normalizeLocalPhone(user.phone);
+  const uEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+  return db.bookings
+    .filter(b => {
+      if (b.userId === user.id || b.ownerId === user.id || b.customerId === user.id) return true;
+      const bPhone = normalizeLocalPhone(b.phone || b.customerPhone);
+      const bEmail = b.email ? String(b.email).trim().toLowerCase() : '';
+      if (uPhone && bPhone && uPhone === bPhone) return true;
+      if (uEmail && bEmail && uEmail === bEmail) return true;
+      return false;
+    })
+    .sort((a, b) => String(b.startsAt || b.createdAt || '').localeCompare(String(a.startsAt || a.createdAt || '')));
+}
+
+function buildBookingSummaryForUser(booking) {
+  const venue = (typeof db !== 'undefined' && Array.isArray(db.venues))
+    ? db.venues.find(v => v.id === booking.venueId)
+    : null;
+  const venueName = String((venue && venue.name) || booking.venueName || booking.venueId || '');
+  return {
+    id: String(booking.id),
+    venueId: String(booking.venueId || ''),
+    venueName,
+    itemId: String(booking.itemId || ''),
+    startsAt: String(booking.startsAt || ''),
+    durationMinutes: Number(booking.durationMinutes) || 0,
+    price: Number(booking.price) || 0,
+    dueNow: Number(booking.dueNow !== undefined ? booking.dueNow : 0),
+    status: String(booking.status || 'pending_payment'),
+    paymentStatus: String(booking.paymentStatus || 'unpaid'),
+    paymentMethod: String(booking.paymentMethod || ''),
+    paymentReference: String(booking.paymentReference || ''),
+    createdAt: String(booking.createdAt || ''),
+    ...(fbFirestore ? { bookingRef: fbFirestore.doc(`bookings/${booking.id}`) } : {})
+  };
+}
+
+async function syncUserToFirebase(user) {
+  if (!fbFirestore || IS_TEST || !user || !user.id) return false;
   try {
+    const userBookings = getBookingsForUser(user);
+    const confirmedCount = userBookings.filter(b => b.status === 'confirmed' && !b.cancelled).length;
+    const pendingCount = userBookings.filter(b => b.status !== 'confirmed' && b.status !== 'cancelled' && !b.cancelled).length;
+    const cleanPhone = normalizeLocalPhone(user.phone || '');
+    const userDoc = {
+      id: String(user.id),
+      name: String(user.name || 'Hagzy Member'),
+      phone: cleanPhone,
+      phoneE164: cleanPhone ? formatE164Phone(cleanPhone) : '',
+      email: String(user.email || '').trim().toLowerCase(),
+      firebaseUid: String(user.firebaseUid || user.googleId || user.appleUserId || ''),
+      authProvider: String(user.authProvider || (cleanPhone ? 'phone' : 'email')),
+      avatar: String(user.avatar || ''),
+      walletBalance: Number(user.walletBalance) || 0,
+      bookingsCount: userBookings.length,
+      confirmedBookingsCount: confirmedCount,
+      pendingBookingsCount: pendingCount,
+      bookings: userBookings.map(buildBookingSummaryForUser),
+      createdAt: String(user.createdAt || new Date().toISOString()),
+      updatedAt: new Date().toISOString()
+    };
+    await fbFirestore.collection('users').doc(String(user.id)).set(userDoc, { merge: true });
+    console.log('✅ Synced user to Cloud Firestore in Firebase:', user.id);
+    return true;
+  } catch (err) {
+    console.warn('Firebase Firestore user sync notice:', err.message);
+    return false;
+  }
+}
+
+async function deleteUserFromFirebase(userId) {
+  if (!fbFirestore || IS_TEST || !userId) return false;
+  try {
+    const subSnap = await fbFirestore.collection('users').doc(String(userId)).collection('bookings').get();
+    for (const d of subSnap.docs) {
+      await d.ref.delete();
+    }
+    await fbFirestore.collection('users').doc(String(userId)).delete();
+    console.log('🗑️ Deleted user from Cloud Firestore in Firebase:', userId);
+    return true;
+  } catch (err) {
+    console.warn('Firebase Firestore user delete notice:', err.message);
+    return false;
+  }
+}
+
+function resolveUserForBooking(booking, explicitUser) {
+  if (explicitUser && explicitUser.id) return explicitUser;
+  if (typeof db === 'undefined' || !Array.isArray(db.users) || !booking) return null;
+  const uid = booking.userId || booking.ownerId || booking.customerId || '';
+  if (uid) {
+    const byId = db.users.find(u => u.id === uid);
+    if (byId) return byId;
+  }
+  const bPhone = normalizeLocalPhone(booking.phone || booking.customerPhone);
+  const bEmail = booking.email ? String(booking.email).trim().toLowerCase() : '';
+  const matched = db.users.find(u => {
+    const uPhone = normalizeLocalPhone(u.phone);
+    const uEmail = u.email ? String(u.email).trim().toLowerCase() : '';
+    if (bPhone && uPhone && bPhone === uPhone) return true;
+    if (bEmail && uEmail && bEmail === uEmail) return true;
+    return false;
+  });
+  return matched || null;
+}
+
+async function syncBookingToFirebase(booking, user) {
+  if (!fbFirestore || IS_TEST || !booking || !booking.id) return;
+  try {
+    const resolvedUser = resolveUserForBooking(booking, user);
+    const resolvedUserId = String((resolvedUser && resolvedUser.id) || booking.userId || booking.ownerId || booking.customerId || '');
+    if (resolvedUserId) {
+      booking.userId = resolvedUserId;
+      booking.ownerId = resolvedUserId;
+      booking.customerId = resolvedUserId;
+    }
+    const venue = (typeof db !== 'undefined' && Array.isArray(db.venues))
+      ? db.venues.find(v => v.id === booking.venueId)
+      : null;
+    const venueName = String((venue && venue.name) || booking.venueName || booking.venueId || '');
+    const cleanPhone = normalizeLocalPhone(booking.phone || booking.customerPhone || (resolvedUser && resolvedUser.phone) || '');
+    const cleanEmail = String(booking.email || (resolvedUser && resolvedUser.email) || '').trim().toLowerCase();
+
     const bookingDoc = {
       id: String(booking.id),
       venueId: String(booking.venueId || ''),
+      venueName,
       itemId: String(booking.itemId || ''),
-      customer: String(booking.customer || ''),
-      phone: String(booking.phone || (user && user.phone) || ''),
-      email: String(booking.email || (user && user.email) || ''),
+      customer: String(booking.customer || (resolvedUser && resolvedUser.name) || ''),
+      phone: cleanPhone,
+      email: cleanEmail,
       startsAt: String(booking.startsAt || ''),
       durationMinutes: Number(booking.durationMinutes) || 0,
       price: Number(booking.price) || 0,
@@ -117,12 +279,42 @@ async function syncBookingToFirebase(booking, user) {
       status: String(booking.status || 'pending_payment'),
       paymentStatus: String(booking.paymentStatus || 'unpaid'),
       paymentMethod: String(booking.paymentMethod || ''),
-      userId: String((user && user.id) || booking.ownerId || ''),
+      paymentReference: String(booking.paymentReference || ''),
+      ...(booking.paymentProof ? { paymentProof: booking.paymentProof } : {}),
+      cancelled: Boolean(booking.cancelled || booking.status === 'cancelled'),
+      userId: resolvedUserId,
+      ownerId: resolvedUserId,
+      customerId: resolvedUserId,
+      ...(resolvedUserId ? {
+        userRef: fbFirestore.doc(`users/${resolvedUserId}`),
+        userBookingRef: fbFirestore.doc(`users/${resolvedUserId}/bookings/${booking.id}`)
+      } : {}),
+      ...(booking.venueId ? {
+        venueRef: fbFirestore.doc(`venues/${booking.venueId}`)
+      } : {}),
       createdAt: String(booking.createdAt || new Date().toISOString()),
       updatedAt: new Date().toISOString()
     };
+
+    // 1. Write to top-level bookings collection
     await fbFirestore.collection('bookings').doc(String(booking.id)).set(bookingDoc, { merge: true });
-    console.log('✅ Synced booking to Cloud Firestore in Firebase:', booking.id);
+
+    // 2. Write directly inside the user's subcollection: users/{userId}/bookings/{bookingId}
+    if (resolvedUserId) {
+      await fbFirestore
+        .collection('users')
+        .doc(resolvedUserId)
+        .collection('bookings')
+        .doc(String(booking.id))
+        .set(bookingDoc, { merge: true });
+    }
+
+    // 3. Update parent user document with refreshed bookings summary & counts
+    if (resolvedUser) {
+      await syncUserToFirebase(resolvedUser);
+    }
+
+    console.log('✅ Synced booking to Cloud Firestore (top-level + user subcollection):', booking.id, '->', resolvedUserId || 'guest');
   } catch (err) {
     console.warn('Firebase Firestore sync notice:', err.message);
   }
@@ -154,14 +346,28 @@ async function deleteVenueFromFirebase(venueId) {
   }
 }
 
+function stripFirestoreRefs(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const copy = { ...obj };
+  delete copy.userRef;
+  delete copy.userBookingRef;
+  delete copy.venueRef;
+  delete copy.bookingRef;
+  if (Array.isArray(copy.bookings)) {
+    copy.bookings = copy.bookings.map(b => stripFirestoreRefs(b));
+  }
+  return copy;
+}
+
 async function hydrateVenuesFromFirebase() {
   if (!fbFirestore || IS_TEST) return;
   try {
+    // 1. Hydrate Venues
     const snap = await fbFirestore.collection('venues').get();
     if (!snap.empty) {
       const fbVenues = [];
       snap.forEach(doc => {
-        const data = doc.data();
+        const data = stripFirestoreRefs(doc.data());
         if (data && (data.id || doc.id)) {
           fbVenues.push({ ...data, id: data.id || doc.id });
         }
@@ -177,7 +383,6 @@ async function hydrateVenuesFromFirebase() {
           }
         }
         db.venues = merged;
-        saveDb(db);
         console.log(`🔥 Hydrated ${fbVenues.length} venues from Cloud Firestore.`);
       }
     } else if (Array.isArray(db.venues) && db.venues.length > 0) {
@@ -186,6 +391,65 @@ async function hydrateVenuesFromFirebase() {
       }
       console.log(`🔥 Seeded ${db.venues.length} initial venues into Cloud Firestore.`);
     }
+
+    // 2. Hydrate Users from Cloud Firestore
+    const usersSnap = await fbFirestore.collection('users').get();
+    if (!usersSnap.empty) {
+      const fbUsers = [];
+      usersSnap.forEach(doc => {
+        const data = stripFirestoreRefs(doc.data());
+        if (data && (data.id || doc.id)) {
+          const { bookings, bookingsCount, confirmedBookingsCount, pendingBookingsCount, ...userFields } = data;
+          fbUsers.push({ ...userFields, id: data.id || doc.id });
+        }
+      });
+      if (fbUsers.length > 0) {
+        const mergedUsers = [...db.users];
+        for (const fu of fbUsers) {
+          const uPhone = normalizeLocalPhone(fu.phone);
+          const uEmail = fu.email ? String(fu.email).toLowerCase() : '';
+          const idx = mergedUsers.findIndex(u =>
+            u.id === fu.id ||
+            (uPhone && normalizeLocalPhone(u.phone) === uPhone) ||
+            (uEmail && u.email && String(u.email).toLowerCase() === uEmail)
+          );
+          if (idx >= 0) {
+            mergedUsers[idx] = { ...mergedUsers[idx], ...fu, id: fu.id };
+          } else {
+            mergedUsers.push(fu);
+          }
+        }
+        db.users = mergedUsers;
+        console.log(`🔥 Hydrated ${fbUsers.length} users from Cloud Firestore.`);
+      }
+    }
+
+    // 3. Hydrate Bookings from Cloud Firestore
+    const bookingsSnap = await fbFirestore.collection('bookings').get();
+    if (!bookingsSnap.empty) {
+      const fbBookings = [];
+      bookingsSnap.forEach(doc => {
+        const data = stripFirestoreRefs(doc.data());
+        if (data && (data.id || doc.id)) {
+          fbBookings.push({ ...data, id: data.id || doc.id });
+        }
+      });
+      if (fbBookings.length > 0) {
+        const mergedBookings = [...db.bookings];
+        for (const fb of fbBookings) {
+          const idx = mergedBookings.findIndex(b => b.id === fb.id);
+          if (idx >= 0) {
+            mergedBookings[idx] = { ...mergedBookings[idx], ...fb };
+          } else {
+            mergedBookings.push(fb);
+          }
+        }
+        db.bookings = mergedBookings;
+        console.log(`🔥 Hydrated ${fbBookings.length} bookings from Cloud Firestore.`);
+      }
+    }
+
+    saveDb(db);
   } catch (err) {
     console.warn('Firebase Firestore hydrate notice:', err.message);
   }
@@ -933,7 +1197,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     let user = db.users.find(u => u.email === verifiedEmail || (u.googleId && u.googleId === verifiedId));
     if (!user) {
       user = {
-        id: 'usr_' + crypto.randomUUID().slice(0, 8),
+        id: buildCleanUserId({ name: verifiedName, email: verifiedEmail, phone: '' }),
         googleId: verifiedId,
         email: verifiedEmail,
         phone: '',
@@ -948,7 +1212,9 @@ app.get('/api/auth/google/callback', async (req, res) => {
       user.googleId = verifiedId;
       if (!user.avatar) user.avatar = verifiedAvatar;
     }
+    claimCustomerBookings(user);
     saveDb(db);
+    syncUserToFirebase(user);
 
     const jwtToken = jwt.sign(
       { id: user.id, email: user.email, name: user.name, provider: 'google' },
@@ -1078,7 +1344,7 @@ app.post('/api/auth/social/google', async (req, res) => {
     let user = db.users.find(u => (u.googleId && u.googleId === verifiedId) || (u.email && u.email.toLowerCase() === verifiedEmail));
     if (!user) {
       user = {
-        id: 'usr_' + crypto.randomUUID().slice(0, 8),
+        id: buildCleanUserId({ name: verifiedName, email: verifiedEmail, phone: '' }),
         googleId: verifiedId,
         email: verifiedEmail,
         phone: '',
@@ -1095,7 +1361,9 @@ app.post('/api/auth/social/google', async (req, res) => {
       if (verifiedAvatar && !user.avatar) user.avatar = verifiedAvatar;
       if (!user.authProvider) user.authProvider = 'google';
     }
+    claimCustomerBookings(user);
     saveDb(db);
+    syncUserToFirebase(user);
 
     const token = jwt.sign(
       { id: user.id, email: user.email, name: user.name, provider: 'google' },
@@ -1183,7 +1451,7 @@ app.post('/api/auth/social/apple', async (req, res) => {
     let user = db.users.find(u => (u.appleUserId && u.appleUserId === verifiedId) || (u.email && u.email.toLowerCase() === verifiedEmail));
     if (!user) {
       user = {
-        id: 'usr_' + crypto.randomUUID().slice(0, 8),
+        id: buildCleanUserId({ name: verifiedName, email: verifiedEmail, phone: '' }),
         appleUserId: verifiedId,
         email: verifiedEmail,
         phone: '',
@@ -1198,7 +1466,9 @@ app.post('/api/auth/social/apple', async (req, res) => {
       if (verifiedName && (!user.name || user.name === 'Hagzy Member')) user.name = verifiedName;
       if (!user.authProvider) user.authProvider = 'apple';
     }
+    claimCustomerBookings(user);
     saveDb(db);
+    syncUserToFirebase(user);
 
     const token = jwt.sign(
       { id: user.id, email: user.email, name: user.name, provider: 'apple' },
@@ -1256,15 +1526,17 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
   // Look the account up ONLY by the identifier that was actually verified.
   // (Matching on a second, unverified identifier allowed account takeover.)
   const isEmail = target.includes('@');
+  const normPhone = isEmail ? '' : normalizeLocalPhone(target);
   let user = db.users.find(u => isEmail
     ? (u.email && u.email.toLowerCase() === target)
-    : (u.phone && u.phone === target));
+    : (u.phone && (u.phone === target || normalizeLocalPhone(u.phone) === normPhone)));
+  const resolvedName = String(name || record.name || 'Hagzy Member').slice(0, 80);
   if (!user) {
     user = {
-      id: 'usr_' + crypto.randomUUID().slice(0, 8),
+      id: buildCleanUserId({ name: resolvedName, email: isEmail ? target : '', phone: isEmail ? '' : target }),
       phone: isEmail ? '' : target,
       email: isEmail ? target : '',
-      name: String(name || record.name || 'Hagzy Member').slice(0, 80),
+      name: resolvedName,
       walletBalance: 50.0, // 50 EGP welcome gift balance
       createdAt: new Date().toISOString()
     };
@@ -1272,7 +1544,9 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
   } else if (name && (!user.name || user.name === 'Hagzy Member')) {
     user.name = String(name).slice(0, 80);
   }
+  claimCustomerBookings(user);
   saveDb(db);
+  syncUserToFirebase(user);
 
   const token = jwt.sign(
     { id: user.id, phone: user.phone, email: user.email, name: user.name },
@@ -1333,24 +1607,27 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
     }
   }
 
+  syncUserToFirebase(user);
   return res.json({ success: true, token, firebaseCustomToken, customer: sanitizeUser(user) });
 });
 
 function claimCustomerBookings(user) {
   if (!user || !user.id) return;
-  const userPhone = user.phone ? String(user.phone).replace(/\D/g, '') : '';
+  const userPhone = normalizeLocalPhone(user.phone);
   const userEmail = user.email ? String(user.email).trim().toLowerCase() : '';
   let changed = false;
   for (const b of db.bookings) {
-    const bPhone = (b.phone || b.customerPhone) ? String(b.phone || b.customerPhone).replace(/\D/g, '') : '';
+    const bPhone = normalizeLocalPhone(b.phone || b.customerPhone);
     const bEmail = b.email ? String(b.email).trim().toLowerCase() : '';
-    const isMine = (b.ownerId === user.id) || (b.customerId === user.id) ||
+    const isMine = (b.ownerId === user.id) || (b.customerId === user.id) || (b.userId === user.id) ||
       (userPhone && bPhone && userPhone === bPhone) ||
       (userEmail && bEmail && userEmail === bEmail);
-    if (isMine && (!b.ownerId || !b.customerId)) {
+    if (isMine && (b.ownerId !== user.id || b.customerId !== user.id || b.userId !== user.id)) {
       b.ownerId = user.id;
       b.customerId = user.id;
+      b.userId = user.id;
       changed = true;
+      syncBookingToFirebase(b, user);
     }
   }
   if (changed) saveDb(db);
@@ -1386,7 +1663,7 @@ app.post('/api/auth/customer/register', async (req, res) => {
 
   const passwordHash = await hashPassword(password);
   const newUser = {
-    id: 'usr_' + crypto.randomUUID().slice(0, 8),
+    id: buildCleanUserId({ name: cleanName || cleanEmail.split('@')[0], email: cleanEmail, phone: cleanPhone }),
     email: cleanEmail,
     name: cleanName || cleanEmail.split('@')[0],
     phone: cleanPhone,
@@ -1399,6 +1676,7 @@ app.post('/api/auth/customer/register', async (req, res) => {
   db.users.push(newUser);
   claimCustomerBookings(newUser);
   saveDb(db);
+  syncUserToFirebase(newUser);
 
   const token = jwt.sign(
     { id: newUser.id, email: newUser.email, name: newUser.name, phone: newUser.phone },
@@ -1448,6 +1726,7 @@ app.post('/api/auth/customer/login', async (req, res) => {
   }
   claimCustomerBookings(user);
   saveDb(db);
+  syncUserToFirebase(user);
 
   const token = jwt.sign(
     { id: user.id, email: user.email, name: user.name, phone: user.phone },
@@ -1500,6 +1779,8 @@ app.put('/api/customer/profile', authenticateCustomer, (req, res) => {
   }
 
   saveDb(db);
+  claimCustomerBookings(user);
+  syncUserToFirebase(user);
   return res.json({ success: true, customer: sanitizeUser(user) });
 });
 
@@ -1534,6 +1815,7 @@ app.delete('/api/customer/account', authenticateCustomer, async (req, res) => {
 
   db.users = db.users.filter(u => u.id !== user.id);
   saveDb(db);
+  await deleteUserFromFirebase(user.id);
   if (req.token) revokeToken(req.token);
 
   return res.json({ success: true, message: 'Account deleted permanently.' });
@@ -1552,6 +1834,7 @@ app.post('/api/customer/wallet/deduct', authenticateCustomer, (req, res) => {
   }
   user.walletBalance = (user.walletBalance || 0) - numAmount;
   saveDb(db);
+  syncUserToFirebase(user);
   return res.json({ success: true, walletBalance: user.walletBalance });
 });
 
@@ -1565,6 +1848,7 @@ app.post('/api/customer/wallet/add', authenticateAdmin, (req, res) => {
   }
   user.walletBalance = (user.walletBalance || 0) + numAmount;
   saveDb(db);
+  syncUserToFirebase(user);
   return res.json({ success: true, walletBalance: user.walletBalance });
 });
 
@@ -1909,6 +2193,7 @@ app.delete('/api/admin/bookings/:id', authenticateAdmin, (req, res) => {
     booking.cancelled = true;
     booking.status = 'cancelled';
     saveDb(db);
+    syncBookingToFirebase(booking);
   }
   return res.json({ success: true, message: 'Booking cancelled' });
 });
@@ -1937,6 +2222,7 @@ app.post('/api/bookings/:id/payment-proof', (req, res) => {
   // Extend the hold so the customer isn't dropped while the venue checks.
   booking.holdExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   saveDb(db);
+  syncBookingToFirebase(booking);
   return res.json({ success: true, booking });
 });
 
@@ -1992,16 +2278,7 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
       matchedBooking.proofSubmitted = true;
       matchedBooking.status = 'pending_confirmation';
       saveDb(db);
-      if (fbFirestore) {
-        try {
-          await fbFirestore.collection('bookings').doc(matchedBooking.id).set({
-            paymentReference: rawRef,
-            proofSubmitted: true,
-            status: 'pending_confirmation',
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (_) {}
-      }
+      await syncBookingToFirebase(matchedBooking);
       return arabic
         ? `✅ تم استلام رقم العملية بنجاح (${rawRef})!\n\n📌 حجزك في "${venue?.name || matchedBooking.venueId}" تم تحديثه إلى: "بانتظار المراجعة والتأكيد".\nسيتم إشعارك فور اكتمال مراجعة التحويل. شكراً لك! 🏆`
         : `✅ Payment reference (${rawRef}) recorded successfully!\n\nYour reservation at "${venue?.name || matchedBooking.venueId}" is now under review. We will notify you once confirmed. Thank you! 🏆`;
