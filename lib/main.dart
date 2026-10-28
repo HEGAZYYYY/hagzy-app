@@ -4408,10 +4408,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                               kDarkMode.value ? kGold : kGreen,
                           side: BorderSide(color: kBorder),
                         ),
-                        icon: Icon(
-                          kDarkMode.value
-                              ? Icons.light_mode_rounded
-                              : Icons.dark_mode_rounded,
+                        icon: HagzyThemeModeIcon(
+                          isDark: kDarkMode.value,
                           size: 20,
                         ),
                       ),
@@ -4431,9 +4429,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                             foregroundColor: kGreen,
                             side: BorderSide(color: kBorder),
                           ),
-                          icon: const Icon(
-                            Icons.dashboard_customize_rounded,
+                          icon: HagzyVenueControlIcon(
                             size: 20,
+                            color: kDarkMode.value ? kGreenLight : kGreen,
                           ),
                         ),
                       ],
@@ -4834,10 +4832,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                 foregroundColor: kDarkMode.value ? kGold : kGreen,
                 side: BorderSide(color: kBorder),
               ),
-              icon: Icon(
-                kDarkMode.value
-                    ? Icons.light_mode_rounded
-                    : Icons.dark_mode_rounded,
+              icon: HagzyThemeModeIcon(
+                isDark: kDarkMode.value,
                 size: 20,
               ),
             ),
@@ -4852,9 +4848,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                 foregroundColor: kGreen,
                 side: BorderSide(color: kBorder),
               ),
-              icon: const Icon(
-                Icons.dashboard_customize_rounded,
+              icon: HagzyVenueControlIcon(
                 size: 20,
+                color: kDarkMode.value ? kGreenLight : kGreen,
               ),
             ),
             const SizedBox(width: 6),
