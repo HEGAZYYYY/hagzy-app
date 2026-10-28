@@ -337,7 +337,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = friendlyError(e, arabic: widget.arabic);
         });
       }
     }
