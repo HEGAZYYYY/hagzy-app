@@ -330,14 +330,14 @@ app.use(express.json({ limit: '200kb' }));
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 60,
+  limit: 150,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please wait a moment and try again.' },
 });
 const otpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 30,
+  limit: 80,
   skipFailedRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
@@ -345,7 +345,7 @@ const otpLimiter = rateLimit({
 });
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 300,
+  limit: 600,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please try again shortly.' },
@@ -810,10 +810,8 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
     }
   }
 
-  // When Firebase Auth is active, Firebase is the source of truth
-  const accountExists = (fbAuth && !IS_TEST)
-    ? !!existingFbUser
-    : !!(existingLocalUser || existingFbUser);
+  // Lookup existing user in local DB or Firebase Auth
+  const accountExists = !!(existingLocalUser || existingFbUser);
 
   // If client specified Log In mode (isSignUp === false) and account does NOT exist anywhere:
   if (isSignUp === false && !accountExists) {

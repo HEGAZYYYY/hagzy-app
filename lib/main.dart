@@ -140,6 +140,23 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       } catch (_) {}
 
+      // Listen for asynchronous Google/Apple redirect auth results
+      SocialAuthService.registerRedirectAuthListener((redirectUser) {
+        if (!mounted) return;
+        final token = redirectUser['token'] as String?;
+        final name = redirectUser['name'] as String?;
+        final email = redirectUser['email'] as String?;
+        final phone = redirectUser['phone'] as String?;
+        if (token != null && token.isNotEmpty && !_customerSignedIn) {
+          _handleCustomerSignIn(
+            name: name ?? (email?.split('@')[0] ?? 'Hagzy Member'),
+            email: email ?? '',
+            phone: phone ?? '',
+            token: token,
+          );
+        }
+      });
+
       // Listen for Firebase account deletion/sign-out in real time
       SocialAuthService.registerSignOutListener(() {
         if (mounted && _customerSignedIn) {
@@ -217,12 +234,35 @@ class _HagzyHomeState extends State<HagzyHome> {
               _customerToken!.isNotEmpty;
           if (kIsWeb) {
             try {
-              final tokenParam = Uri.base.queryParameters['token'];
+              final tokenParam = Uri.base.queryParameters['token'] ??
+                  Uri.base.queryParameters['auth_token'];
+              final nameParam = Uri.base.queryParameters['auth_name'];
+              final emailParam = Uri.base.queryParameters['auth_email'];
               if (tokenParam != null && tokenParam.isNotEmpty) {
                 _customerToken = tokenParam;
                 _customerSignedIn = true;
+                if (nameParam != null && nameParam.isNotEmpty) {
+                  _savedCustomerName = nameParam;
+                }
+                if (emailParam != null && emailParam.isNotEmpty) {
+                  _savedCustomerEmail = emailParam;
+                }
               }
             } catch (_) {}
+          }
+        } catch (_) {}
+      } else if (kIsWeb) {
+        try {
+          final tokenParam = Uri.base.queryParameters['token'] ??
+              Uri.base.queryParameters['auth_token'];
+          final nameParam = Uri.base.queryParameters['auth_name'];
+          final emailParam = Uri.base.queryParameters['auth_email'];
+          if (tokenParam != null && tokenParam.isNotEmpty) {
+            _customerToken = tokenParam;
+            _customerSignedIn = true;
+            _savedCustomerName = nameParam ??
+                (emailParam?.split('@')[0] ?? 'Hagzy Member');
+            _savedCustomerEmail = emailParam ?? '';
           }
         } catch (_) {}
       }
@@ -3744,7 +3784,19 @@ class _HagzyHomeState extends State<HagzyHome> {
     } else if (_customerToken == null || _customerToken!.isEmpty) {
       _customerToken = 'local-session-token';
     }
-    _tab = 0;
+    if (mounted) {
+      setState(() {
+        _mode = 'customer';
+        _tab = 0;
+        _customerSignedIn = true;
+        _savedCustomerName = name;
+        _savedCustomerEmail = email;
+        _savedCustomerPhone = phone;
+        if (walletBalance != null) {
+          _walletBalance = walletBalance;
+        }
+      });
+    }
     await _saveCustomerProfile(
       name: name,
       email: email,
@@ -3753,11 +3805,12 @@ class _HagzyHomeState extends State<HagzyHome> {
       token: _customerToken,
     );
     if (walletBalance != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(HagzyWallet.keyWallet, walletBalance);
-      if (mounted) setState(() => _walletBalance = walletBalance);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setDouble(HagzyWallet.keyWallet, walletBalance);
+      } catch (_) {}
     }
-    await _syncAccountData(showErrors: false);
+    unawaited(_syncAccountData(showErrors: false));
   }
 
   Future<void> _syncAccountData({bool showErrors = false}) async {
@@ -3826,13 +3879,10 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
     } catch (error) {
       final errStr = error.toString().toLowerCase();
-      if (errStr.contains('401') ||
-          errStr.contains('404') ||
-          errStr.contains('deleted') ||
-          errStr.contains('user not found') ||
-          errStr.contains('logged out') ||
-          errStr.contains('invalid or expired')) {
-        // Account was deleted in Firebase / revoked on server
+      if (errStr.contains('account has been deleted') ||
+          errStr.contains('account not found or has been deleted') ||
+          errStr.contains('session has been logged out')) {
+        // Account was explicitly deleted in Firebase or revoked on server
         await _handleCustomerSignOut();
         return;
       }

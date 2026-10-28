@@ -373,18 +373,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final list = _buildBookings(context);
-    final refresh = widget.onRefresh;
-    if (refresh == null) return list;
-    return RefreshIndicator(
-      onRefresh: refresh,
-      // Let short (or empty) lists still be pulled down on Android.
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context)
-            .copyWith(physics: const AlwaysScrollableScrollPhysics()),
-        child: list,
-      ),
-    );
+    return _buildBookings(context);
   }
 
   Widget _buildBookings(BuildContext context) {

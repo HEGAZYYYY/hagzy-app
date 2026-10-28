@@ -6,6 +6,7 @@ Map<String, dynamic>? webGetRedirectUser() => null;
 Future<void> webSignInWithCustomToken(String token) async {}
 void webSignOut() {}
 void webRegisterSignOutListener(void Function() onSignOut) {}
+void webRegisterRedirectAuthListener(void Function(Map<String, dynamic>) onRedirectUser) {}
 void webRegisterVenuesListener(void Function(List<Map<String, dynamic>>) onVenues) {}
 void webSaveVenueToFirestore(Map<String, dynamic> venueJson) {}
 void webDeleteVenueFromFirestore(String venueId) {}
