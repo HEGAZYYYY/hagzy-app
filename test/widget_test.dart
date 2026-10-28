@@ -1143,24 +1143,19 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('customer can sign in with Google account and Apple account on login screen', (tester) async {
+  testWidgets('customer can sign in with Google account on login screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
-    // Verify Login Screen appears on app open with Google and Apple buttons
+    // Verify Login Screen appears on app open with Google button
     expect(find.byType(CustomerLoginScreen), findsOneWidget);
     final googleBtn = find.text('Continue with Google');
-    final appleBtn = find.text('Continue with Apple');
     expect(googleBtn, findsOneWidget);
-    expect(appleBtn, findsOneWidget);
+    expect(find.text('Continue with Apple'), findsNothing);
 
     // Tap Continue with Google
     await tester.tap(googleBtn);
-    await tester.pumpAndSettle();
-
-    // Tap Continue with Apple
-    await tester.tap(appleBtn);
     await tester.pumpAndSettle();
   });
 
