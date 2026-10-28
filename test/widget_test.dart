@@ -177,7 +177,7 @@ void main() {
     await tester.tap(find.text('All Places'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.textContaining('Court 1 · 500.00 EGP/h'),
+      find.textContaining('Court 1 · 500 EGP/h'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
@@ -610,7 +610,7 @@ void main() {
     await tester.tap(find.textContaining('Analytics'));
     await tester.pumpAndSettle();
     expect(find.text('Revenue & Analytics'), findsOneWidget);
-    expect(find.text('400.00 EGP'), findsWidgets);
+    expect(find.text('400 EGP'), findsWidgets);
   });
 
   testWidgets('Customer can view Directions and Book Again (calendar removed)',

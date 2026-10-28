@@ -141,7 +141,7 @@ String governorateName(String english, bool arabic) {
       egyptGovernorates.where((entry) => entry.$1 == english).firstOrNull;
   if (governorate == null) {
     return english == kAllEgyptAreas
-        ? localized(arabic, 'Choose your area', 'كل محافظات مصر')
+        ? localized(arabic, 'All Egypt', 'كل محافظات مصر')
         : english;
   }
   return arabic ? governorate.$2 : governorate.$1;
@@ -1446,7 +1446,15 @@ String? phoneValidator(String? value) {
 String generateId() =>
     '${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(0x7fffffff)}';
 
-String formatMoney(double amount) => amount.toStringAsFixed(2);
+/// Formats prices for display: whole amounts drop the decimals ("150"),
+/// fractional amounts keep two decimals ("37.50").
+String formatMoney(double amount) {
+  if (amount.isNaN || amount.isInfinite) return '0';
+  final rounded = (amount * 100).roundToDouble() / 100;
+  return rounded == rounded.truncateToDouble()
+      ? rounded.toStringAsFixed(0)
+      : rounded.toStringAsFixed(2);
+}
 
 String formatDateTime(DateTime value) =>
     '${value.day}/${value.month}/${value.year} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';

@@ -105,7 +105,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   String? _customerToken;
   bool _customerSignedIn = false;
   bool _prefsLoaded = false;
-  String _currentArea = 'Cairo';
+  String _currentArea = kAllEgyptAreas;
   double _walletBalance = HagzyWallet.defaultWelcomeBalance;
   bool _working = false;
   bool _showAdminPassword = false;
@@ -281,7 +281,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           }
         } catch (_) {}
       }
-      _currentArea = prefs.getString('hagzy_customer_area') ?? 'Cairo';
+      _currentArea = prefs.getString('hagzy_customer_area') ?? kAllEgyptAreas;
       _walletBalance = prefs.getDouble(HagzyWallet.keyWallet) ??
           HagzyWallet.defaultWelcomeBalance;
       final raw = prefs.getString(kStorageKey);
@@ -4628,6 +4628,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             bookings: _bookings,
                                             arabic: arabic,
                                             initialVenueId: _targetVenueId,
+                                            currentArea: _currentArea,
                                             onBook: (venue, item, startsAt) =>
                                                 _createBooking(
                                               venue: venue,
@@ -4635,6 +4636,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               initialStart: startsAt,
                                             ),
                                             onAddReview: _addReview,
+                                            onAreaChanged: (area) {
+                                              if (area != _currentArea) {
+                                                setState(
+                                                    () => _currentArea = area);
+                                              }
+                                            },
                                           ),
                                         1 => MyBookingsTab(
                                             venues: _venues,
@@ -4658,6 +4665,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               _tab = 0;
                                               _targetVenueId = venueId;
                                             }),
+                                            onExplore: () =>
+                                                setState(() => _tab = 0),
                                             api: _api,
                                             apiConfigured: _api.isConfigured,
                                           ),

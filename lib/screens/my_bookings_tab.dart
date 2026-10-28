@@ -23,6 +23,7 @@ class MyBookingsTab extends StatefulWidget {
     this.onGoToSignIn,
     this.onCancelBooking,
     this.onBookAgain,
+    this.onExplore,
     this.onRefresh,
     this.onScreenOpened,
   });
@@ -48,6 +49,9 @@ class MyBookingsTab extends StatefulWidget {
   final bool apiConfigured;
   final ValueChanged<Booking>? onCancelBooking;
   final ValueChanged<String>? onBookAgain;
+
+  /// Takes the customer to the Explore tab from the empty state.
+  final VoidCallback? onExplore;
 
   @override
   State<MyBookingsTab> createState() => _MyBookingsTabState();
@@ -460,6 +464,11 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 arabic,
                 'Explore a venue and choose a time to get started.',
                 'استكشف الأماكن واختر وقتاً للبدء.'),
+            action: widget.onExplore,
+            actionLabel: widget.onExplore == null
+                ? null
+                : localized(arabic, 'Explore venues', 'استكشف الأماكن'),
+            actionIcon: Icons.explore_outlined,
           ),
           if (widget.apiConfigured) ...[
             const SizedBox(height: 12),

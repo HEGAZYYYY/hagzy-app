@@ -16,8 +16,10 @@ class BookTab extends StatefulWidget {
     required this.arabic,
     required this.onBook,
     this.initialVenueId,
+    this.currentArea,
     this.onAddVenue,
     this.onAddReview,
+    this.onAreaChanged,
   });
 
   final List<Venue> venues;
@@ -25,9 +27,14 @@ class BookTab extends StatefulWidget {
   final bool arabic;
   final void Function(Venue venue, VenueItem item, DateTime startsAt) onBook;
   final String? initialVenueId;
+  final String? currentArea;
   final ValueChanged<VenueType?>? onAddVenue;
   final Future<void> Function(
       Venue venue, String author, double rating, String comment)? onAddReview;
+
+  /// Notifies the app shell when the customer's area changes so other tabs
+  /// (e.g. Profile) show the same governorate.
+  final ValueChanged<String>? onAreaChanged;
 
   @override
   State<BookTab> createState() => _BookTabState();
@@ -64,6 +71,9 @@ class _BookTabState extends State<BookTab> {
   @override
   void initState() {
     super.initState();
+    if (widget.currentArea != null && widget.currentArea!.isNotEmpty) {
+      _area = widget.currentArea!;
+    }
     _loadCustomerPreferences();
     if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -88,6 +98,11 @@ class _BookTabState extends State<BookTab> {
   @override
   void didUpdateWidget(BookTab oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.currentArea != null &&
+        widget.currentArea != oldWidget.currentArea &&
+        widget.currentArea != _area) {
+      _area = widget.currentArea!;
+    }
     if (widget.initialVenueId != null &&
         (widget.initialVenueId != oldWidget.initialVenueId ||
             _venueId != widget.initialVenueId)) {
@@ -431,6 +446,7 @@ class _BookTabState extends State<BookTab> {
       if (!saved) throw StateError('Could not save your selected area.');
       if (mounted) {
         setState(() => _area = area);
+        widget.onAreaChanged?.call(area);
         final govName = governorateName(area, widget.arabic);
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1168,79 +1184,84 @@ class _BookTabState extends State<BookTab> {
             ),
           ),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         SectionHeading(
           title: localized(
               widget.arabic, 'Explore Categories', 'استكشف التصنيفات'),
           subtitle: localized(widget.arabic,
               'Something good is around the corner', 'أماكن مميزة بانتظارك'),
         ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _CategoryVisualCard(
-              title: localized(widget.arabic, 'Everything', 'الكل'),
-              subtitle: localized(widget.arabic, 'All Places', 'جميع الأماكن'),
-              icon: Icons.grid_view_rounded,
-              isSelected: _type == null,
-              gradient: const [Color(0xFF064E3B), Color(0xFF047857)],
-              glowColor: kGreen,
-              count: matchingVenues.length,
-              arabic: widget.arabic,
-              onTap: () => _selectCategory(null),
-            ),
-            _CategoryVisualCard(
-              title: localized(widget.arabic, 'Grooming', 'حلاقة وعناية'),
-              subtitle: localized(widget.arabic, 'Hair & Beauty', 'صالونات وحلاقة'),
-              icon: Icons.content_cut_rounded,
-              isSelected: _type == VenueType.salon,
-              gradient: const [Color(0xFF1E1B4B), Color(0xFF4338CA)],
-              glowColor: const Color(0xFF6366F1),
-              count: upsertNaderSalon(widget.venues)
-                  .where((v) =>
-                      v.type == VenueType.salon &&
-                      _locationMatchesArea(v.location))
-                  .length,
-              arabic: widget.arabic,
-              onTap: () => _selectCategory(VenueType.salon),
-            ),
-            _CategoryVisualCard(
-              title: localized(widget.arabic, 'Entertainment', 'ترفيه وألعاب'),
-              subtitle: localized(widget.arabic, 'Gaming & Tables', 'ألعاب وبلايستيشن'),
-              icon: Icons.sports_esports_rounded,
-              isSelected: _type == VenueType.lounge,
-              gradient: const [Color(0xFF311042), Color(0xFF6D28D9)],
-              glowColor: const Color(0xFF8B5CF6),
-              count: widget.venues
-                  .where((v) =>
-                      v.type == VenueType.lounge &&
-                      _locationMatchesArea(v.location))
-                  .length,
-              arabic: widget.arabic,
-              onTap: () => _selectCategory(VenueType.lounge),
-            ),
-            _CategoryVisualCard(
-              title: localized(widget.arabic, 'Sports', 'ملاعب ورياضة'),
-              subtitle: localized(widget.arabic, 'Padel & Football', 'بادل وكرة قدم'),
-              icon: Icons.sports_soccer_rounded,
-              isSelected: _type == VenueType.sports,
-              gradient: const [Color(0xFF064E3B), Color(0xFF059669)],
-              glowColor: kGreen,
-              count: widget.venues
-                  .where((v) =>
-                      v.type == VenueType.sports &&
-                      _locationMatchesArea(v.location))
-                  .length,
-              arabic: widget.arabic,
-              onTap: () => _selectCategory(VenueType.sports),
-            ),
-          ],
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              _CategoryVisualCard(
+                title: localized(widget.arabic, 'Everything', 'الكل'),
+                subtitle: localized(widget.arabic, 'All Places', 'جميع الأماكن'),
+                icon: Icons.grid_view_rounded,
+                isSelected: _type == null,
+                gradient: const [Color(0xFF064E3B), Color(0xFF047857)],
+                glowColor: kGreen,
+                count: matchingVenues.length,
+                arabic: widget.arabic,
+                onTap: () => _selectCategory(null),
+              ),
+              const SizedBox(width: 8),
+              _CategoryVisualCard(
+                title: localized(widget.arabic, 'Grooming', 'حلاقة وعناية'),
+                subtitle: localized(widget.arabic, 'Hair & Beauty', 'صالونات وحلاقة'),
+                icon: Icons.content_cut_rounded,
+                isSelected: _type == VenueType.salon,
+                gradient: const [Color(0xFF1E1B4B), Color(0xFF4338CA)],
+                glowColor: const Color(0xFF6366F1),
+                count: upsertNaderSalon(widget.venues)
+                    .where((v) =>
+                        v.type == VenueType.salon &&
+                        _locationMatchesArea(v.location))
+                    .length,
+                arabic: widget.arabic,
+                onTap: () => _selectCategory(VenueType.salon),
+              ),
+              const SizedBox(width: 8),
+              _CategoryVisualCard(
+                title: localized(widget.arabic, 'Entertainment', 'ترفيه وألعاب'),
+                subtitle: localized(widget.arabic, 'Gaming & Tables', 'ألعاب وبلايستيشن'),
+                icon: Icons.sports_esports_rounded,
+                isSelected: _type == VenueType.lounge,
+                gradient: const [Color(0xFF311042), Color(0xFF6D28D9)],
+                glowColor: const Color(0xFF8B5CF6),
+                count: widget.venues
+                    .where((v) =>
+                        v.type == VenueType.lounge &&
+                        _locationMatchesArea(v.location))
+                    .length,
+                arabic: widget.arabic,
+                onTap: () => _selectCategory(VenueType.lounge),
+              ),
+              const SizedBox(width: 8),
+              _CategoryVisualCard(
+                title: localized(widget.arabic, 'Sports', 'ملاعب ورياضة'),
+                subtitle: localized(widget.arabic, 'Padel & Football', 'بادل وكرة قدم'),
+                icon: Icons.sports_soccer_rounded,
+                isSelected: _type == VenueType.sports,
+                gradient: const [Color(0xFF064E3B), Color(0xFF059669)],
+                glowColor: kGreen,
+                count: widget.venues
+                    .where((v) =>
+                        v.type == VenueType.sports &&
+                        _locationMatchesArea(v.location))
+                    .length,
+                arabic: widget.arabic,
+                onTap: () => _selectCategory(VenueType.sports),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         _buildSubCategoryFilterRow(matchingVenues),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -2334,6 +2355,119 @@ class _BookTabState extends State<BookTab> {
                                                   ),
                                                   const SizedBox(height: 14),
                                                   _buildDateStrip(widget.arabic),
+                                                  AnimatedSize(
+                                                    duration: const Duration(
+                                                        milliseconds: 220),
+                                                    curve: Curves.easeOutCubic,
+                                                    alignment:
+                                                        Alignment.topCenter,
+                                                    child: _selectedStart != null
+                                                        ? Container(
+                                                            margin:
+                                                                const EdgeInsets
+                                                                    .only(
+                                                                    top: 12),
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        14,
+                                                                    vertical:
+                                                                        10),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              gradient: HagzyTheme
+                                                                  .obsidianGradient,
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          16),
+                                                              border: Border.all(
+                                                                  color: kGreen
+                                                                      .withValues(
+                                                                          alpha:
+                                                                              0.5)),
+                                                            ),
+                                                            child: Row(
+                                                              children: [
+                                                                const Icon(
+                                                                  Icons
+                                                                      .check_circle_rounded,
+                                                                  color: Color(
+                                                                      0xFFA7F3D0),
+                                                                  size: 18,
+                                                                ),
+                                                                const SizedBox(
+                                                                    width: 8),
+                                                                Expanded(
+                                                                  child: Text(
+                                                                    '${TimeOfDay.fromDateTime(_selectedStart!).format(context)} · ${item.name}',
+                                                                    style:
+                                                                        const TextStyle(
+                                                                      color: Colors
+                                                                          .white,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w800,
+                                                                      fontSize:
+                                                                          12.5,
+                                                                    ),
+                                                                    maxLines: 1,
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                    width: 8),
+                                                                FilledButton(
+                                                                  style: FilledButton
+                                                                      .styleFrom(
+                                                                    backgroundColor:
+                                                                        kGreenLight,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    visualDensity:
+                                                                        VisualDensity
+                                                                            .compact,
+                                                                    padding: const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal:
+                                                                            14,
+                                                                        vertical:
+                                                                            8),
+                                                                    shape: RoundedRectangleBorder(
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(
+                                                                                999)),
+                                                                  ),
+                                                                  onPressed: () =>
+                                                                      widget.onBook(
+                                                                          venue,
+                                                                          item,
+                                                                          _selectedStart!),
+                                                                  child: Text(
+                                                                    localized(
+                                                                        widget
+                                                                            .arabic,
+                                                                        'Reserve Now',
+                                                                        'احجز الآن'),
+                                                                    style:
+                                                                        const TextStyle(
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w900,
+                                                                      fontSize:
+                                                                          12,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          )
+                                                        : const SizedBox.shrink(),
+                                                  ),
                                                   const SizedBox(height: 16),
                                                   _buildTimeSlotGroup(
                                                     title: localized(
@@ -2952,74 +3086,80 @@ class TimeSlotPill extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => PressableScale(
-        onTap: onTap,
-        scaleDown: 0.96,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            gradient: selected ? HagzyTheme.brandGradient : null,
+  Widget build(BuildContext context) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return PressableScale(
+      onTap: onTap,
+      scaleDown: 0.96,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          gradient: selected ? HagzyTheme.brandGradient : null,
+          color: selected
+              ? null
+              : available
+                  ? kPanel
+                  : (isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
             color: selected
-                ? null
+                ? kGreen
                 : available
-                    ? kPanel
-                    : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected
-                  ? kGreen
-                  : available
-                      ? kBorder
-                      : const Color(0xFFE2E8F0),
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: selected ? HagzyTheme.emeraldGlowShadow : null,
+                    ? kBorder
+                    : (isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFE2E8F0)),
+            width: selected ? 1.5 : 1,
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+          boxShadow: selected ? HagzyTheme.emeraldGlowShadow : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(13),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected || !available) ...[
                     Icon(
                       selected
                           ? Icons.check_circle_rounded
-                          : available
-                              ? Icons.schedule_rounded
-                              : Icons.lock_clock_outlined,
-                      size: 15,
+                          : Icons.lock_clock_outlined,
+                      size: 14,
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 5),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
                       color: selected
                           ? Colors.white
                           : available
-                              ? kGreen
+                              ? kInk
                               : const Color(0xFF94A3B8),
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
                     ),
-                    const SizedBox(width: 7),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : available
-                                ? kInk
-                                : const Color(0xFF94A3B8),
-                        fontSize: 12.5,
-                        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class CustomerAreaBar extends StatelessWidget {

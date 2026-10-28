@@ -482,6 +482,11 @@ class HagzyApi {
       } on TypeError {
         if (response.body.isNotEmpty) message = '$message ${response.body}';
       }
+      if (response.statusCode == 429) {
+        // Never surface raw rate-limit internals to customers.
+        message =
+            'Too many attempts (HTTP 429). Please wait a minute and try again.';
+      }
       throw Exception(message);
     }
     if (response.statusCode == 204 || response.body.isEmpty) {
