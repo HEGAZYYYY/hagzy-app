@@ -17,6 +17,9 @@ class SocialAuthService {
   static void registerVenuesListener(
           void Function(List<Map<String, dynamic>>) onVenues) =>
       webRegisterVenuesListener(onVenues);
+  static void registerUsersListener(
+          void Function(List<Map<String, dynamic>>) onUsers) =>
+      webRegisterUsersListener(onUsers);
   static void saveVenueToFirestore(Map<String, dynamic> venueJson) =>
       webSaveVenueToFirestore(venueJson);
   static void deleteVenueFromFirestore(String venueId) =>

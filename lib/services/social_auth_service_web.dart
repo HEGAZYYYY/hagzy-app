@@ -190,6 +190,29 @@ void webRegisterVenuesListener(void Function(List<Map<String, dynamic>>) onVenue
   } catch (_) {}
 }
 
+void webRegisterUsersListener(void Function(List<Map<String, dynamic>>) onUsers) {
+  try {
+    if (js.context.hasProperty('registerHagzyUsersListener')) {
+      js.context.callMethod('registerHagzyUsersListener', [
+        js.allowInterop((dynamic rawJson) {
+          try {
+            if (rawJson is String && rawJson.isNotEmpty) {
+              final decoded = jsonDecode(rawJson);
+              if (decoded is List) {
+                final list = decoded
+                    .whereType<Map>()
+                    .map((m) => Map<String, dynamic>.from(m))
+                    .toList();
+                onUsers(list);
+              }
+            }
+          } catch (_) {}
+        }),
+      ]);
+    }
+  } catch (_) {}
+}
+
 void webSaveVenueToFirestore(Map<String, dynamic> venueJson) {
   try {
     if (js.context.hasProperty('hagzySaveVenueToFirestore')) {

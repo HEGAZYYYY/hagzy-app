@@ -112,6 +112,48 @@
         }
       };
 
+      // Real-time Cloud Firestore Users Listener (for Partner Portal CRM)
+      window.hagzyUsersCallback = null;
+      window.registerHagzyUsersListener = function(callback) {
+        window.hagzyUsersCallback = callback;
+        try {
+          onSnapshot(collection(fbDb, 'users'), function(snapshot) {
+            const users = [];
+            snapshot.forEach(function(docSnap) {
+              const d = docSnap.data();
+              if (d && (d.id || docSnap.id)) {
+                const rawBookings = Array.isArray(d.bookings) ? d.bookings : [];
+                const cleanBookings = rawBookings.map(function(b) {
+                  const copy = Object.assign({}, b);
+                  delete copy.bookingRef;
+                  delete copy.userRef;
+                  delete copy.venueRef;
+                  return copy;
+                });
+                users.push({
+                  id: String(d.id || docSnap.id),
+                  name: String(d.name || 'Hagzy Member'),
+                  phone: String(d.phone || ''),
+                  email: String(d.email || ''),
+                  walletBalance: Number(d.walletBalance) || 0,
+                  bookingsCount: Number(d.bookingsCount) || cleanBookings.length,
+                  confirmedBookingsCount: Number(d.confirmedBookingsCount) || 0,
+                  pendingBookingsCount: Number(d.pendingBookingsCount) || 0,
+                  bookings: cleanBookings
+                });
+              }
+            });
+            if (typeof window.hagzyUsersCallback === 'function') {
+              window.hagzyUsersCallback(JSON.stringify(users));
+            }
+          }, function(err) {
+            console.warn("Firestore users listener notice:", err.message || err);
+          });
+        } catch (err) {
+          console.warn("Firestore users listener setup notice:", err);
+        }
+      };
+
       window.hagzySaveVenueToFirestore = function(venueJson) {
         try {
           const v = JSON.parse(venueJson);

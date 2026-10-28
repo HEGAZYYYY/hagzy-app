@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
+import '../services/social_auth_service.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 
@@ -78,35 +80,66 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                 selected: _section == 2,
                 onTap: () => setState(() => _section = 2),
               ),
+              CustomPill(
+                label: 'Users & CRM',
+                icon: Icons.people_alt_rounded,
+                selected: _section == 3,
+                onTap: () => setState(() => _section = 3),
+              ),
             ],
           ),
         ),
         Expanded(
-          child: switch (_section) {
-            0 => ManageTab(
-                venues: widget.venues,
-                onAddVenue: widget.onAddVenue,
-                onEditVenue: widget.onEditVenue,
-                onAddItem: widget.onAddItem,
-                onAddService: widget.onAddService,
-                onRemoveService: widget.onRemoveService,
-                onDelete: widget.onDelete,
-                onRemoveItem: widget.onRemoveItem,
-                onSyncFirebase: widget.onSyncFirebase,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 240),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.025),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
               ),
-            1 => PosTab(
-                venues: widget.venues,
-                bookings: widget.bookings,
-                onWalkIn: widget.onWalkIn,
-                onBlockSlot: widget.onBlockSlot,
-                onCancel: widget.onCancel,
-                onConfirm: widget.onConfirm,
-              ),
-            _ => AnalyticsTab(
-                venues: widget.venues,
-                bookings: widget.bookings,
-              ),
-          },
+            ),
+            child: switch (_section) {
+              0 => ManageTab(
+                  key: const ValueKey('admin_manage'),
+                  venues: widget.venues,
+                  onAddVenue: widget.onAddVenue,
+                  onEditVenue: widget.onEditVenue,
+                  onAddItem: widget.onAddItem,
+                  onAddService: widget.onAddService,
+                  onRemoveService: widget.onRemoveService,
+                  onDelete: widget.onDelete,
+                  onRemoveItem: widget.onRemoveItem,
+                  onSyncFirebase: widget.onSyncFirebase,
+                ),
+              1 => PosTab(
+                  key: const ValueKey('admin_pos'),
+                  venues: widget.venues,
+                  bookings: widget.bookings,
+                  onWalkIn: widget.onWalkIn,
+                  onBlockSlot: widget.onBlockSlot,
+                  onCancel: widget.onCancel,
+                  onConfirm: widget.onConfirm,
+                ),
+              2 => AnalyticsTab(
+                  key: const ValueKey('admin_analytics'),
+                  venues: widget.venues,
+                  bookings: widget.bookings,
+                ),
+              _ => UsersCrmTab(
+                  key: const ValueKey('admin_users_crm'),
+                  venues: widget.venues,
+                  bookings: widget.bookings,
+                  onConfirm: widget.onConfirm,
+                  onCancel: widget.onCancel,
+                ),
+            },
+          ),
         ),
       ],
     );
@@ -1119,4 +1152,564 @@ class PaymentTab extends StatelessWidget {
         ],
       );
 }
+
+class UsersCrmTab extends StatefulWidget {
+  const UsersCrmTab({
+    super.key,
+    required this.venues,
+    required this.bookings,
+    required this.onConfirm,
+    required this.onCancel,
+  });
+
+  final List<Venue> venues;
+  final List<Booking> bookings;
+  final ValueChanged<Booking> onConfirm;
+  final ValueChanged<Booking> onCancel;
+
+  @override
+  State<UsersCrmTab> createState() => _UsersCrmTabState();
+}
+
+class _CrmUserEntry {
+  _CrmUserEntry({
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.walletBalance,
+    required this.bookings,
+  });
+
+  final String id;
+  String name;
+  String phone;
+  String email;
+  double walletBalance;
+  final List<Booking> bookings;
+}
+
+class _UsersCrmTabState extends State<UsersCrmTab> {
+  String _searchQuery = '';
+  String _filter = 'all'; // 'all' | 'pending' | 'vip'
+  final Set<String> _expandedUserIds = {};
+  List<Map<String, dynamic>> _firestoreUsers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      SocialAuthService.registerUsersListener((users) {
+        if (!mounted) return;
+        setState(() {
+          _firestoreUsers = users;
+          if (_expandedUserIds.isEmpty && users.isNotEmpty) {
+            _expandedUserIds.add(users.first['id']?.toString() ?? '');
+          }
+        });
+      });
+    }
+  }
+
+  static String _buildCleanId(String name, String email, String phone) {
+    final rawName = name.trim().toLowerCase();
+    final rawEmail = email.trim().toLowerCase();
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    var slug = rawName
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    if (slug.isEmpty || slug == 'hagzy_member' || slug == 'member') {
+      if (rawEmail.contains('@')) {
+        slug = rawEmail
+            .split('@')
+            .first
+            .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+            .replaceAll(RegExp(r'^_+|_+$'), '');
+      } else if (digits.isNotEmpty) {
+        final tail = digits.length > 6 ? digits.substring(digits.length - 6) : digits;
+        slug = 'user_$tail';
+      } else {
+        slug = 'member';
+      }
+    }
+    return 'usr_${slug.length > 28 ? slug.substring(0, 28) : slug}';
+  }
+
+  List<_CrmUserEntry> _buildUsers() {
+    final byId = <String, _CrmUserEntry>{};
+
+    // 1. Seed from live Cloud Firestore users collection
+    for (final fu in _firestoreUsers) {
+      final id = (fu['id']?.toString() ?? '').trim();
+      if (id.isEmpty) continue;
+      final name = (fu['name']?.toString() ?? 'Hagzy Member').trim();
+      final phone = (fu['phone']?.toString() ?? '').trim();
+      final email = (fu['email']?.toString() ?? '').trim();
+      final wallet = (fu['walletBalance'] as num?)?.toDouble() ?? 0.0;
+      final parsedBookings = <Booking>[];
+      final rawList = fu['bookings'];
+      if (rawList is List) {
+        for (final item in rawList) {
+          if (item is Map) {
+            try {
+              parsedBookings.add(Booking.fromJson(Map<String, dynamic>.from(item)));
+            } catch (_) {}
+          }
+        }
+      }
+      byId[id] = _CrmUserEntry(
+        id: id,
+        name: name,
+        phone: phone,
+        email: email,
+        walletBalance: wallet,
+        bookings: parsedBookings,
+      );
+    }
+
+    // 2. Merge live bookings from widget.bookings so local/new bookings are always reflected
+    for (final b in widget.bookings) {
+      if (b.isBlocked) continue;
+      final uid = _buildCleanId(b.customer, b.email, b.phone);
+      final existing = byId[uid];
+      if (existing != null) {
+        if (existing.phone.isEmpty && b.phone.isNotEmpty) existing.phone = b.phone;
+        if (existing.email.isEmpty && b.email.isNotEmpty) existing.email = b.email;
+        final idx = existing.bookings.indexWhere((x) => x.id == b.id);
+        if (idx >= 0) {
+          existing.bookings[idx] = b;
+        } else {
+          existing.bookings.add(b);
+        }
+      } else {
+        byId[uid] = _CrmUserEntry(
+          id: uid,
+          name: b.customer.isEmpty ? 'Hagzy Member' : b.customer,
+          phone: b.phone,
+          email: b.email,
+          walletBalance: 0,
+          bookings: [b],
+        );
+      }
+    }
+
+    final list = byId.values.toList();
+    for (final u in list) {
+      u.bookings.sort((a, b) => b.startsAt.compareTo(a.startsAt));
+    }
+    list.sort((a, b) => b.bookings.length.compareTo(a.bookings.length));
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = kDarkMode.value;
+    final allUsers = _buildUsers();
+    final filtered = allUsers.where((u) {
+      if (_filter == 'pending' &&
+          !u.bookings.any((b) => b.isPendingPayment && !b.cancelled)) {
+        return false;
+      }
+      if (_filter == 'vip' && u.bookings.length < 2) {
+        return false;
+      }
+      if (_searchQuery.trim().isEmpty) return true;
+      final q = _searchQuery.trim().toLowerCase();
+      return u.name.toLowerCase().contains(q) ||
+          u.phone.toLowerCase().contains(q) ||
+          u.email.toLowerCase().contains(q) ||
+          u.id.toLowerCase().contains(q);
+    }).toList();
+
+    final totalBookingsCount =
+        allUsers.fold<int>(0, (sum, u) => sum + u.bookings.length);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      children: [
+        IntroCard(
+          title: 'Users & Linked Bookings (Cloud Firestore)',
+          subtitle:
+              'Every user in Firebase has their bookings directly inside users/{userId}/bookings. Click any user below to view and manage their reservations.',
+          icon: Icons.people_alt_rounded,
+          action: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: kGreen.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: kGreen.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              '${allUsers.length} Users · $totalBookingsCount Bookings',
+              style: const TextStyle(
+                color: kGreen,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          onChanged: (v) => setState(() => _searchQuery = v),
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.search_rounded),
+            hintText: 'Search user by name, phone, email, or ID (e.g. usr_mohamed_hegazy)...',
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            CustomPill(
+              label: 'All Users (${allUsers.length})',
+              selected: _filter == 'all',
+              onTap: () => setState(() => _filter = 'all'),
+            ),
+            CustomPill(
+              label: 'Pending Deposit',
+              icon: Icons.hourglass_top_rounded,
+              selected: _filter == 'pending',
+              onTap: () => setState(() => _filter = 'pending'),
+            ),
+            CustomPill(
+              label: 'Repeat / VIP (2+ bookings)',
+              icon: Icons.workspace_premium_rounded,
+              selected: _filter == 'vip',
+              onTap: () => setState(() => _filter = 'vip'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (filtered.isEmpty)
+          const EmptyCard(
+            icon: Icons.person_search_rounded,
+            title: 'No matching users found',
+            body: 'Try clearing your search or filter to view all registered customers.',
+          ),
+        ...filtered.map((user) {
+          final isExpanded = _expandedUserIds.contains(user.id);
+          final confirmedCount = user.bookings
+              .where((b) => b.isConfirmed && !b.cancelled)
+              .length;
+          final pendingCount = user.bookings
+              .where((b) => b.isPendingPayment && !b.cancelled)
+              .length;
+          final totalSpend = user.bookings
+              .where((b) => !b.cancelled)
+              .fold<double>(0, (sum, b) => sum + b.price);
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: isExpanded ? kGreen : kBorder,
+                width: isExpanded ? 1.6 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expandedUserIds.remove(user.id);
+                      } else {
+                        _expandedUserIds.add(user.id);
+                      }
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 23,
+                          backgroundColor: kGreen.withValues(alpha: 0.14),
+                          child: Text(
+                            user.name.isNotEmpty
+                                ? user.name.trim()[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              color: kGreen,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    user.name,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: kInk,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF19243D)
+                                          : kSurfaceTint,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(color: kBorder),
+                                    ),
+                                    child: Text(
+                                      'users/${user.id}',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: kMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 4,
+                                children: [
+                                  if (user.phone.isNotEmpty)
+                                    Text(
+                                      '📱 ${user.phone}',
+                                      style: TextStyle(
+                                        color: kMuted,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  if (user.email.isNotEmpty)
+                                    Text(
+                                      '✉️ ${user.email}',
+                                      style: TextStyle(
+                                        color: kMuted,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _StatMiniChip(
+                                    label: '${user.bookings.length} Bookings',
+                                    color: kGreen,
+                                  ),
+                                  if (confirmedCount > 0)
+                                    _StatMiniChip(
+                                      label: '$confirmedCount Confirmed',
+                                      color: const Color(0xFF059669),
+                                    ),
+                                  if (pendingCount > 0)
+                                    _StatMiniChip(
+                                      label: '$pendingCount Pending',
+                                      color: const Color(0xFFD97706),
+                                    ),
+                                  _StatMiniChip(
+                                    label: '${totalSpend.toStringAsFixed(0)} EGP Total',
+                                    color: const Color(0xFF2563EB),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          isExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: kMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (isExpanded) ...[
+                  const Divider(height: 1),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                    color: isDark
+                        ? const Color(0xFF0F172A).withValues(alpha: 0.5)
+                        : kSurfaceTint.withValues(alpha: 0.45),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Subcollection: users/${user.id}/bookings (${user.bookings.length})',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: kMuted,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (user.bookings.isEmpty)
+                          Text(
+                            'No bookings recorded for this user yet.',
+                            style: TextStyle(color: kMuted, fontSize: 12.5),
+                          ),
+                        ...user.bookings.map((b) {
+                          final venue = widget.venues
+                              .where((v) => v.id == b.venueId)
+                              .firstOrNull;
+                          final venueName = venue?.name ?? b.venueId;
+                          final item = venue?.items
+                              .where((i) => i.id == b.itemId)
+                              .firstOrNull;
+                          final itemName = item?.name ?? b.itemId;
+                          final statusColor = b.cancelled
+                              ? Colors.red
+                              : (b.isConfirmed
+                                  ? kGreen
+                                  : const Color(0xFFD97706));
+                          final statusLabel = b.cancelled
+                              ? 'Cancelled'
+                              : (b.isConfirmed
+                                  ? 'Confirmed'
+                                  : 'Pending Deposit');
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF131C31) : kPanel,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              '$venueName · $itemName',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13.5,
+                                                color: kInk,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(
+                                                  alpha: 0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              statusLabel,
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: statusColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '📅 ${formatDateTime(b.startsAt)} (${b.durationMinutes} min) · 💵 ${b.price.toStringAsFixed(0)} EGP',
+                                        style: TextStyle(
+                                          color: kMuted,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (b.paymentReference.isNotEmpty ||
+                                          b.paymentMethod.isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 3),
+                                          child: Text(
+                                            '💳 ${b.paymentMethod.isEmpty ? "Transfer" : b.paymentMethod.toUpperCase()}${b.paymentReference.isEmpty ? "" : " · Ref: ${b.paymentReference}"}',
+                                            style: const TextStyle(
+                                              color: kGreen,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (!b.cancelled && b.isPendingPayment) ...[
+                                  const SizedBox(width: 8),
+                                  FilledButton.tonalIcon(
+                                    onPressed: () => widget.onConfirm(b),
+                                    icon: const Icon(Icons.verified_rounded,
+                                        size: 15),
+                                    label: const Text('Confirm'),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _StatMiniChip extends StatelessWidget {
+  const _StatMiniChip({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 
