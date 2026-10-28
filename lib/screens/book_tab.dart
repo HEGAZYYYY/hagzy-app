@@ -272,7 +272,7 @@ class _BookTabState extends State<BookTab> {
             backgroundColor: kInk,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: kBorder),
+              side: BorderSide(color: kBorder),
             ),
             content: Row(
               children: [
@@ -750,7 +750,7 @@ class _BookTabState extends State<BookTab> {
                                             widget.arabic,
                                             'Auto-Assign Area via GPS',
                                             'تحديد منطقتي تلقائياً عبر GPS'),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 13.5,
                                       color: kInk,
@@ -763,7 +763,7 @@ class _BookTabState extends State<BookTab> {
                                       'Finds nearest Egyptian governorate in 1 tap',
                                       'يحدد أقرب محافظة لك في مصر بضغطة واحدة',
                                     ),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
                                       color: kMuted,
                                       fontWeight: FontWeight.w500,
@@ -773,7 +773,7 @@ class _BookTabState extends State<BookTab> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Icon(
+                            Icon(
                               Icons.arrow_forward_ios_rounded,
                               size: 14,
                               color: kMuted,
@@ -1085,7 +1085,7 @@ class _BookTabState extends State<BookTab> {
                                         v.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w900,
                                           fontSize: 13.5,
                                           color: kInk,
@@ -1099,7 +1099,7 @@ class _BookTabState extends State<BookTab> {
                                             : v.location,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: kMuted,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
@@ -1151,7 +1151,7 @@ class _BookTabState extends State<BookTab> {
                                   color: kInk.withValues(alpha: 0.06),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close_rounded,
                                   size: 13,
                                   color: kMuted,
@@ -1434,7 +1434,7 @@ class _BookTabState extends State<BookTab> {
                         'Made with ❤️ in Kafr El-Sheikh',
                         'صُنع بـ ❤️ في كفر الشيخ',
                       ),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: kMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -1871,7 +1871,7 @@ class _BookTabState extends State<BookTab> {
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
-                                border: const Border(
+                                border: Border(
                                   bottom: BorderSide(color: kBorder),
                                 ),
                               ),
@@ -1899,7 +1899,7 @@ class _BookTabState extends State<BookTab> {
                                         Text(
                                           localized(widget.arabic,
                                               'Your Booking', 'حجزك'),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 16.5,
                                             fontWeight: FontWeight.w900,
                                             color: kInk,
@@ -1909,7 +1909,7 @@ class _BookTabState extends State<BookTab> {
                                         const SizedBox(height: 2),
                                         Text(
                                           '${venue.name}${venue.location.isEmpty ? '' : ' · ${venue.location}'}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: kMuted,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
@@ -1959,7 +1959,7 @@ class _BookTabState extends State<BookTab> {
                                           borderRadius:
                                               BorderRadius.circular(999),
                                           side:
-                                              const BorderSide(color: kBorder),
+                                              BorderSide(color: kBorder),
                                         ),
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 12, vertical: 6),
@@ -2102,7 +2102,7 @@ class _BookTabState extends State<BookTab> {
                                         child: Text(
                                           localized(widget.arabic,
                                               'Choose Your Space', 'اختر المساحة'),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 15.5,
                                             fontWeight: FontWeight.w900,
                                             color: kInk,
@@ -2119,7 +2119,7 @@ class _BookTabState extends State<BookTab> {
                                           widget.arabic,
                                           'This venue has no bookable spaces yet.',
                                           'لا توجد مساحات متاحة للحجز حالياً.'),
-                                      style: const TextStyle(color: kMuted),
+                                      style: TextStyle(color: kMuted),
                                     )
                                   else
                                     Wrap(
@@ -2218,7 +2218,7 @@ class _BookTabState extends State<BookTab> {
                                                               'Pick an Available Time',
                                                               'اختر وقتاً متاحاً'),
                                                           style:
-                                                              const TextStyle(
+                                                              TextStyle(
                                                             fontSize: 15.5,
                                                             fontWeight:
                                                                 FontWeight.w900,
@@ -2636,7 +2636,7 @@ class _BookTabState extends State<BookTab> {
                 const SizedBox(width: 6),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: kMuted,
@@ -2801,7 +2801,7 @@ class ReservationQuote extends StatelessWidget {
                   children: [
                     Text(
                       localized(arabic, 'Total Estimate', 'الإجمالي التقريبي'),
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: kMuted,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700),
@@ -2809,7 +2809,7 @@ class ReservationQuote extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${formatMoney(total)} ${localized(arabic, 'EGP', 'جنيه')}',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
                           color: kInk),
@@ -2861,7 +2861,7 @@ class ReservationQuote extends StatelessWidget {
                       arabic,
                       'We hold the time for 15 minutes. It is confirmed only after the deposit is verified.',
                       'نحتفظ بالموعد لمدة ١٥ دقيقة. يتأكد الحجز فقط بعد التحقق من دفع العربون.'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: kMuted,
                     fontSize: 11.5,
                     height: 1.35,
@@ -3049,7 +3049,7 @@ class CustomerAreaBar extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           localized(arabic, 'YOUR AREA', 'محافظتك'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: kMuted,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -3061,7 +3061,7 @@ class CustomerAreaBar extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       area,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 14.5,
                         color: kInk,
@@ -3134,14 +3134,14 @@ class CustomerAreaBar extends StatelessWidget {
                   children: [
                     Text(
                       localized(arabic, 'Change', 'تغيير'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: kInk,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 3),
-                    const Icon(Icons.keyboard_arrow_down_rounded,
+                    Icon(Icons.keyboard_arrow_down_rounded,
                         color: kInk, size: 16),
                   ],
                 ),
@@ -3587,7 +3587,7 @@ class VenueBrowseCard extends StatelessWidget {
                                                     '$ratingStr ($reviewCount) · مكان معتمد')
                                                 : localized(
                                                     arabic, 'New Venue', 'مكان جديد'),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 10.5,
                                               fontWeight: FontWeight.w800,
                                               color: kInk,
@@ -3645,7 +3645,7 @@ class VenueBrowseCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               venue.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: -0.4,
@@ -3683,7 +3683,7 @@ class VenueBrowseCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.location_on_outlined,
+                          Icon(Icons.location_on_outlined,
                               size: 15, color: kMuted),
                           const SizedBox(width: 4),
                           Expanded(
@@ -3694,7 +3694,7 @@ class VenueBrowseCard extends StatelessWidget {
                                       'Location Details Available on Booking',
                                       'تفاصيل الموقع عند الحجز')
                                   : venue.location,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: kMuted,
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
@@ -3809,7 +3809,7 @@ class VenueBrowseCard extends StatelessWidget {
                               ),
                               child: Text(
                                 amenity,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
                                   color: kInk,
@@ -3827,13 +3827,13 @@ class VenueBrowseCard extends StatelessWidget {
                           Expanded(
                             child: RichText(
                               text: TextSpan(
-                                style: const TextStyle(
+                                style: TextStyle(
                                     color: kInk, fontSize: 12.5),
                                 children: [
                                   TextSpan(
                                     text:
                                         localized(arabic, 'From ', 'يبدأ من '),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         color: kMuted,
                                         fontWeight: FontWeight.w600),
                                   ),
@@ -3842,7 +3842,7 @@ class VenueBrowseCard extends StatelessWidget {
                                         ? localized(arabic, 'Price on Request',
                                             'السعر عند الطلب')
                                         : '${formatMoney(lowestPrice)} ${localized(arabic, 'EGP', 'ج.م')}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         color: kInk,
                                         fontSize: 16,
                                         fontWeight: FontWeight.w900),
@@ -3850,7 +3850,7 @@ class VenueBrowseCard extends StatelessWidget {
                                   if (lowestPrice != null)
                                     TextSpan(
                                       text: ' $rateLabel',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           color: kMuted,
                                           fontWeight: FontWeight.w600),
                                     ),
@@ -3864,7 +3864,7 @@ class VenueBrowseCard extends StatelessWidget {
                                   'التفاصيل والتقييمات'),
                               visualDensity: VisualDensity.compact,
                               onPressed: onDetails,
-                              icon: const Icon(Icons.info_outline_rounded,
+                              icon: Icon(Icons.info_outline_rounded,
                                   size: 20, color: kMuted),
                             ),
                             const SizedBox(width: 4),
@@ -4072,7 +4072,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                         venue.location.isEmpty
                             ? venue.type.label
                             : '${venue.location} · ${venue.type.label}',
-                        style: const TextStyle(color: kMuted, fontSize: 12),
+                        style: TextStyle(color: kMuted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -4164,7 +4164,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                     if (venue.description.isNotEmpty) ...[
                       Text(
                         venue.description,
-                        style: const TextStyle(color: kInk, height: 1.45),
+                        style: TextStyle(color: kInk, height: 1.45),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -4240,7 +4240,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                             arabic,
                             'Verified Hagzy venue · Be the first to leave a written review.',
                             'مكان معتمد في حجزي · كن أول من يكتب تقييماً.'),
-                        style: const TextStyle(color: kMuted, fontSize: 12),
+                        style: TextStyle(color: kMuted, fontSize: 12),
                       )
                     else
                       ...venue.reviews.map(
@@ -4278,7 +4278,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                               if (r.comment.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(r.comment,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         color: kMuted, fontSize: 12)),
                               ],
                             ],
@@ -4559,7 +4559,7 @@ class _CategorySectionHeader extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: kInk,
@@ -4587,7 +4587,7 @@ class _CategorySectionHeader extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
                       color: kMuted,
                       fontWeight: FontWeight.w500,

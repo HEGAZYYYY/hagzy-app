@@ -85,7 +85,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               Text(
                 '${localized(arabic, 'Current Balance:', 'رصيدك الحالي:')} ${formatMoney(currentBalance)} EGP',
                 style:
-                    const TextStyle(fontWeight: FontWeight.w700, color: kMuted),
+                    TextStyle(fontWeight: FontWeight.w700, color: kMuted),
               ),
               const SizedBox(height: 14),
               Text(
@@ -427,11 +427,11 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       children: [
                         Text(
                           localized(arabic, 'Sign in to see all your bookings', 'سجل دخولك لعرض جميع حجوزاتك'),
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kInk),
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kInk),
                         ),
                         Text(
                           localized(arabic, 'Sync wallet balance & active reservations', 'مزامنة رصيد المحفظة والحجوزات'),
-                          style: const TextStyle(fontSize: 11, color: kMuted),
+                          style: TextStyle(fontSize: 11, color: kMuted),
                         ),
                       ],
                     ),
@@ -674,7 +674,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               Expanded(
                                 child: Text(
                                   '${formatDateTime(booking.startsAt)} · ${booking.durationMinutes} ${localized(arabic, 'min', 'دقيقة')}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w800,
                                     color: kInk,
@@ -738,7 +738,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                     arabic,
                                     'The payment window ended. Choose another available time to reserve.',
                                     'انتهت مهلة الدفع. اختر وقتاً آخر متاحاً للحجز.'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: kMuted,
                               fontSize: 12,
                               height: 1.4,
@@ -750,7 +750,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           const SizedBox(height: 8),
                           Text(
                             booking.serviceNames.join(' · '),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: kMuted,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -840,7 +840,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                             'إلغاء الحجز'),
                                         onPressed: () =>
                                             widget.onCancelBooking!(booking),
-                                        icon: const Icon(Icons.delete_outline,
+                                        icon: Icon(Icons.delete_outline,
                                             color: kMuted),
                                       ),
                                     ],
@@ -977,7 +977,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           ),
                           Text(
                             venue?.name ?? booking.venueId,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
                               color: kInk,
@@ -1011,7 +1011,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 Text(
                   '${space?.name ?? booking.itemId} · ${formatDateTime(booking.startsAt)}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13.5,
                     color: kInk,
@@ -1020,7 +1020,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 const SizedBox(height: 4),
                 Text(
                   'REF: ${booking.id}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
                     color: kMuted,
@@ -1146,7 +1146,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                             Text(
                               localized(
                                   arabic, 'Payment Breakdown', 'تفاصيل الفاتورة'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 color: kInk,
@@ -1178,7 +1178,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           children: [
                             Text(
                               venue?.name ?? 'Venue',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 15,
                                 color: kInk,
@@ -1214,7 +1214,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           const SizedBox(height: 4),
                           Text(
                             venue!.location,
-                            style: const TextStyle(color: kMuted, fontSize: 12),
+                            style: TextStyle(color: kMuted, fontSize: 12),
                           ),
                         ],
                         const SizedBox(height: 12),

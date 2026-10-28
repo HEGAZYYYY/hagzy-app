@@ -19,6 +19,7 @@ class CustomerLoginScreen extends StatefulWidget {
     required this.onSignIn,
     required this.onChangeLanguage,
     this.onSwitchToAdmin,
+    this.onToggleDarkMode,
   });
 
   final bool arabic;
@@ -34,6 +35,7 @@ class CustomerLoginScreen extends StatefulWidget {
   }) onSignIn;
   final ValueChanged<String> onChangeLanguage;
   final VoidCallback? onSwitchToAdmin;
+  final VoidCallback? onToggleDarkMode;
 
   @override
   State<CustomerLoginScreen> createState() => _CustomerLoginScreenState();
@@ -587,7 +589,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                             children: [
                               Text(
                                 arabic ? 'حجزي' : 'Hagzy',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 21,
                                   letterSpacing: -0.5,
@@ -600,7 +602,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   'Smart Instant Bookings',
                                   'حجوزات ذكية وفورية في ثواني',
                                 ),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11.5,
                                   color: kMuted,
                                   fontWeight: FontWeight.w600,
@@ -631,6 +633,32 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 onTap: () => widget.onChangeLanguage('AR'),
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: localized(
+                            arabic,
+                            kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+                            kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
+                          ),
+                          onPressed: widget.onToggleDarkMode ??
+                              () {
+                                kDarkMode.value = !kDarkMode.value;
+                              },
+                          style: IconButton.styleFrom(
+                            backgroundColor: kDarkMode.value
+                                ? const Color(0xFF19243D)
+                                : kSurfaceTint,
+                            foregroundColor:
+                                kDarkMode.value ? kGold : kGreen,
+                            side: BorderSide(color: kBorder),
+                          ),
+                          icon: Icon(
+                            kDarkMode.value
+                                ? Icons.light_mode_rounded
+                                : Icons.dark_mode_rounded,
+                            size: 20,
                           ),
                         ),
                       ],
@@ -742,7 +770,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                           'Enter Verification Code',
                                           'أدخل كود التحقق',
                                         ),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 16,
                                           color: kInk,
@@ -758,7 +786,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                     'We sent a 6-digit verification code via WhatsApp to ${_phoneController.text}',
                                     'أرسلنا كود التحقق المكون من 6 أرقام عبر واتساب إلى ${_phoneController.text}',
                                   ),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     color: kMuted,
                                     height: 1.4,
@@ -775,7 +803,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   onSubmitted: (_) {
                                     if (!_loading) _verifyOtpAndSubmit();
                                   },
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 10,
@@ -833,7 +861,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.timer_outlined,
+                                          Icon(Icons.timer_outlined,
                                               size: 14, color: kMuted),
                                           const SizedBox(width: 4),
                                           Text(
@@ -842,7 +870,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                               'Resend in ${_resendCountdown}s',
                                               'إعادة الإرسال بعد $_resendCountdown ث',
                                             ),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 12, color: kMuted),
                                           ),
                                         ],
@@ -962,7 +990,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                           'Sign in to Hagzy',
                                           'تسجيل الدخول إلى حجزي',
                                         ),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 16,
                                           color: kInk,
@@ -990,7 +1018,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                           'or continue with mobile number',
                                           'أو المتابعة برقم الموبايل',
                                         ),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
                                           color: kMuted,
@@ -1138,7 +1166,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                               arabic,
                                               "Don't have an account? ",
                                               'ليس لديك حساب؟ '),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontSize: 13, color: kMuted),
                                     ),
                                     GestureDetector(
@@ -1176,7 +1204,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                           'Hagzy v2.4 · Made with ❤️ in Kafr El-Sheikh',
                           'حجزي v2.4 · صُنع بـ ❤️ في كفر الشيخ',
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: kMuted,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
@@ -1208,17 +1236,23 @@ class _SocialSignInButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isApple = provider == 'apple';
+    final isDark = kDarkMode.value;
     return PressableScale(
       onTap: onTap,
       child: Container(
         height: 48,
         decoration: BoxDecoration(
-          color: isApple ? Colors.black : Colors.white,
+          color: isApple
+              ? Colors.black
+              : (isDark ? const Color(0xFF19243D) : Colors.white),
           borderRadius: BorderRadius.circular(14),
-          border: isApple ? null : Border.all(color: const Color(0xFFDADCE0)),
+          border: isApple
+              ? null
+              : Border.all(
+                  color: isDark ? kBorder : const Color(0xFFDADCE0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -1239,7 +1273,9 @@ class _SocialSignInButton extends StatelessWidget {
                   : localized(arabic, 'Continue with Google',
                       'المتابعة باستخدام Google'),
               style: TextStyle(
-                color: isApple ? Colors.white : const Color(0xFF3C4043),
+                color: isApple
+                    ? Colors.white
+                    : (isDark ? Colors.white : const Color(0xFF3C4043)),
                 fontWeight: FontWeight.w700,
                 fontSize: 14.5,
                 letterSpacing: -0.1,

@@ -242,7 +242,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                     ? widget.customerName
                                     : localized(
                                         arabic, 'Hagzy Member', 'عضو حجزي'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 18,
                                   color: kInk,
@@ -271,7 +271,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                       'Verified Hagzy Account',
                                       'حساب حجزي موثق',
                                     )),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
                             color: kInk,
                             fontWeight: FontWeight.w600,
@@ -385,7 +385,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       child: Text(
                         localized(
                             arabic, 'Edit Your Profile', 'تعديل بيانات حسابك'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
                           color: kInk,
@@ -667,7 +667,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           color: kGreen, size: 20),
                       onPressed: widget.onAutoAssignGps,
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded,
+                    Icon(Icons.arrow_forward_ios_rounded,
                         size: 14, color: kMuted),
                   ],
                 ),
@@ -700,7 +700,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   'End-to-end booking protection & Paymob escrow',
                   'حماية كاملة للمدفوعات وحجز مؤكد',
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                trailing: Icon(Icons.arrow_forward_ios_rounded,
                     size: 14, color: kMuted),
                 onTap: () => _showPrivacySecurityModal(context, arabic),
               ),
@@ -881,7 +881,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               'Hagzy v2.4 · Made with ❤️ in Kafr El-Sheikh',
               'حجزي v2.4 · صُنع بـ ❤️ في كفر الشيخ',
             ),
-            style: const TextStyle(
+            style: TextStyle(
               color: kMuted,
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
@@ -927,9 +927,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.90,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: kPanel,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           children: [
@@ -966,7 +966,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               arabic, 'Privacy Policy', 'سياسة الخصوصية')
                           : localized(
                               arabic, 'Terms of Service', 'شروط الاستخدام'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: kInk,
@@ -975,7 +975,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   ),
                   IconButton(
                     tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
-                    icon: const Icon(Icons.close_rounded, color: kMuted),
+                    icon: Icon(Icons.close_rounded, color: kMuted),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -1107,7 +1107,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14.5,
                 color: kInk,
@@ -1116,7 +1116,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             const SizedBox(height: 6),
             Text(
               body,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: kMuted,
                 height: 1.55,
@@ -1136,9 +1136,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: kPanel,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1180,7 +1180,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               Text(
                                 localized(arabic, 'Privacy & Security',
                                     'الخصوصية والأمان'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 19,
                                   fontWeight: FontWeight.w900,
                                   color: kInk,
@@ -1193,7 +1193,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                   'Protected by Hagzy Escrow & Encrypted Payments',
                                   'حماية كاملة للمدفوعات وحجز مؤكد بنكياً',
                                 ),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.5,
                                   color: kMuted,
                                   fontWeight: FontWeight.w600,
@@ -1269,7 +1269,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: kInk,
-                              side: const BorderSide(color: kBorder),
+                              side: BorderSide(color: kBorder),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
@@ -1295,7 +1295,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: kInk,
-                              side: const BorderSide(color: kBorder),
+                              side: BorderSide(color: kBorder),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
@@ -1331,7 +1331,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         child: Center(
                           child: Text(
                             localized(arabic, 'Done', 'تم'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 14.5,
                               color: kInk,
@@ -1359,9 +1359,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: kPanel,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1405,7 +1405,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               Text(
                                 localized(arabic, 'WhatsApp Booking Updates',
                                     'إشعارات وتأكيدات الواتساب'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w900,
                                   color: kInk,
@@ -1565,7 +1565,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13.5,
                     color: kInk,
@@ -1574,7 +1574,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: kMuted,
                     height: 1.35,
@@ -1610,7 +1610,7 @@ class _InfoChip extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 color: kInk,

@@ -697,7 +697,7 @@ class StepPanel extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
                               letterSpacing: -0.3,
@@ -705,7 +705,7 @@ class StepPanel extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(subtitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: kMuted,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500)),
@@ -832,7 +832,7 @@ class PaymentMethodTile extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: kMuted,
                           fontWeight: FontWeight.w600,
@@ -900,14 +900,14 @@ class IntroCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.4,
                           color: kInk)),
                   const SizedBox(height: 4),
                   Text(subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: kMuted,
                           height: 1.35,
                           fontWeight: FontWeight.w600)),
@@ -963,7 +963,7 @@ class EmptyCard extends StatelessWidget {
             const SizedBox(height: 14),
             Text(title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.3,
@@ -971,7 +971,7 @@ class EmptyCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(body,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                     color: kMuted, height: 1.4, fontWeight: FontWeight.w600)),
             if (action != null && actionLabel != null) ...[
               const SizedBox(height: 18),
