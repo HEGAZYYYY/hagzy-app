@@ -2538,18 +2538,18 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
           `• الحالة: ${isConfirmed ? 'مؤكد رسمياً ✓' : 'حجز مؤقت (بانتظار العربون) ⏳'}\n` +
           `• المبلغ: ${price} جنيه\n` +
           `• رقم الحجز: ${matchedBooking.id}\n\n` +
-          `🎫 يمكنك إدارة حجزك وتذكرتك من الرابط: https://hagzy-acea1.web.app`
+          `🎫 يمكنك إدارة حجزك وتذكرتك من الرابط: https://hagzy-booking.web.app`
         : `📌 Your Hagzy Reservation Details:\n\n` +
           `• Venue: ${venueName}\n` +
           `• Date & Time: ${startsAt}\n` +
           `• Status: ${isConfirmed ? 'Confirmed ✓' : 'Temporary Hold (Pending Deposit) ⏳'}\n` +
           `• Amount: ${price} EGP\n` +
           `• Booking ID: ${matchedBooking.id}\n\n` +
-          `🎫 Manage your booking: https://hagzy-acea1.web.app`;
+          `🎫 Manage your booking: https://hagzy-booking.web.app`;
     } else {
       return arabic
-        ? `لم نتمكن من العثور على حجز نشط مرتبط برقمك حالياً.\n\nإذا كان لديك رقم حجز محدد، أرسل الرقم فقط (مثال: 1793...).\nأو يمكنك تصفح الملاعب والأنشطة وحجز موعدك فوراً:\n👉 https://hagzy-acea1.web.app`
-        : `No active reservation was found for your phone number.\n\nIf you have a Booking ID, please reply with it directly.\nOr explore and book venues now at:\n👉 https://hagzy-acea1.web.app`;
+        ? `لم نتمكن من العثور على حجز نشط مرتبط برقمك حالياً.\n\nإذا كان لديك رقم حجز محدد، أرسل الرقم فقط (مثال: 1793...).\nأو يمكنك تصفح الملاعب والأنشطة وحجز موعدك فوراً:\n👉 https://hagzy-booking.web.app`
+        : `No active reservation was found for your phone number.\n\nIf you have a Booking ID, please reply with it directly.\nOr explore and book venues now at:\n👉 https://hagzy-booking.web.app`;
     }
   }
 
@@ -2559,16 +2559,16 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
       return arabic
         ? `⚠️ بخصوص إلغاء الحجز رقم (${matchedBooking.id}) في ${venue?.name || matchedBooking.venueId}:\n\n` +
           `يمكنك إلغاء الحجز واسترداد العربون لمحفظتك قبل الموعد بـ 6 ساعات مباشرة من التطبيق:\n` +
-          `👉 https://hagzy-acea1.web.app\n` +
+          `👉 https://hagzy-booking.web.app\n` +
           `أو أرسل "خدمة العملاء" للمساعدة الفورية.`
         : `⚠️ To cancel booking (${matchedBooking.id}) at ${venue?.name || matchedBooking.venueId}:\n\n` +
           `You can cancel directly on the app up to 6 hours before your slot to receive a wallet refund:\n` +
-          `👉 https://hagzy-acea1.web.app\n` +
+          `👉 https://hagzy-booking.web.app\n` +
           `Or reply "support" for customer assistance.`;
     }
     return arabic
-      ? `لإلغاء أي حجز، يرجى الدخول إلى صفحة "حجوزاتي" عبر الرابط https://hagzy-acea1.web.app واختيار "إلغاء الحجز".`
-      : `To cancel a booking, please open your Reservations page at https://hagzy-acea1.web.app and tap Cancel.`;
+      ? `لإلغاء أي حجز، يرجى الدخول إلى صفحة "حجوزاتي" عبر الرابط https://hagzy-booking.web.app واختيار "إلغاء الحجز".`
+      : `To cancel a booking, please open your Reservations page at https://hagzy-booking.web.app and tap Cancel.`;
   }
 
   // 6. Live Agent / Human Support ("خدمة العملاء", "موظف", "support", "human")
@@ -2586,14 +2586,14 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
       `2️⃣ لدفع العربون وطرق التحويل، أرسل: "دفع" أو "عربون".\n` +
       `3️⃣ لإلغاء حجز، أرسل: "إلغاء".\n` +
       `4️⃣ للتحدث مع خدمة العملاء، أرسل: "خدمة العملاء".\n\n` +
-      `👉 لتصفح وحجز الملاعب: https://hagzy-acea1.web.app`
+      `👉 لتصفح وحجز الملاعب: https://hagzy-booking.web.app`
     : `Welcome to Hagzy Assistant! 🏆👋\n\n` +
       `How can we help you today?\n` +
       `1️⃣ Check booking status: Reply "status" or your Booking ID.\n` +
       `2️⃣ Deposit payment options: Reply "pay" or "deposit".\n` +
       `3️⃣ Cancel a reservation: Reply "cancel".\n` +
       `4️⃣ Talk to human support: Reply "support".\n\n` +
-      `👉 Book venues: https://hagzy-acea1.web.app`;
+      `👉 Book venues: https://hagzy-booking.web.app`;
 }
 
 // UltraMsg Inbound WhatsApp Webhook
