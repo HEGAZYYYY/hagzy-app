@@ -1503,12 +1503,12 @@ class _BookTabState extends State<BookTab> {
       VenueType.salon => (
           localized(widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
           Icons.content_cut_rounded,
-          isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1),
+          isDark ? const Color(0xFFA5B4FC) : const Color(0xFF6366F1),
         ),
       VenueType.lounge => (
           localized(widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
           Icons.sports_esports_rounded,
-          isDark ? const Color(0xFFA78BFA) : const Color(0xFF8B5CF6),
+          isDark ? const Color(0xFFC4B5FD) : const Color(0xFF8B5CF6),
         ),
       VenueType.sports => (
           localized(widget.arabic, 'Sports & Courts', 'ملاعب ورياضة'),
@@ -1549,7 +1549,7 @@ class _BookTabState extends State<BookTab> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFFF1F5F9) : color,
+                      color: isDark ? Colors.white : color,
                     ),
                   ),
                 ),
@@ -1620,14 +1620,14 @@ class _BookTabState extends State<BookTab> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFFF1F5F9) : color,
+                      color: isDark ? Colors.white : color,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     Icons.close_rounded,
                     size: 14,
-                    color: isDark ? const Color(0xFFF1F5F9) : color,
+                    color: isDark ? Colors.white : color,
                   ),
                 ],
               ),
@@ -3722,6 +3722,8 @@ class VenueBrowseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final lowestPrice =
         venue.type == VenueType.salon && venue.services.isNotEmpty
             ? venue.services
@@ -3774,7 +3776,7 @@ class VenueBrowseCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        kInk,
+                        const Color(0xFF0F172A),
                         _accent.withValues(alpha: .85),
                       ],
                       begin: Alignment.bottomLeft,
@@ -3827,7 +3829,7 @@ class VenueBrowseCard extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: kInk.withValues(alpha: 0.78),
+                                    color: const Color(0xFF0F172A).withValues(alpha: 0.78),
                                     borderRadius: BorderRadius.circular(999),
                                     border: Border.all(
                                         color: Colors.white.withValues(alpha: 0.16)),
@@ -3860,9 +3862,9 @@ class VenueBrowseCard extends StatelessWidget {
                               Align(
                                 alignment: AlignmentDirectional.topEnd,
                                 child: Material(
-                                  color: favorite
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.94),
+                                  color: isDark
+                                      ? const Color(0xFF1E293B).withValues(alpha: 0.88)
+                                      : (favorite ? Colors.white : Colors.white.withValues(alpha: 0.94)),
                                   shape: const CircleBorder(),
                                   elevation: favorite ? 3 : 2,
                                   shadowColor: favorite
@@ -3882,7 +3884,7 @@ class VenueBrowseCard extends StatelessWidget {
                                           : Icons.favorite_border_rounded,
                                       color: favorite
                                           ? const Color(0xFFE11D48)
-                                          : kInk,
+                                          : (isDark ? Colors.white : const Color(0xFF0F172A)),
                                       size: 20,
                                     ),
                                   ),
@@ -3897,8 +3899,16 @@ class VenueBrowseCard extends StatelessWidget {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 9, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.95),
+                                        color: isDark
+                                            ? const Color(0xFF0F172A).withValues(alpha: 0.88)
+                                            : Colors.white.withValues(alpha: 0.95),
                                         borderRadius: BorderRadius.circular(999),
+                                        border: isDark
+                                            ? Border.all(
+                                                color: Colors.white.withValues(alpha: 0.20),
+                                                width: 0.8,
+                                              )
+                                            : null,
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
@@ -3910,7 +3920,7 @@ class VenueBrowseCard extends StatelessWidget {
                                             size: 14,
                                             color: hasReviews
                                                 ? const Color(0xFFF59E0B)
-                                                : kGreen,
+                                                : (isDark ? const Color(0xFF34D399) : kGreen),
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
@@ -3924,7 +3934,9 @@ class VenueBrowseCard extends StatelessWidget {
                                             style: TextStyle(
                                               fontSize: 10.5,
                                               fontWeight: FontWeight.w800,
-                                              color: kInk,
+                                              color: isDark
+                                                  ? const Color(0xFFF8FAFC)
+                                                  : const Color(0xFF0F172A),
                                             ),
                                           ),
                                         ],
@@ -4405,6 +4417,8 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final venue = widget.venue;
     final arabic = widget.arabic;
     return SafeArea(
@@ -4457,9 +4471,15 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
+                    color: isDark
+                        ? const Color(0xFF78350F).withValues(alpha: 0.35)
+                        : const Color(0xFFFFFBEB),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
+                          : const Color(0xFFFDE68A),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -4469,8 +4489,12 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                       const SizedBox(width: 4),
                       Text(
                         venue.rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 13),
+                        style: TextStyle(
+                            color: isDark
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFF92400E),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13),
                       ),
                     ],
                   ),
@@ -4478,9 +4502,13 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                 if (widget.onFavorite != null) ...[
                   const SizedBox(width: 8),
                   Material(
-                    color: widget.favorite
-                        ? const Color(0xFFFFE4E6)
-                        : const Color(0xFFF1F5F9),
+                    color: isDark
+                        ? (widget.favorite
+                            ? const Color(0xFFE11D48).withValues(alpha: 0.2)
+                            : const Color(0xFF1E293B))
+                        : (widget.favorite
+                            ? const Color(0xFFFFE4E6)
+                            : const Color(0xFFF1F5F9)),
                     shape: const CircleBorder(),
                     child: IconButton(
                       tooltip: widget.favorite
@@ -4495,7 +4523,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                             : Icons.favorite_border_rounded,
                         color: widget.favorite
                             ? const Color(0xFFE11D48)
-                            : kInk,
+                            : (isDark ? Colors.white : const Color(0xFF0F172A)),
                         size: 20,
                       ),
                     ),
