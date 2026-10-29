@@ -39,10 +39,6 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Hagzy needs access to your photos to attach payment receipts to reservations.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Hagzy needs camera access to scan QR check-in passes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Hagzy uses your location to show sports courts, salons, and venues near you on the map.</string>
 	<key>UIApplicationSceneManifest</key>

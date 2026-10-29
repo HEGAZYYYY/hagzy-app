@@ -245,21 +245,9 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
         'senderIdentifier': senderId,
       });
 
-      http.Response response;
-      try {
-        response = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 12));
-      } catch (_) {
-        response = http.Response(
-          jsonEncode({
-            'intentId': 'intent_${widget.bookingId}_${methodStr.toLowerCase()}',
-            'status': 'AWAITING_TRANSFER',
-            'expectedAmount': widget.amount,
-            'expectedSenderIdentifier': senderId,
-            'expires_at': DateTime.now().add(const Duration(minutes: 10)).toIso8601String(),
-          }),
-          200,
-        );
-      }
+      final response = await http
+          .post(url, headers: headers, body: body)
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -280,17 +268,26 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
           _handleVerifiedTransition();
         }
       } else {
-        final errBody = jsonDecode(response.body);
-        final errText = errBody['message'] ?? errBody['error'] ?? 'Failed to initiate payment session';
+        String errText = _localized(
+            'Failed to initiate payment session', 'فشل في بدء عملية الدفع');
+        try {
+          final errBody = jsonDecode(response.body);
+          if (errBody is Map) {
+            errText = errBody['message'] ?? errBody['error'] ?? errText;
+          }
+        } catch (_) {}
         setState(() {
           _isCreatingIntent = false;
-          _errorMessage = errText.toString();
+          _errorMessage = errText;
         });
       }
     } catch (e) {
       setState(() {
         _isCreatingIntent = false;
-        _errorMessage = e.toString();
+        _errorMessage = _localized(
+          'Unable to reach payment server. Please check your internet connection and try again.',
+          'تعذر الاتصال بسيرفر الدفع. يرجى التأكد من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+        );
       });
     }
   }

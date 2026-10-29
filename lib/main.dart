@@ -19,11 +19,20 @@ import 'screens/unified_payment_screen.dart';
 import 'theme/hagzy_theme.dart';
 import 'widgets/common_widgets.dart';
 import 'services/social_auth_service.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 export 'models/models.dart';
 export 'screens/login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      debugPrint('Firebase native init note: $e');
+    }
+  }
   runApp(const HagzyApp());
 }
 
