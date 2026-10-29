@@ -1496,22 +1496,24 @@ class _BookTabState extends State<BookTab> {
   }
 
   Widget _buildActiveCategoryFilterBanner() {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final type = _type!;
     final (label, icon, color) = switch (type) {
       VenueType.salon => (
           localized(widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
           Icons.content_cut_rounded,
-          const Color(0xFF6366F1),
+          isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1),
         ),
       VenueType.lounge => (
           localized(widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
           Icons.sports_esports_rounded,
-          const Color(0xFF8B5CF6),
+          isDark ? const Color(0xFFA78BFA) : const Color(0xFF8B5CF6),
         ),
       VenueType.sports => (
           localized(widget.arabic, 'Sports & Courts', 'ملاعب ورياضة'),
           Icons.sports_soccer_rounded,
-          kGreen,
+          isDark ? const Color(0xFF34D399) : kGreen,
         ),
     };
 
@@ -1522,9 +1524,16 @@ class _BookTabState extends State<BookTab> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: isDark
+            ? color.withValues(alpha: 0.16)
+            : color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: isDark
+              ? color.withValues(alpha: 0.45)
+              : color.withValues(alpha: 0.25),
+          width: 1.2,
+        ),
       ),
       child: Row(
         children: [
@@ -1540,7 +1549,7 @@ class _BookTabState extends State<BookTab> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: color,
+                      color: isDark ? const Color(0xFFF1F5F9) : color,
                     ),
                   ),
                 ),
@@ -1551,7 +1560,7 @@ class _BookTabState extends State<BookTab> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: color.withValues(alpha: 0.6),
+                      color: isDark ? Colors.white70 : color.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -1559,8 +1568,13 @@ class _BookTabState extends State<BookTab> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
+                      color: isDark
+                          ? color.withValues(alpha: 0.28)
+                          : color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
+                      border: isDark
+                          ? Border.all(color: color.withValues(alpha: 0.35))
+                          : null,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1572,7 +1586,7 @@ class _BookTabState extends State<BookTab> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: color,
+                            color: isDark ? const Color(0xFFF1F5F9) : color,
                           ),
                         ),
                       ],
@@ -1585,8 +1599,19 @@ class _BookTabState extends State<BookTab> {
           InkWell(
             onTap: () => _selectCategory(null),
             borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? color.withValues(alpha: 0.22)
+                    : color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark
+                      ? color.withValues(alpha: 0.45)
+                      : color.withValues(alpha: 0.20),
+                ),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1594,12 +1619,16 @@ class _BookTabState extends State<BookTab> {
                     localized(widget.arabic, 'Show All', 'عرض الكل'),
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: color,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? const Color(0xFFF1F5F9) : color,
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.close_rounded, size: 14, color: color),
+                  Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: isDark ? const Color(0xFFF1F5F9) : color,
+                  ),
                 ],
               ),
             ),
@@ -1690,24 +1719,38 @@ class _BookTabState extends State<BookTab> {
   }
 
   Widget _buildActiveSubCategoryBanner() {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final def = findSubCategoryDef(_subCategory!);
     if (def == null) return const SizedBox.shrink();
 
-    final accentColor = switch (def.parentType) {
+    final baseAccent = switch (def.parentType) {
       VenueType.salon => const Color(0xFF6366F1),
       VenueType.lounge => const Color(0xFF8B5CF6),
       VenueType.sports => kGreen,
     };
+
+    final accentColor = isDark
+        ? switch (def.parentType) {
+            VenueType.salon => const Color(0xFF818CF8),
+            VenueType.lounge => const Color(0xFFA78BFA),
+            VenueType.sports => const Color(0xFF34D399),
+          }
+        : baseAccent;
 
     final matchingCount = _getMatchingVenues().length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.08),
+        color: isDark
+            ? accentColor.withValues(alpha: 0.16)
+            : accentColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: accentColor.withValues(alpha: 0.28),
+          color: isDark
+              ? accentColor.withValues(alpha: 0.45)
+              : accentColor.withValues(alpha: 0.28),
           width: 1.2,
         ),
       ),
@@ -1719,7 +1762,7 @@ class _BookTabState extends State<BookTab> {
             child: Text(
               '${def.title(widget.arabic)}: ${localized(widget.arabic, '$matchingCount ${matchingCount == 1 ? 'place' : 'places'} available', '$matchingCount ${matchingCount == 1 ? 'مكان متاح' : 'أماكن متاحة'}')}',
               style: TextStyle(
-                color: accentColor,
+                color: isDark ? const Color(0xFFF1F5F9) : accentColor,
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
               ),
@@ -1728,8 +1771,19 @@ class _BookTabState extends State<BookTab> {
           InkWell(
             onTap: () => _selectSubCategory(null),
             borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? accentColor.withValues(alpha: 0.22)
+                    : accentColor.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark
+                      ? accentColor.withValues(alpha: 0.45)
+                      : accentColor.withValues(alpha: 0.20),
+                ),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1738,11 +1792,15 @@ class _BookTabState extends State<BookTab> {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
-                      color: accentColor,
+                      color: isDark ? const Color(0xFFF1F5F9) : accentColor,
                     ),
                   ),
                   const SizedBox(width: 3),
-                  Icon(Icons.close_rounded, size: 14, color: accentColor),
+                  Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: isDark ? const Color(0xFFF1F5F9) : accentColor,
+                  ),
                 ],
               ),
             ),
@@ -4846,16 +4904,30 @@ class _CategorySectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final color = isDark
+        ? switch (accentColor.toARGB32()) {
+            0xFF6366F1 => const Color(0xFF818CF8),
+            0xFF8B5CF6 => const Color(0xFFA78BFA),
+            _ => const Color(0xFF34D399),
+          }
+        : accentColor;
+
     return Padding(
       padding: const EdgeInsets.only(top: 18, bottom: 12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: accentColor.withValues(alpha: 0.05),
+          color: isDark
+              ? color.withValues(alpha: 0.14)
+              : color.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: accentColor.withValues(alpha: 0.15),
-            width: 1,
+            color: isDark
+                ? color.withValues(alpha: 0.38)
+                : color.withValues(alpha: 0.15),
+            width: 1.2,
           ),
         ),
         child: Row(
@@ -4863,10 +4935,12 @@ class _CategorySectionHeader extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.14),
+                color: isDark
+                    ? color.withValues(alpha: 0.25)
+                    : color.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: accentColor, size: 18),
+              child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -4880,7 +4954,7 @@ class _CategorySectionHeader extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: kInk,
+                          color: isDark ? const Color(0xFFF1F5F9) : kInk,
                           letterSpacing: -0.2,
                         ),
                       ),
@@ -4889,7 +4963,9 @@ class _CategorySectionHeader extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 1.5),
                         decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.15),
+                          color: isDark
+                              ? color.withValues(alpha: 0.28)
+                              : color.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -4897,7 +4973,7 @@ class _CategorySectionHeader extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,
-                            color: accentColor,
+                            color: isDark ? const Color(0xFFF1F5F9) : color,
                           ),
                         ),
                       ),
@@ -4907,7 +4983,7 @@ class _CategorySectionHeader extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       fontSize: 11.5,
-                      color: kMuted,
+                      color: isDark ? const Color(0xFF94A3B8) : kMuted,
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,
@@ -4919,7 +4995,7 @@ class _CategorySectionHeader extends StatelessWidget {
             TextButton(
               onPressed: onSeeAll,
               style: TextButton.styleFrom(
-                foregroundColor: accentColor,
+                foregroundColor: isDark ? const Color(0xFFF1F5F9) : color,
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
