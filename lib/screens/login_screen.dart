@@ -345,222 +345,191 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   Future<void> _signInWithGoogle() async {
     try {
-      if (kIsWeb) {
-        final res = await SocialAuthService.signInWithGoogle();
-        if (res != null) {
-          if (res['redirecting'] == true) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(localized(
-                    widget.arabic,
-                    'Redirecting to Google Sign-In...',
-                    'جاري الانتقال لتسجيل الدخول بجوجل...',
-                  )),
-                  backgroundColor: kInk,
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
-            return;
-          }
-          if (res['error'] != null) {
-            final err = res['error'].toString();
-            if (!err.contains('popup-closed-by-user') &&
-                !err.contains('cancelled') &&
-                mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(localized(
-                    widget.arabic,
-                    'Google Sign-In notice: $err',
-                    'تنبيه تسجيل الدخول بجوجل: $err',
-                  )),
-                  backgroundColor: Colors.redAccent,
-                ),
-              );
-            }
-            return;
-          }
-          final token = res['token'] as String?;
-          final name = res['name'] as String? ?? 'Hagzy Member';
-          final email = res['email'] as String? ?? '';
-          final phone = res['phone'] as String? ?? '';
-          final avatar = res['avatar'] as String? ?? '';
-          final providerId = res['providerId'] as String?;
-
-          double? walletBalance;
-          String? sessionToken = token;
-          if (widget.apiConfigured && token != null) {
-            try {
-              final backendRes = await widget.api.signInWithSocial(
-                provider: 'google',
-                email: email,
-                name: name,
-                avatar: avatar,
-                providerId: providerId,
-                idToken: token,
-              );
-              if (backendRes['customer'] is Map<String, dynamic>) {
-                final cust = backendRes['customer'] as Map<String, dynamic>;
-                walletBalance = (cust['walletBalance'] as num?)?.toDouble();
-              }
-              if (backendRes['token'] is String &&
-                  (backendRes['token'] as String).isNotEmpty) {
-                sessionToken = backendRes['token'] as String;
-              }
-            } catch (_) {}
-          }
-
-          await widget.onSignIn(
-            name: name,
-            email: email,
-            phone: phone,
-            token: sessionToken,
-            walletBalance: walletBalance,
-          );
-
+      final res = await SocialAuthService.signInWithGoogle();
+      if (res != null) {
+        if (res['redirecting'] == true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(localized(
                   widget.arabic,
-                  'Signed in with Google successfully!',
-                  'تم تسجيل الدخول بجوجل بنجاح!',
+                  'Redirecting to Google Sign-In...',
+                  'جاري الانتقال لتسجيل الدخول بجوجل...',
                 )),
                 backgroundColor: kInk,
+                duration: const Duration(seconds: 4),
               ),
             );
           }
           return;
         }
-      } else {
+        if (res['error'] != null) {
+          final err = res['error'].toString();
+          if (!err.contains('popup-closed-by-user') &&
+              !err.contains('canceled') &&
+              !err.contains('cancelled') &&
+              mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localized(
+                  widget.arabic,
+                  'Google Sign-In notice: $err',
+                  'تنبيه تسجيل الدخول بجوجل: $err',
+                )),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+          return;
+        }
+        final token = res['token'] as String?;
+        final name = res['name'] as String? ?? 'Hagzy Member';
+        final email = res['email'] as String? ?? '';
+        final phone = res['phone'] as String? ?? '';
+        final avatar = res['avatar'] as String? ?? '';
+        final providerId = res['providerId'] as String?;
+
+        double? walletBalance;
+        String? sessionToken = token;
+        if (widget.apiConfigured && token != null) {
+          try {
+            final backendRes = await widget.api.signInWithSocial(
+              provider: 'google',
+              email: email,
+              name: name,
+              avatar: avatar,
+              providerId: providerId,
+              idToken: token,
+            );
+            if (backendRes['customer'] is Map<String, dynamic>) {
+              final cust = backendRes['customer'] as Map<String, dynamic>;
+              walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+            }
+            if (backendRes['token'] is String &&
+                (backendRes['token'] as String).isNotEmpty) {
+              sessionToken = backendRes['token'] as String;
+            }
+          } catch (_) {}
+        }
+
+        await widget.onSignIn(
+          name: name,
+          email: email,
+          phone: phone,
+          token: sessionToken,
+          walletBalance: walletBalance,
+        );
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(localized(
                 widget.arabic,
-                'Google sign-in is enabled on Hagzy Web. Please sign in using Phone.',
-                'تسجيل الدخول بجوجل متاح عبر المتصفح. يرجى تسجيل الدخول برقم الموبايل.',
+                'Signed in with Google successfully!',
+                'تم تسجيل الدخول بجوجل بنجاح!',
               )),
               backgroundColor: kInk,
             ),
           );
         }
+        return;
       }
     } catch (_) {}
   }
 
-  // Apple Sign-In paused pending Apple Developer Services ID setup.
-  /*
   Future<void> _signInWithApple() async {
     try {
-      if (kIsWeb) {
-        final res = await SocialAuthService.signInWithApple();
-        if (res != null) {
-          if (res['redirecting'] == true) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(localized(
-                    widget.arabic,
-                    'Redirecting to Apple Sign-In...',
-                    'جاري الانتقال لتسجيل الدخول بحساب أبل...',
-                  )),
-                  backgroundColor: kInk,
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
-            return;
-          }
-          if (res['error'] != null) {
-            final err = res['error'].toString();
-            if (!err.contains('popup-closed-by-user') &&
-                !err.contains('cancelled') &&
-                mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(localized(
-                    widget.arabic,
-                    'Apple Sign-In notice: $err',
-                    'تنبيه تسجيل الدخول بحساب أبل: $err',
-                  )),
-                  backgroundColor: Colors.redAccent,
-                ),
-              );
-            }
-            return;
-          }
-          final token = res['token'] as String?;
-          final name = res['name'] as String? ?? 'Apple Member';
-          final email = res['email'] as String? ?? '';
-          final phone = res['phone'] as String? ?? '';
-          final avatar = res['avatar'] as String? ?? '';
-          final providerId = res['providerId'] as String?;
-
-          double? walletBalance;
-          String? sessionToken = token;
-          if (widget.apiConfigured && token != null) {
-            try {
-              final backendRes = await widget.api.signInWithSocial(
-                provider: 'apple',
-                email: email,
-                name: name,
-                avatar: avatar,
-                providerId: providerId,
-                idToken: token,
-              );
-              if (backendRes['customer'] is Map<String, dynamic>) {
-                final cust = backendRes['customer'] as Map<String, dynamic>;
-                walletBalance = (cust['walletBalance'] as num?)?.toDouble();
-              }
-              if (backendRes['token'] is String &&
-                  (backendRes['token'] as String).isNotEmpty) {
-                sessionToken = backendRes['token'] as String;
-              }
-            } catch (_) {}
-          }
-
-          await widget.onSignIn(
-            name: name,
-            email: email,
-            phone: phone,
-            token: sessionToken,
-            walletBalance: walletBalance,
-          );
-
+      final res = await SocialAuthService.signInWithApple();
+      if (res != null) {
+        if (res['redirecting'] == true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(localized(
                   widget.arabic,
-                  'Signed in with Apple successfully!',
-                  'تم تسجيل الدخول بحساب أبل بنجاح!',
+                  'Redirecting to Apple Sign-In...',
+                  'جاري الانتقال لتسجيل الدخول بحساب أبل...',
                 )),
                 backgroundColor: kInk,
+                duration: const Duration(seconds: 4),
               ),
             );
           }
           return;
         }
-      } else {
+        if (res['error'] != null) {
+          final err = res['error'].toString();
+          if (!err.contains('popup-closed-by-user') &&
+              !err.contains('canceled') &&
+              !err.contains('cancelled') &&
+              mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localized(
+                  widget.arabic,
+                  'Apple Sign-In notice: $err',
+                  'تنبيه تسجيل الدخول بحساب أبل: $err',
+                )),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+          return;
+        }
+        final token = res['token'] as String?;
+        final name = res['name'] as String? ?? 'Apple Member';
+        final email = res['email'] as String? ?? '';
+        final phone = res['phone'] as String? ?? '';
+        final avatar = res['avatar'] as String? ?? '';
+        final providerId = res['providerId'] as String?;
+
+        double? walletBalance;
+        String? sessionToken = token;
+        if (widget.apiConfigured && token != null) {
+          try {
+            final backendRes = await widget.api.signInWithSocial(
+              provider: 'apple',
+              email: email,
+              name: name,
+              avatar: avatar,
+              providerId: providerId,
+              idToken: token,
+            );
+            if (backendRes['customer'] is Map<String, dynamic>) {
+              final cust = backendRes['customer'] as Map<String, dynamic>;
+              walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+            }
+            if (backendRes['token'] is String &&
+                (backendRes['token'] as String).isNotEmpty) {
+              sessionToken = backendRes['token'] as String;
+            }
+          } catch (_) {}
+        }
+
+        await widget.onSignIn(
+          name: name,
+          email: email,
+          phone: phone,
+          token: sessionToken,
+          walletBalance: walletBalance,
+        );
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(localized(
                 widget.arabic,
-                'Apple sign-in is enabled on Hagzy Web. Please sign in using Phone.',
-                'تسجيل الدخول بحساب أبل متاح عبر المتصفح. يرجى تسجيل الدخول برقم الموبايل.',
+                'Signed in with Apple successfully!',
+                'تم تسجيل الدخول بحساب أبل بنجاح!',
               )),
               backgroundColor: kInk,
             ),
           );
         }
+        return;
       }
     } catch (_) {}
   }
-  */
 
   @override
   Widget build(BuildContext context) {
@@ -1003,6 +972,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   arabic: arabic,
                                   onTap: _signInWithGoogle,
                                 ),
+                                if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+                                  const SizedBox(height: 10),
+                                  _SocialSignInButton(
+                                    provider: 'apple',
+                                    arabic: arabic,
+                                    onTap: _signInWithApple,
+                                  ),
+                                ],
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [

@@ -17,9 +17,16 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Build config fields for Webhook destination & Secret
-        buildConfigField("String", "WEBHOOK_URL", "\"https://paymentgatewaywebhook-acea1-uc.a.run.app\"")
-        buildConfigField("String", "WEBHOOK_SECRET", "\"hagzy_egypt_secret_live_83917401\"")
+        // Build config fields for Webhook destination & Secret (injected from ENV / properties)
+        val webhookUrl = (project.findProperty("PAYMENT_WEBHOOK_URL") as? String)
+            ?: System.getenv("PAYMENT_WEBHOOK_URL")
+            ?: "https://paymentgatewaywebhook-acea1-uc.a.run.app"
+        val webhookSecret = (project.findProperty("PAYMENT_WEBHOOK_SECRET") as? String)
+            ?: System.getenv("PAYMENT_WEBHOOK_SECRET")
+            ?: ""
+
+        buildConfigField("String", "WEBHOOK_URL", "\"$webhookUrl\"")
+        buildConfigField("String", "WEBHOOK_SECRET", "\"$webhookSecret\"")
     }
 
     buildTypes {

@@ -2257,7 +2257,7 @@ function normalizeSenderId(method, raw) {
   return trimmed;
 }
 
-app.post('/api/payments/intent', async (req, res) => {
+app.post('/api/payments/intent', optionalAuth, async (req, res) => {
   const { bookingId, paymentMethod, senderIdentifier } = req.body || {};
   if (!bookingId || !paymentMethod || !senderIdentifier) {
     return res.status(400).json({ error: 'bookingId, paymentMethod, and senderIdentifier are required.' });
@@ -2269,11 +2269,17 @@ app.post('/api/payments/intent', async (req, res) => {
     return res.status(400).json({ error: 'Invalid sender identifier format.' });
   }
 
-  // Look up booking authoritative amount
+  // Look up booking authoritative amount and ownership
   let authoritativeAmount = 0;
   const localBooking = Array.isArray(db.bookings) ? db.bookings.find(b => b.id === bookingId) : null;
   if (localBooking) {
+    // If the booking has an owner and the caller is authenticated, verify ownership
+    if (req.user && localBooking.userId && localBooking.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized: Booking belongs to another user.' });
+    }
     authoritativeAmount = Number(localBooking.depositAmount ?? localBooking.totalPrice ?? localBooking.price ?? 100);
+  } else if (!IS_TEST) {
+    return res.status(404).json({ error: 'Booking not found.' });
   }
 
   const intentId = `intent_${bookingId}_${method.toLowerCase()}`;
@@ -2404,7 +2410,12 @@ app.get('/api/payments/intent/:intentId', async (req, res) => {
 app.post('/api/payments/webhook', async (req, res) => {
   const crypto = require('crypto');
   const signature = req.headers['x-webhook-signature'];
-  const secret = process.env.PAYMENT_WEBHOOK_SECRET || 'hagzy_egypt_secret_live_83917401';
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET;
+
+  if (!secret) {
+    console.error('PAYMENT_WEBHOOK_SECRET is not configured in environment variables.');
+    return res.status(500).json({ error: 'Webhook secret is not configured on server.' });
+  }
 
   if (!signature) {
     return res.status(401).json({ error: 'Missing X-Webhook-Signature header' });

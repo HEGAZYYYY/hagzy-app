@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "112586231867",
+    "project_id": "hagzy-acea1",
+    "storage_bucket": "hagzy-acea1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:112586231867:android:6ec45129c26bce8a500c1e",
+        "android_client_info": {
+          "package_name": "com.hagzy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "112586231867-1h3nmb49t5f0m970vt8mna0bfn9kvl9r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfrTnZrb_Xc3XljvlslkzxIMlC_TWB3JY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "112586231867-1h3nmb49t5f0m970vt8mna0bfn9kvl9r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
