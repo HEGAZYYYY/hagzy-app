@@ -8,6 +8,7 @@ import '../hagzy_api.dart';
 import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
+import 'unified_payment_screen.dart';
 
 class MyBookingsTab extends StatefulWidget {
   const MyBookingsTab({
@@ -203,13 +204,30 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       ),
     );
     if (confirmed == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(localized(
-              arabic,
-              'Transfer ${amount.toInt()} EGP to hagzy@instapay or 01024129393 and send the receipt on WhatsApp to credit your wallet.',
-              'حوّل ${amount.toInt()} ج.م إلى hagzy@instapay أو 01024129393 وأرسل الإيصال عبر واتساب لشحن محفظتك.')),
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => UnifiedPaymentScreen(
+            bookingId: 'wallet_topup_${DateTime.now().millisecondsSinceEpoch}',
+            amount: amount,
+            arabic: arabic,
+            initialMethod: 'instapay',
+            receiverIpa: 'mohamedra4adhegazy@instapay',
+            receiverWallet: '01024129393',
+            onPaymentVerified: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: kGreen,
+                  content: Text(localized(
+                    arabic,
+                    'Wallet successfully credited with ${amount.toInt()} EGP!',
+                    'تم شحن المحفظة بنجاح بمبلغ ${amount.toInt()} ج.م!',
+                  )),
+                ),
+              );
+            },
+          ),
         ),
       );
     }

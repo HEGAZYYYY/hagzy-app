@@ -1,0 +1,360 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model & Schemas
+    // ===============================================================
+    //
+    // 1. Collection: incoming_payment_events
+    //    Document ID: {eventId} (UUID or provider webhook ID)
+    //    Access: Server / Cloud Functions / Admin SDK only (read/write: false for all clients)
+    //    Fields:
+    //      - payment_method: string (required)
+    //      - sender_identifier: string (required)
+    //      - amount: number (required)
+    //      - is_claimed: bool (required)
+    //      - provider_ref: string (required)
+    //      - received_at: timestamp (required)
+    //
+    // 2. Collection: payment_intents
+    //    Document ID: {intentId}
+    //    Access: Authenticated owner read-only (resource.data.user_id == request.auth.uid)
+    //            Mutations restricted exclusively to Cloud Functions / Admin SDK (write: false)
+    //    Fields:
+    //      - user_id: string (owner uid)
+    //      - payment_method: string
+    //      - expected_sender_identifier: string
+    //      - expected_amount: number
+    //      - status: string
+    //      - created_at: timestamp
+    //      - expires_at: timestamp
+    //
+    // 3. Collection: users
+    //    Document ID: {userId} (Firebase Auth UID)
+    //    Access: Read and write restricted to document owner (request.auth.uid == userId) or admin
+    //    Subcollection: users/{userId}/bookings/{bookingId}
+    //      - Read: owner or admin
+    //      - Create: owner or admin
+    //      - Update/Delete: owner or admin
+    //    Fields:
+    //      - id: string (optional, matches document id)
+    //      - name: string (optional, 1..100 chars)
+    //      - email: string (optional, 0..100 chars)
+    //      - phone: string (optional, 0..30 chars)
+    //      - walletBalance: number (optional, >= 0)
+    //      - role: string (optional, only admin can set 'admin')
+    //      - bookingsCount: number (optional, >= 0)
+    //      - confirmedBookingsCount: number (optional, >= 0)
+    //      - pendingBookingsCount: number (optional, >= 0)
+    //      - bookings: list (optional summary list, <= 500 items)
+    //      - firebaseUid: string (optional, 0..128 chars)
+    //      - createdAt: timestamp | string (optional)
+    //      - updatedAt: timestamp | string (optional)
+    //
+    // 4. Collection: bookings
+    //    Document ID: {bookingId}
+    //    Access: Read restricted to authenticated owner or admin; writes validated & authorized
+    //    Fields:
+    //      - id: string (optional, 1..128 chars)
+    //      - venueId: string (optional, 0..128 chars)
+    //      - venueName: string (optional, 0..200 chars)
+    //      - itemId: string (optional, 0..128 chars)
+    //      - customer: string (optional, 0..100 chars)
+    //      - phone: string (optional, 0..30 chars)
+    //      - email: string (optional, 0..100 chars)
+    //      - status: string (optional, 0..50 chars)
+    //      - paymentStatus: string (optional, 0..50 chars)
+    //      - paymentMethod: string (optional, 0..50 chars)
+    //      - paymentReference: string (optional, 0..100 chars)
+    //      - promoCode: string (optional, 0..50 chars)
+    //      - staffMember: string (optional, 0..100 chars)
+    //      - blockReason: string (optional, 0..200 chars)
+    //      - userId: string (optional, 0..128 chars)
+    //      - ownerId: string (optional, 0..128 chars)
+    //      - customerId: string (optional, 0..128 chars)
+    //      - durationMinutes: number (optional, 0..1440)
+    //      - price: number (optional, 0..1000000)
+    //      - dueNow: number (optional, 0..1000000)
+    //      - discountAmount: number (optional, 0..1000000)
+    //      - splitCount: number (optional, 1..100)
+    //      - multiController: bool (optional)
+    //      - cancelled: bool (optional)
+    //      - serviceNames: list (optional, <= 50 strings)
+    //      - startsAt: timestamp | string (optional)
+    //      - holdExpiresAt: timestamp | string (optional)
+    //      - createdAt: timestamp | string (optional)
+    //      - updatedAt: timestamp | string (optional)
+    //
+    // 5. Collection: venues
+    //    Document ID: {venueId}
+    //    Access: Publicly readable; mutations restricted strictly to administrators
+    //    Fields:
+    //      - id: string (optional, 1..128 chars)
+    //      - name: string (optional, 1..200 chars)
+    //      - location: string (optional, 0..200 chars)
+    //      - type: string (optional, 0..50 chars)
+    //      - ownerPhone: string (optional, 0..30 chars)
+    //      - depositPercent: number (optional, 0..100)
+    //      - imageUrl: string (optional, 0..1000 chars)
+    //      - description: string (optional, 0..2000 chars)
+    //      - googleMapsUrl: string (optional, 0..1000 chars)
+    //      - instaPayAddress: string (optional, 0..100 chars)
+    //      - vodafoneCashNumber: string (optional, 0..30 chars)
+    //      - openHour: number (optional, 0..24)
+    //      - closeHour: number (optional, 0..24)
+    //      - rating: number (optional, 0..5)
+    //      - latitude: number (optional, -90..90)
+    //      - longitude: number (optional, -180..180)
+    //      - subCategories: list (optional, <= 50 items)
+    //      - staffMembers: list (optional, <= 100 items)
+    //      - galleryUrls: list (optional, <= 50 items)
+    //      - amenities: list (optional, <= 50 items)
+    //      - reviews: list (optional, <= 1000 items)
+    //      - items: list (optional, <= 100 items)
+    //      - services: list (optional, <= 100 items)
+    //      - createdAt: timestamp | string (optional)
+    //      - updatedAt: timestamp | string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user has verified admin privileges
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.get('admin', false) == true ||
+        request.auth.token.get('role', '') == 'admin' ||
+        (
+          request.auth.token.get('email_verified', false) == true &&
+          request.auth.token.get('email', '') in ['admin@hagzy.com', 'owner@hagzy.com']
+        )
+      );
+    }
+
+    // Check if the current authenticated user owns the document path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate string presence, type, and character length bounds
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // Validate optional string type and length if present
+    function isValidOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() >= minLen && data[field].size() <= maxLen);
+    }
+
+    // Validate number type (int or float) within numeric range
+    function isValidNumber(val, minVal, maxVal) {
+      return (val is int || val is float) && val >= minVal && val <= maxVal;
+    }
+
+    // Validate optional number within numeric range if present
+    function isValidOptionalNumber(data, field, minVal, maxVal) {
+      return !(field in data) || isValidNumber(data[field], minVal, maxVal);
+    }
+
+    // Validate optional list type and item count limit
+    function isValidOptionalList(data, field, maxCount) {
+      return !(field in data) || (data[field] is list && data[field].size() <= maxCount);
+    }
+
+    // Validate optional boolean type if present
+    function isValidOptionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
+    }
+
+    // Validate optional timestamp or ISO date string (length <= 50)
+    function isValidOptionalTimestampOrString(data, field) {
+      return !(field in data) || (data[field] is timestamp || (data[field] is string && data[field].size() <= 50));
+    }
+
+    // ===============================================================
+    // Domain Validator Functions (Applied to both create and update)
+    // ===============================================================
+
+    // Validates user document schema and resource constraints
+    function isValidUser(data) {
+      return (!('name' in data) || isValidString(data.name, 1, 100)) &&
+             (!('id' in data) || isValidString(data.id, 1, 128)) &&
+             isValidOptionalString(data, 'email', 0, 100) &&
+             isValidOptionalString(data, 'phone', 0, 30) &&
+             isValidOptionalString(data, 'firebaseUid', 0, 128) &&
+             isValidOptionalNumber(data, 'walletBalance', 0, 1000000) &&
+             isValidOptionalNumber(data, 'bookingsCount', 0, 100000) &&
+             isValidOptionalNumber(data, 'confirmedBookingsCount', 0, 100000) &&
+             isValidOptionalNumber(data, 'pendingBookingsCount', 0, 100000) &&
+             isValidOptionalList(data, 'bookings', 500) &&
+             isValidOptionalTimestampOrString(data, 'createdAt') &&
+             isValidOptionalTimestampOrString(data, 'updatedAt') &&
+             (!('role' in data) || data.role in ['customer', 'user', 'member'] || isAdmin());
+    }
+
+    // Enforces immutability of identity fields and role escalation protection on user updates
+    function isUserUpdateAllowed() {
+      return (!('id' in resource.data) || !('id' in request.resource.data) || request.resource.data.id == resource.data.id) &&
+             (!('firebaseUid' in resource.data) || !('firebaseUid' in request.resource.data) || request.resource.data.firebaseUid == resource.data.firebaseUid) &&
+             (!('role' in request.resource.data) || request.resource.data.role == resource.data.get('role', 'customer') || isAdmin());
+    }
+
+    // Validates booking document schema and resource bounds
+    function isValidBooking(data) {
+      return (!('id' in data) || isValidString(data.id, 1, 128)) &&
+             isValidOptionalString(data, 'venueId', 0, 128) &&
+             isValidOptionalString(data, 'venueName', 0, 200) &&
+             isValidOptionalString(data, 'itemId', 0, 128) &&
+             isValidOptionalString(data, 'customer', 0, 100) &&
+             isValidOptionalString(data, 'phone', 0, 30) &&
+             isValidOptionalString(data, 'email', 0, 100) &&
+             isValidOptionalString(data, 'status', 0, 50) &&
+             isValidOptionalString(data, 'paymentStatus', 0, 50) &&
+             isValidOptionalString(data, 'paymentMethod', 0, 50) &&
+             isValidOptionalString(data, 'paymentReference', 0, 100) &&
+             isValidOptionalString(data, 'promoCode', 0, 50) &&
+             isValidOptionalString(data, 'staffMember', 0, 100) &&
+             isValidOptionalString(data, 'blockReason', 0, 200) &&
+             isValidOptionalString(data, 'userId', 0, 128) &&
+             isValidOptionalString(data, 'ownerId', 0, 128) &&
+             isValidOptionalString(data, 'customerId', 0, 128) &&
+             isValidOptionalNumber(data, 'durationMinutes', 0, 1440) &&
+             isValidOptionalNumber(data, 'price', 0, 1000000) &&
+             isValidOptionalNumber(data, 'dueNow', 0, 1000000) &&
+             isValidOptionalNumber(data, 'discountAmount', 0, 1000000) &&
+             isValidOptionalNumber(data, 'splitCount', 1, 100) &&
+             isValidOptionalBool(data, 'multiController') &&
+             isValidOptionalBool(data, 'cancelled') &&
+             isValidOptionalList(data, 'serviceNames', 50) &&
+             isValidOptionalTimestampOrString(data, 'startsAt') &&
+             isValidOptionalTimestampOrString(data, 'holdExpiresAt') &&
+             isValidOptionalTimestampOrString(data, 'createdAt') &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
+    }
+
+    // Enforces immutability of booking ownership and identifier on update
+    function isBookingUpdateAllowed() {
+      return (!('id' in resource.data) || !('id' in request.resource.data) || request.resource.data.id == resource.data.id) &&
+             (!('userId' in resource.data) || !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
+             (!('ownerId' in resource.data) || !('ownerId' in request.resource.data) || request.resource.data.ownerId == resource.data.ownerId);
+    }
+
+    // Validates venue catalog schema and resource bounds
+    function isValidVenue(data) {
+      return (!('name' in data) || isValidString(data.name, 1, 200)) &&
+             (!('id' in data) || isValidString(data.id, 1, 128)) &&
+             isValidOptionalString(data, 'location', 0, 200) &&
+             isValidOptionalString(data, 'type', 0, 50) &&
+             isValidOptionalString(data, 'ownerPhone', 0, 30) &&
+             isValidOptionalString(data, 'imageUrl', 0, 1000) &&
+             isValidOptionalString(data, 'description', 0, 2000) &&
+             isValidOptionalString(data, 'googleMapsUrl', 0, 1000) &&
+             isValidOptionalString(data, 'instaPayAddress', 0, 100) &&
+             isValidOptionalString(data, 'vodafoneCashNumber', 0, 30) &&
+             isValidOptionalNumber(data, 'depositPercent', 0, 100) &&
+             isValidOptionalNumber(data, 'openHour', 0, 24) &&
+             isValidOptionalNumber(data, 'closeHour', 0, 24) &&
+             isValidOptionalNumber(data, 'rating', 0, 5) &&
+             isValidOptionalNumber(data, 'latitude', -90, 90) &&
+             isValidOptionalNumber(data, 'longitude', -180, 180) &&
+             isValidOptionalList(data, 'subCategories', 50) &&
+             isValidOptionalList(data, 'staffMembers', 100) &&
+             isValidOptionalList(data, 'galleryUrls', 50) &&
+             isValidOptionalList(data, 'amenities', 50) &&
+             isValidOptionalList(data, 'reviews', 1000) &&
+             isValidOptionalList(data, 'items', 100) &&
+             isValidOptionalList(data, 'services', 100) &&
+             isValidOptionalTimestampOrString(data, 'createdAt') &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
+    }
+
+    // ===============================================================
+    // Rules Specifications
+    // ===============================================================
+
+    // 1. Incoming Payment Events:
+    // Admin SDK / Cloud Functions access ONLY. Clients must never be able to read or write directly.
+    match /incoming_payment_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    // 2. Payment Intents:
+    // Authenticated users can read their own payment intents.
+    // Clients CANNOT write, create, update, or delete directly (handled via Cloud Functions / Admin SDK).
+    match /payment_intents/{intentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.user_id == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
+    // 3. Users Collection & Subcollections:
+    // Allow read, write if authenticated user owns the document (request.auth.uid == userId) or admin.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && isUserUpdateAllowed();
+      allow delete: if isOwner(userId) || isAdmin();
+
+      // Nested user bookings subcollection:
+      // Allow read, create, update, delete restricted to document owner or admin
+      match /bookings/{bookingId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if (isOwner(userId) || isAdmin()) && isValidBooking(request.resource.data);
+        allow update: if (isOwner(userId) || isAdmin()) && isValidBooking(request.resource.data) && isBookingUpdateAllowed();
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // 4. Bookings Collection (Root level):
+    // Allow read if authenticated and either user or admin.
+    // Disallow unauthorized writes.
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('customerId', '') == request.auth.uid ||
+        resource.data.get('ownerId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('ownerId', '') == request.auth.uid ||
+        request.resource.data.get('customerId', '') == request.auth.uid ||
+        isAdmin()
+      ) && isValidBooking(request.resource.data);
+      allow update: if isAuthenticated() && (
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('ownerId', '') == request.auth.uid ||
+        resource.data.get('customerId', '') == request.auth.uid ||
+        isAdmin()
+      ) && isValidBooking(request.resource.data) && isBookingUpdateAllowed();
+      allow delete: if isAdmin();
+    }
+
+    // 5. Venues Collection:
+    // Publicly readable. Write allowed only for admins or denied by default for standard users.
+    match /venues/{venueId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidVenue(request.resource.data);
+      allow update: if isAdmin() && isValidVenue(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // 6. Default Deny:
+    // Deny all reads and writes for any unspecified paths.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

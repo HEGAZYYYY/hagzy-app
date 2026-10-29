@@ -1023,13 +1023,17 @@ class PaymentMethodTile extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              color: enabled ? kInk : kMuted,
-                              letterSpacing: -0.2,
+                          Flexible(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: enabled ? kInk : kMuted,
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ),
                           if (badgeText != null) ...[
