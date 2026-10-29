@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Hagzy Payment Gateway</string>
+    <string name="status_active">Oracle Active &amp; Ready</string>
+    <string name="permission_sms">SMS Access</string>
+    <string name="permission_notifications">Notification Access</string>
+    <string name="permission_battery">Ignore Battery Optimizations</string>
+    <string name="simulate_instapay">Simulate InstaPay (150 EGP)</string>
+    <string name="simulate_vodafone">Simulate Vodafone Cash (200 EGP)</string>
+    <string name="live_events_header">Live Captured Payments</string>
+    <string name="no_events_yet">No payment events captured yet.</string>
+</resources>
+

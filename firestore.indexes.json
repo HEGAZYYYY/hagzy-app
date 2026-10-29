@@ -1,0 +1,44 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "payment_intents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "payment_method", "order": "ASCENDING" },
+        { "fieldPath": "expected_sender_identifier", "order": "ASCENDING" },
+        { "fieldPath": "expected_amount", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "expires_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payment_intents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incoming_payment_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "payment_method", "order": "ASCENDING" },
+        { "fieldPath": "sender_identifier", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" },
+        { "fieldPath": "is_claimed", "order": "ASCENDING" },
+        { "fieldPath": "received_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incoming_payment_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "provider_ref", "order": "ASCENDING" },
+        { "fieldPath": "received_at", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
+

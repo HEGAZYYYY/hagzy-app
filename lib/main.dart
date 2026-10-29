@@ -15,6 +15,7 @@ import 'screens/book_tab.dart';
 import 'screens/login_screen.dart';
 import 'screens/my_bookings_tab.dart';
 import 'screens/profile_tab.dart';
+import 'screens/unified_payment_screen.dart';
 import 'theme/hagzy_theme.dart';
 import 'widgets/common_widgets.dart';
 import 'services/social_auth_service.dart';
@@ -2501,6 +2502,24 @@ class _HagzyHomeState extends State<HagzyHome> {
                 ),
                 const SizedBox(height: 8),
                 PaymentMethodTile(
+                  icon: Icons.flash_on_rounded,
+                  title: localized(
+                    arabic,
+                    'Automated Zero-Screenshot Verification',
+                    'الدفع والتحقق الآلي الفوري',
+                  ),
+                  subtitle: localized(
+                    arabic,
+                    'Auto-verified by phone oracle in seconds',
+                    'تحقق آلي فوري بدون الحاجة لرفع إيصالات',
+                  ),
+                  enabled: true,
+                  accentColor: const Color(0xFF6366F1),
+                  badgeText: localized(arabic, 'AUTO-VERIFY ⚡', 'تأكيد آلي ⚡'),
+                  onTap: () => Navigator.pop(context, 'automated'),
+                ),
+                const SizedBox(height: 8),
+                PaymentMethodTile(
                   icon: Icons.credit_card_rounded,
                   title: 'Paymob',
                   subtitle: localized(
@@ -2582,6 +2601,40 @@ class _HagzyHomeState extends State<HagzyHome> {
       await _startPaymobCheckout(booking, paymentMethod: 'card');
     } else if (method == 'fawry') {
       await _startFawryCheckout(booking, dueNow);
+    } else if (method == 'automated') {
+      if (!mounted) return;
+      final verified = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => UnifiedPaymentScreen(
+            bookingId: booking.id,
+            amount: dueNow,
+            arabic: arabic,
+            initialMethod: 'instapay',
+            receiverIpa: venue?.instaPayAddress.isNotEmpty == true
+                ? venue!.instaPayAddress
+                : 'mohamedra4adhegazy@instapay',
+            receiverWallet: venue?.vodafoneCashNumber.isNotEmpty == true
+                ? venue!.vodafoneCashNumber
+                : '01024129393',
+            prefilledSenderPhone: booking.phone.isNotEmpty
+                ? booking.phone
+                : _savedCustomerPhone,
+            authToken: _adminToken,
+            onPaymentVerified: () {
+              _confirmBooking(booking);
+            },
+          ),
+        ),
+      );
+      if (verified == true && mounted) {
+        await _confirmBooking(booking);
+        if (mounted) setState(() => _tab = 1);
+        _message(localized(
+            arabic,
+            'Payment verified by oracle! Booking is now confirmed.',
+            'تم التحقق من الدفع آلياً وتأكيد الحجز بنجاح!'));
+      }
     } else if (method == 'instapay') {
       await _submitManualTransferProof(
         booking: booking,
