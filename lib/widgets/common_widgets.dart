@@ -971,6 +971,8 @@ class PaymentMethodTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final color = _resolvedAccent;
     return PressableScale(
       onTap: enabled ? onTap : null,
@@ -983,7 +985,11 @@ class PaymentMethodTile extends StatelessWidget {
           child: Ink(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: enabled ? kPanel : const Color(0xFFF5F2EC),
+              color: enabled
+                  ? kPanel
+                  : (isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF5F2EC)),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: enabled ? color.withValues(alpha: 0.25) : kBorder,
@@ -999,7 +1005,9 @@ class PaymentMethodTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: enabled
                         ? color.withValues(alpha: 0.12)
-                        : Colors.black.withValues(alpha: 0.04),
+                        : (isDark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.black.withValues(alpha: 0.04)),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
@@ -1030,7 +1038,9 @@ class PaymentMethodTile extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.12),
+                                color: enabled
+                                    ? color.withValues(alpha: 0.12)
+                                    : kMuted.withValues(alpha: 0.14),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
@@ -1038,7 +1048,7 @@ class PaymentMethodTile extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w900,
-                                  color: color,
+                                  color: enabled ? color : kMuted,
                                   letterSpacing: 0.4,
                                 ),
                               ),

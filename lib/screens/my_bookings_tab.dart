@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../hagzy_api.dart';
@@ -79,35 +80,114 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             children: [
               const Icon(Icons.account_balance_wallet_rounded, color: kGreen),
               const SizedBox(width: 8),
-              Text(localized(arabic, 'Top Up Hagzy Wallet', 'شحن محفظة حجزي')),
+              Expanded(
+                child: Text(localized(
+                    arabic, 'Top Up Hagzy Wallet', 'شحن محفظة حجزي')),
+              ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '${localized(arabic, 'Current Balance:', 'رصيدك الحالي:')} ${formatMoney(currentBalance)} EGP',
-                style:
-                    TextStyle(fontWeight: FontWeight.w700, color: kMuted),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                  localized(arabic, 'Select Top-Up Amount:', 'اختر مبلغ الشحن:'),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 13)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [50.0, 100.0, 200.0, 500.0].map((amt) {
-                  return ChoiceChip(
-                    label: Text('${amt.toInt()} EGP'),
-                    selected: amount == amt,
-                    onSelected: (_) => setDlgState(() => amount = amt),
-                  );
-                }).toList(),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${localized(arabic, 'Current Balance:', 'رصيدك الحالي:')} ${formatMoney(currentBalance)} EGP',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: kMuted),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                    localized(
+                        arabic, 'Select Top-Up Amount:', 'اختر مبلغ الشحن:'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [50.0, 100.0, 200.0, 500.0].map((amt) {
+                    return ChoiceChip(
+                      label: Text('${amt.toInt()} EGP'),
+                      selected: amount == amt,
+                      onSelected: (_) => setDlgState(() => amount = amt),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: kSurfaceTint,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: kGreen.withValues(alpha: 0.25)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        localized(
+                          arabic,
+                          'Transfer ${amount.toInt()} EGP via InstaPay or Vodafone Cash:',
+                          'حوّل ${amount.toInt()} ج.م عبر إنستاباي أو فودافون كاش:',
+                        ),
+                        style: const TextStyle(
+                            fontSize: 11.5, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.bolt_rounded,
+                              size: 16, color: kGreen),
+                          const SizedBox(width: 6),
+                          const Expanded(
+                            child: SelectableText(
+                              'hagzy@instapay',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13.5,
+                                  color: kGreen),
+                            ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              Clipboard.setData(
+                                  const ClipboardData(text: 'hagzy@instapay'));
+                            },
+                            icon: const Icon(Icons.copy_rounded,
+                                size: 15, color: kGreen),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.phone_iphone_rounded,
+                              size: 16, color: kGreen),
+                          const SizedBox(width: 6),
+                          const Expanded(
+                            child: SelectableText(
+                              '01024129393',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13.5,
+                                  color: kGreen),
+                            ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              Clipboard.setData(
+                                  const ClipboardData(text: '01024129393'));
+                            },
+                            icon: const Icon(Icons.copy_rounded,
+                                size: 15, color: kGreen),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -123,14 +203,13 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       ),
     );
     if (confirmed == true && mounted) {
-      // Wallet balance lives on the server and can only be credited after a
-      // verified payment. Never credit it locally (that was free money).
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          behavior: SnackBarBehavior.floating,
           content: Text(localized(
               arabic,
-              'Wallet top-up will be available soon.',
-              'شحن المحفظة سيكون متاحاً قريباً.')),
+              'Transfer ${amount.toInt()} EGP to hagzy@instapay or 01024129393 and send the receipt on WhatsApp to credit your wallet.',
+              'حوّل ${amount.toInt()} ج.م إلى hagzy@instapay أو 01024129393 وأرسل الإيصال عبر واتساب لشحن محفظتك.')),
         ),
       );
     }
