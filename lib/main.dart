@@ -2471,12 +2471,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                         )
                       : localized(
                           arabic,
-                          'Transfer & submit reference for venue verification',
-                          'حوّل وأدخل رقم المرجع للتحقق',
+                          'Send to hagzy@instapay & submit reference',
+                          'حوّل إلى hagzy@instapay وأدخل رقم المرجع',
                         ),
                   enabled: true,
                   accentColor: kGreen,
-                  badgeText: localized(arabic, 'INSTANT', 'فوري'),
+                  badgeText: localized(arabic, 'INSTANT · 0% FEE', 'فوري · بدون رسوم'),
                   onTap: () => Navigator.pop(context, 'instapay'),
                 ),
                 const SizedBox(height: 8),
@@ -2491,12 +2491,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                         )
                       : localized(
                           arabic,
-                          'Mobile wallet transfer & reference verification',
-                          'تحويل محفظة إلكترونية وتأكيد الرقم',
+                          'Wallet 01024129393 · Dial *9*7# or submit reference',
+                          'محفظة 01024129393 · حوّل وأدخل رقم العملية',
                         ),
                   enabled: true,
                   accentColor: kGreen,
-                  badgeText: localized(arabic, 'WALLET', 'محفظة'),
+                  badgeText: localized(arabic, 'WALLET · *9*7#', 'محفظة فودافون'),
                   onTap: () => Navigator.pop(context, 'vodafone_cash'),
                 ),
                 const SizedBox(height: 8),
@@ -2505,27 +2505,25 @@ class _HagzyHomeState extends State<HagzyHome> {
                   title: 'Paymob',
                   subtitle: localized(
                     arabic,
-                    'Visa, Mastercard, Meeza & Mobile Wallets',
-                    'فيزا، ماستركارد، ميزة والمحافظ الإلكترونية',
+                    'Visa, Mastercard & Meeza Cards — coming soon',
+                    'بطاقات فيزا وماستركارد وميزة — قريباً',
                   ),
-                  enabled: true,
+                  enabled: false,
                   accentColor: kGreen,
-                  badgeText: localized(arabic, 'CARD / WALLET', 'بطاقة / محفظة'),
-                  onTap: () => Navigator.pop(context, 'paymob'),
+                  badgeText: localized(arabic, 'COMING SOON', 'قريباً'),
                 ),
                 const SizedBox(height: 8),
                 PaymentMethodTile(
                   icon: Icons.receipt_long_outlined,
                   title: 'Fawry',
                   accentColor: kGreen,
-                  enabled: true,
-                  badgeText: localized(arabic, 'FAWRYPAY', 'كود فوري'),
+                  enabled: false,
+                  badgeText: localized(arabic, 'COMING SOON', 'قريباً'),
                   subtitle: localized(
                     arabic,
-                    'Generate a FawryPay reference code or pay via MyFawry',
-                    'اصدر كود دفع فوري أو ادفع عبر تطبيق MyFawry',
+                    'FawryPay reference code & MyFawry — coming soon',
+                    'كود دفع فوري وتطبيق MyFawry — قريباً',
                   ),
-                  onTap: () => Navigator.pop(context, 'fawry'),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -2627,8 +2625,11 @@ class _HagzyHomeState extends State<HagzyHome> {
     required double dueNow,
   }) async {
     final arabic = _language == 'AR';
-    var reference = '';
+    final refController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final senderPhoneHint = booking.phone.trim().isNotEmpty
+        ? booking.phone.trim()
+        : _savedCustomerPhone.trim();
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2784,9 +2785,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   arabic,
                                   'InstaPay handle copied! Opening app...',
                                   'تم نسخ العنوان! جارٍ فتح إنستاباي...'));
-                              final uri = Uri.parse('https://ipn.eg/');
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri,
+                              final deepUri = Uri.parse('ipn://');
+                              final webUri = Uri.parse('https://ipn.eg/');
+                              if (await canLaunchUrl(deepUri)) {
+                                await launchUrl(deepUri,
+                                    mode: LaunchMode.externalApplication);
+                              } else if (await canLaunchUrl(webUri)) {
+                                await launchUrl(webUri,
                                     mode: LaunchMode.externalApplication);
                               }
                             },
@@ -2798,7 +2803,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 'نسخ العنوان وفتح تطبيق إنستاباي')),
                           ),
                         ),
-                      if (method == 'vodafone_cash')
+                      if (method == 'vodafone_cash') ...[
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.tonalIcon(
@@ -2824,17 +2829,31 @@ class _HagzyHomeState extends State<HagzyHome> {
                             icon: const Icon(Icons.dialpad_rounded, size: 16),
                             label: Text(localized(
                                 arabic,
-                                'Dial *9*7* USSD Code',
-                                'اطلب كود التحويل المباشر')),
+                                'Dial *9*7*${destination.replaceAll(RegExp(r"\D"), "")}*${dueNow.toInt()}#',
+                                'اطلب كود التحويل المباشر *9*7#')),
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
+                Text(
+                  localized(
+                    arabic,
+                    '2. Confirm Your Transfer:',
+                    '٢. تأكيد بيانات التحويل:',
+                  ),
+                  style: TextStyle(
+                    color: kInk,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
                 TextFormField(
+                  controller: refController,
                   autofocus: true,
-                  onChanged: (v) => reference = v,
                   decoration: InputDecoration(
                     labelText: localized(
                         arabic,
@@ -2850,6 +2869,32 @@ class _HagzyHomeState extends State<HagzyHome> {
                           'أدخل رقم العملية المرجعي أو رقم الموبايل (4 أحرف على الأقل)')
                       : null,
                 ),
+                if (senderPhoneHint.length >= 8) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: arabic
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: ActionChip(
+                      avatar: const Icon(Icons.phone_iphone_rounded,
+                          size: 15, color: kGreen),
+                      label: Text(
+                        localized(
+                          arabic,
+                          'Sent from $senderPhoneHint (1-Tap Fill)',
+                          'حوّلت من رقمي $senderPhoneHint (ملء تلقائي)',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      onPressed: () {
+                        refController.text = senderPhoneHint;
+                      },
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                   localized(
@@ -2880,13 +2925,14 @@ class _HagzyHomeState extends State<HagzyHome> {
         ],
       ),
     );
-    if (confirmed != true || reference.trim().isEmpty) return;
+    final submittedRef = refController.text.trim();
+    if (confirmed != true || submittedRef.isEmpty) return;
 
     await _runSave(() async {
       var updated = booking.copyWith(
         paymentStatus: 'pending',
         paymentMethod: method,
-        paymentReference: reference.trim(),
+        paymentReference: submittedRef,
         holdExpiresAt: DateTime.now().add(const Duration(minutes: 60)),
       );
       if (_api.isConfigured) {
@@ -2894,7 +2940,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           final remote = await _api.submitPaymentProof(
             booking.id,
             method: method,
-            reference: reference.trim(),
+            reference: submittedRef,
           );
           updated = Booking.fromJson(remote);
         } catch (e) {
@@ -2910,11 +2956,25 @@ class _HagzyHomeState extends State<HagzyHome> {
           _bookings.map((b) => b.id == booking.id ? updated : b).toList();
       await _commit(_venues, nextBookings);
       if (mounted) setState(() => _tab = 1);
-      _message(localized(
-        arabic,
-        'Transfer reference submitted! Awaiting venue owner verification.',
-        'تم إرسال رقم العملية! بانتظار تأكيد المكان.',
-      ));
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 6),
+            content: Text(localized(
+              arabic,
+              'Transfer reference submitted! Awaiting venue owner verification.',
+              'تم إرسال رقم العملية! بانتظار تأكيد المكان.',
+            )),
+            action: SnackBarAction(
+              label: localized(arabic, 'WhatsApp Receipt', 'إرسال واتساب'),
+              textColor: const Color(0xFFA7F3D0),
+              onPressed: () => _openWhatsAppBookingChat(updated),
+            ),
+          ),
+        );
+      }
     });
   }
 
@@ -2934,6 +2994,8 @@ class _HagzyHomeState extends State<HagzyHome> {
         '${localized(arabic, 'Location', 'الموقع')}: ${venue.googleMapsUrl}',
       '${localized(arabic, 'Date and Time', 'التاريخ والوقت')}: ${formatDateTime(booking.startsAt)}',
       '${localized(arabic, 'Deposit Due', 'العربون المستحق')}: ${formatMoney(booking.dueNow ?? booking.price)} ${localized(arabic, 'EGP', 'جنيه')}',
+      if (booking.paymentReference.isNotEmpty)
+        '${localized(arabic, 'Transfer Proof', 'بيانات التحويل')}: ${booking.paymentMethod.toUpperCase()} · ${booking.paymentReference}',
       localized(
           arabic,
           'Please note: I understand this is only a temporary hold until the deposit is verified.',
