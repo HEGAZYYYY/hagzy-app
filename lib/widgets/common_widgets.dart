@@ -949,6 +949,7 @@ class PaymentMethodTile extends StatelessWidget {
     this.enabled = false,
     this.badgeText,
     this.accentColor,
+    this.customLeadingIcon,
     this.onTap,
   });
 
@@ -958,22 +959,47 @@ class PaymentMethodTile extends StatelessWidget {
   final bool enabled;
   final String? badgeText;
   final Color? accentColor;
+  final Widget? customLeadingIcon;
   final VoidCallback? onTap;
 
-  Color get _resolvedAccent =>
-      accentColor ??
-      switch (title.toLowerCase()) {
-        'instapay' => const Color(0xFF6B21A8),
-        'vodafone cash' => const Color(0xFFE11D48),
-        'paymob' => const Color(0xFF2563EB),
-        _ => const Color(0xFFD97706),
-      };
+  Color get _resolvedAccent {
+    if (accentColor != null) return accentColor!;
+    final lower = title.toLowerCase();
+    if (lower.contains('wallet') || lower.contains('محفظ')) {
+      return kGreen;
+    }
+    if (lower.contains('instapay') || lower.contains('إنستاباي')) {
+      return const Color(0xFF6B21A8);
+    }
+    if (lower.contains('vodafone')) {
+      return const Color(0xFFE11D48);
+    }
+    if (lower.contains('paymob')) {
+      return const Color(0xFF2563EB);
+    }
+    return const Color(0xFFD97706);
+  }
+
+  Color _brightenForDark(Color c) {
+    final v = c.toARGB32();
+    if (v == 0xFF059669 || v == 0xFF047857) {
+      return const Color(0xFF34D399);
+    }
+    if (v == 0xFF6366F1 || v == 0xFF6B21A8 || v == 0xFF8B5CF6) {
+      return const Color(0xFFA78BFA);
+    }
+    if (v == 0xFFE11D48) {
+      return const Color(0xFFFB7185);
+    }
+    return c;
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark =
         Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-    final color = _resolvedAccent;
+    final baseColor = _resolvedAccent;
+    final color = isDark ? _brightenForDark(baseColor) : baseColor;
     return PressableScale(
       onTap: enabled ? onTap : null,
       scaleDown: 0.98,
@@ -992,7 +1018,9 @@ class PaymentMethodTile extends StatelessWidget {
                       : const Color(0xFFF5F2EC)),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: enabled ? color.withValues(alpha: 0.25) : kBorder,
+                color: enabled
+                    ? color.withValues(alpha: isDark ? 0.35 : 0.25)
+                    : kBorder,
                 width: enabled ? 1.3 : 1,
               ),
               boxShadow: enabled ? HagzyTheme.softShadow : null,
@@ -1000,20 +1028,26 @@ class PaymentMethodTile extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: enabled
-                        ? color.withValues(alpha: 0.12)
+                        ? color.withValues(alpha: isDark ? 0.22 : 0.12)
                         : (isDark
                             ? Colors.white.withValues(alpha: 0.05)
                             : Colors.black.withValues(alpha: 0.04)),
                     borderRadius: BorderRadius.circular(14),
+                    border: isDark && enabled
+                        ? Border.all(color: color.withValues(alpha: 0.35))
+                        : null,
                   ),
-                  child: Icon(
-                    icon,
-                    color: enabled ? color : kMuted,
-                    size: 22,
+                  child: Center(
+                    child: customLeadingIcon ??
+                        Icon(
+                          icon,
+                          color: enabled ? color : kMuted,
+                          size: 24,
+                        ),
                   ),
                 ),
                 const SizedBox(width: 14),

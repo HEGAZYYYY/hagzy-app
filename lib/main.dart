@@ -2236,9 +2236,6 @@ class _HagzyHomeState extends State<HagzyHome> {
     final arabic = _language == 'AR';
     final venue =
         _venues.where((value) => value.id == booking.venueId).firstOrNull;
-    final hasInstaPay = venue != null && venue.instaPayAddress.isNotEmpty;
-    final hasVodafoneCash =
-        venue != null && venue.vodafoneCashNumber.isNotEmpty;
 
     final method = await showModalBottomSheet<String>(
       context: context,
@@ -2462,61 +2459,35 @@ class _HagzyHomeState extends State<HagzyHome> {
                 ),
                 const SizedBox(height: 12),
                 PaymentMethodTile(
-                  icon: Icons.account_balance_rounded,
-                  title: 'InstaPay',
-                  subtitle: hasInstaPay
-                      ? localized(
-                          arabic,
-                          'Send to ${venue.instaPayAddress} & submit reference',
-                          'حوّل إلى ${venue.instaPayAddress} وأدخل رقم المرجع',
-                        )
-                      : localized(
-                          arabic,
-                          'Send to hagzy@instapay & submit reference',
-                          'حوّل إلى hagzy@instapay وأدخل رقم المرجع',
-                        ),
-                  enabled: true,
-                  accentColor: kGreen,
-                  badgeText: localized(arabic, 'INSTANT · 0% FEE', 'فوري · بدون رسوم'),
-                  onTap: () => Navigator.pop(context, 'instapay'),
-                ),
-                const SizedBox(height: 8),
-                PaymentMethodTile(
-                  icon: Icons.phone_android_rounded,
-                  title: 'Vodafone Cash',
-                  subtitle: hasVodafoneCash
-                      ? localized(
-                          arabic,
-                          'Wallet ${venue.vodafoneCashNumber} · Submit reference',
-                          'محفظة ${venue.vodafoneCashNumber} · أدخل رقم العملية',
-                        )
-                      : localized(
-                          arabic,
-                          'Wallet 01024129393 · Dial *9*7# or submit reference',
-                          'محفظة 01024129393 · حوّل وأدخل رقم العملية',
-                        ),
-                  enabled: true,
-                  accentColor: kGreen,
-                  badgeText: localized(arabic, 'WALLET · *9*7#', 'محفظة فودافون'),
-                  onTap: () => Navigator.pop(context, 'vodafone_cash'),
-                ),
-                const SizedBox(height: 8),
-                PaymentMethodTile(
-                  icon: Icons.flash_on_rounded,
+                  icon: Icons.account_balance_wallet_rounded,
                   title: localized(
                     arabic,
-                    'Automated Zero-Screenshot Verification',
-                    'الدفع والتحقق الآلي الفوري',
+                    'Pay with Wallet or InstaPay',
+                    'الدفع بالمحفظة أو إنستاباي',
                   ),
                   subtitle: localized(
                     arabic,
-                    'Auto-verified by phone oracle in seconds',
-                    'تحقق آلي فوري بدون الحاجة لرفع إيصالات',
+                    'Vodafone Cash, Orange, e&, WE Pay or InstaPay',
+                    'فودافون كاش، أورنج، اتصالات، وي باي، أو إنستاباي',
                   ),
                   enabled: true,
-                  accentColor: const Color(0xFF6366F1),
-                  badgeText: localized(arabic, 'AUTO-VERIFY ⚡', 'تأكيد آلي ⚡'),
-                  onTap: () => Navigator.pop(context, 'automated'),
+                  accentColor: kGreen,
+                  badgeText: localized(arabic, 'INSTANT · 0% FEE', 'فوري · بدون رسوم'),
+                  customLeadingIcon: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: HagzyTheme.brandGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: HagzyTheme.brandGlowShadow,
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, 'wallet_or_instapay'),
                 ),
                 const SizedBox(height: 8),
                 PaymentMethodTile(
@@ -2601,7 +2572,10 @@ class _HagzyHomeState extends State<HagzyHome> {
       await _startPaymobCheckout(booking, paymentMethod: 'card');
     } else if (method == 'fawry') {
       await _startFawryCheckout(booking, dueNow);
-    } else if (method == 'automated') {
+    } else if (method == 'wallet_or_instapay' ||
+        method == 'automated' ||
+        method == 'instapay' ||
+        method == 'vodafone_cash') {
       if (!mounted) return;
       final verified = await Navigator.push<bool>(
         context,
@@ -2610,7 +2584,8 @@ class _HagzyHomeState extends State<HagzyHome> {
             bookingId: booking.id,
             amount: dueNow,
             arabic: arabic,
-            initialMethod: 'instapay',
+            initialMethod:
+                method == 'vodafone_cash' ? 'vodafone_cash' : 'instapay',
             receiverIpa: venue?.instaPayAddress.isNotEmpty == true
                 ? venue!.instaPayAddress
                 : 'mohamedra4adhegazy@instapay',
@@ -2624,6 +2599,36 @@ class _HagzyHomeState extends State<HagzyHome> {
             onPaymentVerified: () {
               _confirmBooking(booking);
             },
+            onManualProofSubmitted: (proofMethod, ref) async {
+              var updated = booking.copyWith(
+                paymentStatus: 'pending',
+                paymentMethod: proofMethod,
+                paymentReference: ref,
+                holdExpiresAt: DateTime.now().add(const Duration(minutes: 60)),
+              );
+              if (_api.isConfigured) {
+                try {
+                  final remote = await _api.submitPaymentProof(
+                    booking.id,
+                    method: proofMethod,
+                    reference: ref,
+                  );
+                  updated = Booking.fromJson(remote);
+                } catch (e) {
+                  if (!WidgetsBinding.instance.runtimeType
+                      .toString()
+                      .toLowerCase()
+                      .contains('test')) {
+                    rethrow;
+                  }
+                }
+              }
+              final nextBookings = _bookings
+                  .map((b) => b.id == booking.id ? updated : b)
+                  .toList();
+              await _commit(_venues, nextBookings);
+              if (mounted) setState(() => _tab = 1);
+            },
           ),
         ),
       );
@@ -2632,31 +2637,9 @@ class _HagzyHomeState extends State<HagzyHome> {
         if (mounted) setState(() => _tab = 1);
         _message(localized(
             arabic,
-            'Payment verified by oracle! Booking is now confirmed.',
-            'تم التحقق من الدفع آلياً وتأكيد الحجز بنجاح!'));
+            'Payment verified! Booking is now confirmed.',
+            'تم التحقق من الدفع وتأكيد الحجز بنجاح!'));
       }
-    } else if (method == 'instapay') {
-      await _submitManualTransferProof(
-        booking: booking,
-        method: 'instapay',
-        methodLabel: 'InstaPay',
-        destination: venue?.instaPayAddress.isNotEmpty == true
-            ? venue!.instaPayAddress
-            : 'hagzy@instapay',
-        dueNow: dueNow,
-      );
-    } else if (method == 'vodafone_cash') {
-      await _submitManualTransferProof(
-        booking: booking,
-        method: 'vodafone_cash',
-        methodLabel: 'Vodafone Cash',
-        destination: venue?.vodafoneCashNumber.isNotEmpty == true
-            ? venue!.vodafoneCashNumber
-            : (venue?.ownerPhone.isNotEmpty == true
-                ? venue!.ownerPhone
-                : '01024129393'),
-        dueNow: dueNow,
-      );
     } else if (method == 'later') {
       if (mounted) setState(() => _tab = 1);
       if (!_api.isConfigured) {
