@@ -210,7 +210,7 @@ void main() {
         find.text('Not confirmed until payment is verified'), findsOneWidget);
     expect(find.text('Paymob'), findsOneWidget);
     expect(find.text('Fawry'), findsOneWidget);
-    expect(find.text('InstaPay'), findsOneWidget);
+    expect(find.text('Pay with Wallet or InstaPay'), findsOneWidget);
     expect(find.text('Continue in WhatsApp'), findsOneWidget);
     expect(
       find.textContaining(
@@ -571,10 +571,9 @@ void main() {
     expect(find.text('Cairo Padel Arena'), findsOneWidget);
     await tester.tap(find.textContaining('Pay Deposit'));
     await tester.pumpAndSettle();
-    expect(find.text('InstaPay'), findsOneWidget);
-    expect(find.text('Vodafone Cash'), findsOneWidget);
+    expect(find.text('Pay with Wallet or InstaPay'), findsOneWidget);
 
-    await tester.tap(find.text('InstaPay'));
+    await tester.tap(find.text('Pay with Wallet or InstaPay'));
     await tester.pumpAndSettle();
     expect(find.text('arena@instapay'), findsOneWidget);
     await tester.enterText(find.byType(TextFormField).first, 'IPN-776655');

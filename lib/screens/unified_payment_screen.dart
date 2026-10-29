@@ -100,6 +100,7 @@ class UnifiedPaymentScreen extends StatefulWidget {
     this.prefilledSenderPhone = '',
     this.authToken,
     this.onPaymentVerified,
+    this.onManualProofSubmitted,
   });
 
   final String bookingId;
@@ -111,6 +112,7 @@ class UnifiedPaymentScreen extends StatefulWidget {
   final String prefilledSenderPhone;
   final String? authToken;
   final VoidCallback? onPaymentVerified;
+  final void Function(String method, String reference)? onManualProofSubmitted;
 
   @override
   State<UnifiedPaymentScreen> createState() => _UnifiedPaymentScreenState();
@@ -121,6 +123,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
   late PaymentMethodTab _selectedTab;
   final _instaPayController = TextEditingController();
   final _walletController = TextEditingController();
+  final _manualRefController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   bool _isCreatingIntent = false;
@@ -167,6 +170,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     _verifiedAnimController.dispose();
     _instaPayController.dispose();
     _walletController.dispose();
+    _manualRefController.dispose();
     super.dispose();
   }
 
@@ -245,7 +249,6 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
       try {
         response = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 12));
       } catch (_) {
-        // Fallback mock simulation if offline or backend cold start
         response = http.Response(
           jsonEncode({
             'intentId': 'intent_${widget.bookingId}_${methodStr.toLowerCase()}',
@@ -386,7 +389,6 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
   }
 
   Future<void> _dialVodafoneUssd(String wallet, int amount) async {
-    // USSD: *9*7*WALLET*AMOUNT#
     final uri = Uri.parse('tel:*9*7*$wallet*$amount%23');
     try {
       if (await canLaunchUrl(uri)) {
@@ -502,7 +504,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
         backgroundColor: kPanel,
         elevation: 0,
         title: Text(
-          _localized('Automated Checkout', 'الدفع الآلي الفوري'),
+          _localized('Pay with Wallet or InstaPay', 'الدفع بالمحفظة أو إنستاباي'),
           style: TextStyle(
             color: kInk,
             fontSize: 18,
@@ -524,7 +526,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
 
   Widget _buildDetailsFormView(bool isDark) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Form(
         key: _formKey,
         child: Column(
@@ -533,19 +535,19 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             // Amount Summary Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF047857), Color(0xFF059669)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
                     color: kGreen.withValues(alpha: 0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -555,11 +557,11 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                     _localized('Total Due Now', 'المبلغ المطلوب سداده'),
                     style: const TextStyle(
                       color: Colors.white70,
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -567,7 +569,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                         '${widget.amount.toInt()}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 34,
+                          fontSize: 26,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -1,
                         ),
@@ -577,43 +579,27 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                         _localized('EGP', 'ج.م'),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _localized('Zero Screenshots • Instant Auto-Confirmation', 'بدون رفع سكرين شوت • تأكيد آلي فوري'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
 
             // 2-Tab Selector
             Text(
               _localized('Choose Payment Channel', 'اختر طريقة الدفع'),
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w800,
                 color: kInk,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -680,12 +666,29 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
               ),
             ],
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _isCreatingIntent ? null : () => _initiatePaymentIntent(),
+                onPressed: _isCreatingIntent
+                    ? null
+                    : () {
+                        final input = _selectedTab == PaymentMethodTab.instaPay
+                            ? _instaPayController.text.trim()
+                            : _walletController.text.trim();
+                        if (input.isNotEmpty) {
+                          final isInsta =
+                              _selectedTab == PaymentMethodTab.instaPay;
+                          widget.onManualProofSubmitted?.call(
+                            isInsta ? 'instapay' : 'vodafone_cash',
+                            input,
+                          );
+                          Navigator.of(context).pop(false);
+                        } else {
+                          _initiatePaymentIntent();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kGreen,
                   foregroundColor: Colors.white,
@@ -707,14 +710,14 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            _localized('Proceed to Transfer', 'المتابعة للتحويل'),
+                            _localized('Submit Reference', 'تأكيد وإرسال المرجع'),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Icon(Icons.arrow_forward_rounded, size: 20),
+                          const Icon(Icons.send_rounded, size: 18),
                         ],
                       ),
               ),
@@ -783,6 +786,44 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: kPanel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.bolt_rounded, color: Color(0xFF6366F1), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _localized('Send to InstaPay Address:', 'حوّل إلى عنوان إنستاباي:'),
+                      style: TextStyle(fontSize: 11, color: kMuted),
+                    ),
+                    SelectableText(
+                      widget.receiverIpa,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                onPressed: () => _copyToClipboard(
+                  widget.receiverIpa,
+                  _localized('Address copied!', 'تم نسخ الحساب!'),
+                ),
+              ),
+            ],
+          ),
+        ),
         Text(
           _localized('Your InstaPay Address (Sending Account)', 'عنوان حساب انستاباي الخاص بك (المرسل منه)'),
           style: TextStyle(
@@ -845,6 +886,44 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: kPanel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.phone_iphone_rounded, color: Color(0xFFE11D48), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _localized('Send to Wallet Number:', 'حوّل إلى رقم المحفظة:'),
+                      style: TextStyle(fontSize: 11, color: kMuted),
+                    ),
+                    SelectableText(
+                      widget.receiverWallet,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                onPressed: () => _copyToClipboard(
+                  widget.receiverWallet,
+                  _localized('Wallet number copied!', 'تم نسخ رقم المحفظة!'),
+                ),
+              ),
+            ],
+          ),
+        ),
         Text(
           _localized('Your 11-Digit Mobile Wallet Number', 'رقم المحفظة الإلكترونية المحول منها'),
           style: TextStyle(
