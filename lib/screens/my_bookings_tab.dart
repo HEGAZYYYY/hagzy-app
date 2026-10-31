@@ -67,12 +67,32 @@ class MyBookingsTab extends StatefulWidget {
 class _MyBookingsTabState extends State<MyBookingsTab> {
   bool _lookingUp = false;
   String? _lookupError;
+  Timer? _liveRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     final onScreenOpened = widget.onScreenOpened;
     if (onScreenOpened != null) unawaited(onScreenOpened());
+    _startLiveRefreshTimer();
+  }
+
+  void _startLiveRefreshTimer() {
+    _liveRefreshTimer?.cancel();
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      final hasPending =
+          widget.bookings.any((b) => !b.cancelled && !b.isConfirmed);
+      if (hasPending) {
+        widget.onRefresh?.call();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _liveRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _topUpWalletDialog(double currentBalance) async {
@@ -522,12 +542,16 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               ? localized(arabic, 'Confirmed', 'مؤكد')
               : booking.isPendingPayment
                   ? localized(arabic, 'Awaiting Deposit', 'بانتظار العربون')
-                  : localized(arabic, 'Hold Expired', 'انتهى الحجز المؤقت');
+                  : booking.isHoldExpired
+                      ? localized(arabic, 'Hold Expired', 'انتهى الحجز المؤقت')
+                      : localized(arabic, 'Confirmed', 'مؤكد');
           final statusColor = booking.isConfirmed
               ? kGreen
               : booking.isPendingPayment
                   ? const Color(0xFFB45309)
-                  : kMuted;
+                  : booking.isHoldExpired
+                      ? kMuted
+                      : kGreen;
           final remainingMin = booking.holdExpiresAt
               ?.difference(DateTime.now())
               .inMinutes
@@ -751,25 +775,45 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 9),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
+                              color: booking.isConfirmed
+                                  ? const Color(0xFFECFDF5)
+                                  : const Color(0xFFEFF6FF),
                               borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: const Color(0xFFBFDBFE)),
+                              border: Border.all(
+                                color: booking.isConfirmed
+                                    ? const Color(0xFFA7F3D0)
+                                    : const Color(0xFFBFDBFE),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.verified_user_outlined,
-                                    size: 16, color: Color(0xFF1D4ED8)),
+                                Icon(
+                                  booking.isConfirmed
+                                      ? Icons.check_circle_outline_rounded
+                                      : Icons.verified_user_outlined,
+                                  size: 16,
+                                  color: booking.isConfirmed
+                                      ? kGreen
+                                      : const Color(0xFF1D4ED8),
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    localized(
-                                      arabic,
-                                      'Payment proof submitted (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Awaiting venue verification',
-                                      'تم إرسال إثبات الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · بانتظار مراجعة المكان',
-                                    ),
-                                    style: const TextStyle(
-                                      color: Color(0xFF1E40AF),
+                                    booking.isConfirmed
+                                        ? localized(
+                                            arabic,
+                                            'Payment verified (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Deposit received ✓',
+                                            'تم التحقق من الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · تم استلام العربون ✓',
+                                          )
+                                        : localized(
+                                            arabic,
+                                            'Payment proof submitted (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Awaiting venue verification',
+                                            'تم إرسال إثبات الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · بانتظار مراجعة المكان',
+                                          ),
+                                    style: TextStyle(
+                                      color: booking.isConfirmed
+                                          ? const Color(0xFF065F46)
+                                          : const Color(0xFF1E40AF),
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                     ),

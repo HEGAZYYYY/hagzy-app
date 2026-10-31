@@ -499,10 +499,37 @@ const DB_FILE = path.join(DATA_DIR, 'hagzy_db.json');
 
 let isHydrated = false;
 
+function markBookingConfirmed(b, { method, providerRef, amount, excess } = {}) {
+  if (!b) return b;
+  b.status = 'confirmed';
+  b.confirmed = true;
+  b.isPendingPayment = false;
+  b.depositPaid = true;
+  b.paymentStatus = 'paid';
+  b.dueNow = 0;
+  b.holdExpiresAt = null;
+  if (method) b.paymentMethod = method;
+  if (providerRef) b.paymentReference = providerRef;
+  if (amount != null) b.actualPaidAmount = Number(amount);
+  if (excess != null) b.excessDeposit = Number(excess);
+  if (b.price && amount != null) {
+    b.remainingDue = Math.max(0, b.price - Number(amount));
+  }
+  return b;
+}
+
 function loadDb() {
   if (fs.existsSync(DB_FILE)) {
     try {
-      return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      if (data.bookings && Array.isArray(data.bookings)) {
+        for (const b of data.bookings) {
+          if (b.status === 'confirmed' || b.confirmed) {
+            markBookingConfirmed(b);
+          }
+        }
+      }
+      return data;
     } catch (_) {}
   }
 
@@ -585,6 +612,18 @@ async function hydratePostgres() {
 }
 
 let db = loadDb();
+if (db.bookings && Array.isArray(db.bookings)) {
+  let initialFixed = false;
+  for (const b of db.bookings) {
+    if (b.status === 'confirmed' || b.confirmed) {
+      if (b.paymentStatus !== 'paid' || b.dueNow !== 0 || b.holdExpiresAt !== null) {
+        markBookingConfirmed(b);
+        initialFixed = true;
+      }
+    }
+  }
+  if (initialFixed) saveDb(db);
+}
 
 app.set('trust proxy', 1); // behind Render's proxy: needed for correct client IPs
 app.disable('x-powered-by');
@@ -2120,6 +2159,11 @@ app.get('/api/bookings', authenticateCustomer, (req, res) => {
     if (userPhone && bPhone && userPhone === bPhone) return true;
     if (userEmail && bEmail && userEmail === bEmail) return true;
     return false;
+  }).map(b => {
+    if (b.status === 'confirmed' || b.confirmed) {
+      markBookingConfirmed(b);
+    }
+    return b;
   });
   return res.json({ success: true, bookings: mine });
 });
@@ -2163,6 +2207,9 @@ app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
 app.get('/api/bookings/:id', (req, res) => {
   const b = db.bookings.find(x => x.id === req.params.id);
   if (!b) return res.status(404).json({ error: 'Booking not found' });
+  if (b.status === 'confirmed' || b.confirmed) {
+    markBookingConfirmed(b);
+  }
   const { phone, email, customerPhone, ownerId, paymentReference, ...safe } = b;
   return res.json({ success: true, booking: safe });
 });
@@ -2172,9 +2219,7 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-  booking.confirmed = true;
-  booking.isPendingPayment = false;
-  booking.status = 'confirmed';
+  markBookingConfirmed(booking);
   saveDb(db);
   syncBookingToFirebase(booking);
 
@@ -2323,7 +2368,7 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   // 3. Parse Sender Identifier
   if (!senderIdentifier) {
     if (paymentMethod === 'MOBILE_WALLET') {
-      const RECEIVER_WALLETS = new Set(['01027371804', '01024129393']);
+      const RECEIVER_WALLETS = new Set(['01027371804']);
       const phoneMatches = fullText.match(/(?:من\s+رقم|من|from\s+number|from)?\s*(01[0125][0-9]{8})/i);
       if (phoneMatches && phoneMatches[1] && !RECEIVER_WALLETS.has(phoneMatches[1])) {
         senderIdentifier = phoneMatches[1];
@@ -2454,7 +2499,12 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
         } else if (intentData.booking_id) {
           await fbFirestore.collection('bookings').doc(intentData.booking_id).set({
             status: 'confirmed',
+            confirmed: true,
+            isPendingPayment: false,
             depositPaid: true,
+            paymentStatus: 'paid',
+            dueNow: 0,
+            holdExpiresAt: null,
             paymentMethod: method,
             paymentReference: providerRef,
             actualPaidAmount: numAmount,
@@ -2464,15 +2514,7 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
 
           const b = db.bookings ? db.bookings.find(bk => bk.id === intentData.booking_id) : null;
           if (b) {
-            b.status = 'confirmed';
-            b.depositPaid = true;
-            b.paymentMethod = method;
-            b.paymentReference = providerRef;
-            b.actualPaidAmount = numAmount;
-            b.excessDeposit = excess;
-            if (b.price) {
-              b.remainingDue = Math.max(0, b.price - numAmount);
-            }
+            markBookingConfirmed(b, { method, providerRef, amount: numAmount, excess });
             saveDb(db);
           }
         }
@@ -2518,15 +2560,7 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
       } else if (intent.booking_id) {
         const b = db.bookings ? db.bookings.find(bk => bk.id === intent.booking_id) : null;
         if (b) {
-          b.status = 'confirmed';
-          b.depositPaid = true;
-          b.paymentMethod = method;
-          b.paymentReference = providerRef;
-          b.actualPaidAmount = numAmount;
-          b.excessDeposit = excess;
-          if (b.price) {
-            b.remainingDue = Math.max(0, b.price - numAmount);
-          }
+          markBookingConfirmed(b, { method, providerRef, amount: numAmount, excess });
           saveDb(db);
           syncBookingToFirebase(b);
         }
@@ -2547,15 +2581,8 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
     if (directBooking) {
       const reqDeposit = Number(directBooking.dueNow ?? directBooking.depositAmount ?? (directBooking.price * 0.2) ?? 5);
       if (numAmount >= reqDeposit || numAmount >= 5) {
-        directBooking.status = 'confirmed';
-        directBooking.depositPaid = true;
-        directBooking.paymentMethod = method;
-        directBooking.paymentReference = providerRef;
-        directBooking.actualPaidAmount = numAmount;
-        directBooking.excessDeposit = Math.max(0, numAmount - reqDeposit);
-        if (directBooking.price) {
-          directBooking.remainingDue = Math.max(0, directBooking.price - numAmount);
-        }
+        const excess = Math.max(0, numAmount - reqDeposit);
+        markBookingConfirmed(directBooking, { method, providerRef, amount: numAmount, excess });
         saveDb(db);
         syncBookingToFirebase(directBooking);
 
@@ -2747,11 +2774,7 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
       localPaymentIntents.set(intentId, verifiedIntent);
 
       if (localBooking) {
-        localBooking.status = 'confirmed';
-        localBooking.depositPaid = true;
-        localBooking.actualPaidAmount = receivedAmt;
-        localBooking.excessDeposit = excess;
-        localBooking.paymentMethod = method;
+        markBookingConfirmed(localBooking, { method, amount: receivedAmt, excess });
         saveDb(db);
         syncBookingToFirebase(localBooking);
       } else if (bookingId.startsWith('wallet_topup_') && req.user) {
@@ -2843,8 +2866,38 @@ app.get(['/api/payments/listener/status', '/api/payments/android-listener/status
 });
 
 app.all(['/api/payments/listener', '/api/payments/android-listener'], async (req, res) => {
+  const isHtml = req.headers.accept && req.headers.accept.includes('text/html');
+
   // If GET request with no payment payload, return status info
   if (req.method === 'GET' && !req.query.text && !req.query.smsBody && !req.query.message && !req.query.amount && !req.query.body) {
+    if (isHtml) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>حجزي - مستمع الدفع التلقائي</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0A0F1D; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+            .card { background: #131B2E; border: 1px solid #1E293B; border-radius: 24px; padding: 32px 24px; text-align: center; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+            .icon { width: 64px; height: 64px; background: rgba(16, 185, 129, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #10B981; font-size: 32px; border: 2px solid #10B981; }
+            h1 { font-size: 20px; margin: 0 0 8px; color: #fff; font-weight: 800; }
+            p { color: #94A3B8; font-size: 14px; line-height: 1.6; margin: 0; }
+            .badge { display: inline-block; background: #064E3B; color: #34D399; font-weight: 700; padding: 5px 14px; border-radius: 999px; font-size: 12px; margin-bottom: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">⚡</div>
+            <div class="badge">المستمع متصل وجاهز · Listener Online</div>
+            <h1>خدمة التحقق التلقائي من الدفع (حجزي)</h1>
+            <p>سيرفر حجزي متصل ومستعد لمعالجة تحويلات فودافون كاش وإنستاباي عبر MacroDroid تلقائياً.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
     return res.json({
       status: 'online',
       endpoint: 'GET or POST /api/payments/listener',
@@ -2863,6 +2916,20 @@ app.all(['/api/payments/listener', '/api/payments/android-listener'], async (req
                       (req.headers['authorization'] ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : null);
 
   if (providedKey !== configuredSecret) {
+    if (isHtml) {
+      return res.status(401).send(`
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>غير مصرح - حجزي</title>
+          <style>body { font-family: sans-serif; background: #0A0F1D; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; } .card { background: #131B2E; border: 1px solid #EF4444; border-radius: 20px; padding: 28px; text-align: center; max-width: 400px; } h1 { color: #EF4444; font-size: 18px; }</style>
+        </head>
+        <body><div class="card"><h1>مفتاح التحقق غير صحيح أو مفقود</h1><p>يرجى التأكد من كتابة ?secret=hagzy_live_listener_secret_2026 في الرابط.</p></div></body>
+        </html>
+      `);
+    }
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing listener secret key' });
   }
 
@@ -2870,6 +2937,20 @@ app.all(['/api/payments/listener', '/api/payments/android-listener'], async (req
 
   const parsed = parseIncomingTransferText(rawText, payload);
   if (!parsed || !parsed.amount || !parsed.senderIdentifier) {
+    if (isHtml) {
+      return res.status(422).send(`
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>تعذر قراءة بيانات الرسالة - حجزي</title>
+          <style>body { font-family: sans-serif; background: #0A0F1D; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; } .card { background: #131B2E; border: 1px solid #F59E0B; border-radius: 20px; padding: 28px; text-align: center; max-width: 420px; } h1 { color: #F59E0B; font-size: 18px; } code { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; font-size: 12px; word-break: break-all; display: block; margin-top: 10px; }</style>
+        </head>
+        <body><div class="card"><h1>تعذر استخراج رقم الراسل أو المبلغ</h1><p>الرسالة المستلمة لم تحتوي على صيغة تحويل فودافون كاش أو إنستاباي المتوقعة.</p><code>${rawText || 'نص الرسالة فارغ'}</code></div></body>
+        </html>
+      `);
+    }
     return res.status(422).json({
       error: 'Could not parse transfer amount or sender identifier from notification payload',
       parsed,
@@ -2884,6 +2965,45 @@ app.all(['/api/payments/listener', '/api/payments/android-listener'], async (req
     providerRef: parsed.providerRef,
     rawText,
   });
+
+  if (isHtml) {
+    const isSuccess = result.matched;
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${isSuccess ? 'تم تأكيد الحجز بنجاح' : 'تم استلام الإشعار'} - حجزي</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0A0F1D; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+          .card { background: #131B2E; border: 1px solid ${isSuccess ? '#10B981' : '#3B82F6'}; border-radius: 24px; padding: 32px 24px; text-align: center; max-width: 420px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+          .icon { width: 72px; height: 72px; background: ${isSuccess ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: ${isSuccess ? '#10B981' : '#3B82F6'}; font-size: 38px; border: 2px solid ${isSuccess ? '#10B981' : '#3B82F6'}; }
+          h1 { font-size: 22px; margin: 0 0 10px; color: #fff; font-weight: 800; }
+          p { color: #94A3B8; font-size: 14px; line-height: 1.6; margin: 0 0 20px; }
+          .badge { display: inline-block; background: ${isSuccess ? '#064E3B' : '#1E3A8A'}; color: ${isSuccess ? '#34D399' : '#93C5FD'}; font-weight: 700; padding: 6px 16px; border-radius: 999px; font-size: 13px; margin-bottom: 20px; }
+          .info { background: rgba(255,255,255,0.05); border-radius: 14px; padding: 14px; margin-bottom: 20px; text-align: right; font-size: 13px; line-height: 1.8; color: #E2E8F0; }
+          .close-btn { display: inline-block; background: #10B981; color: #0A0F1D; font-weight: 800; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-size: 15px; border: none; cursor: pointer; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">${isSuccess ? '✓' : '⚡'}</div>
+          <div class="badge">${isSuccess ? 'تم تأكيد الحجز بنجاح' : 'تم تسجيل الإشعار'}</div>
+          <h1>${isSuccess ? 'تم استلام الدفع وتأكيد الحجز! 🏆' : 'تم استلام التحويل بنجاح'}</h1>
+          <div class="info">
+            <div>💵 المبلغ: <b>${parsed.amount} ج.م</b></div>
+            <div>📱 الراسل: <b>${parsed.senderIdentifier}</b></div>
+            ${result.bookingId ? `<div>🏷️ رقم الحجز: <b>${result.bookingId}</b></div>` : ''}
+            ${result.excessAmount > 0 ? `<div>🎁 الرصيد الإضافي: <b>+${result.excessAmount} ج.م</b></div>` : ''}
+          </div>
+          <p>${isSuccess ? 'تم تأكيد حجزك رسمياً وتحديث التطبيق فوراً. يمكنك الآن العودة لتطبيق حجزي.' : 'تم تسجيل العملية وجاري مطابقتها بالحجز.'}</p>
+          <button class="close-btn" onclick="window.close()">إغلاق الصفحة</button>
+        </div>
+      </body>
+      </html>
+    `);
+  }
 
   return res.json(result);
 });

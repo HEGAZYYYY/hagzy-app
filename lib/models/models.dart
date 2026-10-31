@@ -760,19 +760,29 @@ class Booking {
   bool get isBlocked =>
       blockReason.isNotEmpty || customer.startsWith('[BLOCKED]');
 
+  bool get isConfirmed =>
+      !cancelled &&
+      (status == 'confirmed' || paymentStatus == 'paid');
+
   bool get isPendingPayment =>
+      !isConfirmed &&
+      !cancelled &&
       status == 'pending_payment' &&
       paymentStatus != 'paid' &&
       (holdExpiresAt == null || holdExpiresAt!.isAfter(DateTime.now()));
 
   bool get isPendingVerification =>
+      !isConfirmed &&
       isPendingPayment &&
       (paymentStatus == 'pending' || paymentReference.trim().isNotEmpty);
 
-  bool get isConfirmed =>
-      status == 'confirmed' &&
+  bool get isHoldExpired =>
+      !isConfirmed &&
       !cancelled &&
-      (paymentStatus == 'paid' || dueNow == 0);
+      (status == 'expired' ||
+          (status == 'pending_payment' &&
+              holdExpiresAt != null &&
+              holdExpiresAt!.isBefore(DateTime.now())));
 
   bool get blocksAvailability =>
       !cancelled &&
@@ -851,6 +861,7 @@ class Booking {
         'email': email,
         'dueNow': dueNow,
         'status': status,
+        'confirmed': isConfirmed,
         'paymentStatus': paymentStatus,
         'holdExpiresAt': holdExpiresAt?.toIso8601String(),
         if (paymentMethod.isNotEmpty) 'paymentMethod': paymentMethod,
@@ -861,41 +872,54 @@ class Booking {
         if (blockReason.isNotEmpty) 'blockReason': blockReason,
       };
 
-  factory Booking.fromJson(Map<String, dynamic> json) => Booking(
-        id: json['id'] as String,
-        venueId: json['venueId'] as String,
-        itemId: json['itemId'] as String,
-        customer: json['customer'] as String,
-        startsAt: DateTime.parse(json['startsAt'] as String),
-        durationMinutes: json['durationMinutes'] as int,
-        price: (json['price'] as num).toDouble(),
-        serviceNames:
-            (json['serviceNames'] as List<dynamic>? ?? []).cast<String>(),
-        splitCount: json['splitCount'] as int? ?? 1,
-        multiController: json['multiController'] as bool? ?? false,
-        cancelled: json['cancelled'] as bool? ?? false,
-        phone: json['phone'] as String? ?? '',
-        email: json['email'] as String? ?? '',
-        dueNow: (json['dueNow'] as num?)?.toDouble(),
-        status: json['status'] as String? ??
-            ((json['cancelled'] as bool? ?? false)
-                ? 'cancelled'
-                : 'pending_payment'),
-        paymentStatus: json['paymentStatus'] as String? ?? 'unpaid',
-        holdExpiresAt: DateTime.tryParse(
-              json['holdExpiresAt'] as String? ?? '',
-            ) ??
-            ((json['status'] as String? ?? 'pending_payment') ==
-                    'pending_payment'
-                ? DateTime.now()
-                : null),
-        paymentMethod: json['paymentMethod'] as String? ?? '',
-        paymentReference: json['paymentReference'] as String? ?? '',
-        promoCode: json['promoCode'] as String? ?? '',
-        discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
-        staffMember: json['staffMember'] as String? ?? '',
-        blockReason: json['blockReason'] as String? ?? '',
-      );
+  factory Booking.fromJson(Map<String, dynamic> json) {
+    final isExplicitlyConfirmed =
+        (json['confirmed'] as bool? ?? false) ||
+        (json['status'] as String? ?? '').toLowerCase() == 'confirmed' ||
+        (json['paymentStatus'] as String? ?? '').toLowerCase() == 'paid';
+
+    return Booking(
+      id: json['id'] as String,
+      venueId: json['venueId'] as String,
+      itemId: json['itemId'] as String,
+      customer: json['customer'] as String,
+      startsAt: DateTime.parse(json['startsAt'] as String),
+      durationMinutes: json['durationMinutes'] as int,
+      price: (json['price'] as num).toDouble(),
+      serviceNames:
+          (json['serviceNames'] as List<dynamic>? ?? []).cast<String>(),
+      splitCount: json['splitCount'] as int? ?? 1,
+      multiController: json['multiController'] as bool? ?? false,
+      cancelled: json['cancelled'] as bool? ?? false,
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      dueNow: isExplicitlyConfirmed ? 0.0 : (json['dueNow'] as num?)?.toDouble(),
+      status: isExplicitlyConfirmed
+          ? 'confirmed'
+          : (json['status'] as String? ??
+              ((json['cancelled'] as bool? ?? false)
+                  ? 'cancelled'
+                  : 'pending_payment')),
+      paymentStatus: isExplicitlyConfirmed
+          ? 'paid'
+          : (json['paymentStatus'] as String? ?? 'unpaid'),
+      holdExpiresAt: isExplicitlyConfirmed
+          ? null
+          : (DateTime.tryParse(
+                json['holdExpiresAt'] as String? ?? '',
+              ) ??
+              ((json['status'] as String? ?? 'pending_payment') ==
+                      'pending_payment'
+                  ? DateTime.now()
+                  : null)),
+      paymentMethod: json['paymentMethod'] as String? ?? '',
+      paymentReference: json['paymentReference'] as String? ?? '',
+      promoCode: json['promoCode'] as String? ?? '',
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
+      staffMember: json['staffMember'] as String? ?? '',
+      blockReason: json['blockReason'] as String? ?? '',
+    );
+  }
 }
 
 Venue naderSalonSample() => Venue(

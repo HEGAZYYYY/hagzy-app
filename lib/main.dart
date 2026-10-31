@@ -106,6 +106,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   final TextEditingController _passwordController = TextEditingController();
   Timer? _expiredBookingTimer;
   Timer? _paymentPollingTimer;
+  Timer? _liveSyncTimer;
   List<Venue> _venues = kSeedNaderSalon ? defaultPrototypeVenues() : [];
   List<Booking> _bookings = [];
   List<Booking> _customerBookings = [];
@@ -330,6 +331,10 @@ class _HagzyHomeState extends State<HagzyHome> {
         const Duration(seconds: 20),
         (_) => _purgeExpiredBookings(),
       );
+      _liveSyncTimer = Timer.periodic(
+        const Duration(seconds: 2),
+        (_) => _pollPendingBookingsLiveSync(),
+      );
       if (raw != null &&
           (jsonDecode(raw) as Map<String, dynamic>)['bookings'] is List &&
           ((jsonDecode(raw) as Map<String, dynamic>)['bookings'] as List)
@@ -357,6 +362,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   void dispose() {
     _expiredBookingTimer?.cancel();
     _paymentPollingTimer?.cancel();
+    _liveSyncTimer?.cancel();
     _api.close();
     _emailController.dispose();
     _passwordController.dispose();
@@ -3998,11 +4004,59 @@ class _HagzyHomeState extends State<HagzyHome> {
     unawaited(_syncAccountData(showErrors: false));
   }
 
+  Future<void> _pollPendingBookingsLiveSync() async {
+    if (!mounted || !_api.isConfigured) return;
+    final hasPending = _bookings.any((b) => !b.cancelled && !b.isConfirmed);
+    if (!hasPending && _tab != 1) return;
+
+    try {
+      bool anyChanged = false;
+      final pending =
+          _bookings.where((b) => !b.cancelled && !b.isConfirmed).toList();
+      for (final pb in pending) {
+        try {
+          final remote = await _api.bookingStatus(pb.id);
+          final updated = Booking.fromJson(remote);
+          if (updated.isConfirmed != pb.isConfirmed ||
+              updated.status != pb.status) {
+            final idx = _bookings.indexWhere((x) => x.id == pb.id);
+            if (idx >= 0) _bookings[idx] = updated;
+            final cIdx = _customerBookings.indexWhere((x) => x.id == pb.id);
+            if (cIdx >= 0) _customerBookings[cIdx] = updated;
+            anyChanged = true;
+
+            if (updated.isConfirmed) {
+              final venue =
+                  _venues.where((v) => v.id == updated.venueId).firstOrNull;
+              _message(
+                localized(
+                  _language == 'AR',
+                  '🎉 Payment received! Booking at ${venue?.name ?? "Hagzy"} is confirmed.',
+                  '🎉 تم استلام الدفع وتأكيد الحجز بنجاح في ${venue?.name ?? "حجزي"}!',
+                ),
+              );
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (anyChanged) {
+        await _commit(_venues, _bookings);
+        if (mounted) setState(() {});
+      }
+    } catch (_) {}
+  }
+
   Future<void> _syncAccountData({bool showErrors = false}) async {
     if (!_api.isConfigured) return;
+    final hasPendingLocal =
+        _bookings.any((b) => !b.cancelled && !b.isConfirmed);
     if (_customerToken == null &&
         _savedCustomerPhone.isEmpty &&
         _savedCustomerEmail.isEmpty) {
+      if (hasPendingLocal) {
+        await _pollPendingBookingsLiveSync();
+      }
       return;
     }
 
@@ -4062,6 +4116,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
         await _commit(_venues, merged);
       }
+      await _pollPendingBookingsLiveSync();
     } catch (error) {
       final errStr = error.toString().toLowerCase();
       if (errStr.contains('account has been deleted') ||
