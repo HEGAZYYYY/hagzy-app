@@ -9,6 +9,9 @@ import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 import 'unified_payment_screen.dart';
+import '../core/models/models_v2.dart';
+import '../features/checkout_psychology/checkout_psychology.dart';
+import '../features/passport_wallet/passport_wallet.dart';
 
 class MyBookingsTab extends StatefulWidget {
   const MyBookingsTab({
@@ -22,6 +25,7 @@ class MyBookingsTab extends StatefulWidget {
     this.walletBalance = HagzyWallet.defaultWelcomeBalance,
     this.isSignedIn = false,
     this.onSignIn,
+    this.onWalletUpdated,
     this.onGoToSignIn,
     this.onCancelBooking,
     this.onBookAgain,
@@ -36,6 +40,7 @@ class MyBookingsTab extends StatefulWidget {
   final List<Venue> venues;
   final List<Booking> bookings;
   final double walletBalance;
+  final ValueChanged<double>? onWalletUpdated;
   final bool arabic;
   final bool isSignedIn;
   final Future<void> Function({
@@ -72,165 +77,66 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 
   Future<void> _topUpWalletDialog(double currentBalance) async {
     final arabic = widget.arabic;
-    double amount = 100.0;
-    final confirmed = await showDialog<bool>(
+    TopUpWalletSheet.show(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.account_balance_wallet_rounded, color: kGreen),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(localized(
-                    arabic, 'Top Up Hagzy Wallet', 'شحن محفظة حجزي')),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '${localized(arabic, 'Current Balance:', 'رصيدك الحالي:')} ${formatMoney(currentBalance)} EGP',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: kMuted),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                    localized(
-                        arabic, 'Select Top-Up Amount:', 'اختر مبلغ الشحن:'),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 13)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [50.0, 100.0, 200.0, 500.0].map((amt) {
-                    return ChoiceChip(
-                      label: Text('${amt.toInt()} EGP'),
-                      selected: amount == amt,
-                      onSelected: (_) => setDlgState(() => amount = amt),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: kSurfaceTint,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: kGreen.withValues(alpha: 0.25)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        localized(
-                          arabic,
-                          'Transfer ${amount.toInt()} EGP via InstaPay or Vodafone Cash:',
-                          'حوّل ${amount.toInt()} ج.م عبر إنستاباي أو فودافون كاش:',
-                        ),
-                        style: const TextStyle(
-                            fontSize: 11.5, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.bolt_rounded,
-                              size: 16, color: kGreen),
-                          const SizedBox(width: 6),
-                          const Expanded(
-                            child: SelectableText(
-                              'hagzy@instapay',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13.5,
-                                  color: kGreen),
-                            ),
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
-                              Clipboard.setData(
-                                  const ClipboardData(text: 'hagzy@instapay'));
-                            },
-                            icon: const Icon(Icons.copy_rounded,
-                                size: 15, color: kGreen),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_iphone_rounded,
-                              size: 16, color: kGreen),
-                          const SizedBox(width: 6),
-                          const Expanded(
-                            child: SelectableText(
-                              '01024129393',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13.5,
-                                  color: kGreen),
-                            ),
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
-                              Clipboard.setData(
-                                  const ClipboardData(text: '01024129393'));
-                            },
-                            icon: const Icon(Icons.copy_rounded,
-                                size: 15, color: kGreen),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      currentBalance: currentBalance,
+      isArabic: arabic,
+      onProceedToPayment: (amount) async {
+        await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (ctx) => UnifiedPaymentScreen(
+              bookingId:
+                  'wallet_topup_${DateTime.now().millisecondsSinceEpoch}',
+              amount: amount,
+              arabic: arabic,
+              isWalletTopUp: true,
+              venueName: localized(arabic, 'Hagzy In-App Wallet', 'محفظة حجزي'),
+              slotTimeFormatted: localized(
+                  arabic, 'Instant Wallet Credit', 'شحن فوري للرصيد'),
+              headcount: 1,
+              initialMethod: 'instapay',
+              receiverIpa: 'mohamedra4adhegazy@instapay',
+              receiverWallet: '01027371804',
+              onPaymentVerified: () async {
+                final newBal = await HagzyWallet.addFunds(amount);
+                widget.onWalletUpdated?.call(newBal);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: kGreen,
+                      content: Text(localized(
+                        arabic,
+                        'Wallet successfully credited with ${amount.toStringAsFixed(0)} EGP! Current Balance: ${newBal.toStringAsFixed(0)} EGP',
+                        'تم شحن المحفظة بنجاح بمبلغ ${amount.toStringAsFixed(0)} ج.م! الرصيد الحالي: ${newBal.toStringAsFixed(0)} ج.م',
+                      )),
+                    ),
+                  );
+                }
+              },
+              onManualProofSubmitted: (proofMethod, ref) async {
+                final newBal = await HagzyWallet.addFunds(amount);
+                widget.onWalletUpdated?.call(newBal);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: kGreen,
+                      content: Text(localized(
+                        arabic,
+                        'Top-up reference recorded. ${amount.toStringAsFixed(0)} EGP added to your wallet!',
+                        'تم تسجيل كود التحويل وإضافة ${amount.toStringAsFixed(0)} ج.م لمحفظتك بنجاح!',
+                      )),
+                    ),
+                  );
+                }
+              },
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(localized(arabic, 'Cancel', 'إلغاء')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(localized(arabic, 'Top Up Now', 'شحن الآن')),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
-    if (confirmed == true && mounted) {
-      await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => UnifiedPaymentScreen(
-            bookingId: 'wallet_topup_${DateTime.now().millisecondsSinceEpoch}',
-            amount: amount,
-            arabic: arabic,
-            initialMethod: 'instapay',
-            receiverIpa: 'mohamedra4adhegazy@instapay',
-            receiverWallet: '01024129393',
-            onPaymentVerified: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: kGreen,
-                  content: Text(localized(
-                    arabic,
-                    'Wallet successfully credited with ${amount.toInt()} EGP!',
-                    'تم شحن المحفظة بنجاح بمبلغ ${amount.toInt()} ج.م!',
-                  )),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    }
   }
 
   Widget _buildWalletCard(bool arabic) {
@@ -626,28 +532,69 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               ?.difference(DateTime.now())
               .inMinutes
               .clamp(1, 120);
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: HagzyTheme.softShadow,
-            ),
-            child: Card(
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(
-                  color: booking.isConfirmed
-                      ? kGreen.withValues(alpha: 0.35)
-                      : kBorder,
-                  width: booking.isConfirmed ? 1.5 : 1,
+
+          final hagzyB = HagzyBooking(
+            id: booking.id,
+            unitId: booking.itemId,
+            venueId: booking.venueId,
+            hostUserId: booking.customer,
+            startTime: booking.startsAt,
+            endTime: booking.endsAt,
+            headcount: booking.splitCount,
+            totalPriceEgp: booking.price,
+            depositRequiredEgp: booking.dueNow ?? (booking.price * 0.1),
+            status: booking.isConfirmed ? BookingStatus.confirmed : BookingStatus.pendingDeposit,
+            confirmedAt: booking.isConfirmed ? DateTime.now().subtract(const Duration(minutes: 2)) : null,
+            createdAt: DateTime.now().subtract(const Duration(minutes: 3)),
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (booking.isConfirmed && hagzyB.isGracePeriodActive()) ...[
+                GracePeriodCountdownBanner(
+                  booking: hagzyB,
+                  isArabic: arabic,
+                  onCancelUnderGrace: () {
+                    widget.onCancelBooking?.call(booking);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: kGreen,
+                        content: Text(
+                          localized(
+                            arabic,
+                            'Booking cancelled within grace period. 100% deposit refunded to your Hagzy Wallet!',
+                            'تم إلغاء الحجز ضمن فترة السماح. تم استرداد العربون ١٠٠٪ فوراً في محفظة حجزي!',
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
+                const SizedBox(height: 6),
+              ],
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: HagzyTheme.softShadow,
+                ),
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(
+                      color: booking.isConfirmed
+                          ? kGreen.withValues(alpha: 0.35)
+                          : kBorder,
+                      width: booking.isConfirmed ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
                     decoration: BoxDecoration(
                       gradient: booking.isConfirmed
@@ -1041,8 +988,10 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 ],
               ),
             ),
-          );
-        }),
+          ),
+        ],
+      );
+    }),
       ],
     );
   }

@@ -6,6 +6,8 @@ import '../models/models.dart';
 import '../services/social_auth_service.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../core/models/models_v2.dart';
+import '../features/merchant_portal/merchant_portal.dart';
 
 class AdminManageWorkspace extends StatefulWidget {
   const AdminManageWorkspace({
@@ -228,13 +230,36 @@ class _ManageTabState extends State<ManageTab> {
           ),
         ],
         const SizedBox(height: 14),
-        if (filteredVenues.isEmpty)
+        if (filteredVenues.isEmpty) ...[
           const EmptyCard(
             icon: Icons.add_business_outlined,
             title: 'Build your first venue',
             body:
                 'Choose a venue type, add spaces or chairs, then set prices.',
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => GoalGradientOnboardingScreen(
+                      ownerId: 'merchant',
+                      onVenueCreated: (newHagzyVenue) {
+                        Navigator.pop(ctx);
+                        widget.onAddVenue();
+                      },
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.flash_on_rounded, size: 16),
+              label: const Text('Fast-Track Onboarding (Starts at 40%)'),
+            ),
+          ),
+        ],
         ...filteredVenues.map((venue) => Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: Padding(
@@ -258,6 +283,27 @@ class _ManageTabState extends State<ManageTab> {
                                   style: TextStyle(color: kMuted)),
                             ],
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'Print Table QR Standee',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => QrStandeeGenerator(
+                                  venue: HagzyVenue(
+                                    id: venue.id,
+                                    ownerId: venue.ownerPhone.isNotEmpty ? venue.ownerPhone : 'owner',
+                                    name: venue.name,
+                                    city: venue.location,
+                                    categories: [venue.type.name],
+                                    createdAt: DateTime.now(),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.qr_code_rounded, color: Colors.amber),
                         ),
                         IconButton(
                           tooltip: 'Edit venue',
@@ -401,6 +447,30 @@ class _ManageTabState extends State<ManageTab> {
                 ),
               ),
             )),
+        if (filteredVenues.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => GoalGradientOnboardingScreen(
+                      ownerId: 'merchant',
+                      onVenueCreated: (newHagzyVenue) {
+                        Navigator.pop(ctx);
+                        widget.onAddVenue();
+                      },
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.flash_on_rounded, size: 16),
+              label: const Text('Fast-Track Onboarding (Starts at 40%)'),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -916,6 +986,27 @@ class AnalyticsTab extends StatelessWidget {
               color: const Color(0xFFD97706),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        MerchantLossAversionBanner(
+          estimatedLostRevenueEgp: 1450.0,
+          noShowCount: 6,
+          onUpgradePro: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Colors.green,
+                content: Text(
+                    'Hagzy Pro activated! Automated deposits and WhatsApp reminders enabled.'),
+              ),
+            );
+          },
+          onDismissAbsorbLosses: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Hagzy Pro alert dismissed.'),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 18),
         const Text(

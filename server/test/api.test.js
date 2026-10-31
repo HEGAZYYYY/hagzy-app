@@ -242,3 +242,151 @@ test('WhatsApp webhook and chatbot message handler process questions and booking
   assert.equal(webhookCust.status, 200);
   assert.equal(webhookCust.json.replied, true);
 });
+
+test('Android listener automates Vodafone Cash & InstaPay zero-touch verification', async () => {
+  // 1. Health status check
+  const statusRes = await call('GET', '/api/payments/listener/status');
+  assert.equal(statusRes.status, 200);
+  assert.equal(statusRes.json.status, 'online');
+
+  // 2. Secret authentication rejection
+  const unauth = await call('POST', '/api/payments/listener', {
+    body: { text: 'Some transfer' },
+    headers: { 'x-listener-key': 'wrong_secret' },
+  });
+  assert.equal(unauth.status, 401);
+
+  // 3. Create a booking to pay for with Vodafone Cash
+  const bRes = await call('POST', '/api/bookings', { token: cust, body: booking({ price: 150 }) });
+  assert.equal(bRes.status, 200);
+  const bookingId = bRes.json.booking.id;
+
+  // Create payment intent for 150 EGP from 01012345678
+  const intentRes = await call('POST', '/api/payments/intent', {
+    token: cust,
+    body: {
+      bookingId,
+      paymentMethod: 'MOBILE_WALLET',
+      senderIdentifier: '01012345678',
+    },
+  });
+  assert.equal(intentRes.status, 200);
+  assert.equal(intentRes.json.status, 'AWAITING_TRANSFER');
+
+  // Simulate MacroDroid receiving Vodafone Cash Arabic SMS on Android phone
+  const smsBody = 'تم استلام مبلغ 150.00 جنيه من رقم 01012345678. مصاريف الخدمة 0.00 جنيه. رصيدك الحالي هو 1000.00 جنيه.';
+  const listenerRes = await call('POST', '/api/payments/listener', {
+    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    body: {
+      source: 'sms',
+      sender: 'VF-Cash',
+      text: smsBody,
+    },
+  });
+  assert.equal(listenerRes.status, 200);
+  assert.equal(listenerRes.json.matched, true);
+  assert.equal(listenerRes.json.bookingId, bookingId);
+
+  // Verify intent status updated to VERIFIED
+  const checkIntent = await call('GET', `/api/payments/intent/${intentRes.json.intentId}`);
+  assert.equal(checkIntent.status, 200);
+  assert.equal(checkIntent.json.status, 'VERIFIED');
+
+  // Verify booking is confirmed in system
+  const checkBooking = await call('GET', `/api/bookings/${bookingId}`, { token: cust });
+  assert.equal(checkBooking.status, 200);
+  assert.equal(checkBooking.json.booking.status, 'confirmed');
+  assert.equal(checkBooking.json.booking.depositPaid, true);
+
+  // 4. Test InstaPay Push Notification matching with Eastern Arabic Numerals
+  const bRes2 = await call('POST', '/api/bookings', { token: cust, body: booking({ price: 200 }) });
+  assert.equal(bRes2.status, 200);
+  const bookingId2 = bRes2.json.booking.id;
+
+  const intentRes2 = await call('POST', '/api/payments/intent', {
+    token: cust,
+    body: {
+      bookingId: bookingId2,
+      paymentMethod: 'INSTAPAY',
+      senderIdentifier: 'karim_aly@instapay',
+    },
+  });
+  assert.equal(intentRes2.status, 200);
+
+  // Android notification received from InstaPay app with Eastern Arabic digits
+  const instaPush = 'تم استلام تحويل بمبلغ ٢٠٠٫٠٠ ج.م من karim_aly@instapay بنجاح';
+  const listenerRes2 = await call('POST', '/api/payments/listener', {
+    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    body: {
+      source: 'notification',
+      appName: 'InstaPay',
+      package: 'com.emeint.android.mysrv',
+      text: instaPush,
+    },
+  });
+  assert.equal(listenerRes2.status, 200);
+  assert.equal(listenerRes2.json.matched, true);
+  assert.equal(listenerRes2.json.bookingId, bookingId2);
+
+  // 5. Retroactive matching: transfer arrives BEFORE user creates payment intent
+  const preTransferSms = 'تم تحويل مبلغ 300 جنيه من 01099887766';
+  const preListenerRes = await call('POST', '/api/payments/listener', {
+    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    body: { text: preTransferSms },
+  });
+  assert.equal(preListenerRes.status, 200);
+  assert.equal(preListenerRes.json.matched, false); // No intent existed yet
+
+  // 6. Test GET listener request with URL query parameters (for Open Website / HTTP GET actions)
+  const getListenerRes = await call('GET', `/api/payments/listener?secret=hagzy_live_listener_secret_2026&text=${encodeURIComponent('تم استلام 50 جنيه من 01011223344')}`);
+  assert.equal(getListenerRes.status, 200);
+  assert.equal(getListenerRes.json.amount, 50);
+  assert.equal(getListenerRes.json.senderIdentifier, '01011223344');
+
+  // Now customer creates intent for that booking & amount
+  const bRes3 = await call('POST', '/api/bookings', { token: cust, body: booking({ price: 300 }) });
+  const bookingId3 = bRes3.json.booking.id;
+
+  const retroIntent = await call('POST', '/api/payments/intent', {
+    token: cust,
+    body: {
+      bookingId: bookingId3,
+      paymentMethod: 'MOBILE_WALLET',
+      senderIdentifier: '01099887766',
+    },
+  });
+  // Retroactively auto-verified on creation!
+  assert.equal(retroIntent.status, 200);
+  assert.equal(retroIntent.json.status, 'VERIFIED');
+
+  // 7. Overpayment: customer sends 150 EGP when booking deposit is 100 EGP
+  const bResOver = await call('POST', '/api/bookings', { token: cust, body: booking({ price: 250, depositAmount: 100 }) });
+  const overBookingId = bResOver.json.booking.id;
+
+  const overIntent = await call('POST', '/api/payments/intent', {
+    token: cust,
+    body: {
+      bookingId: overBookingId,
+      paymentMethod: 'MOBILE_WALLET',
+      senderIdentifier: '01055443322',
+    },
+  });
+  assert.equal(overIntent.status, 200);
+
+  // Transfer arrives with 150 EGP (50 EGP more than requested)
+  const overTransferRes = await call('POST', '/api/payments/listener', {
+    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    body: { text: 'تم استلام مبلغ 150.00 جنيه من رقم 01055443322' },
+  });
+  assert.equal(overTransferRes.status, 200);
+  assert.equal(overTransferRes.json.matched, true);
+  assert.equal(overTransferRes.json.excessAmount, 50);
+
+  // Booking is confirmed and excess is recorded
+  const checkOverBooking = await call('GET', `/api/bookings/${overBookingId}`, { token: cust });
+  assert.equal(checkOverBooking.status, 200);
+  assert.equal(checkOverBooking.json.booking.status, 'confirmed');
+  assert.equal(checkOverBooking.json.booking.depositPaid, true);
+  assert.equal(checkOverBooking.json.booking.actualPaidAmount, 150);
+  assert.equal(checkOverBooking.json.booking.excessDeposit, 50);
+});

@@ -1975,7 +1975,7 @@ app.get('/api/admin/bookings', authenticateAdmin, (req, res) => {
 const BOOKING_FIELDS = [
   'id', 'venueId', 'itemId', 'customer', 'startsAt', 'durationMinutes', 'price',
   'serviceNames', 'splitCount', 'multiController', 'phone', 'email', 'paymentMethod',
-  'promoCode', 'discountAmount', 'staffMember', 'dueNow', 'serviceIds'
+  'promoCode', 'discountAmount', 'staffMember', 'dueNow', 'depositAmount', 'serviceIds'
 ];
 
 function bookingBlocksSlot(b, now) {
@@ -2240,9 +2240,17 @@ app.post('/api/bookings/:id/paymob-intention', (req, res) => {
 const localPaymentIntents = new Map();
 const localPaymentEvents = new Map();
 
+function convertEasternArabicNumerals(str) {
+  if (!str || typeof str !== 'string') return '';
+  const easternDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  return str
+    .replace(/[٠-٩]/g, d => easternDigits.indexOf(d))
+    .replace(/٫/g, '.');
+}
+
 function normalizeSenderId(method, raw) {
   if (!raw || typeof raw !== 'string') return '';
-  const trimmed = raw.trim();
+  const trimmed = convertEasternArabicNumerals(raw).trim();
   if (method === 'INSTAPAY') {
     let handle = trimmed.toLowerCase().replace(/(@instapay)+$/gi, '').trim();
     handle = handle.replace(/[^a-z0-9_.-]/g, '');
@@ -2257,8 +2265,289 @@ function normalizeSenderId(method, raw) {
   return trimmed;
 }
 
+function parseIncomingTransferText(rawText, metadata = {}) {
+  const fullText = convertEasternArabicNumerals(
+    `${rawText || ''} ${metadata.title || ''} ${metadata.text || ''} ${metadata.body || ''} ${metadata.smsBody || ''} ${metadata.appName || ''} ${metadata.package || ''}`
+  ).trim();
+
+  let amount = null;
+  let paymentMethod = null;
+  let senderIdentifier = null;
+  let providerRef = null;
+
+  if (metadata.amount && Number(metadata.amount) > 0) {
+    amount = Number(metadata.amount);
+  }
+  if (metadata.paymentMethod) {
+    paymentMethod = metadata.paymentMethod === 'MOBILE_WALLET' ? 'MOBILE_WALLET' : 'INSTAPAY';
+  }
+  if (metadata.senderIdentifier) {
+    senderIdentifier = String(metadata.senderIdentifier).trim();
+  }
+
+  // 1. Detect Payment Method
+  const isVodafone = /vodafone|vf-cash|فودافون|vfcash|vf cash/i.test(fullText) || 
+                     /^(VF-Cash|Vodafone|VF)$/i.test(metadata.sender || metadata.smsSender || '');
+  const isInstapay = /instapay|انستاباي|انستا باي|@instapay|لحظي|حوالة عبر انستاباي/i.test(fullText) ||
+                     /mysrv|instapay/i.test(metadata.package || metadata.appName || '');
+
+  if (!paymentMethod) {
+    if (isInstapay) paymentMethod = 'INSTAPAY';
+    else if (isVodafone) paymentMethod = 'MOBILE_WALLET';
+    else if (/01[0125]\d{8}/.test(fullText)) paymentMethod = 'MOBILE_WALLET';
+    else paymentMethod = 'INSTAPAY';
+  }
+
+  // 2. Parse Amount
+  if (amount === null) {
+    const amountRegexes = [
+      /(?:مبلغ|بمبلغ|بقيمة|قيمة|استلام|استلمت|تحويل|إيداع|ايداع)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|ج م|egp|le)/i,
+      /(?:received|you have received|you received|transfer of)\s+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
+      /([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le|جنيه|ج\.م|جم)\s+(?:received|from|من)/i,
+      /(?:مبلغ|بمبلغ|بقيمة)\s+([0-9]+(?:\.[0-9]+)?)/i,
+      /([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|egp|le)/i,
+    ];
+
+    for (const rx of amountRegexes) {
+      const match = fullText.match(rx);
+      if (match && match[1]) {
+        const val = parseFloat(match[1]);
+        if (!isNaN(val) && val > 0) {
+          amount = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Parse Sender Identifier
+  if (!senderIdentifier) {
+    if (paymentMethod === 'MOBILE_WALLET') {
+      const RECEIVER_WALLETS = new Set(['01027371804', '01024129393']);
+      const phoneMatches = fullText.match(/(?:من\s+رقم|من|from\s+number|from)?\s*(01[0125][0-9]{8})/i);
+      if (phoneMatches && phoneMatches[1] && !RECEIVER_WALLETS.has(phoneMatches[1])) {
+        senderIdentifier = phoneMatches[1];
+      } else {
+        const allPhones = fullText.match(/01[0125][0-9]{8}/g) || [];
+        for (const p of allPhones) {
+          if (!RECEIVER_WALLETS.has(p)) {
+            senderIdentifier = p;
+            break;
+          }
+        }
+      }
+    } else {
+      const handleMatch = fullText.match(/([a-zA-Z0-9._-]+@instapay)/i);
+      if (handleMatch && handleMatch[1]) {
+        senderIdentifier = handleMatch[1];
+      } else {
+        const fromMatch = fullText.match(/(?:من|from)\s+([a-zA-Z0-9._-]+)/i);
+        if (fromMatch && fromMatch[1]) {
+          const raw = fromMatch[1].trim();
+          if (!/^(رقم|حساب|بنك|bank|account)$/i.test(raw)) {
+            senderIdentifier = raw;
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Provider Reference Number
+  const refMatch = fullText.match(/(?:رقم العملية|مرجع|المرجع|ref(?:erence)?[:\s]+)([0-9a-zA-Z]+)/i);
+  if (refMatch && refMatch[1]) {
+    providerRef = refMatch[1];
+  }
+
+  return {
+    amount,
+    paymentMethod,
+    senderIdentifier: senderIdentifier ? normalizeSenderId(paymentMethod, senderIdentifier) : null,
+    providerRef: providerRef || `auto_${Date.now()}`,
+    rawText,
+  };
+}
+
+async function finalizePaymentVerification({ paymentMethod, senderIdentifier, amount, providerRef, rawText = '' }) {
+  const method = paymentMethod === 'MOBILE_WALLET' ? 'MOBILE_WALLET' : 'INSTAPAY';
+  const normalizedSender = normalizeSenderId(method, senderIdentifier);
+  const numAmount = Number(amount);
+  const now = new Date();
+  const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Store in local memory events
+  localPaymentEvents.set(eventId, {
+    eventId,
+    payment_method: method,
+    sender_identifier: normalizedSender,
+    amount: numAmount,
+    provider_ref: providerRef,
+    received_at: now.toISOString(),
+    is_claimed: false,
+    raw_text: rawText,
+  });
+
+  // 1. If Cloud Firestore is configured, check active intents
+  if (fbFirestore) {
+    try {
+      const intentSnap = await fbFirestore.collection('payment_intents')
+        .where('payment_method', '==', method)
+        .where('expected_sender_identifier', '==', normalizedSender)
+        .where('status', '==', 'AWAITING_TRANSFER')
+        .where('expires_at', '>', now)
+        .get();
+
+      const matchedDoc = intentSnap.docs.find(d => numAmount >= Number(d.data().expected_amount));
+
+      if (matchedDoc) {
+        const intentDoc = matchedDoc;
+        const intentData = intentDoc.data();
+        const intentId = intentDoc.id;
+        const expected = Number(intentData.expected_amount || 0);
+        const excess = Math.max(0, numAmount - expected);
+
+        await intentDoc.ref.update({
+          status: 'VERIFIED',
+          verified_at: now,
+          matched_event_id: eventId,
+          actual_amount: numAmount,
+          excess_amount: excess,
+          provider_ref: providerRef,
+          updated_at: now,
+        });
+
+        await fbFirestore.collection('incoming_payment_events').doc(eventId).set({
+          payment_method: method,
+          sender_identifier: normalizedSender,
+          amount: numAmount,
+          provider_ref: providerRef,
+          received_at: now,
+          is_claimed: true,
+          claimed_by_intent_id: intentId,
+          claimed_by_booking_id: intentData.booking_id,
+          claimed_at: now,
+          raw_text: rawText,
+        });
+
+        const localIntent = localPaymentIntents.get(intentId);
+        if (localIntent) {
+          localIntent.status = 'VERIFIED';
+          localIntent.verified_at = now.toISOString();
+          localIntent.matched_event_id = eventId;
+          localIntent.actual_amount = numAmount;
+          localIntent.excess_amount = excess;
+        }
+
+        if (intentData.booking_id && intentData.booking_id.startsWith('wallet_topup_')) {
+          if (intentData.user_id) {
+            const userRef = fbFirestore.collection('users').doc(intentData.user_id);
+            const userDoc = await userRef.get();
+            if (userDoc.exists) {
+              const prev = Number(userDoc.data().walletBalance || 0);
+              await userRef.update({ walletBalance: Number((prev + numAmount).toFixed(2)) });
+            }
+            const localU = db.users ? db.users.find(u => u.id === intentData.user_id) : null;
+            if (localU) {
+              localU.walletBalance = Number(((localU.walletBalance || 0) + numAmount).toFixed(2));
+              saveDb(db);
+            }
+          }
+        } else if (intentData.booking_id) {
+          await fbFirestore.collection('bookings').doc(intentData.booking_id).set({
+            status: 'confirmed',
+            depositPaid: true,
+            paymentMethod: method,
+            paymentReference: providerRef,
+            actualPaidAmount: numAmount,
+            excessDeposit: excess,
+            updatedAt: now.toISOString(),
+          }, { merge: true });
+
+          const b = db.bookings ? db.bookings.find(bk => bk.id === intentData.booking_id) : null;
+          if (b) {
+            b.status = 'confirmed';
+            b.depositPaid = true;
+            b.paymentMethod = method;
+            b.paymentReference = providerRef;
+            b.actualPaidAmount = numAmount;
+            b.excessDeposit = excess;
+            if (b.price) {
+              b.remainingDue = Math.max(0, b.price - numAmount);
+            }
+            saveDb(db);
+          }
+        }
+
+        return { success: true, matched: true, intentId, bookingId: intentData.booking_id, amount: numAmount, excessAmount: excess };
+      } else {
+        await fbFirestore.collection('incoming_payment_events').doc(eventId).set({
+          payment_method: method,
+          sender_identifier: normalizedSender,
+          amount: numAmount,
+          provider_ref: providerRef,
+          received_at: now,
+          is_claimed: false,
+          raw_text: rawText,
+        });
+      }
+    } catch (fsErr) {
+      console.warn('Firestore payment matching notice:', fsErr.message);
+    }
+  }
+
+  // 2. In-memory check (supports amount >= expected_amount)
+  for (const [id, intent] of localPaymentIntents.entries()) {
+    if (intent.payment_method === method &&
+        intent.expected_sender_identifier === normalizedSender &&
+        numAmount >= Number(intent.expected_amount) &&
+        intent.status === 'AWAITING_TRANSFER') {
+      const expected = Number(intent.expected_amount || 0);
+      const excess = Math.max(0, numAmount - expected);
+
+      intent.status = 'VERIFIED';
+      intent.verified_at = now.toISOString();
+      intent.matched_event_id = eventId;
+      intent.actual_amount = numAmount;
+      intent.excess_amount = excess;
+
+      if (intent.booking_id && intent.booking_id.startsWith('wallet_topup_')) {
+        const u = db.users ? db.users.find(usr => usr.id === intent.user_id) : null;
+        if (u) {
+          u.walletBalance = Number(((u.walletBalance || 0) + numAmount).toFixed(2));
+          saveDb(db);
+        }
+      } else if (intent.booking_id) {
+        const b = db.bookings ? db.bookings.find(bk => bk.id === intent.booking_id) : null;
+        if (b) {
+          b.status = 'confirmed';
+          b.depositPaid = true;
+          b.paymentMethod = method;
+          b.paymentReference = providerRef;
+          b.actualPaidAmount = numAmount;
+          b.excessDeposit = excess;
+          if (b.price) {
+            b.remainingDue = Math.max(0, b.price - numAmount);
+          }
+          saveDb(db);
+          syncBookingToFirebase(b);
+        }
+      }
+
+      return { success: true, matched: true, intentId: id, bookingId: intent.booking_id, amount: numAmount, excessAmount: excess };
+    }
+  }
+
+  return {
+    success: true,
+    matched: false,
+    eventId,
+    amount: numAmount,
+    paymentMethod: method,
+    senderIdentifier: normalizedSender,
+  };
+}
+
 app.post('/api/payments/intent', optionalAuth, async (req, res) => {
-  const { bookingId, paymentMethod, senderIdentifier } = req.body || {};
+  const { bookingId, paymentMethod, senderIdentifier, amount, isWalletTopUp } = req.body || {};
   if (!bookingId || !paymentMethod || !senderIdentifier) {
     return res.status(400).json({ error: 'bookingId, paymentMethod, and senderIdentifier are required.' });
   }
@@ -2273,13 +2562,22 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
   let authoritativeAmount = 0;
   const localBooking = Array.isArray(db.bookings) ? db.bookings.find(b => b.id === bookingId) : null;
   if (localBooking) {
-    // If the booking has an owner and the caller is authenticated, verify ownership
     if (req.user && localBooking.userId && localBooking.userId !== req.user.id) {
       return res.status(403).json({ error: 'Unauthorized: Booking belongs to another user.' });
     }
-    authoritativeAmount = Number(localBooking.depositAmount ?? localBooking.totalPrice ?? localBooking.price ?? 100);
+    authoritativeAmount = Number(localBooking.dueNow ?? localBooking.depositAmount ?? localBooking.totalPrice ?? localBooking.price ?? 100);
+  } else if (bookingId && (bookingId.startsWith('wallet_topup_') || isWalletTopUp)) {
+    authoritativeAmount = Number(amount || req.body?.authoritativeAmount || 100);
+    if (isNaN(authoritativeAmount) || authoritativeAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid top-up amount' });
+    }
   } else if (!IS_TEST) {
     return res.status(404).json({ error: 'Booking not found.' });
+  }
+
+  // Network minimum floor: InstaPay & Vodafone Cash have a hard minimum of 5.0 EGP in Egypt
+  if (authoritativeAmount > 0 && authoritativeAmount < 5.0) {
+    authoritativeAmount = 5.0;
   }
 
   const intentId = `intent_${bookingId}_${method.toLowerCase()}`;
@@ -2308,12 +2606,12 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
           }
         }
 
-        // Retroactive match
+        // Retroactive match (supports transfer amount >= required amount)
         const retroactiveSnap = await transaction.get(
           fbFirestore.collection('incoming_payment_events')
             .where('payment_method', '==', method)
             .where('sender_identifier', '==', normalizedSender)
-            .where('amount', '==', authoritativeAmount)
+            .where('amount', '>=', authoritativeAmount)
             .where('is_claimed', '==', false)
             .where('received_at', '>=', fifteenMinutesAgo)
             .limit(1)
@@ -2321,6 +2619,9 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
 
         if (!retroactiveSnap.empty) {
           const eventDoc = retroactiveSnap.docs[0];
+          const receivedAmt = Number(eventDoc.data().amount || authoritativeAmount);
+          const excess = Math.max(0, receivedAmt - authoritativeAmount);
+
           transaction.update(eventDoc.ref, {
             is_claimed: true,
             claimed_by_intent_id: intentId,
@@ -2334,6 +2635,8 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
             payment_method: method,
             expected_sender_identifier: normalizedSender,
             expected_amount: authoritativeAmount,
+            actual_amount: receivedAmt,
+            excess_amount: excess,
             status: 'VERIFIED',
             expires_at: expiresAt,
             verified_at: now,
@@ -2345,6 +2648,8 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
           if (localBooking) {
             localBooking.status = 'confirmed';
             localBooking.depositPaid = true;
+            localBooking.actualPaidAmount = receivedAmt;
+            localBooking.excessDeposit = excess;
           }
 
           return { ...intentData, intentId, status: 'VERIFIED' };
@@ -2376,10 +2681,60 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     }
   }
 
-  // In-memory fallback
+  // In-memory fallback with retroactive matching
+  for (const [evtId, evt] of localPaymentEvents.entries()) {
+    if (!evt.is_claimed &&
+        evt.payment_method === method &&
+        evt.sender_identifier === normalizedSender &&
+        Number(evt.amount) >= authoritativeAmount &&
+        (now.getTime() - new Date(evt.received_at).getTime()) <= 15 * 60 * 1000) {
+      const receivedAmt = Number(evt.amount);
+      const excess = Math.max(0, receivedAmt - authoritativeAmount);
+
+      evt.is_claimed = true;
+      evt.claimed_by_intent_id = intentId;
+      evt.claimed_at = now.toISOString();
+
+      const verifiedIntent = {
+        intentId,
+        booking_id: bookingId,
+        user_id: req.user?.id || 'guest',
+        payment_method: method,
+        expected_sender_identifier: normalizedSender,
+        expected_amount: authoritativeAmount,
+        actual_amount: receivedAmt,
+        excess_amount: excess,
+        status: 'VERIFIED',
+        expires_at: expiresAt.toISOString(),
+        verified_at: now.toISOString(),
+        matched_event_id: evtId,
+      };
+      localPaymentIntents.set(intentId, verifiedIntent);
+
+      if (localBooking) {
+        localBooking.status = 'confirmed';
+        localBooking.depositPaid = true;
+        localBooking.actualPaidAmount = receivedAmt;
+        localBooking.excessDeposit = excess;
+        localBooking.paymentMethod = method;
+        saveDb(db);
+        syncBookingToFirebase(localBooking);
+      } else if (bookingId.startsWith('wallet_topup_') && req.user) {
+        const u = db.users ? db.users.find(usr => usr.id === req.user.id) : null;
+        if (u) {
+          u.walletBalance = Number(((u.walletBalance || 0) + receivedAmt).toFixed(2));
+          saveDb(db);
+        }
+      }
+
+      return res.json(verifiedIntent);
+    }
+  }
+
   const intentData = {
     intentId,
     booking_id: bookingId,
+    user_id: req.user?.id || 'guest',
     payment_method: method,
     expected_sender_identifier: normalizedSender,
     expected_amount: authoritativeAmount,
@@ -2410,7 +2765,7 @@ app.get('/api/payments/intent/:intentId', async (req, res) => {
 app.post('/api/payments/webhook', async (req, res) => {
   const crypto = require('crypto');
   const signature = req.headers['x-webhook-signature'];
-  const secret = process.env.PAYMENT_WEBHOOK_SECRET;
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET || process.env.PAYMENT_LISTENER_KEY;
 
   if (!secret) {
     console.error('PAYMENT_WEBHOOK_SECRET is not configured in environment variables.');
@@ -2427,30 +2782,75 @@ app.post('/api/payments/webhook', async (req, res) => {
     return res.status(403).json({ error: 'Invalid HMAC signature' });
   }
 
-  const { eventId, paymentMethod, senderIdentifier, amount, providerRef } = req.body;
-  const method = paymentMethod === 'MOBILE_WALLET' ? 'MOBILE_WALLET' : 'INSTAPAY';
-  const normalizedSender = normalizeSenderId(method, senderIdentifier);
-  const numAmount = Number(amount);
+  const { paymentMethod, senderIdentifier, amount, providerRef } = req.body;
+  const result = await finalizePaymentVerification({
+    paymentMethod,
+    senderIdentifier,
+    amount,
+    providerRef,
+    rawText: rawPayload,
+  });
 
-  // If local memory intent exists, verify it
-  for (const [id, intent] of localPaymentIntents.entries()) {
-    if (intent.payment_method === method &&
-        intent.expected_sender_identifier === normalizedSender &&
-        Number(intent.expected_amount) === numAmount &&
-        intent.status === 'AWAITING_TRANSFER') {
-      intent.status = 'VERIFIED';
-      intent.verified_at = new Date().toISOString();
-      intent.matched_event_id = eventId;
-      const b = db.bookings.find(bk => bk.id === intent.booking_id);
-      if (b) {
-        b.status = 'confirmed';
-        b.depositPaid = true;
-      }
-      return res.json({ success: true, matched: true, bookingId: intent.booking_id });
-    }
+  return res.json(result);
+});
+
+// ==========================================
+// ANDROID NOTIFICATION & SMS LISTENER ENDPOINT
+// ==========================================
+app.get(['/api/payments/listener/status', '/api/payments/android-listener/status'], (req, res) => {
+  return res.json({
+    status: 'online',
+    endpoint: 'GET or POST /api/payments/listener',
+    supportedMethods: ['VODAFONE_CASH (MOBILE_WALLET)', 'INSTAPAY'],
+    authMethods: ['Header: x-listener-key', 'Query: ?secret=', 'Body: secret'],
+    serverTime: new Date().toISOString(),
+  });
+});
+
+app.all(['/api/payments/listener', '/api/payments/android-listener'], async (req, res) => {
+  // If GET request with no payment payload, return status info
+  if (req.method === 'GET' && !req.query.text && !req.query.smsBody && !req.query.message && !req.query.amount && !req.query.body) {
+    return res.json({
+      status: 'online',
+      endpoint: 'GET or POST /api/payments/listener',
+      supportedMethods: ['VODAFONE_CASH (MOBILE_WALLET)', 'INSTAPAY'],
+      authMethods: ['Header: x-listener-key', 'Query: ?secret=', 'Body: secret'],
+      serverTime: new Date().toISOString(),
+    });
   }
 
-  return res.json({ success: true, matched: false, eventId });
+  const payload = req.method === 'GET' ? req.query : (req.body || {});
+  const configuredSecret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET || 'hagzy_live_listener_secret_2026';
+  const providedKey = req.headers['x-listener-key'] ||
+                      req.query.secret ||
+                      req.query.key ||
+                      payload?.secret ||
+                      (req.headers['authorization'] ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : null);
+
+  if (providedKey !== configuredSecret) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing listener secret key' });
+  }
+
+  const rawText = payload.text || payload.smsBody || payload.body || payload.message || payload.not_text || '';
+
+  const parsed = parseIncomingTransferText(rawText, payload);
+  if (!parsed || !parsed.amount || !parsed.senderIdentifier) {
+    return res.status(422).json({
+      error: 'Could not parse transfer amount or sender identifier from notification payload',
+      parsed,
+      receivedPayload: payload
+    });
+  }
+
+  const result = await finalizePaymentVerification({
+    paymentMethod: parsed.paymentMethod,
+    senderIdentifier: parsed.senderIdentifier,
+    amount: parsed.amount,
+    providerRef: parsed.providerRef,
+    rawText,
+  });
+
+  return res.json(result);
 });
 
 // ==========================================

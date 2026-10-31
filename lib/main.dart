@@ -2593,14 +2593,16 @@ class _HagzyHomeState extends State<HagzyHome> {
             bookingId: booking.id,
             amount: dueNow,
             arabic: arabic,
+            venueName: venue?.name,
+            slotTimeFormatted: '${booking.startsAt.hour.toString().padLeft(2, '0')}:${booking.startsAt.minute.toString().padLeft(2, '0')}',
+            totalBookingValue: booking.price,
+            headcount: booking.splitCount,
             initialMethod:
                 method == 'vodafone_cash' ? 'vodafone_cash' : 'instapay',
             receiverIpa: venue?.instaPayAddress.isNotEmpty == true
                 ? venue!.instaPayAddress
                 : 'mohamedra4adhegazy@instapay',
-            receiverWallet: venue?.vodafoneCashNumber.isNotEmpty == true
-                ? venue!.vodafoneCashNumber
-                : '01024129393',
+            receiverWallet: '01027371804',
             prefilledSenderPhone: booking.phone.isNotEmpty
                 ? booking.phone
                 : _savedCustomerPhone,
@@ -4199,6 +4201,13 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
   }
 
+  Future<void> _handleWalletUpdated(double newBalance) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(HagzyWallet.keyWallet, newBalance);
+    if (mounted) setState(() => _walletBalance = newBalance);
+    await _syncAccountData();
+  }
+
   Future<void> _chooseCustomerAreaFromProfile() async {
     final arabic = _language == 'AR';
     String query = '';
@@ -4754,6 +4763,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             venues: _venues,
                                             bookings: _bookings,
                                             walletBalance: _walletBalance,
+                                            onWalletUpdated: _handleWalletUpdated,
                                             arabic: arabic,
                                             isSignedIn: _customerSignedIn,
                                             onSignIn: _handleCustomerSignIn,
@@ -4785,6 +4795,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             isSignedIn: _customerSignedIn,
                                             bookingCount: _customerBookings.length,
                                             walletBalance: _walletBalance,
+                                            onWalletUpdated: _handleWalletUpdated,
                                             currentArea: _currentArea,
                                             api: _api,
                                             apiConfigured: _api.isConfigured,

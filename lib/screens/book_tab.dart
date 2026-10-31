@@ -7,6 +7,9 @@ import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/map_explorer.dart';
+import '../core/models/models_v2.dart';
+import '../core/utils/smart_defaults.dart';
+import '../features/discovery/discovery.dart';
 
 class BookTab extends StatefulWidget {
   const BookTab({
@@ -53,6 +56,7 @@ class _BookTabState extends State<BookTab> {
   bool _sortByPrice = false;
   bool _showMapView = false;
   bool _isAutoAssigningGps = false;
+  ShillaSizePreset _shillaFilter = ShillaSizePreset.all;
   DateTime _date = () {
     final now = DateTime.now();
     return now.hour >= 21
@@ -927,6 +931,23 @@ class _BookTabState extends State<BookTab> {
     );
   }
 
+  bool _venueMatchesShilla(Venue venue, ShillaSizePreset preset) {
+    if (preset == ShillaSizePreset.all) return true;
+    if (preset == ShillaSizePreset.solo) {
+      return venue.type == VenueType.salon || venue.items.any((i) => i.hourlyRate > 0);
+    }
+    if (preset == ShillaSizePreset.duo) {
+      return venue.type == VenueType.lounge || venue.type == VenueType.sports || venue.items.any((i) => i.multiRate > 0 || i.hourlyRate > 0);
+    }
+    if (preset == ShillaSizePreset.group) {
+      return venue.type == VenueType.lounge || venue.type == VenueType.sports || venue.items.any((i) => i.multiRate > 0);
+    }
+    if (preset == ShillaSizePreset.squad) {
+      return venue.type == VenueType.sports;
+    }
+    return true;
+  }
+
   List<Venue> _getMatchingVenues() {
     final list = upsertNaderSalon(widget.venues).where((venue) {
       final matchesCategory = _type == null || venue.type == _type;
@@ -939,11 +960,13 @@ class _BookTabState extends State<BookTab> {
       final matchesFavorite =
           !_favoritesOnly || _favoriteIds.contains(venue.id);
       final matchesArea = _locationMatchesArea(venue.location);
+      final matchesShilla = _shillaFilter == ShillaSizePreset.all || _venueMatchesShilla(venue, _shillaFilter);
       return matchesCategory &&
           matchesSubCategory &&
           matchesSearch &&
           matchesFavorite &&
-          matchesArea;
+          matchesArea &&
+          matchesShilla;
     }).toList()
       ..sort((a, b) {
         if (!_sortByPrice) return a.name.compareTo(b.name);
@@ -971,6 +994,7 @@ class _BookTabState extends State<BookTab> {
             : venue.services.first.minutes
         : 60;
     return ListView(
+      cacheExtent: 3000,
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
       children: [
@@ -982,37 +1006,74 @@ class _BookTabState extends State<BookTab> {
           isLocating: _isAutoAssigningGps,
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: localized(
-                widget.arabic,
-                'Search venues, sports, salons...',
-                'ابحث عن الأماكن والأنشطة...'),
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: localized(widget.arabic, 'Clear search', 'مسح البحث'),
-                    onPressed: () => setState(() {
-                      _query = '';
-                      _searchController.clear();
-                    }),
-                    icon: const Icon(Icons.close),
-                  ),
-            filled: true,
-            fillColor: kDarkMode.value ? const Color(0xFF131C31) : kPanel,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: kDarkMode.value ? 0.25 : 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          onChanged: (value) => setState(() {
-            _query = value;
-            _venueId = null;
-            _itemId = null;
-            _selectedStart = null;
-          }),
+          child: TextField(
+            controller: _searchController,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: kInk,
+            ),
+            decoration: InputDecoration(
+              hintText: localized(
+                  widget.arabic,
+                  'Search padel, football, salons, gaming...',
+                  'ابحث عن ملاعب، صالونات، بلايستيشن، كافيهات...'),
+              hintStyle: TextStyle(
+                color: kMuted,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: const Icon(Icons.search_rounded, color: kGreen, size: 21),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: localized(widget.arabic, 'Clear search', 'مسح البحث'),
+                      onPressed: () => setState(() {
+                        _query = '';
+                        _searchController.clear();
+                      }),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                    ),
+              filled: true,
+              fillColor: kDarkMode.value ? const Color(0xFF131C31) : Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(
+                  color: kDarkMode.value ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(
+                  color: kDarkMode.value ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: const BorderSide(color: kGreen, width: 1.5),
+              ),
+            ),
+            onChanged: (value) => setState(() {
+              _query = value;
+              _venueId = null;
+              _itemId = null;
+              _selectedStart = null;
+            }),
+          ),
         ),
         const SizedBox(height: 10),
         RepaintBoundary(
@@ -1261,6 +1322,31 @@ class _BookTabState extends State<BookTab> {
         ),
         const SizedBox(height: 10),
         _buildSubCategoryFilterRow(matchingVenues),
+        const SizedBox(height: 12),
+        VibeSmartBanner(
+          vibe: DiscoveryVibe.fromDateTime(),
+          openVenuesCount: matchingVenues.length,
+          isArabic: widget.arabic,
+          onCtaPressed: () {
+            _scrollController.animateTo(
+              600,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        ShillaGroupSizeFilterBar(
+          selectedPreset: _shillaFilter,
+          onPresetSelected: (preset) {
+            setState(() {
+              _shillaFilter = preset;
+              _venueId = null;
+              _itemId = null;
+            });
+          },
+          isArabic: widget.arabic,
+        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -2928,7 +3014,8 @@ class ReservationQuote extends StatelessWidget {
         : item.hourlyRate *
             estimatedMinutes /
             (venue.type == VenueType.salon ? 15 : 60);
-    final deposit = total * venue.depositPercent / 100;
+    final rawDeposit = total * venue.depositPercent / 100;
+    final deposit = rawDeposit > 0 && rawDeposit < 5.0 ? 5.0 : rawDeposit;
     return Container(
       decoration: BoxDecoration(
         color: kPage,
@@ -4775,40 +4862,41 @@ class _CategoryVisualCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     return PressableScale(
       onTap: onTap,
-      scaleDown: 0.94,
+      scaleDown: 0.95,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
+        duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           gradient: isSelected
-              ? LinearGradient(
-                  colors: gradient,
+              ? const LinearGradient(
+                  colors: [Color(0xFF047857), Color(0xFF059669)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
               : null,
-          color: isSelected ? null : kPanel,
-          borderRadius: BorderRadius.circular(18),
+          color: isSelected ? null : (isDark ? const Color(0xFF131C31) : Colors.white),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? glowColor.withValues(alpha: 0.6)
+                ? kGreenLight.withValues(alpha: 0.5)
                 : kBorder,
-            width: isSelected ? 1.6 : 1,
+            width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: glowColor.withValues(alpha: 0.35),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
+                    color: kGreen.withValues(alpha: 0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   )
                 ]
               : [
                   BoxShadow(
-                    color: kInk.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   )
@@ -4817,23 +4905,22 @@ class _CategoryVisualCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 280),
-              width: 36,
-              height: 36,
+            Container(
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Colors.white.withValues(alpha: 0.22)
-                    : glowColor.withValues(alpha: 0.12),
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                size: 18,
-                color: isSelected ? Colors.white : glowColor,
+                size: 16,
+                color: isSelected ? Colors.white : kGreen,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -4845,7 +4932,7 @@ class _CategoryVisualCard extends StatelessWidget {
                       title,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
+                        fontSize: 13,
                         color: isSelected ? Colors.white : kInk,
                         letterSpacing: -0.2,
                       ),
@@ -4854,17 +4941,17 @@ class _CategoryVisualCard extends StatelessWidget {
                       const SizedBox(width: 5),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
+                            horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? Colors.white.withValues(alpha: 0.25)
-                              : kSurfaceTint,
+                              ? Colors.white.withValues(alpha: 0.22)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           '$count',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w800,
                             color: isSelected ? Colors.white : kMuted,
                           ),
@@ -4873,11 +4960,10 @@ class _CategoryVisualCard extends StatelessWidget {
                     ],
                   ],
                 ),
-                const SizedBox(height: 1),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
                         ? Colors.white.withValues(alpha: 0.85)
@@ -4886,24 +4972,6 @@ class _CategoryVisualCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Container(
-                width: 16,
-                height: 16,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.check_rounded,
-                    size: 11,
-                    color: gradient.first,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),

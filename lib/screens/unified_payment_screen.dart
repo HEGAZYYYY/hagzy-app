@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../hagzy_api.dart';
 import '../theme/hagzy_theme.dart';
+import '../core/models/models_v2.dart';
+import '../features/checkout_psychology/checkout_psychology.dart';
 
 enum PaymentMethodTab {
   instaPay,
@@ -96,11 +98,16 @@ class UnifiedPaymentScreen extends StatefulWidget {
     required this.arabic,
     this.initialMethod = 'instapay',
     this.receiverIpa = 'mohamedra4adhegazy@instapay',
-    this.receiverWallet = '01024129393',
+    this.receiverWallet = '01027371804',
     this.prefilledSenderPhone = '',
     this.authToken,
     this.onPaymentVerified,
     this.onManualProofSubmitted,
+    this.venueName,
+    this.slotTimeFormatted,
+    this.totalBookingValue,
+    this.headcount = 1,
+    this.isWalletTopUp = false,
   });
 
   final String bookingId;
@@ -113,6 +120,11 @@ class UnifiedPaymentScreen extends StatefulWidget {
   final String? authToken;
   final VoidCallback? onPaymentVerified;
   final void Function(String method, String reference)? onManualProofSubmitted;
+  final String? venueName;
+  final String? slotTimeFormatted;
+  final double? totalBookingValue;
+  final int headcount;
+  final bool isWalletTopUp;
 
   @override
   State<UnifiedPaymentScreen> createState() => _UnifiedPaymentScreenState();
@@ -120,6 +132,10 @@ class UnifiedPaymentScreen extends StatefulWidget {
 
 class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     with SingleTickerProviderStateMixin {
+  bool get _isTopUp =>
+      widget.isWalletTopUp || widget.bookingId.startsWith('wallet_topup_');
+  double get effectivePayableAmount =>
+      widget.amount > 0 && widget.amount < 5.0 ? 5.0 : widget.amount;
   late PaymentMethodTab _selectedTab;
   final _instaPayController = TextEditingController();
   final _walletController = TextEditingController();
@@ -243,6 +259,8 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
         'bookingId': widget.bookingId,
         'paymentMethod': methodStr,
         'senderIdentifier': senderId,
+        'amount': effectivePayableAmount,
+        'isWalletTopUp': _isTopUp,
       });
 
       final response = await http
@@ -485,38 +503,76 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                 ),
               ),
             ),
+            if (widget.totalBookingValue != null && !_isTopUp) ...[
+              const SizedBox(height: 14),
+              ContrastAnchoredCheckoutCard(
+                booking: HagzyBooking(
+                  id: widget.bookingId,
+                  unitId: 'unit',
+                  venueId: 'venue',
+                  hostUserId: 'user',
+                  startTime: DateTime.now(),
+                  endTime: DateTime.now().add(const Duration(hours: 1)),
+                  headcount: widget.headcount,
+                  totalPriceEgp: widget.totalBookingValue!,
+                  depositRequiredEgp: effectivePayableAmount,
+                  createdAt: DateTime.now(),
+                  venueName: widget.venueName,
+                ),
+                isArabic: widget.arabic,
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Future<void> _handleBackPress() async {
+    final shouldRelease = await LossAversionExitDialog.show(
+      context: context,
+      slotTimeFormatted: widget.slotTimeFormatted ?? 'Today',
+      venueName: widget.venueName ?? 'Hagzy Venue',
+      isArabic: widget.arabic,
+    );
+    if (shouldRelease == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
 
-    return Scaffold(
-      backgroundColor: kPage,
-      appBar: AppBar(
-        backgroundColor: kPanel,
-        elevation: 0,
-        title: Text(
-          _localized('Pay with Wallet or InstaPay', 'الدفع بالمحفظة أو إنستاباي'),
-          style: TextStyle(
-            color: kInk,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBackPress();
+      },
+      child: Scaffold(
+        backgroundColor: kPage,
+        appBar: AppBar(
+          backgroundColor: kPanel,
+          elevation: 0,
+          title: Text(
+            _localized('Pay with Wallet or InstaPay', 'الدفع بالمحفظة أو إنستاباي'),
+            style: TextStyle(
+              color: kInk,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: kInk, size: 20),
+            onPressed: _handleBackPress,
           ),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: kInk, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+        body: SafeArea(
+          child: _activeIntent == null
+              ? _buildDetailsFormView(isDark)
+              : _buildActiveIntentStreamView(isDark),
         ),
-      ),
-      body: SafeArea(
-        child: _activeIntent == null
-            ? _buildDetailsFormView(isDark)
-            : _buildActiveIntentStreamView(isDark),
       ),
     );
   }
@@ -529,6 +585,36 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.amount > 0 && widget.amount < 5.0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _localized(
+                          'Notice: Minimum transfer on InstaPay & Vodafone Cash is 5 EGP. Payable amount is adjusted to 5 EGP (any excess reduces your venue bill or is added to your wallet).',
+                          'تنبيه: الحد الأدنى للتحويل عبر إنستاباي وفودافون كاش هو ٥ جنيه. تم ضبط المبلغ على ٥ جنيه (أي زيادة تُخصم من باقي حسابك في المكان أو تضاف لمحفظتك).',
+                        ),
+                        style: const TextStyle(
+                          color: Color(0xFF92400E),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Amount Summary Card
             Container(
               width: double.infinity,
@@ -563,7 +649,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '${widget.amount.toInt()}',
+                        '${effectivePayableAmount.toInt()}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 26,
@@ -719,6 +805,25 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                       ),
               ),
             ),
+            if (widget.totalBookingValue != null && !_isTopUp) ...[
+              const SizedBox(height: 14),
+              ContrastAnchoredCheckoutCard(
+                booking: HagzyBooking(
+                  id: widget.bookingId,
+                  unitId: 'unit',
+                  venueId: 'venue',
+                  hostUserId: 'user',
+                  startTime: DateTime.now(),
+                  endTime: DateTime.now().add(const Duration(hours: 1)),
+                  headcount: widget.headcount,
+                  totalPriceEgp: widget.totalBookingValue!,
+                  depositRequiredEgp: effectivePayableAmount,
+                  createdAt: DateTime.now(),
+                  venueName: widget.venueName,
+                ),
+                isArabic: widget.arabic,
+              ),
+            ],
           ],
         ),
       ),

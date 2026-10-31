@@ -6,6 +6,9 @@ import '../hagzy_api.dart';
 import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../core/models/models_v2.dart';
+import '../features/passport_wallet/passport_wallet.dart';
+import 'unified_payment_screen.dart';
 
 class CustomerProfileTab extends StatefulWidget {
   const CustomerProfileTab({
@@ -17,6 +20,7 @@ class CustomerProfileTab extends StatefulWidget {
     required this.isSignedIn,
     required this.bookingCount,
     required this.walletBalance,
+    this.onWalletUpdated,
     required this.currentArea,
     required this.api,
     required this.apiConfigured,
@@ -39,6 +43,7 @@ class CustomerProfileTab extends StatefulWidget {
   final bool isSignedIn;
   final int bookingCount;
   final double walletBalance;
+  final ValueChanged<double>? onWalletUpdated;
   final String currentArea;
   final HagzyApi api;
   final bool apiConfigured;
@@ -108,6 +113,70 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _topUpWalletDialog(double currentBalance) async {
+    final arabic = widget.arabic;
+    TopUpWalletSheet.show(
+      context: context,
+      currentBalance: currentBalance,
+      isArabic: arabic,
+      onProceedToPayment: (amount) async {
+        await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (ctx) => UnifiedPaymentScreen(
+              bookingId:
+                  'wallet_topup_${DateTime.now().millisecondsSinceEpoch}',
+              amount: amount,
+              arabic: arabic,
+              isWalletTopUp: true,
+              venueName: localized(arabic, 'Hagzy In-App Wallet', 'محفظة حجزي'),
+              slotTimeFormatted: localized(
+                  arabic, 'Instant Wallet Credit', 'شحن فوري للرصيد'),
+              headcount: 1,
+              initialMethod: 'instapay',
+              receiverIpa: 'mohamedra4adhegazy@instapay',
+              receiverWallet: '01027371804',
+              onPaymentVerified: () async {
+                final newBal = await HagzyWallet.addFunds(amount);
+                widget.onWalletUpdated?.call(newBal);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: kGreen,
+                      content: Text(localized(
+                        arabic,
+                        'Wallet successfully credited with ${amount.toStringAsFixed(0)} EGP! Current Balance: ${newBal.toStringAsFixed(0)} EGP',
+                        'تم شحن المحفظة بنجاح بمبلغ ${amount.toStringAsFixed(0)} ج.م! الرصيد الحالي: ${newBal.toStringAsFixed(0)} ج.م',
+                      )),
+                    ),
+                  );
+                }
+              },
+              onManualProofSubmitted: (proofMethod, ref) async {
+                final newBal = await HagzyWallet.addFunds(amount);
+                widget.onWalletUpdated?.call(newBal);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: kGreen,
+                      content: Text(localized(
+                        arabic,
+                        'Top-up reference recorded. ${amount.toStringAsFixed(0)} EGP added to your wallet!',
+                        'تم تسجيل كود التحويل وإضافة ${amount.toStringAsFixed(0)} ج.م لمحفظتك بنجاح!',
+                      )),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _submitProfileUpdate() async {
@@ -180,6 +249,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     final signedIn = widget.isSignedIn;
 
     return ListView(
+      cacheExtent: 3000,
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
@@ -529,19 +599,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 icon: Icons.account_balance_wallet_rounded,
                 title: '${widget.walletBalance.toStringAsFixed(0)} EGP',
                 subtitle: localized(arabic, 'Wallet', 'المحفظة'),
-                badge: localized(arabic, 'Active', 'نشطة'),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(localized(
-                        arabic,
-                        'Your Hagzy Wallet balance is ${widget.walletBalance.toStringAsFixed(0)} EGP. It is automatically applied at checkout.',
-                        'رصيد محفظتك ${widget.walletBalance.toStringAsFixed(0)} ج.م ويتم خصمه تلقائياً عند الدفع.',
-                      )),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
+                badge: localized(arabic, 'Top Up', 'شحن'),
+                onTap: () => _topUpWalletDialog(widget.walletBalance),
               ),
             ),
             const SizedBox(width: 10),
@@ -678,6 +737,27 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               ),
             ],
           ),
+        ),
+
+        const SizedBox(height: 16),
+        UserReliabilityPassportCard(
+          profile: UserProfile(
+            id: widget.customerPhone.isNotEmpty ? widget.customerPhone : 'guest',
+            phoneNumber: widget.customerPhone.isNotEmpty ? widget.customerPhone : '01011112222',
+            displayName: widget.customerName.isNotEmpty ? widget.customerName : 'Hagzy Member',
+            city: widget.currentArea,
+            completedBookingsCount: widget.bookingCount,
+            reliabilityScore: 100.0,
+            hagzyWalletBalance: widget.walletBalance,
+            badges: const ['reliable', 'shilla_leader', 'gamer_vip'],
+            createdAt: DateTime(2026, 1, 1),
+          ),
+          isArabic: arabic,
+          onTopUpTap: () => _topUpWalletDialog(widget.walletBalance),
+        ),
+        const SizedBox(height: 12),
+        CrossCategoryVouchersCarousel(
+          isArabic: arabic,
         ),
 
         const SizedBox(height: 20),
