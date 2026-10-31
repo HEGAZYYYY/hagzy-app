@@ -2536,6 +2536,41 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
     }
   }
 
+  // 3. Direct booking match by customer phone (for direct transfers without active intent open)
+  if (method === 'MOBILE_WALLET') {
+    const directBooking = db.bookings ? db.bookings.find(b =>
+      b.status === 'pending_payment' &&
+      !b.cancelled &&
+      (b.phone === normalizedSender || b.customerPhone === normalizedSender)
+    ) : null;
+
+    if (directBooking) {
+      const reqDeposit = Number(directBooking.dueNow ?? directBooking.depositAmount ?? (directBooking.price * 0.2) ?? 5);
+      if (numAmount >= reqDeposit || numAmount >= 5) {
+        directBooking.status = 'confirmed';
+        directBooking.depositPaid = true;
+        directBooking.paymentMethod = method;
+        directBooking.paymentReference = providerRef;
+        directBooking.actualPaidAmount = numAmount;
+        directBooking.excessDeposit = Math.max(0, numAmount - reqDeposit);
+        if (directBooking.price) {
+          directBooking.remainingDue = Math.max(0, directBooking.price - numAmount);
+        }
+        saveDb(db);
+        syncBookingToFirebase(directBooking);
+
+        return {
+          success: true,
+          matched: true,
+          directBookingMatch: true,
+          bookingId: directBooking.id,
+          amount: numAmount,
+          excessAmount: directBooking.excessDeposit,
+        };
+      }
+    }
+  }
+
   return {
     success: true,
     matched: false,
