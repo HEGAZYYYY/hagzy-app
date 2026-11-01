@@ -25,9 +25,17 @@ services:
         generateValue: true
       # Secrets: set these in the Render dashboard (never commit values).
       - key: ADMIN_EMAIL
-        value: admin@hagzy.app
+        sync: false
       - key: ADMIN_PASSWORD
-        value: hagzy2026!
+        sync: false
+      - key: ADMIN_PHONE
+        sync: false
+      - key: PAYMENT_WEBHOOK_SECRET
+        sync: false
+      - key: PAYMENT_LISTENER_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://hagzy-booking.web.app,https://hagzy.app
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: APPLE_CLIENT_ID

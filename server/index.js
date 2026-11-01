@@ -5,19 +5,59 @@ const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const IS_TEST = process.env.NODE_ENV === 'test';
 
-// Token Revocation Store
-const revokedTokens = new Set();
-function revokeToken(token) {
+// Token Revocation Store with Expiring Denylist (Bounded memory)
+const revokedTokens = new Map(); // tokenHash -> expiryTimestamp
+function revokeToken(token, maxLifetimeMs = 30 * 24 * 3600 * 1000) {
   if (typeof token === 'string' && token.trim()) {
-    revokedTokens.add(token.trim());
+    const hash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    revokedTokens.set(hash, Date.now() + maxLifetimeMs);
   }
 }
 function isTokenRevoked(token) {
-  return typeof token === 'string' && revokedTokens.has(token.trim());
+  if (typeof token !== 'string' || !token.trim()) return false;
+  const hash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+  const expiresAt = revokedTokens.get(hash);
+  if (!expiresAt) return false;
+  if (Date.now() > expiresAt) {
+    revokedTokens.delete(hash);
+    return false;
+  }
+  return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [hash, exp] of revokedTokens.entries()) {
+    if (now > exp) revokedTokens.delete(hash);
+  }
+}, 3600000).unref();
+
+// Account Lockout / Brute-force Tracking
+const loginFailures = new Map(); // key -> { count, lockedUntil }
+function checkLoginLockout(key) {
+  const rec = loginFailures.get(key);
+  if (!rec) return false;
+  if (Date.now() < rec.lockedUntil) return true;
+  if (Date.now() > rec.lockedUntil) {
+    loginFailures.delete(key);
+    return false;
+  }
+  return false;
+}
+function recordLoginFailure(key) {
+  const rec = loginFailures.get(key) || { count: 0, lockedUntil: 0 };
+  rec.count += 1;
+  if (rec.count >= 5) {
+    rec.lockedUntil = Date.now() + 15 * 60 * 1000;
+  }
+  loginFailures.set(key, rec);
+}
+function clearLoginFailure(key) {
+  loginFailures.delete(key);
 }
 
 // Dual Password Hashing (Bcrypt primary + Legacy Scrypt fallback)
@@ -464,25 +504,57 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_prod_sec_2026_rotated_k8x9q2m1';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hagzy2026!';
+// Banned / leaked default strings that MUST NEVER be accepted
+const BANNED_SECRETS = new Set([
+  'hagzy_prod_sec_2026_rotated_k8x9q2m1',
+  'hagzy2026!',
+  'hagzy_live_listener_secret_2026',
+  'dev_secret_key_change_in_production'
+]);
+
+if (IS_PROD) {
+  if (!process.env.JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable is missing.');
+    process.exit(1);
+  }
+  if (BANNED_SECRETS.has(process.env.JWT_SECRET)) {
+    console.error('FATAL: Insecure leaked JWT_SECRET provided in production.');
+    process.exit(1);
+  }
+  if (process.env.ADMIN_PASSWORD && BANNED_SECRETS.has(process.env.ADMIN_PASSWORD)) {
+    console.error('FATAL: Insecure leaked ADMIN_PASSWORD provided in production.');
+    process.exit(1);
+  }
+  if (process.env.PAYMENT_LISTENER_KEY && BANNED_SECRETS.has(process.env.PAYMENT_LISTENER_KEY)) {
+    console.error('FATAL: Insecure leaked PAYMENT_LISTENER_KEY provided in production.');
+    process.exit(1);
+  }
+  if (process.env.PAYMENT_WEBHOOK_SECRET && BANNED_SECRETS.has(process.env.PAYMENT_WEBHOOK_SECRET)) {
+    console.error('FATAL: Insecure leaked PAYMENT_WEBHOOK_SECRET provided in production.');
+    process.exit(1);
+  }
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || (IS_TEST ? 'test-secret' : crypto.randomBytes(32).toString('hex'));
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
+
 const ADMIN_WHITELIST_EMAILS = [
-  'mohamedhegazypc11@gmail.com',
   (process.env.ADMIN_EMAIL || '').trim().toLowerCase()
 ].filter(Boolean);
 
 const ADMIN_WHITELIST_PHONES = [
-  '01027371804',
   normalizeLocalPhone(process.env.ADMIN_PHONE || '')
 ].filter(Boolean);
 
 function isUserAdmin(identity) {
   if (!identity) return false;
+  if (identity.role === 'owner' || identity.role === 'super_admin') return true;
+  if (identity.isAdmin === true && identity.role === 'owner') return true;
   const email = String(identity.email || '').trim().toLowerCase();
-  if (email && ADMIN_WHITELIST_EMAILS.includes(email)) return true;
+  if (email && ADMIN_WHITELIST_EMAILS.length > 0 && ADMIN_WHITELIST_EMAILS.includes(email)) return true;
   const rawPhone = identity.phone || identity.customerPhone || identity.target || identity.phoneNumber;
   const cleanPhone = normalizeLocalPhone(rawPhone);
-  if (cleanPhone && ADMIN_WHITELIST_PHONES.includes(cleanPhone)) return true;
+  if (cleanPhone && ADMIN_WHITELIST_PHONES.length > 0 && ADMIN_WHITELIST_PHONES.includes(cleanPhone)) return true;
   return false;
 }
 
@@ -647,12 +719,33 @@ if (db.bookings && Array.isArray(db.bookings)) {
 
 app.set('trust proxy', 1); // behind Render's proxy: needed for correct client IPs
 app.disable('x-powered-by');
-app.use(cors({
-  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()) : true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
 }));
-app.use(express.json({ limit: '200kb' }));
+
+const allowedCorsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim().toLowerCase())
+  : (IS_PROD ? ['https://hagzy-booking.web.app', 'https://hagzy.app', 'https://hagzy-api.onrender.com'] : ['*']);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedCorsOrigins.includes('*') || allowedCorsOrigins.includes(origin.toLowerCase())) {
+      return callback(null, true);
+    }
+    return callback(new Error('Blocked by CORS policy'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Signature', 'X-Hagzy-Signature', 'X-Timestamp', 'X-Listener-Key', 'X-Webhook-Signature'],
+  credentials: true
+}));
+
+app.use(express.json({
+  limit: '200kb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -1152,8 +1245,9 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   const isReviewer = !!REVIEWER_TARGET && !!REVIEWER_CODE && target === REVIEWER_TARGET;
   const otp = isReviewer ? REVIEWER_CODE : crypto.randomInt(100000, 1000000).toString();
 
+  const hashedCode = crypto.createHash('sha256').update(otp).digest('hex');
   db.otps[target] = {
-    code: otp,
+    hashedCode,
     expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     name: String(name || '').slice(0, 80),
@@ -1565,8 +1659,10 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
     saveDb(db);
     return res.status(429).json({ error: 'Too many attempts. Please request a new code.' });
   }
-  const a = Buffer.from(String(record.code));
-  const b = Buffer.from(inputCode);
+  const inputHash = crypto.createHash('sha256').update(inputCode).digest('hex');
+  const storedHash = record.hashedCode || (record.code ? crypto.createHash('sha256').update(String(record.code)).digest('hex') : '');
+  const a = Buffer.from(storedHash);
+  const b = Buffer.from(inputHash);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     saveDb(db);
     return res.status(400).json({ error: 'Invalid verification code. Please enter the code sent to your email/phone.' });
@@ -1705,11 +1801,13 @@ app.post('/api/auth/customer/register', async (req, res) => {
   if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
     return res.status(400).json({ error: 'Please enter a valid email address' });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters long' });
   }
 
-  if (isUserAdmin({ email: cleanEmail, phone: cleanPhone })) {
+  if (isUserAdmin({ email: cleanEmail, phone: cleanPhone }) ||
+      ADMIN_WHITELIST_EMAILS.includes(cleanEmail) ||
+      (cleanPhone && ADMIN_WHITELIST_PHONES.includes(normalizeLocalPhone(cleanPhone)))) {
     return res.status(403).json({
       error: 'Administrative identities cannot be registered through customer registration. Please sign in via Google OAuth or Phone OTP.'
     });
@@ -1744,9 +1842,9 @@ app.post('/api/auth/customer/register', async (req, res) => {
   syncUserToFirebase(newUser);
 
   const token = jwt.sign(
-    { id: newUser.id, email: newUser.email, name: newUser.name, phone: newUser.phone },
+    { id: newUser.id, email: newUser.email, name: newUser.name, phone: newUser.phone, role: 'customer', isAdmin: false },
     JWT_SECRET,
-    { expiresIn: '90d' }
+    { expiresIn: '30d' }
   );
 
   return res.status(201).json({
@@ -1771,19 +1869,24 @@ app.post('/api/auth/customer/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
-  if (!user) {
-    return res.status(401).json({ error: 'No account found with this email. Please register or check your spelling.' });
+  const lockoutKey = `login:${cleanEmail}`;
+  if (checkLoginLockout(lockoutKey)) {
+    return res.status(429).json({ error: 'Account temporarily locked due to multiple failed login attempts. Please wait 15 minutes.' });
   }
 
-  if (!user.passwordHash) {
-    return res.status(400).json({ error: 'This account was registered via Google or SMS. Please sign in with Google or request a code.' });
+  const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  if (!user || !user.passwordHash) {
+    recordLoginFailure(lockoutKey);
+    return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
   const match = await comparePassword(password, user.passwordHash);
   if (!match) {
-    return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+    recordLoginFailure(lockoutKey);
+    return res.status(401).json({ error: 'Invalid email or password.' });
   }
+
+  clearLoginFailure(lockoutKey);
 
   // Transparently upgrade legacy scrypt hash to bcrypt
   if (user.passwordHash.includes(':')) {
@@ -1793,11 +1896,11 @@ app.post('/api/auth/customer/login', async (req, res) => {
   saveDb(db);
   syncUserToFirebase(user);
 
-  const isAdmin = isUserAdmin(user);
+  const isAdmin = user.role === 'owner' && isUserAdmin(user);
   const token = jwt.sign(
     { id: user.id, email: user.email, name: user.name, phone: user.phone, isAdmin, role: isAdmin ? 'owner' : 'customer' },
     JWT_SECRET,
-    { expiresIn: '90d' }
+    { expiresIn: '30d' }
   );
 
   return res.json({
@@ -1933,11 +2036,11 @@ app.post('/api/auth/login', async (req, res) => {
   if (token && typeof token === 'string') {
     try {
       const decoded = jwt.verify(token.replace(/^Bearer\s+/i, ''), JWT_SECRET);
-      if (decoded.isAdmin || isUserAdmin(decoded)) {
+      if (decoded.role === 'owner' || isUserAdmin(decoded)) {
         const adminToken = jwt.sign(
           { id: decoded.id, email: decoded.email, phone: decoded.phone, isAdmin: true, role: 'owner' },
           JWT_SECRET,
-          { expiresIn: '24h' }
+          { expiresIn: '12h' }
         );
         return res.json({
           success: true,
@@ -1947,23 +2050,23 @@ app.post('/api/auth/login', async (req, res) => {
       }
     } catch (_) {}
     return res.status(403).json({
-      error: 'Access denied: Only mohamedhegazypc11@gmail.com or authorized owner phone can access the Admin Portal.'
+      error: 'Access denied: Identity is not authorized for administrative access.'
     });
   }
 
-  // Password-based admin verification (strictly bcrypt against authorized user)
+  // Password-based admin verification (strictly bcrypt or safeEqual against authorized user)
   if (typeof email === 'string' && typeof password === 'string') {
     const cleanEmail = email.trim().toLowerCase();
     if (!ADMIN_WHITELIST_EMAILS.includes(cleanEmail)) {
       return res.status(401).json({
-        error: 'Access denied: Invalid credentials or unauthorized email.'
+        error: 'Invalid email or password.'
       });
     }
     if (ADMIN_PASSWORD && safeEqual(password, ADMIN_PASSWORD)) {
       const adminToken = jwt.sign(
         { email: cleanEmail, isAdmin: true, role: 'owner' },
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: '12h' }
       );
       return res.json({
         success: true,
@@ -1978,7 +2081,7 @@ app.post('/api/auth/login', async (req, res) => {
         const adminToken = jwt.sign(
           { id: user.id, email: user.email, phone: user.phone, isAdmin: true, role: 'owner' },
           JWT_SECRET,
-          { expiresIn: '24h' }
+          { expiresIn: '12h' }
         );
         return res.json({
           success: true,
@@ -1988,7 +2091,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     }
     return res.status(401).json({
-      error: 'Invalid credentials. Please sign in with Google (mohamedhegazypc11@gmail.com) or Phone OTP.'
+      error: 'Invalid email or password.'
     });
   }
 
@@ -2450,7 +2553,10 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   // 3. Parse Sender Identifier
   if (!senderIdentifier) {
     if (paymentMethod === 'MOBILE_WALLET') {
-      const RECEIVER_WALLETS = new Set(['01027371804']);
+      const RECEIVER_WALLETS = new Set([
+  normalizeLocalPhone(process.env.ADMIN_PHONE || ''),
+  ...(process.env.RECEIVER_WALLETS || '').split(',').map(normalizeLocalPhone)
+].filter(Boolean));
       const phoneMatches = fullText.match(/(?:من\s+رقم|من|from\s+number|from)?\s*(01[0125][0-9]{8})/i);
       if (phoneMatches && phoneMatches[1] && !RECEIVER_WALLETS.has(phoneMatches[1])) {
         senderIdentifier = phoneMatches[1];
@@ -2903,23 +3009,35 @@ app.get('/api/payments/intent/:intentId', async (req, res) => {
 });
 
 app.post('/api/payments/webhook', async (req, res) => {
-  const crypto = require('crypto');
-  const signature = req.headers['x-webhook-signature'];
   const secret = process.env.PAYMENT_WEBHOOK_SECRET || process.env.PAYMENT_LISTENER_KEY;
 
   if (!secret) {
-    console.error('PAYMENT_WEBHOOK_SECRET is not configured in environment variables.');
-    return res.status(500).json({ error: 'Webhook secret is not configured on server.' });
+    return res.status(503).json({ error: 'Webhook secret is not configured on server.' });
   }
+
+  const signature = req.headers['x-signature'] || req.headers['x-hagzy-signature'] || req.headers['x-webhook-signature'];
+  const timestamp = req.headers['x-timestamp'];
 
   if (!signature) {
-    return res.status(401).json({ error: 'Missing X-Webhook-Signature header' });
+    return res.status(401).json({ error: 'Missing signature header' });
   }
 
-  const rawPayload = JSON.stringify(req.body);
-  const expectedSig = crypto.createHmac('sha256', secret).update(rawPayload).digest('hex');
-  if (signature !== expectedSig) {
-    return res.status(403).json({ error: 'Invalid HMAC signature' });
+  const rawPayload = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
+
+  if (timestamp) {
+    const timeDiff = Math.abs(Date.now() - Number(timestamp));
+    if (isNaN(timeDiff) || timeDiff > 5 * 60 * 1000) {
+      return res.status(401).json({ error: 'Timestamp expired or invalid (max 5m drift)' });
+    }
+    const expectedSigWithTime = crypto.createHmac('sha256', secret).update(rawPayload).update('.').update(String(timestamp)).digest('hex');
+    if (!safeEqual(signature, expectedSigWithTime)) {
+      return res.status(403).json({ error: 'Invalid HMAC signature' });
+    }
+  } else {
+    const expectedSig = crypto.createHmac('sha256', secret).update(rawPayload).digest('hex');
+    if (!safeEqual(signature, expectedSig)) {
+      return res.status(403).json({ error: 'Invalid HMAC signature' });
+    }
   }
 
   const { paymentMethod, senderIdentifier, amount, providerRef } = req.body;
@@ -2940,79 +3058,68 @@ app.post('/api/payments/webhook', async (req, res) => {
 app.get(['/api/payments/listener/status', '/api/payments/android-listener/status'], (req, res) => {
   return res.json({
     status: 'online',
-    endpoint: 'GET or POST /api/payments/listener',
+    endpoint: 'POST /api/payments/listener',
     supportedMethods: ['VODAFONE_CASH (MOBILE_WALLET)', 'INSTAPAY'],
-    authMethods: ['Header: x-listener-key', 'Query: ?secret=', 'Body: secret'],
+    authMethods: ['Header: x-signature with x-timestamp', 'Header: x-listener-key'],
     serverTime: new Date().toISOString(),
   });
 });
 
-app.all(['/api/payments/listener', '/api/payments/android-listener'], async (req, res) => {
-  const isHtml = req.headers.accept && req.headers.accept.includes('text/html');
-
-  // If GET request with no payment payload, return status info
-  if (req.method === 'GET' && !req.query.text && !req.query.smsBody && !req.query.message && !req.query.amount && !req.query.body) {
-    if (isHtml) {
-      return res.send(`
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>حجزي - مستمع الدفع التلقائي</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0A0F1D; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-            .card { background: #131B2E; border: 1px solid #1E293B; border-radius: 24px; padding: 32px 24px; text-align: center; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
-            .icon { width: 64px; height: 64px; background: rgba(16, 185, 129, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #10B981; font-size: 32px; border: 2px solid #10B981; }
-            h1 { font-size: 20px; margin: 0 0 8px; color: #fff; font-weight: 800; }
-            p { color: #94A3B8; font-size: 14px; line-height: 1.6; margin: 0; }
-            .badge { display: inline-block; background: #064E3B; color: #34D399; font-weight: 700; padding: 5px 14px; border-radius: 999px; font-size: 12px; margin-bottom: 16px; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="icon">⚡</div>
-            <div class="badge">المستمع متصل وجاهز · Listener Online</div>
-            <h1>خدمة التحقق التلقائي من الدفع (حجزي)</h1>
-            <p>سيرفر حجزي متصل ومستعد لمعالجة تحويلات فودافون كاش وإنستاباي عبر MacroDroid تلقائياً.</p>
-          </div>
-        </body>
-        </html>
-      `);
-    }
+// Reject GET variant for state-changing payment recording
+app.get(['/api/payments/listener', '/api/payments/android-listener'], (req, res) => {
+  if (!req.query.text && !req.query.smsBody && !req.query.message && !req.query.amount && !req.query.body) {
     return res.json({
       status: 'online',
-      endpoint: 'GET or POST /api/payments/listener',
+      endpoint: 'POST /api/payments/listener',
       supportedMethods: ['VODAFONE_CASH (MOBILE_WALLET)', 'INSTAPAY'],
-      authMethods: ['Header: x-listener-key', 'Query: ?secret=', 'Body: secret'],
       serverTime: new Date().toISOString(),
     });
   }
+  return res.status(405).json({
+    error: 'Payment events must be submitted via POST with authorization headers. GET parameter execution is disabled.'
+  });
+});
 
-  const payload = req.method === 'GET' ? req.query : (req.body || {});
-  const configuredSecret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET || 'hagzy_live_listener_secret_2026';
-  const providedKey = req.headers['x-listener-key'] ||
-                      req.query.secret ||
-                      req.query.key ||
-                      payload?.secret ||
+app.post(['/api/payments/listener', '/api/payments/android-listener'], async (req, res) => {
+  const isHtml = req.headers.accept && req.headers.accept.includes('text/html');
+  const payload = req.body || {};
+
+  // Disallow query parameter secrets
+  if (req.query.secret || req.query.key) {
+    return res.status(401).json({ error: 'Secrets in query parameters are strictly forbidden. Use authorization headers.' });
+  }
+
+  const configuredSecret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET;
+  if (!configuredSecret) {
+    return res.status(503).json({ error: 'Payment listener secret is not configured on server.' });
+  }
+
+  const signature = req.headers['x-signature'] || req.headers['x-hagzy-signature'];
+  const timestamp = req.headers['x-timestamp'];
+  const listenerKey = req.headers['x-listener-key'] ||
                       (req.headers['authorization'] ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : null);
 
-  if (providedKey !== configuredSecret) {
-    if (isHtml) {
-      return res.status(401).send(`
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>غير مصرح - حجزي</title>
-          <style>body { font-family: sans-serif; background: #0A0F1D; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; } .card { background: #131B2E; border: 1px solid #EF4444; border-radius: 20px; padding: 28px; text-align: center; max-width: 400px; } h1 { color: #EF4444; font-size: 18px; }</style>
-        </head>
-        <body><div class="card"><h1>مفتاح التحقق غير صحيح أو مفقود</h1><p>يرجى التأكد من كتابة ?secret=hagzy_live_listener_secret_2026 في الرابط.</p></div></body>
-        </html>
-      `);
+  let authenticated = false;
+
+  // 1. HMAC signature in header (preferred)
+  if (signature) {
+    if (!timestamp) {
+      return res.status(401).json({ error: 'Missing X-Timestamp header' });
     }
-    return res.status(401).json({ error: 'Unauthorized: Invalid or missing listener secret key' });
+    const timeDiff = Math.abs(Date.now() - Number(timestamp));
+    if (isNaN(timeDiff) || timeDiff > 5 * 60 * 1000) {
+      return res.status(401).json({ error: 'Timestamp expired or outside 5-minute window' });
+    }
+    const rawPayload = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
+    const expectedSig = crypto.createHmac('sha256', configuredSecret).update(rawPayload).update('.').update(String(timestamp)).digest('hex');
+    authenticated = safeEqual(signature, expectedSig);
+  } else if (listenerKey) {
+    // 2. Header-based listener key constant-time comparison
+    authenticated = safeEqual(listenerKey, configuredSecret);
+  }
+
+  if (!authenticated) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing listener authentication' });
   }
 
   const rawText = payload.text || payload.smsBody || payload.body || payload.message || payload.not_text || '';
@@ -3307,7 +3414,13 @@ app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
     time: new Date().toISOString(),
     usersCount: db.users.length,
     venuesCount: db.venues.length,
-    bookingsCount: db.bookings.length
+    bookingsCount: db.bookings.length,
+    configured: {
+      database: Boolean(pgPool),
+      jwt: Boolean(process.env.JWT_SECRET),
+      adminEmail: Boolean(process.env.ADMIN_EMAIL),
+      payments: Boolean(process.env.PAYMENT_WEBHOOK_SECRET || process.env.PAYMENT_LISTENER_KEY)
+    }
   });
 });
 

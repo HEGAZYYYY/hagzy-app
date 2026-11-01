@@ -10,10 +10,13 @@ import 'package:hagzy_app/widgets/map_explorer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> enterAdminPreview(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Open local preview'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Open local preview'));
-  await tester.pumpAndSettle();
+  final homeFinder = find.byType(HagzyHome);
+  if (homeFinder.evaluate().isNotEmpty) {
+    final dynamic state = tester.state(homeFinder);
+    state.enterAdminPreviewForTesting();
+    await tester.pumpAndSettle();
+    return;
+  }
 }
 
 const kSignedInCustomerProfile =

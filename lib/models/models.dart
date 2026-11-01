@@ -949,7 +949,7 @@ Venue naderSalonSample() => Venue(
       description:
           'Premier men’s grooming & barbershop in Kafr El Sheikh offering precision haircuts, beard styling, and VIP chair service.',
       instaPayAddress: 'nader.salon@instapay',
-      vodafoneCashNumber: '01027371804',
+      vodafoneCashNumber: '01024129393',
       amenities: const ['AC', 'Wi-Fi', 'VIP Chair', 'Kids Friendly'],
       items: [
         VenueItem(

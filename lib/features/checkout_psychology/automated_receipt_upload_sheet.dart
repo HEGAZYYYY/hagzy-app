@@ -14,7 +14,7 @@ class AutomatedReceiptUploadSheet extends StatefulWidget {
   const AutomatedReceiptUploadSheet({
     super.key,
     required this.booking,
-    this.instapayAddress = 'mohamedra4adhegazy@instapay',
+    this.instapayAddress = 'hagzy@instapay',
     this.walletNumber = '01012345678',
     this.existingOcrRefs = const {},
     required this.onVerified,

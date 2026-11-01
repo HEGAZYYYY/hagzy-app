@@ -29,7 +29,7 @@ before(async () => {
   proc = spawn('node', ['index.js'], {
     cwd: path.join(__dirname, '..'),
     env: { ...process.env, NODE_ENV: 'test', PORT, JWT_SECRET: 'test-secret',
-           ADMIN_EMAIL: 'admin@test.dev', ADMIN_PASSWORD: 'correct-horse', HAGZY_DATA_DIR: dataDir },
+           ADMIN_EMAIL: 'admin@test.dev', ADMIN_PHONE: '01000000001', ADMIN_PASSWORD: 'correct-horse', PAYMENT_LISTENER_KEY: 'test-listener-secret', PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', HAGZY_DATA_DIR: dataDir },
     stdio: 'ignore',
   });
   for (let i = 0; i < 50; i++) {
@@ -293,7 +293,7 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   // Simulate MacroDroid receiving Vodafone Cash Arabic SMS on Android phone
   const smsBody = 'تم استلام مبلغ 150.00 جنيه من رقم 01012345678. مصاريف الخدمة 0.00 جنيه. رصيدك الحالي هو 1000.00 جنيه.';
   const listenerRes = await call('POST', '/api/payments/listener', {
-    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    headers: { 'x-listener-key': 'test-listener-secret' },
     body: {
       source: 'sms',
       sender: 'VF-Cash',
@@ -333,7 +333,7 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   // Android notification received from InstaPay app with Eastern Arabic digits
   const instaPush = 'تم استلام تحويل بمبلغ ٢٠٠٫٠٠ ج.م من karim_aly@instapay بنجاح';
   const listenerRes2 = await call('POST', '/api/payments/listener', {
-    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    headers: { 'x-listener-key': 'test-listener-secret' },
     body: {
       source: 'notification',
       appName: 'InstaPay',
@@ -348,17 +348,17 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   // 5. Retroactive matching: transfer arrives BEFORE user creates payment intent
   const preTransferSms = 'تم تحويل مبلغ 300 جنيه من 01099887766';
   const preListenerRes = await call('POST', '/api/payments/listener', {
-    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    headers: { 'x-listener-key': 'test-listener-secret' },
     body: { text: preTransferSms },
   });
   assert.equal(preListenerRes.status, 200);
   assert.equal(preListenerRes.json.matched, false); // No intent existed yet
 
-  // 6. Test GET listener request with URL query parameters (for Open Website / HTTP GET actions)
-  const getListenerRes = await call('GET', `/api/payments/listener?secret=hagzy_live_listener_secret_2026&text=${encodeURIComponent('تم استلام 50 جنيه من 01011223344')}`);
-  assert.equal(getListenerRes.status, 200);
-  assert.equal(getListenerRes.json.amount, 50);
-  assert.equal(getListenerRes.json.senderIdentifier, '01011223344');
+  // 6. Test GET listener request and query parameter secrets: GET state-changes are blocked (405) and secrets in query are blocked (401)
+  const getListenerRes = await call('GET', `/api/payments/listener?secret=test-listener-secret&text=${encodeURIComponent('تم استلام 50 جنيه من 01011223344')}`);
+  assert.equal(getListenerRes.status, 405);
+  const querySecRes = await call('POST', '/api/payments/listener?secret=test-listener-secret', { body: { text: 'test' } });
+  assert.equal(querySecRes.status, 401);
 
   // Now customer creates intent for that booking & amount
   const bRes3 = await call('POST', '/api/bookings', { token: cust, body: booking({ price: 300 }) });
@@ -392,7 +392,7 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
 
   // Transfer arrives with 150 EGP (50 EGP more than requested)
   const overTransferRes = await call('POST', '/api/payments/listener', {
-    headers: { 'x-listener-key': 'hagzy_live_listener_secret_2026' },
+    headers: { 'x-listener-key': 'test-listener-secret' },
     body: { text: 'تم استلام مبلغ 150.00 جنيه من رقم 01055443322' },
   });
   assert.equal(overTransferRes.status, 200);
@@ -409,12 +409,12 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
 });
 
 test('whitelisted admin identity is granted owner privileges via OTP and login', async () => {
-  // 1. Whitelisted phone 01027371804
-  const reqAdminOtp = await call('POST', '/api/auth/customer-otp/request', { body: { phone: '01027371804' } });
+  // 1. Whitelisted phone 01000000001
+  const reqAdminOtp = await call('POST', '/api/auth/customer-otp/request', { body: { phone: '01000000001' } });
   assert.equal(reqAdminOtp.status, 200);
   const adminCode = reqAdminOtp.json.testOtp;
 
-  const verifyAdmin = await call('POST', '/api/auth/customer-otp/verify', { body: { phone: '01027371804', code: adminCode } });
+  const verifyAdmin = await call('POST', '/api/auth/customer-otp/verify', { body: { phone: '01000000001', code: adminCode } });
   assert.equal(verifyAdmin.status, 200);
   assert.equal(verifyAdmin.json.isAdmin, true);
   assert.equal(verifyAdmin.json.role, 'owner');
@@ -442,9 +442,10 @@ test('whitelisted admin identity is granted owner privileges via OTP and login',
   assert.equal(strangerAttempt.status, 403);
 });
 
-test('SECURITY: forged tokens, unverified claims, and admin registration bypass are strictly rejected', async () => {
+test('SECURITY: forged tokens, expired tokens, unverified claims, password constraints, and HMAC signatures', async () => {
+  const crypto = require('crypto');
   const forgedToken = jwt.sign(
-    { email: 'admin@test.dev', phone: '01027371804', aud: 'hagzy-acea1', iss: 'https://securetoken.google.com/hagzy-acea1', isAdmin: true, role: 'owner' },
+    { email: 'admin@test.dev', phone: '01000000001', aud: 'hagzy-acea1', iss: 'https://securetoken.google.com/hagzy-acea1', isAdmin: true, role: 'owner' },
     'forged-attacker-secret-key-123'
   );
 
@@ -456,21 +457,101 @@ test('SECURITY: forged tokens, unverified claims, and admin registration bypass 
   const adminRes = await call('GET', '/api/admin/venues', { token: forgedToken });
   assert.equal(adminRes.status, 401);
 
-  // 3. Forged token rejected from Google social login
+  // 3. Expired token rejected from customer and admin auth
+  const expiredToken = jwt.sign(
+    { id: 'usr-1', email: 'user@test.dev' },
+    'test-secret',
+    { expiresIn: '-5s' }
+  );
+  const expiredCustRes = await call('GET', '/api/customer/profile', { token: expiredToken });
+  assert.equal(expiredCustRes.status, 401);
+  const expiredAdminRes = await call('GET', '/api/admin/venues', { token: expiredToken });
+  assert.equal(expiredAdminRes.status, 401);
+
+  // 4. Forged token rejected from Google social login
   const googleRes = await call('POST', '/api/auth/social/google', {
     body: { idToken: forgedToken, email: 'admin@test.dev', name: 'Attacker' }
   });
   assert.equal(googleRes.status, 401);
 
-  // 4. Forged token rejected from Apple social login
+  // 5. Forged token rejected from Apple social login
   const appleRes = await call('POST', '/api/auth/social/apple', {
     body: { identityToken: forgedToken }
   });
   assert.equal(appleRes.status, 401);
 
-  // 5. Attempting to register admin email via unverified customer registration is rejected
+  // 6. Attempting to register admin email via customer registration is rejected (403)
   const regAdminEmail = await call('POST', '/api/auth/customer/register', {
     body: { email: 'admin@test.dev', password: 'Password123!', name: 'Imposter' }
   });
   assert.equal(regAdminEmail.status, 403);
+
+  // 7. Attempting to register admin phone via customer registration is rejected (403)
+  const regAdminPhone = await call('POST', '/api/auth/customer/register', {
+    body: { email: 'imposter@test.dev', phone: '01000000001', password: 'Password123!', name: 'Imposter' }
+  });
+  assert.equal(regAdminPhone.status, 403);
+
+  // 8. Password minimum 8 characters enforced on registration (400)
+  const shortPwdRes = await call('POST', '/api/auth/customer/register', {
+    body: { email: 'shortpwd@test.dev', password: '12345', name: 'Short' }
+  });
+  assert.equal(shortPwdRes.status, 400);
+
+  // 9. HMAC payment webhook: valid signature and fresh timestamp succeeds (200)
+  const webhookBody = {
+    paymentMethod: 'MOBILE_WALLET',
+    senderIdentifier: '01011112222',
+    amount: 50,
+    providerRef: 'REF_TEST_HMAC_1'
+  };
+  const rawBodyStr = JSON.stringify(webhookBody);
+  const freshTimestamp = Date.now().toString();
+  const validHmacSig = crypto.createHmac('sha256', 'test-webhook-secret')
+    .update(rawBodyStr)
+    .update('.')
+    .update(freshTimestamp)
+    .digest('hex');
+
+  const hmacOk = await call('POST', '/api/payments/webhook', {
+    body: webhookBody,
+    headers: {
+      'x-signature': validHmacSig,
+      'x-timestamp': freshTimestamp
+    }
+  });
+  assert.equal(hmacOk.status, 200);
+
+  // 10. HMAC payment webhook: expired timestamp (> 5 min) is rejected (401)
+  const staleTimestamp = (Date.now() - 6 * 60 * 1000).toString();
+  const staleSig = crypto.createHmac('sha256', 'test-webhook-secret')
+    .update(rawBodyStr)
+    .update('.')
+    .update(staleTimestamp)
+    .digest('hex');
+
+  const hmacStale = await call('POST', '/api/payments/webhook', {
+    body: webhookBody,
+    headers: {
+      'x-signature': staleSig,
+      'x-timestamp': staleTimestamp
+    }
+  });
+  assert.equal(hmacStale.status, 401);
+
+  // 11. HMAC payment webhook: forged signature is rejected (403)
+  const forgedSig = crypto.createHmac('sha256', 'wrong-attacker-secret')
+    .update(rawBodyStr)
+    .update('.')
+    .update(freshTimestamp)
+    .digest('hex');
+
+  const hmacForged = await call('POST', '/api/payments/webhook', {
+    body: webhookBody,
+    headers: {
+      'x-signature': forgedSig,
+      'x-timestamp': freshTimestamp
+    }
+  });
+  assert.equal(hmacForged.status, 403);
 });

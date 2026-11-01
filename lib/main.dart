@@ -139,7 +139,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   bool _adminShowPasswordAuth = false;
   bool _showAdminPassword = false;
   bool _savedCustomerIsAdmin = false;
-  final TextEditingController _adminPhoneController = TextEditingController(text: '01027371804');
+  final TextEditingController _adminPhoneController = TextEditingController();
   final TextEditingController _adminOtpController = TextEditingController();
   String _mode = 'landing';
   int _tab = 0;
@@ -508,13 +508,16 @@ class _HagzyHomeState extends State<HagzyHome> {
     });
   }
 
+  @visibleForTesting
+  void enterAdminPreviewForTesting() {
+    setState(() {
+      _mode = 'adminPreview';
+      _tab = 0;
+    });
+  }
+
   bool get _isAuthorizedAdmin {
-    final cleanEmail = _savedCustomerEmail.trim().toLowerCase();
-    final cleanPhone = _savedCustomerPhone.replaceAll(RegExp(r'\D'), '');
-    final matchesAdmin = cleanEmail == 'mohamedhegazypc11@gmail.com' ||
-        cleanPhone == '01027371804' ||
-        cleanPhone.endsWith('1027371804');
-    return _savedCustomerIsAdmin || matchesAdmin || (_adminToken != null && _adminToken!.isNotEmpty);
+    return _savedCustomerIsAdmin || (_adminToken != null && _adminToken!.isNotEmpty);
   }
 
   Future<void> _loginAdminWithPassword() async {
@@ -717,9 +720,9 @@ class _HagzyHomeState extends State<HagzyHome> {
           idToken: idToken,
         );
         final token = backendRes['token'] as String? ?? idToken;
-        final isAdmin = backendRes['isAdmin'] == true || email == 'mohamedhegazypc11@gmail.com';
+        final isAdmin = backendRes['isAdmin'] == true || backendRes['role'] == 'owner';
         if (!isAdmin) {
-          throw Exception('Access denied: $email is not authorized for administrative access.');
+          throw Exception('Access denied: Account is not authorized for administrative access.');
         }
         _adminToken = token;
         _savedCustomerIsAdmin = true;
@@ -2851,8 +2854,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                 method == 'vodafone_cash' ? 'vodafone_cash' : 'instapay',
             receiverIpa: venue?.instaPayAddress.isNotEmpty == true
                 ? venue!.instaPayAddress
-                : 'mohamedra4adhegazy@instapay',
-            receiverWallet: '01027371804',
+                : 'venue@instapay',
+            receiverWallet: venue?.vodafoneCashNumber.isNotEmpty == true
+                ? venue!.vodafoneCashNumber
+                : '01000000000',
             prefilledSenderPhone: booking.phone.isNotEmpty
                 ? booking.phone
                 : _savedCustomerPhone,
@@ -4222,14 +4227,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _customerToken = 'local-session-token';
     }
 
-    final cleanEmail = email.trim().toLowerCase();
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    final matchesAdminIdentity = cleanEmail == 'mohamedhegazypc11@gmail.com' ||
-        cleanPhone == '01027371804' ||
-        cleanPhone.endsWith('1027371804');
-
     final isAuthorizedAdmin = isAdmin == true ||
-        matchesAdminIdentity ||
         _savedCustomerIsAdmin ||
         (_adminToken != null && _adminToken!.isNotEmpty);
 
@@ -5318,9 +5316,6 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 : () => setState(() {
                                       _adminShowPasswordAuth = true;
                                       _adminShowPhoneAuth = false;
-                                      if (_emailController.text.isEmpty) {
-                                        _emailController.text = 'mohamedhegazypc11@gmail.com';
-                                      }
                                       _loginError = null;
                                     }),
                             icon: const Icon(Icons.lock_outline_rounded, size: 18),
@@ -5460,7 +5455,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     keyboardType: TextInputType.phone,
                                     decoration: InputDecoration(
                                       labelText: 'Owner Phone Number',
-                                      hintText: '01027371804',
+                                      hintText: '010XXXXXXXX',
                                       prefixIcon: const Icon(Icons.phone_rounded, color: kGreen, size: 20),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
