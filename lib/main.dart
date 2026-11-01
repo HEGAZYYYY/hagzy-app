@@ -1681,7 +1681,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         '${venue.name} · ${item.name}',
                         style: const TextStyle(
                           color: kGreen,
-                          fontSize: 11,
+                          fontSize: 12.0,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1759,7 +1759,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                         'التاريخ والوقت'),
                                     style: TextStyle(
                                       color: kMuted,
-                                      fontSize: 10,
+                                      fontSize: 12.0,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.7,
                                     ),
@@ -1787,7 +1787,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               child: Text(
                                 localized(arabic, 'Change', 'تعديل'),
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12.0,
                                   fontWeight: FontWeight.w800,
                                   color: kGreen,
                                 ),
@@ -2011,7 +2011,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             localized(arabic, selectedOffer.englishDescription,
                                 selectedOffer.arabicDescription),
                             style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 12.0,
                                 color: kGreen,
                                 fontWeight: FontWeight.w700),
                           );
@@ -2048,7 +2048,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       'Sign in to pay from your Hagzy wallet and track booking',
                                       'سجل دخولك للدفع من محفظة حجزي وتتبع حجزك'),
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 12.0,
                                     fontWeight: FontWeight.w600,
                                     color: kInk,
                                   ),
@@ -2122,7 +2122,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     Text(
                                       '${formatMoney(walletBalance)} EGP ${localized(arabic, 'available', 'رصيد متاح')}',
                                       style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12.0,
                                           fontWeight: FontWeight.w600,
                                           color: useWallet ? kGreen : kMuted),
                                     ),
@@ -2310,7 +2310,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           'نحتفظ بالموعد لمدة ١٥ دقيقة. لا يتأكد الحجز إلا بعد التحقق من دفع العربون.'),
                                       style: TextStyle(
                                           color: kMuted,
-                                          fontSize: 11,
+                                          fontSize: 12.0,
                                           fontWeight: FontWeight.w600),
                                     ),
                                   ),
@@ -2666,7 +2666,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               ),
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.78),
-                                fontSize: 11.5,
+                                fontSize: 12.0,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -2704,7 +2704,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: kMuted,
-                    fontSize: 11,
+                    fontSize: 12.0,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -2734,7 +2734,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                           ),
                           style: TextStyle(
                             color: kInk,
-                            fontSize: 11.5,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w600,
                             height: 1.3,
                           ),
@@ -2828,7 +2828,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: kMuted,
-                      fontSize: 11,
+                      fontSize: 12.0,
                       height: 1.35,
                     ),
                   ),
@@ -3043,7 +3043,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 localized(arabic, 'Copy ${formatMoney(dueNow)} EGP',
                                     'نسخ المبلغ'),
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12.0,
                                   fontWeight: FontWeight.w800,
                                   color: kGreen,
                                 ),
@@ -3211,7 +3211,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                           'حوّلت من رقمي $senderPhoneHint (ملء تلقائي)',
                         ),
                         style: const TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12.0,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -3228,7 +3228,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     'Your hold is extended for 60 minutes while the venue owner verifies your transfer in their POS timeline.',
                     'يتم تمديد الحجز المؤقت لمدة 60 دقيقة ريثما يتحقق صاحب المكان من التحويل.',
                   ),
-                  style: TextStyle(color: kMuted, fontSize: 11.5),
+                  style: TextStyle(color: kMuted, fontSize: 12.0),
                 ),
               ],
             ),
@@ -3416,7 +3416,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       style: const TextStyle(
                         color: Color(0xFFA7F3D0),
-                        fontSize: 11,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.7,
                       ),
@@ -3849,7 +3849,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                         style: TextStyle(
                                           color: Colors.white
                                               .withValues(alpha: 0.80),
-                                          fontSize: 11,
+                                          fontSize: 12.0,
                                         ),
                                       ),
                                     ),
@@ -3885,7 +3885,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     localized(arabic, 'WhatsApp', 'واتساب'),
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 11.5,
+                                      fontSize: 12.0,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -4762,7 +4762,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             Text(
                               appTitles[_tab],
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 12.0,
                                 color: kMuted,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -5600,7 +5600,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         const SizedBox(height: 18),
                         Text(
                           'Protected Access: Administrative privileges are strictly restricted to verified owner credentials.',
-                          style: TextStyle(color: kMuted, fontSize: 11.5, height: 1.4),
+                          style: TextStyle(color: kMuted, fontSize: 12.0, height: 1.4),
                           textAlign: TextAlign.center,
                         ),
                       ] else ...[

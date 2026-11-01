@@ -580,6 +580,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('arena@instapay'), findsOneWidget);
     await tester.enterText(find.byType(TextFormField).first, 'IPN-776655');
+    await tester.ensureVisible(find.text('Submit Reference'));
     await tester.tap(find.text('Submit Reference'));
     await tester.pumpAndSettle();
 

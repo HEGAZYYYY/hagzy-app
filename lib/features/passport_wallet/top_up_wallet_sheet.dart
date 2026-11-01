@@ -219,7 +219,7 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
                       : 'Minimum 5 EGP (InstaPay & Vodafone Cash limit)',
                   helperStyle: TextStyle(
                     color: kMuted,
-                    fontSize: 11,
+                    fontSize: 12.0,
                     fontWeight: FontWeight.w600,
                   ),
                   filled: true,

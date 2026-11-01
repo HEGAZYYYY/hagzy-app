@@ -783,7 +783,7 @@ class _BookTabState extends State<BookTab> {
                                       'يحدد أقرب محافظة لك في مصر بضغطة واحدة',
                                     ),
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 12.0,
                                       color: kMuted,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -821,7 +821,7 @@ class _BookTabState extends State<BookTab> {
                               gpsError!,
                               style: const TextStyle(
                                 color: Colors.redAccent,
-                                fontSize: 11.5,
+                                fontSize: 12.0,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1178,7 +1178,7 @@ class _BookTabState extends State<BookTab> {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: kMuted,
-                                          fontSize: 11,
+                                          fontSize: 12.0,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1193,7 +1193,7 @@ class _BookTabState extends State<BookTab> {
                                                 'احجز الآن'),
                                             style: const TextStyle(
                                               color: kGreen,
-                                              fontSize: 11,
+                                              fontSize: 12.0,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
@@ -1670,7 +1670,7 @@ class _BookTabState extends State<BookTab> {
                         Text(
                           activeSubDef.title(widget.arabic),
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w800,
                             color: isDark ? const Color(0xFFF1F5F9) : color,
                           ),
@@ -1876,7 +1876,7 @@ class _BookTabState extends State<BookTab> {
                   Text(
                     localized(widget.arabic, 'Clear', 'إلغاء الفلتر'),
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w800,
                       color: isDark ? const Color(0xFFF1F5F9) : accentColor,
                     ),
@@ -2279,7 +2279,7 @@ class _BookTabState extends State<BookTab> {
                                           localized(widget.arabic, 'STEP 1',
                                               'خطوة ١'),
                                           style: const TextStyle(
-                                            fontSize: 10,
+                                            fontSize: 12.0,
                                             fontWeight: FontWeight.w900,
                                             color: kGreen,
                                             letterSpacing: 0.5,
@@ -2391,7 +2391,7 @@ class _BookTabState extends State<BookTab> {
                                                               'خطوة ٢'),
                                                           style:
                                                               const TextStyle(
-                                                            fontSize: 10,
+                                                            fontSize: 12.0,
                                                             fontWeight:
                                                                 FontWeight.w900,
                                                             color: kGreenLight,
@@ -2485,7 +2485,7 @@ class _BookTabState extends State<BookTab> {
                                                                 style:
                                                                     const TextStyle(
                                                                   fontSize:
-                                                                      11.5,
+                                                                      12.0,
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .w800,
@@ -2866,7 +2866,7 @@ class _BookTabState extends State<BookTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 12.0,
                         height: 1.1,
                         fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                         letterSpacing: 0.2,
@@ -2890,7 +2890,7 @@ class _BookTabState extends State<BookTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 12.0,
                         height: 1.1,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                         color: isSelected ? Colors.white.withValues(alpha: 0.9) : kMuted,
@@ -2961,7 +2961,7 @@ class _BookTabState extends State<BookTab> {
                             '$availableCount متاح')
                         : localized(arabic, 'Fully booked', 'مكتمل'),
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w700,
                       color: availableCount > 0 ? kGreen : kMuted,
                     ),
@@ -3085,7 +3085,7 @@ class ReservationQuote extends StatelessWidget {
                           child: Text(
                             '$estimatedMinutes min',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                             ),
@@ -3106,7 +3106,7 @@ class ReservationQuote extends StatelessWidget {
                       localized(arabic, 'Total Estimate', 'الإجمالي التقريبي'),
                       style: TextStyle(
                           color: kMuted,
-                          fontSize: 11.5,
+                          fontSize: 12.0,
                           fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 2),
@@ -3135,7 +3135,7 @@ class ReservationQuote extends StatelessWidget {
                       '${localized(arabic, 'Deposit', 'العربون')} (${formatMoney(venue.depositPercent)}%)',
                       style: const TextStyle(
                         color: kGreen,
-                        fontSize: 10.5,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -3166,7 +3166,7 @@ class ReservationQuote extends StatelessWidget {
                       'نحتفظ بالموعد لمدة ١٥ دقيقة. يتأكد الحجز فقط بعد التحقق من دفع العربون.'),
                   style: TextStyle(
                     color: kMuted,
-                    fontSize: 11.5,
+                    fontSize: 12.0,
                     height: 1.35,
                     fontWeight: FontWeight.w600,
                   ),
@@ -3360,7 +3360,7 @@ class CustomerAreaBar extends StatelessWidget {
                           localized(arabic, 'YOUR AREA', 'محافظتك'),
                           style: TextStyle(
                             color: kMuted,
-                            fontSize: 10,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.8,
                           ),
@@ -3420,7 +3420,7 @@ class CustomerAreaBar extends StatelessWidget {
                             'GPS',
                             style: TextStyle(
                               color: kGreen,
-                              fontSize: 11.5,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -3611,7 +3611,7 @@ class CustomerHero extends StatelessWidget {
                             content.$3,
                             style: TextStyle(
                               color: content.$5,
-                              fontSize: 10,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.0,
                             ),
@@ -3648,7 +3648,7 @@ class CustomerHero extends StatelessWidget {
                               : '$venueCount ${venueCount == 1 ? 'place' : 'places'} nearby · Instant hold',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.82),
-                            fontSize: 11.5,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -3938,7 +3938,7 @@ class VenueBrowseCard extends StatelessWidget {
                                         },
                                         style: const TextStyle(
                                             color: Colors.white,
-                                            fontSize: 9.5,
+                                            fontSize: 12.0,
                                             letterSpacing: .7,
                                             fontWeight: FontWeight.w800),
                                       ),
@@ -4019,7 +4019,7 @@ class VenueBrowseCard extends StatelessWidget {
                                                 : localized(
                                                     arabic, 'New Venue', 'مكان جديد'),
                                             style: TextStyle(
-                                              fontSize: 10.5,
+                                              fontSize: 12.0,
                                               fontWeight: FontWeight.w800,
                                               color: isDark
                                                   ? const Color(0xFFF8FAFC)
@@ -4049,7 +4049,7 @@ class VenueBrowseCard extends StatelessWidget {
                                               localized(arabic, 'Instant Transfer',
                                                   'تحويل فوري'),
                                               style: const TextStyle(
-                                                fontSize: 10,
+                                                fontSize: 12.0,
                                                 fontWeight: FontWeight.w800,
                                                 color: Colors.white,
                                               ),
@@ -4104,7 +4104,7 @@ class VenueBrowseCard extends StatelessWidget {
                                     localized(arabic, 'Selected', 'محدد'),
                                     style: const TextStyle(
                                       color: kGreen,
-                                      fontSize: 11,
+                                      fontSize: 12.0,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -4144,7 +4144,7 @@ class VenueBrowseCard extends StatelessWidget {
                                         avail.label,
                                         style: TextStyle(
                                           color: badgeColor,
-                                          fontSize: 10.5,
+                                          fontSize: 12.0,
                                           fontWeight: FontWeight.w800,
                                         ),
                                       ),
@@ -4203,7 +4203,7 @@ class VenueBrowseCard extends StatelessWidget {
                                         arabic, 'Directions', 'الاتجاهات'),
                                     style: const TextStyle(
                                       color: kGreen,
-                                      fontSize: 11,
+                                      fontSize: 12.0,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -4223,7 +4223,7 @@ class VenueBrowseCard extends StatelessWidget {
                               '${venue.items.length} $spaceLabel',
                               style: TextStyle(
                                 color: _accent,
-                                fontSize: 11,
+                                fontSize: 12.0,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -4258,7 +4258,7 @@ class VenueBrowseCard extends StatelessWidget {
                                     def.title(arabic),
                                     style: TextStyle(
                                       color: _accent,
-                                      fontSize: 11,
+                                      fontSize: 12.0,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -4285,7 +4285,7 @@ class VenueBrowseCard extends StatelessWidget {
                               child: Text(
                                 amenity,
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 12.0,
                                   fontWeight: FontWeight.w700,
                                   color: kInk,
                                 ),
@@ -4951,7 +4951,7 @@ class _CategoryVisualCard extends StatelessWidget {
                         child: Text(
                           '$count',
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w800,
                             color: isSelected ? Colors.white : kMuted,
                           ),
@@ -4963,7 +4963,7 @@ class _CategoryVisualCard extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 12.0,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
                         ? Colors.white.withValues(alpha: 0.85)
@@ -5067,7 +5067,7 @@ class _CategorySectionHeader extends StatelessWidget {
                         child: Text(
                           '$count',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w800,
                             color: isDark ? const Color(0xFFF1F5F9) : color,
                           ),
@@ -5078,7 +5078,7 @@ class _CategorySectionHeader extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12.0,
                       color: isDark ? const Color(0xFF94A3B8) : kMuted,
                       fontWeight: FontWeight.w500,
                     ),
@@ -5202,7 +5202,7 @@ class _SubCategoryVisualPill extends StatelessWidget {
                 child: Text(
                   '$count',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12.0,
                     fontWeight: FontWeight.w900,
                     color: isSelected ? Colors.white : accentColor,
                   ),
@@ -5275,7 +5275,7 @@ class _BookingStepPill extends StatelessWidget {
                   : Text(
                       stepNumber,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.w900,
                         color: active || done
                             ? Colors.white
@@ -5294,7 +5294,7 @@ class _BookingStepPill extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w900,
                       color: active
                           ? Colors.white
@@ -5306,7 +5306,7 @@ class _BookingStepPill extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 9.5,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w600,
                       color: active
                           ? Colors.white.withValues(alpha: 0.88)

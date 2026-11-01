@@ -211,7 +211,7 @@ class _UniversalBookingBottomSheetState
                   Text(
                     isAr ? 'ميعاد الحجز' : 'Reservation Time',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12.0,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
@@ -416,7 +416,7 @@ class _UniversalBookingBottomSheetState
                   child: Text(
                     '$tierCap ${isAr ? "أفراد" : "p"}: ${e.value} ${isAr ? "ج.م" : "EGP"}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12.0,
                       fontWeight: isCurrentTier ? FontWeight.bold : FontWeight.normal,
                       color: isCurrentTier ? theme.colorScheme.primary : null,
                     ),
@@ -521,7 +521,7 @@ class _UniversalBookingBottomSheetState
               subtitle: Text(
                 '${service.durationMins} ${isAr ? "دقيقة" : "mins"}',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12.0,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
@@ -569,7 +569,7 @@ class _UniversalBookingBottomSheetState
               label: Text(
                 '${(isAr && addon.nameAr != null) ? addon.nameAr! : addon.name} (+${addon.price.toStringAsFixed(0)} EGP)',
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12.0,
                   fontWeight: isChecked ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -657,7 +657,7 @@ class _UniversalBookingBottomSheetState
               Text(
                 isAr ? 'الباقي $remaining ج.م كاش بالمكان' : 'Remaining $remaining EGP at venue',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12.0,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),

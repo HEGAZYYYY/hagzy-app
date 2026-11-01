@@ -582,7 +582,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   'حجوزات ذكية وفورية في ثواني',
                                 ),
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12.0,
                                   color: kMuted,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1187,7 +1187,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                         TextSpan(
                           style: TextStyle(
                             color: kMuted,
-                            fontSize: 11.5,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w600,
                           ),
                           children: [

@@ -146,7 +146,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                             v.discountLabel,
                             style: TextStyle(
                               color: v.color,
-                              fontSize: 10.5,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -159,7 +159,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.75),
-                        fontSize: 11,
+                        fontSize: 12.0,
                       ),
                     ),
                     Align(
@@ -189,7 +189,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                             isArabic ? 'استخدم الخصم ⚡' : 'Use Voucher ⚡',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 10.5,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

@@ -123,7 +123,7 @@ class QrStandeeGenerator extends StatelessWidget {
                         isArabic ? 'امسح للحجز الفوري' : 'Scan to Book Instantly',
                         style: TextStyle(
                           color: Colors.black.withValues(alpha: 0.7),
-                          fontSize: 11,
+                          fontSize: 12.0,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -152,7 +152,7 @@ class QrStandeeGenerator extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.black.withValues(alpha: 0.65),
-                    fontSize: 11.5,
+                    fontSize: 12.0,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -168,7 +168,7 @@ class QrStandeeGenerator extends StatelessWidget {
                     bookingUrl,
                     style: const TextStyle(
                       color: Colors.black87,
-                      fontSize: 10.5,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

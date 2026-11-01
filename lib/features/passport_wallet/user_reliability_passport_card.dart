@@ -190,7 +190,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
                       isArabic ? 'حجوزات مكتملة' : 'Completed',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 11,
+                        fontSize: 12.0,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -213,7 +213,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
                       isArabic ? 'غياب بدون إلغاء' : 'No-Shows',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 11,
+                        fontSize: 12.0,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -242,7 +242,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
                             isArabic ? 'رصيد محفظة حجزي' : 'Hagzy Balance',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 11,
+                              fontSize: 12.0,
                             ),
                           ),
                           if (onTopUpTap != null) ...[
@@ -325,7 +325,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
                         label,
                         style: TextStyle(
                           color: color,
-                          fontSize: 11,
+                          fontSize: 12.0,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

@@ -163,7 +163,7 @@ class _SocialLobbyRosterScreenState extends State<SocialLobbyRosterScreen> {
                             widget.isArabic ? 'ماتش مفتوح / كمّل العدد' : 'Open Lobby / Match',
                             style: const TextStyle(
                               color: Colors.amber,
-                              fontSize: 11,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -185,7 +185,7 @@ class _SocialLobbyRosterScreenState extends State<SocialLobbyRosterScreen> {
                             : (widget.isArabic ? 'باقي $spotsRemaining مكان' : '$spotsRemaining spots left'),
                         style: TextStyle(
                           color: isFull ? Colors.redAccent : Colors.greenAccent,
-                          fontSize: 11.5,
+                          fontSize: 12.0,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -381,7 +381,7 @@ class _SocialLobbyRosterScreenState extends State<SocialLobbyRosterScreen> {
                       ),
                       child: Text(
                         widget.isArabic ? 'الكابتن' : 'Host',
-                        style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Colors.amber, fontSize: 12.0, fontWeight: FontWeight.bold),
                       ),
                     ),
                 ],

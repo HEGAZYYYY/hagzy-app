@@ -84,7 +84,7 @@ class VibeSmartBanner extends StatelessWidget {
                           ? (isArabic ? 'صباح التركيز والإنجاز' : 'Daytime Focus')
                           : (isArabic ? 'سهرة الشلة واللعب' : 'Night Hangout'),
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 12.0,
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
                       ),
@@ -103,7 +103,7 @@ class VibeSmartBanner extends StatelessWidget {
                   child: Text(
                     isArabic ? '$openVenuesCount متاح الآن' : '$openVenuesCount Open Now',
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 12.0,
                       color: Colors.greenAccent,
                       fontWeight: FontWeight.w800,
                     ),

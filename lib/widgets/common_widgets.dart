@@ -410,7 +410,7 @@ class CustomPill extends StatelessWidget {
                   child: Text(
                     badge!,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w800,
                       color: selected ? Colors.white : (isDark ? kGreenLight : kGreen),
                     ),
@@ -457,7 +457,7 @@ class LanguageOption extends StatelessWidget {
               label,
               style: TextStyle(
                 color: selected ? Colors.white : kMuted,
-                fontSize: 11,
+                fontSize: 12.0,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.3,
               ),
@@ -806,7 +806,7 @@ class FloatingDock extends StatelessWidget {
                                               color: selected
                                                   ? kGreen
                                                   : Colors.white,
-                                              fontSize: 9,
+                                              fontSize: 12.0,
                                               fontWeight: FontWeight.w900,
                                             ),
                                           ),
@@ -902,7 +902,7 @@ class StepPanel extends StatelessWidget {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 11,
+                                fontSize: 12.0,
                               ),
                             ),
                     ),
@@ -1084,7 +1084,7 @@ class PaymentMethodTile extends StatelessWidget {
                               child: Text(
                                 badgeText!,
                                 style: TextStyle(
-                                  fontSize: 9.5,
+                                  fontSize: 12.0,
                                   fontWeight: FontWeight.w900,
                                   color: enabled ? color : kMuted,
                                   letterSpacing: 0.4,

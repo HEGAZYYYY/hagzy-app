@@ -79,7 +79,7 @@ class ContrastAnchoredCheckoutCard extends StatelessWidget {
                 child: Text(
                   isArabic ? 'سعر مميز' : 'Best Rate',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12.0,
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.primary,
                   ),
@@ -143,7 +143,7 @@ class ContrastAnchoredCheckoutCard extends StatelessWidget {
                       ? '($perPersonDeposit ج.م لكل فرد فقط لتأكيد الحجز ومنع إلغاء الميعاد)'
                       : '($perPersonDeposit EGP / player hold to guarantee your time slot)',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12.0,
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
@@ -168,7 +168,7 @@ class ContrastAnchoredCheckoutCard extends StatelessWidget {
                       ? 'المتبقي ($remaining ج.م) يُدفع كاش أو إنستاباي في المكان.'
                       : 'Remaining ($remaining EGP) is paid in cash/Instapay directly at venue.',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12.0,
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                   ),
                 ),

@@ -872,7 +872,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 12.0,
                 color: kMuted,
               ),
               maxLines: 1,
@@ -906,7 +906,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                   children: [
                     Text(
                       _localized('Send to InstaPay Address:', 'حوّل إلى عنوان إنستاباي:'),
-                      style: TextStyle(fontSize: 11, color: kMuted),
+                      style: TextStyle(fontSize: 12.0, color: kMuted),
                     ),
                     SelectableText(
                       widget.receiverIpa,
@@ -978,7 +978,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             'Important: Enter the exact username of the bank account sending the funds so the payment oracle can match it in seconds.',
             'تنبيه: اكتب اسم حساب انستاباي الذي ستقوم بالتحويل منه ليتعرف النظام الآلي على عملية الدفع خلال ثوانٍ.',
           ),
-          style: TextStyle(fontSize: 11.5, color: kMuted),
+          style: TextStyle(fontSize: 12.0, color: kMuted),
         ),
       ],
     );
@@ -1006,7 +1006,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                   children: [
                     Text(
                       _localized('Send to Wallet Number:', 'حوّل إلى رقم المحفظة:'),
-                      style: TextStyle(fontSize: 11, color: kMuted),
+                      style: TextStyle(fontSize: 12.0, color: kMuted),
                     ),
                     SelectableText(
                       widget.receiverWallet,
@@ -1073,7 +1073,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             'Supported wallets: Vodafone Cash, Orange Cash, e& money (Etisalat), WE Pay.',
             'المحافظ المدعومة: فودافون كاش، أورنج كاش، اتصالات كاش (e& money)، وي باي (WE Pay).',
           ),
-          style: TextStyle(fontSize: 11.5, color: kMuted),
+          style: TextStyle(fontSize: 12.0, color: kMuted),
         ),
       ],
     );
@@ -1211,7 +1211,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                           children: [
                             Text(
                               isInsta ? _localized('Receiver InstaPay IPA', 'حساب انستاباي المستلم') : _localized('Receiver Wallet Number', 'رقم المحفظة المستلمة'),
-                              style: TextStyle(fontSize: 11, color: kMuted),
+                              style: TextStyle(fontSize: 12.0, color: kMuted),
                             ),
                             const SizedBox(height: 2),
                             SelectableText(
@@ -1305,7 +1305,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                     children: [
                       Text(
                         _localized('Listening for transfer from:', 'في انتظار التحويل من:'),
-                        style: TextStyle(fontSize: 11.5, color: kMuted),
+                        style: TextStyle(fontSize: 12.0, color: kMuted),
                       ),
                       Text(
                         intent.expectedSenderIdentifier,

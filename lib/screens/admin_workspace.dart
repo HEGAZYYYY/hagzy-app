@@ -423,7 +423,7 @@ class _ManageTabState extends State<ManageTab> {
                                       a,
                                       style: const TextStyle(
                                         color: kGreen,
-                                        fontSize: 11,
+                                        fontSize: 12.0,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -872,7 +872,7 @@ class _PosTabState extends State<PosTab> {
                             child: Text(
                               'LOCKED / موعد مغلق: ${booking.blockReason.isNotEmpty ? booking.blockReason : booking.customer}',
                               style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 12.0,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFFB45309),
                               ),
@@ -887,7 +887,7 @@ class _PosTabState extends State<PosTab> {
                             onPressed: () => widget.onCancel(booking),
                             child: const Text('Unblock / فتح الموعد',
                                 style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12.0,
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xFFB45309))),
                           ),
@@ -1198,7 +1198,7 @@ class _MetricCard extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 color: kMuted,
-                fontSize: 11.5,
+                fontSize: 12.0,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1619,7 +1619,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                     child: Text(
                                       'users/${user.id}',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: 12.0,
                                         fontWeight: FontWeight.w700,
                                         color: kMuted,
                                       ),
@@ -1725,7 +1725,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                         Text(
                           'Subcollection: users/${user.id}/bookings (${user.bookings.length})',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w800,
                             color: kMuted,
                             letterSpacing: 0.2,
@@ -1796,7 +1796,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                             child: Text(
                                               statusLabel,
                                               style: TextStyle(
-                                                fontSize: 10.5,
+                                                fontSize: 12.0,
                                                 fontWeight: FontWeight.w800,
                                                 color: statusColor,
                                               ),
@@ -1861,7 +1861,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                                       TextOverflow.ellipsis,
                                                   style: const TextStyle(
                                                     color: kGreen,
-                                                    fontSize: 11.5,
+                                                    fontSize: 12.0,
                                                     fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
@@ -1915,7 +1915,7 @@ class _StatMiniChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 12.0,
           fontWeight: FontWeight.w800,
         ),
       ),

@@ -126,7 +126,7 @@ class _GracePeriodCountdownBannerState
                 ? 'نسق مع الشلة على واتساب براحتك! لو غيرتوا رأيكم خلال العد التنازلي، بيتم استرداد العربون ١٠٠٪ فوراً في رصيد محفظة حجزي.'
                 : 'Coordinate with your squad on WhatsApp! If plans change during the countdown, 100% of your deposit is refunded instantly to your Hagzy Wallet.',
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 12.0,
               color: Colors.white.withValues(alpha: 0.85),
               height: 1.35,
             ),

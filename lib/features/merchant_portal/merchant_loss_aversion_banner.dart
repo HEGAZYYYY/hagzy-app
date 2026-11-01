@@ -119,7 +119,7 @@ class MerchantLossAversionBanner extends StatelessWidget {
                 ),
                 child: Text(
                   isArabic ? 'سأتحمل الخسائر بنفسي' : 'I\'ll absorb the losses',
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(fontSize: 12.0),
                 ),
               ),
             ],

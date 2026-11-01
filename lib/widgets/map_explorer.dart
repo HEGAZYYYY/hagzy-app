@@ -251,7 +251,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
             localized(arabic, 'You', 'أنت هنا'),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 9,
+              fontSize: 12.0,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -317,7 +317,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 12.0,
               fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
               color: isSelected ? kGreen : kInk,
             ),
@@ -465,7 +465,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                                     : localized(
                                         arabic, 'Use GPS', 'موقعي (GPS)'),
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.w800,
                               color: _userGpsPosition != null
                                   ? const Color(0xFF1E40AF)
@@ -487,7 +487,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                     child: Text(
                       '${sortedVenues.length} ${localized(arabic, 'nearby', 'قريب')}',
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.w800,
                         color: kGreen,
                       ),
@@ -505,7 +505,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                     Text(
                       _gpsStatusMessage!,
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 12.0,
                         color: Color(0xFFDC2626),
                         fontWeight: FontWeight.w700,
                       ),
@@ -683,7 +683,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                   child: const Text(
                     '© OpenStreetMap contributors',
                     style: TextStyle(
-                      fontSize: 8.5,
+                      fontSize: 12.0,
                       color: Color(0xFF64748B),
                       fontWeight: FontWeight.w600,
                     ),

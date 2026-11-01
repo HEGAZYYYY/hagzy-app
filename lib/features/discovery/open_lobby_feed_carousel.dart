@@ -113,7 +113,7 @@ class _LobbyCard extends StatelessWidget {
             : (isArabic ? 'كمّل الشلة' : 'Open Shilla Match'));
 
     return Container(
-      width: 280,
+      width: 290,
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -140,26 +140,29 @@ class _LobbyCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isChallenger
-                        ? Colors.amber.withValues(alpha: 0.2)
-                        : theme.colorScheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    isChallenger
-                        ? (isArabic ? '⚔️ مطلوب منافس' : '⚔️ 1v1 Challenge')
-                        : (isArabic ? '👥 ناقص أفراد' : '👥 Need Players'),
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: isChallenger ? Colors.amber.shade300 : theme.colorScheme.primary,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isChallenger
+                          ? Colors.amber.withValues(alpha: 0.2)
+                          : theme.colorScheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isChallenger
+                          ? (isArabic ? '⚔️ مطلوب منافس' : '⚔️ 1v1 Challenge')
+                          : (isArabic ? '👥 ناقص أفراد' : '👥 Need Players'),
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.bold,
+                        color: isChallenger ? Colors.amber.shade300 : theme.colorScheme.primary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   '${lobby.startTime.hour.toString().padLeft(2, '0')}:${lobby.startTime.minute.toString().padLeft(2, '0')}',
                   style: TextStyle(
@@ -188,7 +191,7 @@ class _LobbyCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12.0,
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                   ),
                 ),
@@ -209,7 +212,7 @@ class _LobbyCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 12.0,
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
@@ -218,7 +221,7 @@ class _LobbyCard extends StatelessWidget {
                     Text(
                       isArabic ? '$perPerson ج.م / فرد' : '$perPerson EGP/player',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.primary,
                       ),
@@ -257,7 +260,7 @@ class _LobbyCard extends StatelessWidget {
                       ? (isArabic ? 'اقبل التحدي ⚔️' : 'Accept Challenge ⚔️')
                       : (isArabic ? 'احجز مكانك في الشلة' : 'Claim My Spot'),
                   style: const TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12.0,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

@@ -457,7 +457,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                         ),
                         Text(
                           localized(arabic, 'Sync wallet balance & active reservations', 'مزامنة رصيد المحفظة والحجوزات'),
-                          style: TextStyle(fontSize: 11, color: kMuted),
+                          style: TextStyle(fontSize: 12.0, color: kMuted),
                         ),
                       ],
                     ),
@@ -717,7 +717,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                   color: booking.isConfirmed
                                       ? kGreenLight
                                       : const Color(0xFFFDE68A),
-                                  fontSize: 9.5,
+                                  fontSize: 12.0,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.5,
                                 ),
@@ -813,7 +813,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                       color: booking.isConfirmed
                                           ? const Color(0xFF065F46)
                                           : const Color(0xFF1E40AF),
-                                      fontSize: 11.5,
+                                      fontSize: 12.0,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -879,7 +879,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                   ),
                                   style: const TextStyle(
                                     color: kGreen,
-                                    fontSize: 11.5,
+                                    fontSize: 12.0,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -1067,7 +1067,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                             localized(
                                 arabic, 'HAGZY CHECK-IN PASS', 'بطاقة دخول حجزي'),
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 12.0,
                               fontWeight: FontWeight.w900,
                               color: kGreen,
                               letterSpacing: 0.8,
@@ -1120,7 +1120,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                   'REF: ${booking.id}',
                   style: TextStyle(
                     fontFamily: 'monospace',
-                    fontSize: 11,
+                    fontSize: 12.0,
                     color: kMuted,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1144,7 +1144,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       color: booking.isConfirmed
                           ? kGreen
                           : const Color(0xFFB45309),
-                      fontSize: 11,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1166,7 +1166,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                         size: 15, color: kGreen),
                     label: Text(
                       localized(arabic, 'Directions', 'الاتجاهات'),
-                      style: const TextStyle(fontSize: 11.5),
+                      style: const TextStyle(fontSize: 12.0),
                     ),
                   ),
                 ),
@@ -1235,7 +1235,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               localized(
                                   arabic, 'OFFICIAL RECEIPT', 'إيصال رسمي معتمد'),
                               style: const TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 12.0,
                                 fontWeight: FontWeight.w900,
                                 color: kGreen,
                                 letterSpacing: 0.8,
@@ -1302,7 +1302,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                       ? kGreen
                                       : const Color(0xFFB45309),
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 10,
+                                  fontSize: 12.0,
                                 ),
                               ),
                             ),

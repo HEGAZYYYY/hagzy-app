@@ -382,7 +382,7 @@ class _GoalGradientOnboardingScreenState
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 11.5,
+          fontSize: 12.0,
           fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
           color: isDone
               ? Colors.greenAccent

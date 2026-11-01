@@ -948,7 +948,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             TextSpan(
               style: TextStyle(
                 color: kMuted,
-                fontSize: 11.5,
+                fontSize: 12.0,
                 fontWeight: FontWeight.w600,
               ),
               children: [
@@ -1702,7 +1702,7 @@ class _InfoChip extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12.0,
                 fontWeight: FontWeight.w700,
                 color: kInk,
               ),
@@ -1760,7 +1760,7 @@ class _StatCard extends StatelessWidget {
                       badge!,
                       style: TextStyle(
                         color: isDark ? kGreenLight : kGreen,
-                        fontSize: 9.5,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1782,7 +1782,7 @@ class _StatCard extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12.0,
                 color: isDark ? const Color(0xFF94A3B8) : kMuted,
                 fontWeight: FontWeight.w600,
               ),
@@ -1855,7 +1855,7 @@ class _SettingTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12.0,
                       color: isDark ? const Color(0xFF94A3B8) : kMuted,
                       fontWeight: FontWeight.w500,
                     ),

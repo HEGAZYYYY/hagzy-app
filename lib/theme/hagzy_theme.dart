@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+export 'tokens.dart';
 import 'google_fonts_stub.dart' if (dart.library.html) 'google_fonts_web.dart';
 
 // ---------------------------------------------------------------------------
@@ -10,11 +11,11 @@ import 'google_fonts_stub.dart' if (dart.library.html) 'google_fonts_web.dart';
 Color get kInk => kDarkMode.value ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 const kDark = Color(0xFF064E3B);
 
-const kGreen = Color(0xFF059669);
+const kGreen = Color(0xFF047857);
 const kGreenDark = Color(0xFF047857);
 const kGreenLight = Color(0xFF10B981);
 
-const kGold = Color(0xFFF59E0B);
+const kGold = Color(0xFFB45309);
 const kCobalt = Color(0xFF059669);
 const kTerracotta = Color(0xFF047857);
 
