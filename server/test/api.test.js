@@ -38,7 +38,23 @@ before(async () => {
   admin = (await call('POST', '/api/auth/login', { body: { email: 'admin@test.dev', password: 'correct-horse' } })).json.token;
   const otp = (await call('POST', '/api/auth/customer-otp/request', { body: { phone: '01011112222' } })).json.testOtp;
   cust = (await call('POST', '/api/auth/customer-otp/verify', { body: { phone: '01011112222', code: otp } })).json.token;
-  venueId = (await call('GET', '/api/venues')).json.venues[0].id;
+  let venues = (await call('GET', '/api/venues')).json.venues || [];
+  if (venues.length === 0) {
+    await call('PUT', '/api/admin/venues/test-venue', {
+      token: admin,
+      body: {
+        id: 'test-venue',
+        name: 'Test Venue',
+        nameAr: 'ملعب تجريبي',
+        type: 'sports',
+        depositPercent: 30,
+        spaces: [{ id: 'court-1', name: 'Court 1', price: 100 }],
+        services: []
+      }
+    });
+    venues = (await call('GET', '/api/venues')).json.venues;
+  }
+  venueId = venues[0].id;
 });
 after(() => { proc.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); });
 
@@ -389,4 +405,38 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   assert.equal(checkOverBooking.json.booking.depositPaid, true);
   assert.equal(checkOverBooking.json.booking.actualPaidAmount, 150);
   assert.equal(checkOverBooking.json.booking.excessDeposit, 50);
+});
+
+test('whitelisted admin identity is granted owner privileges via OTP and login', async () => {
+  // 1. Whitelisted phone 01027371804
+  const reqAdminOtp = await call('POST', '/api/auth/customer-otp/request', { body: { phone: '01027371804' } });
+  assert.equal(reqAdminOtp.status, 200);
+  const adminCode = reqAdminOtp.json.testOtp;
+
+  const verifyAdmin = await call('POST', '/api/auth/customer-otp/verify', { body: { phone: '01027371804', code: adminCode } });
+  assert.equal(verifyAdmin.status, 200);
+  assert.equal(verifyAdmin.json.isAdmin, true);
+  assert.equal(verifyAdmin.json.role, 'owner');
+  const ownerToken = verifyAdmin.json.token;
+
+  // Can access admin endpoints
+  const adminVenues = await call('GET', '/api/admin/venues', { token: ownerToken });
+  assert.equal(adminVenues.status, 200);
+
+  // Exchange token via /api/auth/login
+  const exchange = await call('POST', '/api/auth/login', { body: { token: ownerToken } });
+  assert.equal(exchange.status, 200);
+  assert.equal(exchange.json.success, true);
+  assert.equal(exchange.json.admin.role, 'owner');
+
+  // 2. Non-whitelisted phone
+  const reqStrangerOtp = await call('POST', '/api/auth/customer-otp/request', { body: { phone: '01099887766' } });
+  const strangerCode = reqStrangerOtp.json.testOtp;
+  const verifyStranger = await call('POST', '/api/auth/customer-otp/verify', { body: { phone: '01099887766', code: strangerCode } });
+  assert.equal(verifyStranger.status, 200);
+  assert.equal(verifyStranger.json.isAdmin, false);
+  assert.equal(verifyStranger.json.role, 'customer');
+
+  const strangerAttempt = await call('GET', '/api/admin/venues', { token: verifyStranger.json.token });
+  assert.equal(strangerAttempt.status, 403);
 });

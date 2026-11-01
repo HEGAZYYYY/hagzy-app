@@ -465,13 +465,33 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_production_secret_2026';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hagzy.app';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hagzy2026!';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ADMIN_WHITELIST_EMAILS = [
+  'mohamedhegazypc11@gmail.com',
+  (process.env.ADMIN_EMAIL || '').trim().toLowerCase()
+].filter(Boolean);
+
+const ADMIN_WHITELIST_PHONES = [
+  '01027371804',
+  normalizeLocalPhone(process.env.ADMIN_PHONE || '')
+].filter(Boolean);
+
+function isUserAdmin(identity) {
+  if (!identity) return false;
+  const email = String(identity.email || '').trim().toLowerCase();
+  if (email && ADMIN_WHITELIST_EMAILS.includes(email)) return true;
+  const rawPhone = identity.phone || identity.customerPhone || identity.target || identity.phoneNumber;
+  const cleanPhone = normalizeLocalPhone(rawPhone);
+  if (cleanPhone && ADMIN_WHITELIST_PHONES.includes(cleanPhone)) return true;
+  return false;
+}
+
 // App Store / Play review login. Disabled unless explicitly configured.
 const REVIEWER_TARGET = process.env.REVIEWER_TARGET || '';
 const REVIEWER_CODE = process.env.REVIEWER_CODE || '';
 
 function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
   const ha = crypto.createHash('sha256').update(String(a)).digest();
   const hb = crypto.createHash('sha256').update(String(b)).digest();
   return crypto.timingSafeEqual(ha, hb);
@@ -1000,7 +1020,9 @@ function authenticateAdmin(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (!decoded.isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    if (!decoded.isAdmin && !isUserAdmin(decoded)) {
+      return res.status(403).json({ error: 'Forbidden: Admin access restricted to authorized owner' });
+    }
     req.admin = decoded;
     next();
   } catch (err) {
@@ -1407,8 +1429,9 @@ app.post('/api/auth/social/google', async (req, res) => {
     saveDb(db);
     syncUserToFirebase(user);
 
+    const isAdmin = isUserAdmin(user) || isUserAdmin({ email: verifiedEmail });
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, provider: 'google' },
+      { id: user.id, email: user.email, name: user.name, provider: 'google', isAdmin, role: isAdmin ? 'owner' : 'customer' },
       JWT_SECRET,
       { expiresIn: '90d' }
     );
@@ -1416,6 +1439,8 @@ app.post('/api/auth/social/google', async (req, res) => {
     return res.json({
       success: true,
       token,
+      isAdmin,
+      role: isAdmin ? 'owner' : 'customer',
       customer: {
         id: user.id,
         name: user.name,
@@ -1423,7 +1448,8 @@ app.post('/api/auth/social/google', async (req, res) => {
         phone: user.phone || '',
         avatar: user.avatar || '',
         walletBalance: user.walletBalance || 0,
-        authProvider: 'google'
+        authProvider: 'google',
+        isAdmin
       }
     });
   } catch (e) {
@@ -1512,8 +1538,9 @@ app.post('/api/auth/social/apple', async (req, res) => {
     saveDb(db);
     syncUserToFirebase(user);
 
+    const isAdmin = isUserAdmin(user) || isUserAdmin({ email: verifiedEmail });
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, provider: 'apple' },
+      { id: user.id, email: user.email, name: user.name, provider: 'apple', isAdmin, role: isAdmin ? 'owner' : 'customer' },
       JWT_SECRET,
       { expiresIn: '90d' }
     );
@@ -1521,13 +1548,16 @@ app.post('/api/auth/social/apple', async (req, res) => {
     return res.json({
       success: true,
       token,
+      isAdmin,
+      role: isAdmin ? 'owner' : 'customer',
       customer: {
         id: user.id,
         name: user.name,
         email: user.email,
         phone: user.phone || '',
         walletBalance: user.walletBalance || 0,
-        authProvider: 'apple'
+        authProvider: 'apple',
+        isAdmin
       }
     });
   } catch (e) {
@@ -1590,8 +1620,9 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
   saveDb(db);
   syncUserToFirebase(user);
 
+  const isAdmin = isUserAdmin(user) || isUserAdmin({ phone: target, email: target });
   const token = jwt.sign(
-    { id: user.id, phone: user.phone, email: user.email, name: user.name },
+    { id: user.id, phone: user.phone, email: user.email, name: user.name, isAdmin, role: isAdmin ? 'owner' : 'customer' },
     JWT_SECRET,
     { expiresIn: '30d' }
   );
@@ -1650,7 +1681,14 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
   }
 
   syncUserToFirebase(user);
-  return res.json({ success: true, token, firebaseCustomToken, customer: sanitizeUser(user) });
+  return res.json({
+    success: true,
+    token,
+    isAdmin,
+    role: isAdmin ? 'owner' : 'customer',
+    firebaseCustomToken,
+    customer: { ...sanitizeUser(user), isAdmin }
+  });
 });
 
 function claimCustomerBookings(user) {
@@ -1770,8 +1808,9 @@ app.post('/api/auth/customer/login', async (req, res) => {
   saveDb(db);
   syncUserToFirebase(user);
 
+  const isAdmin = isUserAdmin(user);
   const token = jwt.sign(
-    { id: user.id, email: user.email, name: user.name, phone: user.phone },
+    { id: user.id, email: user.email, name: user.name, phone: user.phone, isAdmin, role: isAdmin ? 'owner' : 'customer' },
     JWT_SECRET,
     { expiresIn: '90d' }
   );
@@ -1779,12 +1818,15 @@ app.post('/api/auth/customer/login', async (req, res) => {
   return res.json({
     success: true,
     token,
+    isAdmin,
+    role: isAdmin ? 'owner' : 'customer',
     customer: {
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
-      walletBalance: user.walletBalance !== undefined ? user.walletBalance : 0.0
+      walletBalance: user.walletBalance !== undefined ? user.walletBalance : 0.0,
+      isAdmin
     }
   });
 });
@@ -1899,18 +1941,73 @@ app.post('/api/customer/wallet/add', authenticateAdmin, (req, res) => {
 // ==========================================
 
 // Admin Sign In
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  if (typeof email === 'string' && typeof password === 'string' &&
-      safeEqual(email, ADMIN_EMAIL) && safeEqual(password, ADMIN_PASSWORD)) {
-    const token = jwt.sign({ email, isAdmin: true }, JWT_SECRET, { expiresIn: '12h' });
-    return res.json({
-      success: true,
-      token,
-      admin: { email, role: 'owner' }
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password, token } = req.body || {};
+
+  // Token-based admin verification (e.g., from Google or Phone OTP)
+  if (token && typeof token === 'string') {
+    try {
+      const decoded = jwt.verify(token.replace(/^Bearer\s+/i, ''), JWT_SECRET);
+      if (decoded.isAdmin || isUserAdmin(decoded)) {
+        const adminToken = jwt.sign(
+          { id: decoded.id, email: decoded.email, phone: decoded.phone, isAdmin: true, role: 'owner' },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+        return res.json({
+          success: true,
+          token: adminToken,
+          admin: { email: decoded.email, phone: decoded.phone, role: 'owner' }
+        });
+      }
+    } catch (_) {}
+    return res.status(403).json({
+      error: 'Access denied: Only mohamedhegazypc11@gmail.com or authorized owner phone can access the Admin Portal.'
     });
   }
-  return res.status(401).json({ error: 'Invalid admin email or password' });
+
+  // Password-based admin verification (strictly bcrypt against authorized user)
+  if (typeof email === 'string' && typeof password === 'string') {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!ADMIN_WHITELIST_EMAILS.includes(cleanEmail)) {
+      return res.status(401).json({
+        error: 'Access denied: Invalid credentials or unauthorized email.'
+      });
+    }
+    if (ADMIN_PASSWORD && safeEqual(password, ADMIN_PASSWORD)) {
+      const adminToken = jwt.sign(
+        { email: cleanEmail, isAdmin: true, role: 'owner' },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+      return res.json({
+        success: true,
+        token: adminToken,
+        admin: { email: cleanEmail, role: 'owner' }
+      });
+    }
+    const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+    if (user && user.passwordHash) {
+      const match = await comparePassword(password, user.passwordHash);
+      if (match) {
+        const adminToken = jwt.sign(
+          { id: user.id, email: user.email, phone: user.phone, isAdmin: true, role: 'owner' },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+        return res.json({
+          success: true,
+          token: adminToken,
+          admin: { email: user.email, role: 'owner' }
+        });
+      }
+    }
+    return res.status(401).json({
+      error: 'Invalid credentials. Please sign in with Google (mohamedhegazypc11@gmail.com) or Phone OTP.'
+    });
+  }
+
+  return res.status(400).json({ error: 'Email and password or valid auth token required.' });
 });
 
 // ==========================================

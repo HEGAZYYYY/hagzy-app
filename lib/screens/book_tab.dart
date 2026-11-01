@@ -7,7 +7,6 @@ import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/map_explorer.dart';
-import '../core/models/models_v2.dart';
 import '../core/utils/smart_defaults.dart';
 import '../features/discovery/discovery.dart';
 

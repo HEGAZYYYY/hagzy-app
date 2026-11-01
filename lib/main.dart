@@ -45,9 +45,11 @@ class HagzyApp extends StatelessWidget {
   const HagzyApp({
     super.key,
     this.adminMode = const bool.fromEnvironment('HAGZY_ADMIN_APP'),
+    this.initialMode,
   });
 
   final bool adminMode;
+  final String? initialMode;
 
   static bool get _isWebPortalPath {
     if (!kIsWeb) return false;
@@ -85,16 +87,24 @@ class HagzyApp extends StatelessWidget {
               maxScaleFactor: 1.35,
               child: child ?? const SizedBox.shrink(),
             ),
-            home: HagzyHome(adminMode: adminMode || _isWebPortalPath),
+            home: HagzyHome(
+              adminMode: adminMode || _isWebPortalPath,
+              initialMode: initialMode,
+            ),
           ),
         ),
       );
 }
 
 class HagzyHome extends StatefulWidget {
-  const HagzyHome({super.key, this.adminMode = false});
+  const HagzyHome({
+    super.key,
+    this.adminMode = false,
+    this.initialMode,
+  });
 
   final bool adminMode;
+  final String? initialMode;
 
   @override
   State<HagzyHome> createState() => _HagzyHomeState();
@@ -119,11 +129,11 @@ class _HagzyHomeState extends State<HagzyHome> {
   String _currentArea = kAllEgyptAreas;
   double _walletBalance = HagzyWallet.defaultWelcomeBalance;
   bool _working = false;
-  bool _showAdminPassword = false;
   String? _loadError;
   String? _apiError;
   String? _loginError;
   String? _adminToken;
+  bool _adminPhoneLogin = false;
   String _mode = 'landing';
   int _tab = 0;
   String? _targetVenueId;
@@ -136,8 +146,16 @@ class _HagzyHomeState extends State<HagzyHome> {
   @override
   void initState() {
     super.initState();
-    _mode = widget.adminMode ? 'adminLogin' : 'customer';
+    _mode = widget.initialMode ?? (widget.adminMode ? 'adminLogin' : 'customer');
     _load();
+
+  @override
+  void didUpdateWidget(covariant HagzyHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMode != null && widget.initialMode != oldWidget.initialMode) {
+      setState(() => _mode = widget.initialMode!);
+    }
+  }
 
     // Check for real OAuth 2.0 callback credentials in URL query parameters or Firebase redirect result
     if (kIsWeb) {
@@ -309,7 +327,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
       _prefsLoaded = true;
       if (mounted) setState(() {});
-      if (!widget.adminMode && _api.isConfigured) {
+      if (_api.isConfigured) {
         try {
           final remoteVenues = await _api.venues();
           _venues = remoteVenues
@@ -469,50 +487,6 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
   }
 
-  Future<void> _loginAdmin() async {
-    setState(() {
-      _working = true;
-      _loginError = null;
-    });
-    try {
-      final auth = await _api.login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-      final token = auth['token'] as String;
-      final venues = await _api.venues(adminToken: token);
-      final bookings = await _api.bookings(token);
-      if (!mounted) return;
-      setState(() {
-        _adminToken = token;
-        _venues = upsertNaderSalon(
-          venues
-              .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-              .toList(),
-        );
-        _bookings = bookings
-            .map((value) => Booking.fromJson(value as Map<String, dynamic>))
-            .toList();
-        _mode = 'admin';
-        _tab = 0;
-        _passwordController.clear();
-      });
-    } catch (error) {
-      if (mounted) setState(() => _loginError = friendlyError(error, arabic: false));
-    } finally {
-      if (mounted) setState(() => _working = false);
-    }
-  }
-
-  void _enterAdminPreview() {
-    setState(() {
-      _mode = 'adminPreview';
-      _tab = 0;
-      _apiError = null;
-      _bookings = List.of(_customerBookings);
-    });
-  }
-
   void _returnToPortal() {
     setState(() {
       _mode = widget.adminMode ? 'adminLogin' : 'customer';
@@ -522,6 +496,101 @@ class _HagzyHomeState extends State<HagzyHome> {
       _loginError = null;
       _bookings = [];
     });
+  }
+
+  bool get _isAuthorizedAdmin {
+    final cleanEmail = _savedCustomerEmail.trim().toLowerCase();
+    final cleanPhone = _savedCustomerPhone.replaceAll(RegExp(r'\D'), '');
+    return cleanEmail == 'mohamedhegazypc11@gmail.com' ||
+        cleanPhone == '01027371804' ||
+        cleanPhone.endsWith('1027371804');
+  }
+
+  void _enterAdminPreview() {
+    setState(() {
+      _mode = 'adminPreview';
+      _tab = 0;
+    });
+  }
+
+  Future<void> _switchToAdminPortal() async {
+    final token = _adminToken ?? _customerToken;
+    if (token != null && _api.isConfigured) {
+      try {
+        final venues = await _api.venues(adminToken: token);
+        final bookings = await _api.bookings(token);
+        _venues = venues.map((v) => Venue.fromJson(v as Map<String, dynamic>)).toList();
+        _bookings = bookings.map((b) => Booking.fromJson(b as Map<String, dynamic>)).toList();
+      } catch (_) {}
+    }
+    setState(() {
+      _adminToken = token;
+      _mode = 'admin';
+      _tab = 0;
+    });
+  }
+
+  Future<void> _loginAdminWithGoogle() async {
+    setState(() {
+      _working = true;
+      _loginError = null;
+    });
+    try {
+      final res = await SocialAuthService.signInWithGoogle();
+      if (res != null) {
+        if (res['redirecting'] == true) return;
+        final email = (res['email'] as String? ?? '').trim().toLowerCase();
+        final name = res['name'] as String? ?? '';
+        final idToken = res['idToken'] as String? ?? res['token'] as String? ?? '';
+        final backendRes = await _api.signInWithSocial(
+          provider: 'google',
+          email: email,
+          name: name,
+          idToken: idToken,
+        );
+        final token = backendRes['token'] as String? ?? idToken;
+        final isAdmin = backendRes['isAdmin'] == true ||
+            email == 'mohamedhegazypc11@gmail.com';
+        if (!isAdmin) {
+          throw Exception('Access denied: $email is not authorized as an administrator.');
+        }
+        _adminToken = token;
+        _savedCustomerEmail = email;
+        _savedCustomerName = name;
+        _customerSignedIn = true;
+
+        List<dynamic> venues = [];
+        List<dynamic> bookings = [];
+        if (_api.isConfigured) {
+          try {
+            venues = await _api.venues(adminToken: token);
+          } catch (_) {
+            try {
+              venues = await _api.venues();
+            } catch (_) {}
+          }
+          try {
+            bookings = await _api.bookings(token);
+          } catch (_) {}
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _mode = 'admin';
+          _tab = 0;
+          _venues = venues
+              .map((value) => Venue.fromJson(value as Map<String, dynamic>))
+              .toList();
+          _bookings = bookings
+              .map((value) => Booking.fromJson(value as Map<String, dynamic>))
+              .toList();
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loginError = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
   }
 
   Future<void> _saveAdminVenue(Venue venue) async {
@@ -3975,9 +4044,48 @@ class _HagzyHomeState extends State<HagzyHome> {
     } else if (_customerToken == null || _customerToken!.isEmpty) {
       _customerToken = 'local-session-token';
     }
+
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final isAuthorizedAdmin = cleanEmail == 'mohamedhegazypc11@gmail.com' ||
+        cleanPhone == '01027371804' ||
+        cleanPhone.endsWith('1027371804');
+    if (isAuthorizedAdmin && token != null && token.isNotEmpty) {
+      _adminToken = token;
+    }
+
+    final shouldOpenAdmin = (widget.adminMode || _mode == 'adminLogin' || _adminPhoneLogin) && isAuthorizedAdmin;
+    _adminPhoneLogin = false;
+
+    if (widget.adminMode) {
+      if (!isAuthorizedAdmin) {
+        if (mounted) {
+          setState(() {
+            _loginError = 'Access denied: Only mohamedhegazypc11@gmail.com or authorized owner phone can access the Owner Portal.';
+            _mode = 'adminLogin';
+          });
+        }
+        return;
+      }
+    }
+
+    if (shouldOpenAdmin && token != null && _api.isConfigured) {
+      try {
+        final venues = await _api.venues(adminToken: token);
+        final bookings = await _api.bookings(token);
+        _venues = venues.map((v) => Venue.fromJson(v as Map<String, dynamic>)).toList();
+        _bookings = bookings.map((b) => Booking.fromJson(b as Map<String, dynamic>)).toList();
+      } catch (_) {
+        try {
+          final venues = await _api.venues();
+          _venues = venues.map((v) => Venue.fromJson(v as Map<String, dynamic>)).toList();
+        } catch (_) {}
+      }
+    }
+
     if (mounted) {
       setState(() {
-        _mode = 'customer';
+        _mode = shouldOpenAdmin ? 'admin' : 'customer';
         _tab = 0;
         _customerSignedIn = true;
         _savedCustomerName = name;
@@ -4332,137 +4440,6 @@ class _HagzyHomeState extends State<HagzyHome> {
     } catch (_) {}
   }
 
-  void _openVenueControlDashboardModal() {
-    final arabic = _language == 'AR';
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          final isDark = kDarkMode.value;
-          return Container(
-            height: MediaQuery.of(context).size.height * 0.92,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0B1120) : kPage,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                  color: isDark ? const Color(0xFF283552) : kBorder),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 10, bottom: 6),
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 12, 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          gradient: HagzyTheme.brandGradient,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.dashboard_customize_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              localized(
-                                arabic,
-                                'Firebase Venue Control Dashboard',
-                                'لوحة التحكم في الأماكن (Firebase)',
-                              ),
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                color: isDark
-                                    ? const Color(0xFFF8FAFC)
-                                    : kInk,
-                              ),
-                            ),
-                            Text(
-                              localized(
-                                arabic,
-                                'Add, remove, or renovate venues online in real time',
-                                'إضافة أو حذف أو تجديد الأماكن والملاعب فوراً على السحابة',
-                              ),
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : kMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ManageTab(
-                    venues: _venues,
-                    onAddVenue: () async {
-                      await _addVenue();
-                      setModalState(() {});
-                    },
-                    onEditVenue: (v) async {
-                      await _editVenue(v);
-                      setModalState(() {});
-                    },
-                    onAddItem: (v) async {
-                      await _addItem(v);
-                      setModalState(() {});
-                    },
-                    onAddService: (v) async {
-                      await _addService(v);
-                      setModalState(() {});
-                    },
-                    onRemoveService: (v, s) async {
-                      await _removeService(v, s);
-                      setModalState(() {});
-                    },
-                    onDelete: (v) async {
-                      await _deleteVenue(v);
-                      setModalState(() {});
-                    },
-                    onRemoveItem: (v, item) async {
-                      await _removeItem(v, item);
-                      setModalState(() {});
-                    },
-                    onSyncFirebase: _syncAllVenuesToFirebase,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loadError != null) {
@@ -4537,7 +4514,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   onChangeLanguage: _changeLanguage,
                   onToggleDarkMode: _toggleDarkMode,
                   onSwitchToAdmin: () => setState(() {
-                    _mode = _api.isConfigured ? 'adminLogin' : 'adminPreview';
+                    _mode = 'adminLogin';
                     _tab = 2;
                   }),
                 )
@@ -4645,28 +4622,6 @@ class _HagzyHomeState extends State<HagzyHome> {
                           size: 20,
                         ),
                       ),
-                      if (!isCustomer) ...[
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: localized(
-                            arabic,
-                            'Venue Control Dashboard',
-                            'لوحة التحكم في الأماكن',
-                          ),
-                          onPressed: _openVenueControlDashboardModal,
-                          style: IconButton.styleFrom(
-                            backgroundColor: kDarkMode.value
-                                ? const Color(0xFF19243D)
-                                : kSurfaceTint,
-                            foregroundColor: kGreen,
-                            side: BorderSide(color: kBorder),
-                          ),
-                          icon: HagzyVenueControlIcon(
-                            size: 20,
-                            color: kDarkMode.value ? kGreenLight : kGreen,
-                          ),
-                        ),
-                      ],
                       if (isCustomer) ...[
                         const SizedBox(width: 8),
                         IconButton(
@@ -4869,6 +4824,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               setState(() => _tab = 0);
                                             },
                                             onToggleDarkMode: _toggleDarkMode,
+                                            onSwitchToAdmin: _isAuthorizedAdmin ? _switchToAdminPortal : null,
                                           ),
                                       }
                                     : isPreview
@@ -5081,22 +5037,6 @@ class _HagzyHomeState extends State<HagzyHome> {
               ),
             ),
             const SizedBox(width: 6),
-            IconButton(
-              tooltip: 'Venue Control Dashboard',
-              onPressed: _openVenueControlDashboardModal,
-              style: IconButton.styleFrom(
-                backgroundColor: kDarkMode.value
-                    ? const Color(0xFF19243D)
-                    : kSurfaceTint,
-                foregroundColor: kGreen,
-                side: BorderSide(color: kBorder),
-              ),
-              icon: HagzyVenueControlIcon(
-                size: 20,
-                color: kDarkMode.value ? kGreenLight : kGreen,
-              ),
-            ),
-            const SizedBox(width: 6),
             TextButton.icon(
               onPressed: () => setState(() => _mode = 'customer'),
               icon: const Icon(Icons.arrow_back_rounded),
@@ -5138,75 +5078,83 @@ class _HagzyHomeState extends State<HagzyHome> {
                       const SizedBox(height: 8),
                       Text(
                         _api.isConfigured
-                            ? 'Sign in with the admin account created for your Hagzy server.'
+                            ? 'Sign in with your authorized owner Google account or Phone to manage venues.'
                             : 'Connect your Hagzy API to sign in and sync venue data across devices.',
                         style: TextStyle(color: kMuted, height: 1.4),
                       ),
                       const SizedBox(height: 22),
                       if (_api.isConfigured) ...[
-                        TextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.username],
-                          decoration: const InputDecoration(
-                              labelText: 'Admin email',
-                              prefixIcon: Icon(Icons.email_outlined)),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: !_showAdminPassword,
-                          textInputAction: TextInputAction.done,
-                          autofillHints: const [AutofillHints.password],
-                          onSubmitted: (_) => _working ? null : _loginAdmin(),
-                          decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.key_outlined),
-                              suffixIcon: IconButton(
-                                tooltip: _showAdminPassword
-                                    ? 'Hide password'
-                                    : 'Show password',
-                                icon: Icon(_showAdminPassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined),
-                                onPressed: () => setState(() =>
-                                    _showAdminPassword = !_showAdminPassword),
-                              )),
-                        ),
-                        if (_loginError != null) ...[
-                          const SizedBox(height: 12),
-                          // redAccent was 3.2:1 on white; this is 6.5:1.
-                          Text(_loginError!,
-                              style: const TextStyle(color: Color(0xFFB91C1C))),
-                        ],
-                        const SizedBox(height: 18),
-                        FilledButton(
-                          onPressed: _working ? null : _loginAdmin,
-                          child: _working
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2))
-                              : const Text('Sign in securely'),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: _working ? null : _loginAdminWithGoogle,
+                          icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                          label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                         ),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
-                          onPressed: _enterAdminPreview,
-                          icon: const Icon(Icons.visibility_outlined),
-                          label: const Text('Open local preview'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kInk,
+                            side: BorderSide(color: kBorder),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: _working
+                              ? null
+                              : () => setState(() {
+                                    _adminPhoneLogin = true;
+                                    _mode = 'customer';
+                                    _tab = 2; // Open Customer Login Screen for Phone OTP
+                                  }),
+                          icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
+                          label: const Text('Continue with Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                        ),
+                        if (!kReleaseMode) ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: _enterAdminPreview,
+                            icon: const Icon(Icons.visibility_outlined),
+                            label: const Text('Open local preview'),
+                          ),
+                        ],
+                        if (_loginError != null) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: Color(0xFFB91C1C), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _loginError!,
+                                    style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        Text(
+                          'Protected Access: Only mohamedhegazypc11@gmail.com or authorized phone number are granted administrative privileges.',
+                          style: TextStyle(color: kMuted, fontSize: 11.5, height: 1.4),
+                          textAlign: TextAlign.center,
                         ),
                       ] else ...[
-                        FilledButton.icon(
-                          onPressed: _enterAdminPreview,
-                          icon: const Icon(Icons.visibility_outlined),
-                          label: const Text('Open local preview'),
-                        ),
-                        const SizedBox(height: 10),
                         Text(
-                          'Local preview data stays on this device and is not shared with customers on other phones.',
-                          style: TextStyle(color: kMuted, fontSize: 12),
+                          'Connect your Hagzy API backend to enable administrative access.',
+                          style: TextStyle(color: kMuted, fontSize: 13),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ],

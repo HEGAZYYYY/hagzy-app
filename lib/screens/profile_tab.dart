@@ -735,6 +735,22 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     size: 14, color: kMuted),
                 onTap: () => _showPrivacySecurityModal(context, arabic),
               ),
+              if (widget.onSwitchToAdmin != null) ...[
+                const Divider(height: 1),
+                _SettingTile(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: localized(
+                      arabic, 'Owner & Venue Management Portal', 'لوحة إدارة الأماكن والملاعب'),
+                  subtitle: localized(
+                    arabic,
+                    'Add venues, manage slots & track revenue',
+                    'إضافة ملاعب وأماكن جديدة ومتابعة الأرباح',
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                      size: 14, color: kGreen),
+                  onTap: widget.onSwitchToAdmin,
+                ),
+              ],
             ],
           ),
         ),

@@ -20,7 +20,6 @@ class VibeSmartBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final headline = isArabic ? vibe.headlineAr : vibe.headlineEn;
     final ctaText = buildDynamicCtaText(
       availableCount: openVenuesCount,
