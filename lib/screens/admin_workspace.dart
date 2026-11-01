@@ -9,12 +9,43 @@ import '../widgets/common_widgets.dart';
 import '../core/models/models_v2.dart';
 import '../features/merchant_portal/merchant_portal.dart';
 
+Venue venueFromHagzyVenue(HagzyVenue v) {
+  VenueType type = VenueType.sports;
+  if (v.categories.contains('barber') || v.categories.contains('grooming')) {
+    type = VenueType.salon;
+  } else if (v.categories.contains('playstation') ||
+      v.categories.contains('billiards') ||
+      v.categories.contains('entertainment')) {
+    type = VenueType.lounge;
+  }
+
+  return Venue(
+    id: v.id,
+    name: v.name,
+    location: (v.address != null && v.address!.isNotEmpty) ? v.address! : v.city,
+    type: type,
+    ownerPhone: v.walletNumber ?? v.phone ?? '',
+    depositPercent: 25.0,
+    instaPayAddress: v.instapayAddress ?? '',
+    vodafoneCashNumber: v.walletNumber ?? '',
+    items: v.units
+        .map((u) => VenueItem(
+              id: u.id,
+              name: u.unitName,
+              kind: u.category,
+              hourlyRate: u.basePriceEgp,
+            ))
+        .toList(),
+  );
+}
+
 class AdminManageWorkspace extends StatefulWidget {
   const AdminManageWorkspace({
     super.key,
     required this.venues,
     required this.bookings,
     required this.onAddVenue,
+    this.onAddVenueModel,
     required this.onEditVenue,
     required this.onAddItem,
     required this.onAddService,
@@ -31,6 +62,7 @@ class AdminManageWorkspace extends StatefulWidget {
   final List<Venue> venues;
   final List<Booking> bookings;
   final VoidCallback onAddVenue;
+  final ValueChanged<Venue>? onAddVenueModel;
   final ValueChanged<Venue> onEditVenue;
   final ValueChanged<Venue> onAddItem;
   final ValueChanged<Venue> onAddService;
@@ -153,6 +185,7 @@ class ManageTab extends StatefulWidget {
     super.key,
     required this.venues,
     required this.onAddVenue,
+    this.onAddVenueModel,
     required this.onEditVenue,
     required this.onAddItem,
     required this.onAddService,
@@ -164,6 +197,7 @@ class ManageTab extends StatefulWidget {
 
   final List<Venue> venues;
   final VoidCallback onAddVenue;
+  final ValueChanged<Venue>? onAddVenueModel;
   final ValueChanged<Venue> onEditVenue;
   final ValueChanged<Venue> onAddItem;
   final ValueChanged<Venue> onAddService;
@@ -249,14 +283,19 @@ class _ManageTabState extends State<ManageTab> {
                       ownerId: 'merchant',
                       onVenueCreated: (newHagzyVenue) {
                         Navigator.pop(ctx);
-                        widget.onAddVenue();
+                        final created = venueFromHagzyVenue(newHagzyVenue);
+                        if (widget.onAddVenueModel != null) {
+                          widget.onAddVenueModel!(created);
+                        } else {
+                          widget.onAddVenue();
+                        }
                       },
                     ),
                   ),
                 );
               },
               icon: const Icon(Icons.flash_on_rounded, size: 16),
-              label: const Text('Fast-Track Onboarding (Starts at 40%)'),
+              label: const Text('Fast-Track Venue Onboarding'),
             ),
           ),
         ],
@@ -460,14 +499,19 @@ class _ManageTabState extends State<ManageTab> {
                       ownerId: 'merchant',
                       onVenueCreated: (newHagzyVenue) {
                         Navigator.pop(ctx);
-                        widget.onAddVenue();
+                        final created = venueFromHagzyVenue(newHagzyVenue);
+                        if (widget.onAddVenueModel != null) {
+                          widget.onAddVenueModel!(created);
+                        } else {
+                          widget.onAddVenue();
+                        }
                       },
                     ),
                   ),
                 );
               },
               icon: const Icon(Icons.flash_on_rounded, size: 16),
-              label: const Text('Fast-Track Onboarding (Starts at 40%)'),
+              label: const Text('Fast-Track Venue Onboarding'),
             ),
           ),
         ],
@@ -949,6 +993,11 @@ class AnalyticsTab extends StatelessWidget {
         0, (sum, b) => sum + (b.dueNow ?? b.price));
     final pendingPipeline =
         pendingBookings.fold<double>(0, (sum, b) => sum + b.price);
+    final cancelledOrExpired = bookings
+        .where((b) => b.cancelled || b.status == 'expired' || b.status == 'cancelled')
+        .toList();
+    final realLostRevenue = cancelledOrExpired.fold<double>(
+        0.0, (acc, b) => acc + b.price);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -987,27 +1036,29 @@ class AnalyticsTab extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        MerchantLossAversionBanner(
-          estimatedLostRevenueEgp: 1450.0,
-          noShowCount: 6,
-          onUpgradePro: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Colors.green,
-                content: Text(
-                    'Hagzy Pro activated! Automated deposits and WhatsApp reminders enabled.'),
-              ),
-            );
-          },
-          onDismissAbsorbLosses: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Hagzy Pro alert dismissed.'),
-              ),
-            );
-          },
-        ),
+        if (cancelledOrExpired.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          MerchantLossAversionBanner(
+            estimatedLostRevenueEgp: realLostRevenue,
+            noShowCount: cancelledOrExpired.length,
+            onUpgradePro: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: kInk,
+                  content: const Text(
+                      'Automated deposit protection is enabled on paid slots.'),
+                ),
+              );
+            },
+            onDismissAbsorbLosses: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Notice dismissed.'),
+                ),
+              );
+            },
+          ),
+        ],
         const SizedBox(height: 18),
         const Text(
           'Performance by Venue',

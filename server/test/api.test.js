@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const jwt = require('jsonwebtoken');
 
 const PORT = 4600 + Math.floor(Math.random() * 300);
 const B = `http://localhost:${PORT}`;
@@ -439,4 +440,37 @@ test('whitelisted admin identity is granted owner privileges via OTP and login',
 
   const strangerAttempt = await call('GET', '/api/admin/venues', { token: verifyStranger.json.token });
   assert.equal(strangerAttempt.status, 403);
+});
+
+test('SECURITY: forged tokens, unverified claims, and admin registration bypass are strictly rejected', async () => {
+  const forgedToken = jwt.sign(
+    { email: 'admin@test.dev', phone: '01027371804', aud: 'hagzy-acea1', iss: 'https://securetoken.google.com/hagzy-acea1', isAdmin: true, role: 'owner' },
+    'forged-attacker-secret-key-123'
+  );
+
+  // 1. Forged token rejected from customer auth
+  const custRes = await call('GET', '/api/customer/profile', { token: forgedToken });
+  assert.equal(custRes.status, 401);
+
+  // 2. Forged token rejected from admin auth
+  const adminRes = await call('GET', '/api/admin/venues', { token: forgedToken });
+  assert.equal(adminRes.status, 401);
+
+  // 3. Forged token rejected from Google social login
+  const googleRes = await call('POST', '/api/auth/social/google', {
+    body: { idToken: forgedToken, email: 'admin@test.dev', name: 'Attacker' }
+  });
+  assert.equal(googleRes.status, 401);
+
+  // 4. Forged token rejected from Apple social login
+  const appleRes = await call('POST', '/api/auth/social/apple', {
+    body: { identityToken: forgedToken }
+  });
+  assert.equal(appleRes.status, 401);
+
+  // 5. Attempting to register admin email via unverified customer registration is rejected
+  const regAdminEmail = await call('POST', '/api/auth/customer/register', {
+    body: { email: 'admin@test.dev', password: 'Password123!', name: 'Imposter' }
+  });
+  assert.equal(regAdminEmail.status, 403);
 });

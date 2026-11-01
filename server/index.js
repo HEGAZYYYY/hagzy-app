@@ -464,8 +464,8 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_production_secret_2026';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const JWT_SECRET = process.env.JWT_SECRET || 'hagzy_prod_sec_2026_rotated_k8x9q2m1';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hagzy2026!';
 const ADMIN_WHITELIST_EMAILS = [
   'mohamedhegazypc11@gmail.com',
   (process.env.ADMIN_EMAIL || '').trim().toLowerCase()
@@ -975,38 +975,26 @@ async function authenticateCustomer(req, res, next) {
 
     return next();
   } catch (err) {
-    try {
-      const decodedWithoutVerify = jwt.decode(token);
-      if (decodedWithoutVerify && (decodedWithoutVerify.email || decodedWithoutVerify.user_id || decodedWithoutVerify.sub || decodedWithoutVerify.phone_number)) {
-        const email = (decodedWithoutVerify.email || '').toLowerCase();
-        const phone = (decodedWithoutVerify.phone_number || '').replace(/\D/g, '');
-        const sub = decodedWithoutVerify.user_id || decodedWithoutVerify.sub;
-        let user = db.users.find(u => 
-          (email && u.email && u.email.toLowerCase() === email) || 
-          (phone && u.phone && u.phone.replace(/\D/g, '') === phone) ||
-          (u.googleId && u.googleId === sub) || 
-          u.id === sub
-        );
-        if (!user && (email || phone || sub)) {
-          user = {
-            id: 'usr_' + crypto.randomUUID().slice(0, 8),
-            email: email || (phone ? `${phone}@hagzy.phone` : ''),
-            phone: phone || '',
-            name: decodedWithoutVerify.name || (phone ? `Member ${phone.slice(-4)}` : (email ? email.split('@')[0] : 'Hagzy Member')),
-            googleId: sub,
-            walletBalance: 0.0,
-            createdAt: new Date().toISOString()
-          };
-          db.users.push(user);
-          saveDb(db);
+    // If local JWT fails, check whether token is a valid Firebase ID token cryptographically verified via Firebase Admin SDK
+    if (fbAuth && !IS_TEST) {
+      try {
+        const fbDecoded = await fbAuth.verifyIdToken(token);
+        if (fbDecoded && (fbDecoded.email || fbDecoded.uid)) {
+          const email = (fbDecoded.email || '').toLowerCase();
+          const phone = (fbDecoded.phone_number || '').replace(/\D/g, '');
+          const localUser = db.users.find(u =>
+            (email && u.email && u.email.toLowerCase() === email) ||
+            (phone && u.phone && u.phone.replace(/\D/g, '') === phone) ||
+            u.firebaseUid === fbDecoded.uid
+          );
+          if (localUser) {
+            req.user = { id: localUser.id, email: localUser.email, name: localUser.name, phone: localUser.phone };
+            req.token = token;
+            return next();
+          }
         }
-        if (user) {
-          req.user = { id: user.id, email: user.email, name: user.name, phone: user.phone };
-          req.token = token;
-          return next();
-        }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
@@ -1020,8 +1008,11 @@ function authenticateAdmin(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (!decoded.isAdmin && !isUserAdmin(decoded)) {
+    if (!decoded.isAdmin || decoded.role !== 'owner') {
       return res.status(403).json({ error: 'Forbidden: Admin access restricted to authorized owner' });
+    }
+    if (!isUserAdmin(decoded)) {
+      return res.status(403).json({ error: 'Forbidden: Identity is not authorized for administrative access' });
     }
     req.admin = decoded;
     next();
@@ -1386,22 +1377,23 @@ app.post('/api/auth/social/google', async (req, res) => {
           verifiedId = payload.sub || '';
         }
       }
-      if (!verifiedEmail) {
-        // Safe fallback for Firebase-issued tokens decoded with sub/email
-        const decoded = jwt.decode(idToken);
-        if (decoded && decoded.email && (decoded.email_verified === true || decoded.email_verified === 'true' || decoded.aud === 'hagzy-acea1' || decoded.iss?.includes('hagzy-acea1'))) {
-          verifiedEmail = String(decoded.email).toLowerCase();
-          verifiedName = String(decoded.name || (decoded.email ? decoded.email.split('@')[0] : '')).trim();
-          verifiedAvatar = String(decoded.picture || '').trim();
-          verifiedId = decoded.user_id || decoded.sub || '';
-        }
+      if (!verifiedEmail && fbAuth) {
+        try {
+          const decoded = await fbAuth.verifyIdToken(idToken);
+          if (decoded && decoded.email) {
+            verifiedEmail = String(decoded.email).toLowerCase();
+            verifiedName = String(decoded.name || decoded.email.split('@')[0]).trim();
+            verifiedAvatar = String(decoded.picture || '').trim();
+            verifiedId = decoded.uid || decoded.sub || '';
+          }
+        } catch (_) {}
       }
       if (!verifiedEmail) {
         return res.status(401).json({ error: 'Invalid Google token' });
       }
     } catch (err) {
       console.warn('Google id_token validation failed:', err.message);
-      return res.status(502).json({ error: 'Could not verify Google token' });
+      return res.status(401).json({ error: 'Could not verify Google token' });
     }
 
     // Find or create customer
@@ -1483,20 +1475,7 @@ app.post('/api/auth/social/apple', async (req, res) => {
       }
     }
 
-    // 2. Fallback for Firebase-issued tokens decoded for project hagzy-acea1
-    if (!verifiedEmail && !verifiedId) {
-      try {
-        const decoded = jwt.decode(identityToken);
-        if (decoded && (decoded.email || decoded.user_id || decoded.sub) &&
-            (decoded.aud === 'hagzy-acea1' || decoded.iss?.includes('hagzy-acea1') || decoded.firebase)) {
-          verifiedEmail = String(decoded.email || '').toLowerCase();
-          verifiedId = decoded.user_id || decoded.sub || '';
-          if (decoded.name && !verifiedName) verifiedName = String(decoded.name).trim();
-        }
-      } catch (_) {}
-    }
-
-    // 3. Fallback for direct Apple identity tokens (RS256 verified via Apple JWKS)
+    // 2. Direct Apple identity tokens (RS256 verified via Apple JWKS)
     if (!verifiedEmail && !verifiedId) {
       try {
         const claims = await verifyAppleIdentityToken(identityToken);
@@ -1728,6 +1707,12 @@ app.post('/api/auth/customer/register', async (req, res) => {
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
+  if (isUserAdmin({ email: cleanEmail, phone: cleanPhone })) {
+    return res.status(403).json({
+      error: 'Administrative identities cannot be registered through customer registration. Please sign in via Google OAuth or Phone OTP.'
+    });
   }
 
   const existingEmail = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);

@@ -32,6 +32,7 @@ class CustomerLoginScreen extends StatefulWidget {
     required String phone,
     String? token,
     double? walletBalance,
+    bool? isAdmin,
   }) onSignIn;
   final ValueChanged<String> onChangeLanguage;
   final VoidCallback? onSwitchToAdmin;
@@ -260,6 +261,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       String? token;
       double? walletBalance;
 
+      bool? isAdmin;
       if (widget.apiConfigured) {
         try {
           final res = await widget.api.verifyVerificationOtp(
@@ -268,6 +270,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             name: name,
           );
           token = res['token'] as String?;
+          isAdmin = res['isAdmin'] == true;
           final fbCustomToken = res['firebaseCustomToken'] as String?;
           if (fbCustomToken != null && fbCustomToken.isNotEmpty) {
             unawaited(SocialAuthService.signInWithCustomToken(fbCustomToken));
@@ -312,6 +315,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         phone: resolvedPhone,
         token: token,
         walletBalance: walletBalance,
+        isAdmin: isAdmin,
       );
 
       if (mounted) {
@@ -391,6 +395,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
         double? walletBalance;
         String? sessionToken = token;
+        bool? isAdmin;
         if (widget.apiConfigured && token != null) {
           try {
             final backendRes = await widget.api.signInWithSocial(
@@ -401,6 +406,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               providerId: providerId,
               idToken: token,
             );
+            isAdmin = backendRes['isAdmin'] == true;
             if (backendRes['customer'] is Map<String, dynamic>) {
               final cust = backendRes['customer'] as Map<String, dynamic>;
               walletBalance = (cust['walletBalance'] as num?)?.toDouble();
@@ -418,6 +424,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           phone: phone,
           token: sessionToken,
           walletBalance: walletBalance,
+          isAdmin: isAdmin,
         );
 
         if (mounted) {
@@ -485,6 +492,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
         double? walletBalance;
         String? sessionToken = token;
+        bool? isAdmin;
         if (widget.apiConfigured && token != null) {
           try {
             final backendRes = await widget.api.signInWithSocial(
@@ -495,6 +503,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               providerId: providerId,
               idToken: token,
             );
+            isAdmin = backendRes['isAdmin'] == true;
             if (backendRes['customer'] is Map<String, dynamic>) {
               final cust = backendRes['customer'] as Map<String, dynamic>;
               walletBalance = (cust['walletBalance'] as num?)?.toDouble();
@@ -512,6 +521,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           phone: phone,
           token: sessionToken,
           walletBalance: walletBalance,
+          isAdmin: isAdmin,
         );
 
         if (mounted) {

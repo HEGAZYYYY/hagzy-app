@@ -136,8 +136,10 @@ class _HagzyHomeState extends State<HagzyHome> {
   bool _adminPhoneLogin = false;
   bool _adminShowPhoneAuth = false;
   bool _adminPhoneCodeSent = false;
-  final TextEditingController _adminPhoneController =
-      TextEditingController(text: '01027371804');
+  bool _adminShowPasswordAuth = false;
+  bool _showAdminPassword = false;
+  bool _savedCustomerIsAdmin = false;
+  final TextEditingController _adminPhoneController = TextEditingController(text: '01027371804');
   final TextEditingController _adminOtpController = TextEditingController();
   String _mode = 'landing';
   int _tab = 0;
@@ -281,6 +283,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           _customerSignedIn = (profile['isSignedIn'] as bool? ?? false) &&
               _customerToken != null &&
               _customerToken!.isNotEmpty;
+          _savedCustomerIsAdmin = profile['isAdmin'] == true;
           if (kIsWeb) {
             try {
               final tokenParam = Uri.base.queryParameters['token'] ??
@@ -508,17 +511,76 @@ class _HagzyHomeState extends State<HagzyHome> {
   bool get _isAuthorizedAdmin {
     final cleanEmail = _savedCustomerEmail.trim().toLowerCase();
     final cleanPhone = _savedCustomerPhone.replaceAll(RegExp(r'\D'), '');
-    return cleanEmail == 'mohamedhegazypc11@gmail.com' ||
+    final matchesAdmin = cleanEmail == 'mohamedhegazypc11@gmail.com' ||
         cleanPhone == '01027371804' ||
         cleanPhone.endsWith('1027371804');
+    return _savedCustomerIsAdmin || matchesAdmin || (_adminToken != null && _adminToken!.isNotEmpty);
   }
 
-  void _enterAdminPreview() {
+  Future<void> _loginAdminWithPassword() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _loginError = 'Please enter your owner email and password.');
+      return;
+    }
     setState(() {
-      _mode = 'adminPreview';
-      _tab = 0;
+      _working = true;
+      _loginError = null;
     });
+    try {
+      final res = await _api.login(email, password);
+      final token = res['token'] as String;
+      _adminToken = token;
+      _savedCustomerIsAdmin = true;
+      _savedCustomerEmail = email;
+      _savedCustomerName = 'Admin';
+      _customerSignedIn = true;
+      await _saveCustomerProfile(
+        name: 'Admin',
+        email: email,
+        phone: _savedCustomerPhone,
+        isSignedIn: true,
+        token: token,
+      );
+
+      List<dynamic> venues = [];
+      List<dynamic> bookings = [];
+      if (_api.isConfigured) {
+        try {
+          venues = await _api.venues(adminToken: token);
+        } catch (_) {
+          try {
+            venues = await _api.venues();
+          } catch (_) {}
+        }
+        try {
+          bookings = await _api.bookings(token);
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _mode = 'admin';
+        _tab = 0;
+        _venues = venues
+            .map((v) => Venue.fromJson(v as Map<String, dynamic>))
+            .toList();
+        _bookings = bookings
+            .map((b) => Booking.fromJson(b as Map<String, dynamic>))
+            .toList();
+        _passwordController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _loginError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
+
 
   Future<void> _switchToAdminPortal() async {
     final token = _adminToken ?? _customerToken;
@@ -539,10 +601,8 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _sendAdminPhoneOtp() async {
     final phone = _adminPhoneController.text.trim();
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    if (!cleanPhone.endsWith('1027371804') && cleanPhone != '01027371804') {
-      setState(() => _loginError =
-          'Access denied: Only authorized owner phone numbers are permitted.');
+    if (phone.isEmpty) {
+      setState(() => _loginError = 'Please enter your registered owner phone number.');
       return;
     }
     setState(() {
@@ -584,6 +644,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         throw Exception('Access denied: Unauthorized phone number.');
       }
       _adminToken = token;
+      _savedCustomerIsAdmin = true;
       _savedCustomerPhone = phone;
       _savedCustomerName = res['customer']?['name'] as String? ?? 'Admin';
       _customerSignedIn = true;
@@ -640,9 +701,15 @@ class _HagzyHomeState extends State<HagzyHome> {
       final res = await SocialAuthService.signInWithGoogle();
       if (res != null) {
         if (res['redirecting'] == true) return;
+        if (res['error'] != null) {
+          throw Exception(res['error']);
+        }
         final email = (res['email'] as String? ?? '').trim().toLowerCase();
         final name = res['name'] as String? ?? '';
         final idToken = res['idToken'] as String? ?? res['token'] as String? ?? '';
+        if (idToken.isEmpty) {
+          throw Exception('Google sign-in was cancelled or returned empty credentials.');
+        }
         final backendRes = await _api.signInWithSocial(
           provider: 'google',
           email: email,
@@ -650,15 +717,22 @@ class _HagzyHomeState extends State<HagzyHome> {
           idToken: idToken,
         );
         final token = backendRes['token'] as String? ?? idToken;
-        final isAdmin = backendRes['isAdmin'] == true ||
-            email == 'mohamedhegazypc11@gmail.com';
+        final isAdmin = backendRes['isAdmin'] == true || email == 'mohamedhegazypc11@gmail.com';
         if (!isAdmin) {
-          throw Exception('Access denied: $email is not authorized as an administrator.');
+          throw Exception('Access denied: $email is not authorized for administrative access.');
         }
         _adminToken = token;
+        _savedCustomerIsAdmin = true;
         _savedCustomerEmail = email;
         _savedCustomerName = name;
         _customerSignedIn = true;
+        await _saveCustomerProfile(
+          name: name,
+          email: email,
+          phone: _savedCustomerPhone,
+          isSignedIn: true,
+          token: token,
+        );
 
         List<dynamic> venues = [];
         List<dynamic> bookings = [];
@@ -4116,6 +4190,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           'phone': _savedCustomerPhone,
           'isSignedIn': _customerSignedIn,
           'token': _customerToken,
+          'isAdmin': _savedCustomerIsAdmin,
         }),
       );
       if (kIsWeb &&
@@ -4139,6 +4214,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     required String phone,
     String? token,
     double? walletBalance,
+    bool? isAdmin,
   }) async {
     if (token != null && token.isNotEmpty) {
       _customerToken = token;
@@ -4148,11 +4224,18 @@ class _HagzyHomeState extends State<HagzyHome> {
 
     final cleanEmail = email.trim().toLowerCase();
     final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    final isAuthorizedAdmin = cleanEmail == 'mohamedhegazypc11@gmail.com' ||
+    final matchesAdminIdentity = cleanEmail == 'mohamedhegazypc11@gmail.com' ||
         cleanPhone == '01027371804' ||
         cleanPhone.endsWith('1027371804');
+
+    final isAuthorizedAdmin = isAdmin == true ||
+        matchesAdminIdentity ||
+        _savedCustomerIsAdmin ||
+        (_adminToken != null && _adminToken!.isNotEmpty);
+
     if (isAuthorizedAdmin && token != null && token.isNotEmpty) {
       _adminToken = token;
+      _savedCustomerIsAdmin = true;
     }
 
     final shouldOpenAdmin = (widget.adminMode || _mode == 'adminLogin' || _adminPhoneLogin) && isAuthorizedAdmin;
@@ -4162,7 +4245,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (!isAuthorizedAdmin) {
         if (mounted) {
           setState(() {
-            _loginError = 'Access denied: Only mohamedhegazypc11@gmail.com or authorized owner phone can access the Owner Portal.';
+            _loginError = 'Access denied: Administrative privileges are restricted to verified owner credentials.';
             _mode = 'adminLogin';
           });
         }
@@ -4950,6 +5033,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             1 => ManageTab(
                                                 venues: _venues,
                                                 onAddVenue: _addVenue,
+                                                onAddVenueModel: (venue) async {
+                                                  await _runSave(() async {
+                                                    await _saveAdminVenue(venue);
+                                                    await _commit([..._venues, venue], _bookings);
+                                                  });
+                                                },
                                                 onEditVenue: _editVenue,
                                                 onAddItem: _addItem,
                                                 onAddService: _addService,
@@ -5034,6 +5123,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                                         1 => ManageTab(
                                             venues: _venues,
                                             onAddVenue: _addVenue,
+                                            onAddVenueModel: (venue) async {
+                                              await _runSave(() async {
+                                                await _saveAdminVenue(venue);
+                                                await _commit([..._venues, venue], _bookings);
+                                              });
+                                            },
                                             onEditVenue: _editVenue,
                                             onAddItem: _addItem,
                                             onAddService: _addService,
@@ -5185,7 +5280,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       const SizedBox(height: 22),
                       if (_api.isConfigured) ...[
-                        if (!_adminShowPhoneAuth) ...[
+                        if (!_adminShowPhoneAuth && !_adminShowPasswordAuth) ...[
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
                               backgroundColor: kGreen,
@@ -5209,11 +5304,121 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 ? null
                                 : () => setState(() {
                                       _adminShowPhoneAuth = true;
+                                      _adminShowPasswordAuth = false;
                                       _adminPhoneCodeSent = false;
                                       _loginError = null;
                                     }),
                             icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
                             label: const Text('Continue with Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton.icon(
+                            onPressed: _working
+                                ? null
+                                : () => setState(() {
+                                      _adminShowPasswordAuth = true;
+                                      _adminShowPhoneAuth = false;
+                                      if (_emailController.text.isEmpty) {
+                                        _emailController.text = 'mohamedhegazypc11@gmail.com';
+                                      }
+                                      _loginError = null;
+                                    }),
+                            icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                            label: const Text('Sign in with Owner Password', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                          ),
+                        ] else if (_adminShowPasswordAuth) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: kSurfaceTint,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.admin_panel_settings_rounded, color: kGreen, size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Owner Password Sign In',
+                                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 20),
+                                      onPressed: _working
+                                          ? null
+                                          : () => setState(() {
+                                                _adminShowPasswordAuth = false;
+                                                _loginError = null;
+                                              }),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: InputDecoration(
+                                    labelText: 'Owner Email',
+                                    prefixIcon: const Icon(Icons.email_outlined, color: kGreen, size: 20),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _passwordController,
+                                  obscureText: !_showAdminPassword,
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: kGreen, size: 20),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _showAdminPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(() => _showAdminPassword = !_showAdminPassword),
+                                    ),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onSubmitted: (_) {
+                                    if (!_working) _loginAdminWithPassword();
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: kGreen,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: _working ? null : _loginAdminWithPassword,
+                                  child: _working
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Text('Sign In to Owner Portal', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                ),
+                                const SizedBox(height: 6),
+                                Center(
+                                  child: TextButton(
+                                    onPressed: _working
+                                        ? null
+                                        : () => setState(() {
+                                              _adminShowPasswordAuth = false;
+                                              _loginError = null;
+                                            }),
+                                    child: const Text('← Other Sign-In Methods', style: TextStyle(fontSize: 12.5)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ] else ...[
                           Container(
@@ -5340,14 +5545,6 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ),
                           ),
                         ],
-                        if (!kReleaseMode) ...[
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            onPressed: _enterAdminPreview,
-                            icon: const Icon(Icons.visibility_outlined),
-                            label: const Text('Open local preview'),
-                          ),
-                        ],
                         if (_loginError != null) ...[
                           const SizedBox(height: 14),
                           Container(
@@ -5373,7 +5570,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         ],
                         const SizedBox(height: 18),
                         Text(
-                          'Protected Access: Only mohamedhegazypc11@gmail.com or authorized phone number are granted administrative privileges.',
+                          'Protected Access: Administrative privileges are strictly restricted to verified owner credentials.',
                           style: TextStyle(color: kMuted, fontSize: 11.5, height: 1.4),
                           textAlign: TextAlign.center,
                         ),
