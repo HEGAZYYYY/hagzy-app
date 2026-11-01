@@ -1,0 +1,251 @@
+# Hagzy: Master Fix Plan for Claude Code
+
+**How to use:** save this file in the repo as `docs/FIX_PLAN.md`. Then tell Claude Code:
+
+> Read `docs/FIX_PLAN.md` fully. Execute **Phase 0**, then **Phase 1**, then stop and report. I will tell you when to continue to the next phase.
+
+Run one phase per session (`/clear` between phases). Each phase ends with a gate. Do not start the next phase until the gate passes.
+
+---
+
+## 0. Role, rules of engagement, and honesty requirements
+
+You are the lead engineer taking this app (Flutter client + Node/Express server + Firebase Functions/Firestore + an Android SMS payment-gateway app) to production quality. The owner wants it fixed and ready.
+
+**Rules**
+1. **Verify before fixing.** This plan comes from an earlier review. Line numbers and details may have changed. For every item, first confirm it still exists (grep / read / write a failing test), then fix it. If an item is already fixed, say so and add a regression test.
+2. **Never touch production.** Do not call the live API (`hagzy-booking.web.app` or the Render URL), do not try any real credentials, do not deploy. Work locally and in tests only.
+3. **Never print, log, or commit secrets.** Use environment variables. Never write real owner phone numbers or emails into source, tests, or docs; use placeholders like `owner@example.com`.
+4. **Work on a branch per phase** (`fix/phase-1-security`, etc.). Commit in small logical commits with clear messages. Do not force-push or rewrite history unless the owner asks.
+5. **Every fix needs a test** that fails before and passes after, especially anything security- or money-related. Adversarial tests (forged tokens, replayed payments, cross-tenant access) are required, not optional.
+6. **Do not weaken a test to make it pass.** If an existing test asserts fake or insecure behavior (e.g. the "40% progress" test), replace it with a test of the correct behavior.
+7. **When something is ambiguous, choose the safer default and document it** in `docs/DECISIONS.md`. Only stop and ask the owner at the **Decision Points** listed in section 9.
+8. **Audit beyond this list.** This list is not exhaustive. Parts that were NOT deeply reviewed: `functions/`, `firestore.rules`, `android_payment_gateway/`, `ios/` and `android/` configuration, `lib/services/*`, `lib/widgets/map_explorer.dart`, `lib/screens/unified_payment_screen.dart`, `lib/screens/login_screen.dart`, time-zone handling, and `lib/core/models/*` (the "v2" models). Review them fully and record every additional finding in `docs/AUDIT.md`, then fix it.
+9. **Be honest about "done".** Do not claim 100% readiness. At the end, report residual risks and anything that only the owner can do (section 10).
+
+**Environment note:** Flutter may not be installed. If it is not, install it or state clearly which checks you could not run. Never say tests passed if you did not run them.
+
+---
+
+## Phase 0: Baseline and setup
+
+- [ ] Create `CLAUDE.md` (stack, how to run server/app/tests, rules above, "don't touch `build/`").
+- [ ] Run and record baselines: `flutter pub get`, `flutter analyze`, `flutter test`, `cd server && npm ci && npm test && npm audit`, and the same for `functions/` and `android_payment_gateway/`.
+- [ ] Inventory every HTTP route (server and functions) into `docs/AUDIT.md` with: auth required? role? input validation? rate limit? Mark each as OK / needs work.
+- [ ] Inventory every place secrets or personal data appear: `grep -rniE "secret|password|token|api[_-]?key|@gmail|01[0125][0-9]{8}"` across the repo including `render.yaml`, `.github/`, `lib/`, `server/`, `functions/`, `android_payment_gateway/`. Record in `docs/AUDIT.md`.
+- [ ] Confirm the repo's `.gitignore` covers `server/.env`, `server/data/*.json`, keystores, and build output.
+
+**Gate 0:** baselines recorded, inventory written. No code changed yet except `CLAUDE.md`, `docs/`.
+
+---
+
+## Phase 1: Authentication and authorization (CRITICAL, do first)
+
+### 1.1 Forged-token admin takeover
+`server/index.js` contains fallbacks that call `jwt.decode()` (no signature check) and then trust the result:
+- Google social login: if Google's tokeninfo rejects the token, the code decodes the token unverified and accepts it if `aud`/`iss` mentions the public Firebase project id.
+- Apple social login: same pattern.
+- `authenticateCustomer`: when `jwt.verify` throws, it falls back to `jwt.decode` and even auto-creates a user.
+
+I proved locally that a token signed with a random key and carrying the whitelisted admin email yields admin access.
+
+**Fix:**
+- [ ] Delete **every** `jwt.decode`-then-trust path (`grep -n "jwt.decode" server/index.js`).
+- [ ] Verify Firebase ID tokens with `firebase-admin` (`getAuth().verifyIdToken(token, true)`), checking audience/issuer for the configured project. Verify Google ID tokens against Google's keys with the exact expected audience(s) from env (`GOOGLE_CLIENT_ID`s). Verify Apple identity tokens against Apple's JWKS (RS256), checking `iss`, `aud` (from `APPLE_CLIENT_ID`), `exp`.
+- [ ] If verification fails or required config is missing → 401/503. Never fall back.
+- [ ] Tests: forged token (random key) for Google, Apple, and customer-auth endpoints must all be rejected; expired token rejected; wrong audience rejected; token for a different Firebase project rejected.
+
+### 1.2 Admin identity must never come from unverified claims
+`isUserAdmin()` grants admin if a token's `email`/`phone` matches a whitelist. Customer registration accepts any email/phone with no verification and issues a token containing it.
+- [ ] Admin/partner privileges must come from a **server-side role** (stored in the DB: `users.role` and membership tables, see Phase 3) assigned after a **verified** login. Never from a free-text claim.
+- [ ] Remove the hardcoded owner email/phone from `server/index.js` AND the client gate in `lib/main.dart` (`isAuthorizedAdmin`). The client must read the role from the server's login response and treat it as UI-only (the server remains the authority).
+- [ ] Seed the first super-admin via environment variables (`ADMIN_EMAIL`, `ADMIN_PHONE`) **and** require a verified login (OTP / verified Google) for that identity.
+- [ ] Tests: registering with the super-admin's email/phone via the password route must NOT yield admin; a forged claim must NOT yield admin.
+
+### 1.3 Registration and login hardening
+- [ ] Email/password registration must verify email ownership (emailed one-time code or link) **before** issuing a usable token or linking to existing data. Pre-registration of someone else's email must not later merge into their Google/Apple sign-in ("pre-hijacking"). Do not auto-merge accounts by unverified email.
+- [ ] Phone numbers on accounts must be OTP-verified before they are trusted for anything (booking claims, admin, payment matching).
+- [ ] Passwords: minimum 8 chars, bcrypt/argon2 with sane cost, constant-time compare, lockout/backoff per account and per IP (not only per IP), generic error messages (no account enumeration).
+- [ ] Token lifetimes: customers ≤ 30 days with refresh or re-login, admin/partner ≤ 12 hours. Replace the unbounded in-memory `revokedTokens` set with a persisted, expiring denylist (or short-lived tokens + refresh rotation).
+- [ ] OTP: 6 digits via `crypto.randomInt`, 5-minute expiry, ≤ 5 attempts, per-target and per-IP request rate limits, code stored hashed. Reviewer/test bypass codes only when explicitly configured by env and never in production builds unless `REVIEWER_*` is set.
+- [ ] Remove any code path that echoes OTPs in responses outside `NODE_ENV=test`.
+
+### 1.4 Secrets and configuration
+- [ ] Remove **every** hardcoded fallback secret: JWT secret, admin password, payment listener key/secret, webhook secret (`grep -rn "||\s*'" server/index.js` for secret-looking defaults).
+- [ ] In production the server must refuse to start without required secrets (fail fast with a clear message listing which env var is missing) **and** `render.yaml` / `DEPLOYMENT.md` must document exactly how to set each one in the Render dashboard so the boot problem that caused the earlier "restore fallbacks" commit does not recur. Add a `/api/health` that reports config readiness without revealing values.
+- [ ] `render.yaml`: no plaintext secrets; use `sync: false` or `generateValue: true`. Delete plaintext `ADMIN_PASSWORD`.
+- [ ] Remove any HTML/JSON error response that prints a secret or secret hint (the payment listener's 401 page currently does).
+- [ ] `.env.example` contains only empty placeholders. Add a startup check that rejects known-leaked default values.
+
+### 1.5 Payment listener / webhook authentication
+- [ ] Authenticate listener and webhook requests with an **HMAC-SHA256 signature in a header** over the raw body plus a timestamp; reject if the timestamp is older than 5 minutes; compare with `crypto.timingSafeEqual`. No secrets in query strings. No GET variant for state-changing endpoints. Use the raw request body for HMAC (capture with `express.json({ verify })`), not re-stringified JSON.
+- [ ] Bring `functions/` webhook and the Node webhook to the same standard (the Cloud Function is closer already; reuse its approach).
+
+### 1.6 General server hardening
+- [ ] Add `helmet`, strict CORS from `CORS_ORIGINS` env (no `*` in production), request body size limits, JSON schema validation (zod/joi/ajv) on **every** write endpoint, parameterized queries only, and consistent error shape without stack traces.
+- [ ] Rate limits on every auth and payment route; trust-proxy configured for Render.
+- [ ] Review the Firestore rules (`firestore.rules`) and Storage rules: default deny, no client writes to bookings/payments/wallets, no reads of other users' PII. Add rules unit tests with the emulator if feasible.
+- [ ] Review `functions/` for secrets in code, auth on every callable/HTTP function, and input validation.
+
+### 1.7 History and rotation
+- [ ] Add `docs/OWNER_TODO.md` item: **rotate every secret that ever appeared in git history** (JWT secret, admin password, listener/webhook secrets, any Firebase/Google keys that were embedded). Rotation is the real fix; history rewriting is optional and only if the owner asks.
+
+**Gate 1:** all adversarial auth tests pass; `grep -rn "jwt.decode" server/` returns nothing used for trust decisions; no hardcoded secrets remain (`docs/AUDIT.md` shows the re-run of the secrets grep); `npm test` and `npm audit` clean (or documented exceptions).
+
+---
+
+## Phase 2: Payments and booking integrity
+
+The business flow: a customer books a slot, pays by InstaPay or Vodafone Cash, an Android gateway phone reads the bank/wallet notification and posts it to the server, which matches it to a pending booking by the customer's handle/phone and amount, then confirms.
+
+### 2.1 Matching safeguards
+- [ ] **Unique payable amount per pending intent**: add a unique piaster suffix (e.g. 250.37 instead of 250.00), guaranteed unique among open intents for that receiving wallet; show the exact amount prominently in the app; document how the app/Instapay display decimals.
+- [ ] Default expected sender to the customer's **OTP-verified** phone; any other handle triggers manual review.
+- [ ] Match on **exact** amount (or an explicit, documented tolerance), not `>=`.
+- [ ] If more than one pending intent could match, or none, put the event in a **review queue**. Never guess.
+- [ ] Reject events older than a configurable window, from unknown senders/packages, or exceeding an auto-confirm cap (larger amounts always go to manual review).
+- [ ] **Idempotency/dedupe:** use the provider's transaction reference when present; otherwise a hash of (sender, amount, provider timestamp, normalized text). Persist it with a unique constraint. Remove timestamp-generated IDs (`auto_${Date.now()}`) as dedupe keys.
+- [ ] Store minimal raw message data; redact other people's numbers/names; define a retention period.
+- [ ] Gateway heartbeat endpoint + admin alert when the phone has been silent too long; surface "gateway offline" in the partner dashboard and fall back to manual confirmation.
+- [ ] Admin/partner **unmatched-payments screen**: list events, manually attach to a booking, with an audit log entry.
+- [ ] Tests: replayed event, duplicate delivery, wrong amount, two identical pending intents, spoofed/unknown sender, stale event, large amount, forged signature.
+
+### 2.2 Booking state machine and money
+- [ ] Centralize booking status transitions in one module: `pending_payment → confirmed → completed | cancelled | expired | no_show`. Illegal transitions return 409 (e.g. confirming a cancelled booking must not revive it, nor confirm an expired hold without re-checking the slot).
+- [ ] Re-check slot overlap at confirm time and in every code path that can create/confirm (customer, admin walk-in, payment match, manual confirm). Make the check atomic (DB transaction or exclusion constraint once on Postgres tables).
+- [ ] **Server-side pricing**: compute price, deposit and due-now on the server from venue/unit/service data (never trust client `price`, `dueNow`, `discountAmount`, `promoCode` value). Validate promo codes server-side.
+- [ ] Hold expiry: background sweeper that expires `pending_payment` holds on time; the client shows a visible countdown.
+- [ ] Wallet: implement as an **append-only ledger** (credit/debit entries with reason and reference) with a computed balance, not a mutable number. Refunds on cancellation (per venue policy) create ledger entries. Welcome bonus: add per-account/device abuse limits or remove.
+- [ ] Cancellation/refund policy per venue (cutoff window, deposit forfeiture) enforced server-side and shown to the customer before booking.
+- [ ] Notifications (SMS/WhatsApp/push) on: hold created, payment received, confirmed, cancelled, refunded, reminder before start. Idempotent, with failure logging and retry.
+- [ ] Implement `POST /api/bookings/:id/fawry-reference` or remove the client code and UI for it. No dead endpoints in either direction: add a script that diffs client-called routes against server routes and fail CI if they differ.
+- [ ] Paymob/card payments: either implement properly (server-created intention, HMAC-verified webhook, idempotent confirmation, refunds) behind an env flag, or remove the UI path. A fake checkout must not exist.
+- [ ] **Time zones**: all slot math in `Africa/Cairo`, stored in UTC, with tests around midnight and DST changes.
+
+### 2.3 Source of truth and persistence
+Today state lives in: a JSON file, a Postgres JSONB snapshot of the whole state rewritten on every change, and Firestore (synced from the server), plus Cloud Functions that also touch bookings.
+- [ ] Decide and document in `docs/DECISIONS.md` the single system of record for users, venues, bookings, payments and wallets. **Default recommendation:** Postgres with real tables (`users`, `venues`, `units`, `bookings`, `payment_events`, `wallet_ledger`, `audit_log`, `venue_members`) and migrations; the Node API is the only writer; Firestore is an optional read-only mirror or is removed; Cloud Functions do not mutate bookings independently.
+- [ ] Migrate the JSON/JSONB state into tables with a tested one-off migration script (dry-run mode, idempotent).
+- [ ] Remove the whole-state snapshot write on every request (lost-update and scale problem). Use transactions.
+- [ ] Backups: scheduled DB backups and a documented restore drill.
+
+**Gate 2:** payment and booking adversarial tests pass; concurrency test proves two simultaneous bookings of the same slot yield exactly one success; all client-called routes exist on the server (CI check); migration dry-run passes on a fixture.
+
+---
+
+## Phase 3: Partner (venue-owner) portal
+
+Currently it is an owner-only dashboard with a single admin identity and several fake or disconnected pieces.
+
+### 3.1 Multi-tenancy (required for real partners)
+- [ ] Add `ownerId`/membership to venues; roles: `super_admin`, `owner`, `staff`. Every partner route is scoped: partners only see/modify **their** venues, bookings, payments, customers. Add ownership checks centrally (middleware/policy) and tests for cross-tenant read/write/delete attempts.
+- [ ] Partner onboarding/invite flow: super-admin invites by verified email/phone; partner sets up the account via verified login; staff invitations by owners.
+- [ ] Audit log (who did what, when) for confirm, cancel, refund, price change, delete, manual payment attach, role changes. Viewable by owners.
+- [ ] Customer data privacy: partners see only customers who booked their venue, only fields they need.
+
+### 3.2 Remove fake and misleading pieces
+- [ ] `MerchantLossAversionBanner`: remove the hardcoded "lost 1450 EGP to 6 no-shows" numbers. Either drive it from real no-show/cancellation data for that venue, or delete it. The "Upgrade Pro" button currently only shows a success snackbar. Remove it unless a real billing/plan system exists (see Decision Points).
+- [ ] Onboarding progress "starts at 40%": remove the fake head-start; show honest step progress. Update/replace the test that asserts the fake value.
+- [ ] Replace the "Fast-Track Onboarding (Starts at 40%)" label with plain wording.
+
+### 3.3 Make onboarding actually work
+- [ ] `GoalGradientOnboardingScreen` builds a venue (units from templates, InstaPay/wallet handles, location) but the caller **discards it** and passes a hardcoded `ownerId: 'merchant'`. Wire it to the server: authenticated create-venue endpoint (owner from the token), schema validation, persist units/services/pricing/opening hours/deposit %, payout handles.
+- [ ] No fake defaults ("My Lounge / Venue", "Central Street, <city>", default coordinates). Require name, address and a map-picked location; validate.
+- [ ] Require a verified payout handle (InstaPay address / wallet number) before a venue can accept bookings, and bind each venue to its receiving wallet so payment matching knows which wallet received the money.
+- [ ] Reconcile the two data models (legacy `Venue` vs v2 `HagzyVenue`/`BookableUnit`): pick one, migrate, delete the other.
+
+### 3.4 Real QR standee and links
+- [ ] Add `qr_flutter` (or equivalent) and render a **real QR code**; the current widget shows a placeholder icon. Export/print as PDF/PNG.
+- [ ] The URL `https://hagzy.app/venue/<id>` is not routed anywhere. Implement the route (Firebase Hosting rewrite + in-app deep link handling for web, Android App Links, iOS Universal Links) on a domain the owner controls (Decision Point D1). Test that scanning opens the right venue.
+
+### 3.5 Safer venue and booking actions
+- [ ] Venue update: schema-validated, whitelisted fields only (no mass assignment of `ownerId`, ids, internal flags).
+- [ ] Venue delete → **soft delete/archive**; block or require explicit handling when future confirmed/paid bookings exist; never silently delete bookings.
+- [ ] Cancel booking: enforce state machine, refund per policy via the wallet ledger, notify the customer, return 404 when not found.
+- [ ] Walk-ins and slot blocks go through the same overlap checks and state machine.
+- [ ] Opening hours, holidays/closures, per-unit pricing rules (peak/off-peak), minimum/maximum duration, buffer time, capacity for classes/services, staff assignment for salons: verify the model supports what the venue categories (PlayStation, padel, football, barber, salon, etc.) need, and implement gaps.
+
+### 3.6 Reports and operations
+- [ ] Move analytics server-side with date ranges, per-unit and per-service revenue, deposits vs balances due, no-show/cancellation rates, payout reconciliation vs payment events; CSV export.
+- [ ] Partner notifications for new bookings/payments/unmatched payments; WhatsApp/SMS templates configurable.
+- [ ] All partner screens: Arabic and English, RTL-correct (admin screens are currently English-only in places).
+
+**Gate 3:** cross-tenant tests pass; onboarding creates a venue end-to-end against the local server; no hardcoded fake stats remain (`grep -rn "1450\|Pro activated"`); QR scans resolve to the venue page in an automated link test.
+
+---
+
+## Phase 4: UX, UI, accessibility, and code health
+
+Verify each, then fix:
+- [ ] **RTL/locale**: language lives in a notifier above `MaterialApp` (`kAppLanguage`). Audit every dialog, bottom sheet, snackbar, date/time picker and numeric formatting in Arabic mode (Arabic-Indic digits policy, currency "ج.م").
+- [ ] **Contrast (WCAG AA ≥ 4.5:1 for text):** do not use `kGreen` (#059669, 3.77:1 on white) or `kGold` (#F59E0B, 2.15:1) for text on white; use `kGreenDark` (#047857) or darker. Audit dark mode separately. Replace `Colors.redAccent` text with a darker red.
+- [ ] **Font sizes:** no text below 12 px (about 25 styles use ≤ 10.5 px and 28 use 11 px). Fix layouts that then overflow; test at text scale 1.0, 1.35 (the app clamps at 1.35) and with the system's largest setting.
+- [ ] **Semantics:** every interactive `GestureDetector`/`InkWell`/custom control gets a `Semantics` label and role or is replaced by a Material button; every `IconButton` has a `tooltip`; images have `semanticLabel` or are excluded; verify with TalkBack/VoiceOver notes in `docs/QA.md`.
+- [ ] **Tap targets ≥ 48×48 dp** everywhere (chips, small icons, stars).
+- [ ] **Errors:** replace the ~15 remaining `catch (_) {}` with handling: log (no PII), and show a user-friendly message via `friendlyError()` where the user is affected; keep background syncs quiet but record telemetry.
+- [ ] **States:** each screen needs designed loading (skeleton/spinner), empty, error-with-retry, and offline states; image `loadingBuilder` placeholders; pull-to-refresh on lists (bookings has it; add venues, admin lists).
+- [ ] **Forms:** Egyptian phone validation (`^01[0125]\d{8}$` after normalization, accept +20), correct `keyboardType`, `autofillHints`, `textInputAction`, inline validation messages in both languages, password visibility toggles, no layout jump with the keyboard.
+- [ ] **Booking flow:** price breakdown (price, deposit, due now, remaining), clear payment instructions with exact amount and copy button, countdown for the hold, success/failed confirmation screens, "add to calendar", cancellation policy visible before paying.
+- [ ] **Web:** remove `user-scalable=no` and `maximum-scale=1.0` from `web/index.html` (blocks pinch-zoom); check PWA manifest/icons, SEO meta/Open Graph for venue pages, and that deep links work on refresh.
+- [ ] **Code health:** split `lib/main.dart` (~5.2k lines), `lib/screens/book_tab.dart` (~5.3k lines), `lib/screens/admin_workspace.dart` (~1.9k lines) and `server/index.js` (~3.2k lines) into feature modules (routes/controllers/services on the server; feature folders and smaller widgets on the client) **with no behavior change**, in small PRs, tests green after each. Remove dead code (unused API methods, unused v1/v2 duplicates, the stale `payment_service` leftovers).
+- [ ] Add a design-token file (colors, spacing, typography) and remove duplicate brand colors that are the same green.
+- [ ] Add widget tests for: login, browse/search, booking happy path, booking conflict, payment instructions, my bookings, cancel, language switch (RTL), partner onboarding, partner confirm/cancel. Add a few golden tests for key screens in EN and AR.
+
+**Gate 4:** `flutter analyze` has zero issues; `flutter test` green; manual QA checklist in `docs/QA.md` executed on one small and one large Android device size, plus web at mobile and desktop widths (record which you could not run).
+
+---
+
+## Phase 5: Release readiness (mobile, web, CI/CD, compliance)
+
+- [ ] **Android:** real release signing from `key.properties` (never debug-signed release APK/AAB); unique `applicationId`; R8/ProGuard on; minimal permissions; `usesCleartextTraffic=false`; target latest required SDK; verify `HAGZY_API_URL` default for release builds is the production HTTPS URL (not `localhost`); build an AAB for Play.
+- [ ] **iOS:** privacy manifest, usage-description strings, Sign in with Apple present if Google/other social login is offered, push entitlements, App Transport Security default, build via CI.
+- [ ] **Account deletion in-app** (required by Apple and Google Play): delete/anonymize the account and personal data server-side, with a documented retention exception for financial records.
+- [ ] Privacy policy and terms URLs live and linked in-app and in store listings; consent for notifications/location; data-safety forms prepared (`docs/STORE_LISTING.md`).
+- [ ] The Android **payment-gateway app** reads SMS/notifications: keep it a separate, sideloaded/owner-only app; document its permissions, auth to the server (HMAC), battery-optimization exemptions, and a setup guide; it must not ship in the customer app or Play listing.
+- [ ] **CI:** GitHub Actions run `flutter analyze`, `flutter test`, server tests, `npm audit`, secrets scanning (gitleaks), and the client-routes-vs-server-routes check on every PR; release builds only on version tags `v*`; no `HAGZY_SEED_*` demo flags in release builds; remove the committed `build/` directory from git and build web in CI/Docker (multi-stage); cache dependencies.
+- [ ] **Observability:** structured logs with request IDs and **no PII or secrets**, error reporting (e.g. Sentry/Crashlytics), uptime monitor on `/api/health`, alerts for gateway-offline and payment-match failures.
+- [ ] **Dependencies:** `flutter pub outdated` and `npm outdated`; update safe ones, pin versions, and note breaking ones.
+- [ ] **Docs:** rewrite `README.md` and `DEPLOYMENT.md` to match reality (remove claims that are not true, e.g. "zero conflict" unless proven by tests); add architecture diagram, env var table, runbooks (rotate secrets, restore DB, gateway phone down, refund a booking).
+- [ ] **Performance:** pagination on venue/booking lists, image sizing/caching, web bundle size check, cold-start behavior on Render's free tier (keep-alive or move off free tier), DB indexes.
+
+**Gate 5:** a clean checkout builds web, Android AAB and iOS in CI; release artifacts are signed correctly; health check and alerts verified in a staging environment (not production).
+
+---
+
+## Phase 6: Final verification and report
+
+- [ ] Run everything: `flutter analyze`, `flutter test`, server/functions/gateway tests, `npm audit`, gitleaks, the route-diff check, the migration dry-run, and the concurrency/booking and payment adversarial suites.
+- [ ] Write `docs/AUDIT.md` (all findings, status: fixed/verified/deferred, with test names) and `docs/DECISIONS.md`.
+- [ ] Write `docs/OWNER_TODO.md` (section 10).
+- [ ] Produce a final report: what changed, test results (and any checks you could not run), residual risks, and a recommended order for rollout (staging → small pilot with one venue → wider launch).
+
+---
+
+## 9. Decision Points (stop and ask the owner only at these)
+
+- **D1. Domain:** which domain serves customer web, partner portal and QR links (`hagzy.app` vs `hagzy-booking.web.app` vs another)? The owner must prove control of it.
+- **D2. System of record:** confirm the default (Postgres authoritative, Firestore optional mirror) or choose Firebase-first.
+- **D3. Money model:** will customers pay each venue's own wallet (per-venue gateway phones) or Hagzy's single wallet (Hagzy holds funds and pays out)? The latter has legal/accounting implications.
+- **D4. Card payments:** implement Paymob/Kashier now, or remove the card path until later?
+- **D5. Monetization:** is there a real "Pro" plan? If not, remove all upgrade UI.
+- **D6. Cancellation/refund policy defaults** per venue category.
+- **D7. Welcome wallet bonus:** keep (with abuse limits) or remove.
+
+---
+
+## 10. Things only the owner can do (write these into `docs/OWNER_TODO.md`)
+
+1. Rotate every secret that was ever in the repo or logs; set new values in the Render dashboard and Firebase secrets.
+2. Review recent bookings/venues/payments for tampering made before the fixes, and check the payment records for events you did not expect.
+3. Create the real Google/Apple OAuth credentials and enter their IDs in the environment.
+4. Provide the Android signing keystore and Apple developer account access for release builds.
+5. Publish the privacy policy and terms; complete the Play data-safety and App Store privacy forms.
+6. Confirm the legal/tax position for collecting money on behalf of venues (accountant/lawyer).
+7. Set up the gateway phone(s): dedicated SIM/device, battery optimization off, notification access granted, and test with small real transfers in a staging setup.
+8. Test the full flow on real devices with real (small) payments before launch, and run a pilot with one venue.
+
+---
+
+## Definition of done
+
+The app is "ready" only when: all gates pass; there are no known critical/high findings open; every item in this plan is fixed, verified by a test, or explicitly deferred with a written reason; the owner checklist is handed over; and the final report lists residual risks honestly.
