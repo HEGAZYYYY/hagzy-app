@@ -44,6 +44,7 @@ class AdminManageWorkspace extends StatefulWidget {
     super.key,
     required this.venues,
     required this.bookings,
+    this.ownerId,
     required this.onAddVenue,
     this.onAddVenueModel,
     required this.onEditVenue,
@@ -61,6 +62,7 @@ class AdminManageWorkspace extends StatefulWidget {
 
   final List<Venue> venues;
   final List<Booking> bookings;
+  final String? ownerId;
   final VoidCallback onAddVenue;
   final ValueChanged<Venue>? onAddVenueModel;
   final ValueChanged<Venue> onEditVenue;
@@ -142,6 +144,7 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
               0 => ManageTab(
                   key: const ValueKey('admin_manage'),
                   venues: widget.venues,
+                  ownerId: widget.ownerId,
                   onAddVenue: widget.onAddVenue,
                   onEditVenue: widget.onEditVenue,
                   onAddItem: widget.onAddItem,
@@ -184,6 +187,7 @@ class ManageTab extends StatefulWidget {
   const ManageTab({
     super.key,
     required this.venues,
+    this.ownerId,
     required this.onAddVenue,
     this.onAddVenueModel,
     required this.onEditVenue,
@@ -196,6 +200,7 @@ class ManageTab extends StatefulWidget {
   });
 
   final List<Venue> venues;
+  final String? ownerId;
   final VoidCallback onAddVenue;
   final ValueChanged<Venue>? onAddVenueModel;
   final ValueChanged<Venue> onEditVenue;
@@ -280,7 +285,7 @@ class _ManageTabState extends State<ManageTab> {
                   context,
                   MaterialPageRoute(
                     builder: (ctx) => GoalGradientOnboardingScreen(
-                      ownerId: 'merchant',
+                      ownerId: widget.ownerId ?? 'owner',
                       onVenueCreated: (newHagzyVenue) {
                         Navigator.pop(ctx);
                         final created = venueFromHagzyVenue(newHagzyVenue);
@@ -294,8 +299,8 @@ class _ManageTabState extends State<ManageTab> {
                   ),
                 );
               },
-              icon: const Icon(Icons.flash_on_rounded, size: 16),
-              label: const Text('Fast-Track Venue Onboarding'),
+              icon: const Icon(Icons.add_business_rounded, size: 16),
+              label: const Text('Step-by-Step Venue Setup'),
             ),
           ),
         ],
@@ -496,7 +501,7 @@ class _ManageTabState extends State<ManageTab> {
                   context,
                   MaterialPageRoute(
                     builder: (ctx) => GoalGradientOnboardingScreen(
-                      ownerId: 'merchant',
+                      ownerId: widget.ownerId ?? 'owner',
                       onVenueCreated: (newHagzyVenue) {
                         Navigator.pop(ctx);
                         final created = venueFromHagzyVenue(newHagzyVenue);
@@ -510,8 +515,8 @@ class _ManageTabState extends State<ManageTab> {
                   ),
                 );
               },
-              icon: const Icon(Icons.flash_on_rounded, size: 16),
-              label: const Text('Fast-Track Venue Onboarding'),
+              icon: const Icon(Icons.add_business_rounded, size: 16),
+              label: const Text('Step-by-Step Venue Setup'),
             ),
           ),
         ],

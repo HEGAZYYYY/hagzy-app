@@ -32,8 +32,8 @@ void main() {
     });
   });
 
-  group('Phase 5: Merchant Portal Widgets Rendering', () {
-    testWidgets('GoalGradientOnboardingScreen displays 40% initial progress',
+  group('Phase 3: Merchant Portal Widgets Rendering', () {
+    testWidgets('GoalGradientOnboardingScreen displays honest initial progress',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -44,15 +44,30 @@ void main() {
         ),
       );
 
-      // Verify 40% complete callout (Principle 3)
-      expect(find.textContaining('40% Complete'), findsOneWidget);
-      expect(find.textContaining('Partner Account Initialized ✅'), findsOneWidget);
-      expect(find.textContaining('Default Category Templates Loaded ✅'), findsOneWidget);
-      expect(find.textContaining('Venue Name & 1-Tap GPS Pin 🔄'), findsOneWidget);
+      // Verify honest 50% complete progress on step 1
+      expect(find.textContaining('50% Complete'), findsOneWidget);
+      expect(find.textContaining('Step 1: Venue Info & Location'), findsWidgets);
+      expect(find.textContaining('Step 2: Payout & Deposit Details'), findsOneWidget);
     });
 
-    testWidgets('MerchantLossAversionBanner displays lost revenue and absorb button',
+    testWidgets('MerchantLossAversionBanner hides when no losses, displays when losses exist',
         (tester) async {
+      // 1. Should be completely hidden when no losses
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MerchantLossAversionBanner(
+              estimatedLostRevenueEgp: 0.0,
+              noShowCount: 0,
+              onUpgradePro: () {},
+              onDismissAbsorbLosses: () {},
+            ),
+          ),
+        ),
+      );
+      expect(find.textContaining('no-shows'), findsNothing);
+
+      // 2. Should display real loss aversion warning when losses exist
       bool proTapped = false;
       bool absorbTapped = false;
 

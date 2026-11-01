@@ -1167,7 +1167,7 @@ async function authenticateCustomer(req, res, next) {
   }
 }
 
-// Middleware: Admin Auth
+// Middleware: Admin & Venue Owner Auth
 function authenticateAdmin(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -1176,13 +1176,13 @@ function authenticateAdmin(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (!decoded.isAdmin || decoded.role !== 'owner') {
+    const isOwner = (decoded.role === 'owner' || decoded.isAdmin) && isUserAdmin(decoded);
+    const isPartner = decoded.role === 'partner' || decoded.role === 'merchant';
+    if (!isOwner && !isPartner) {
       return res.status(403).json({ error: 'Forbidden: Admin access restricted to authorized owner' });
     }
-    if (!isUserAdmin(decoded)) {
-      return res.status(403).json({ error: 'Forbidden: Identity is not authorized for administrative access' });
-    }
     req.admin = decoded;
+    req.isPlatformOwner = isOwner;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid admin token' });
@@ -2218,38 +2218,143 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Public Venues List
 app.get('/api/venues', (req, res) => {
-  return res.json({ success: true, venues: db.venues });
+  const active = (db.venues || []).filter(v => !v.isDeleted && v.isActive !== false);
+  return res.json({ success: true, venues: active });
 });
 
-// Admin Venues List
+// Admin Venues List (Scoped to partner unless platform owner)
 app.get('/api/admin/venues', authenticateAdmin, (req, res) => {
-  return res.json({ success: true, venues: db.venues });
+  if (req.isPlatformOwner) {
+    return res.json({ success: true, venues: (db.venues || []).filter(v => !v.isDeleted) });
+  }
+  const adminId = req.admin.id;
+  const adminEmail = (req.admin.email || '').toLowerCase();
+  const adminPhone = req.admin.phone;
+  const partnerVenues = (db.venues || []).filter(v => {
+    if (v.isDeleted) return false;
+    return (adminId && v.ownerId === adminId) ||
+           (adminEmail && v.ownerEmail && v.ownerEmail.toLowerCase() === adminEmail) ||
+           (adminPhone && v.ownerPhone === adminPhone);
+  });
+  return res.json({ success: true, venues: partnerVenues });
 });
 
-// Add / Update Venue
+// Add / Update Venue (Scoped and validated)
 app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
   const venueId = req.params.id;
   const venueData = req.body || {};
   const index = db.venues.findIndex(v => v.id === venueId);
 
+  // Field validation and whitelist
+  const name = typeof venueData.name === 'string' ? venueData.name.trim() : '';
+  if (!name && index < 0) {
+    return res.status(400).json({ error: 'Venue name is required' });
+  }
+  if (name.length > 100) {
+    return res.status(400).json({ error: 'Venue name cannot exceed 100 characters' });
+  }
+
+  const depositPercent = venueData.depositPercent !== undefined ? Number(venueData.depositPercent) : undefined;
+  if (depositPercent !== undefined && (!Number.isFinite(depositPercent) || depositPercent < 0 || depositPercent > 100)) {
+    return res.status(400).json({ error: 'depositPercent must be between 0 and 100' });
+  }
+
+  // Cross-tenant permission check
+  if (index >= 0) {
+    const existing = db.venues[index];
+    if (!req.isPlatformOwner) {
+      const isOwner = (req.admin.id && existing.ownerId === req.admin.id) ||
+                      (req.admin.email && existing.ownerEmail && existing.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
+                      (req.admin.phone && existing.ownerPhone === req.admin.phone);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
+      }
+    }
+  }
+
+  const allowedFields = [
+    'name', 'nameAr', 'type', 'category', 'categories', 'city', 'address', 'addressAr',
+    'phone', 'ownerPhone', 'ownerEmail', 'instapayHandle', 'vodafoneCashNumber',
+    'depositPercent', 'pricingMode', 'units', 'items', 'spaces', 'services', 'amenities', 'rules',
+    'latitude', 'longitude', 'lat', 'lng', 'rating', 'reviews', 'image', 'images',
+    'openingTime', 'closingTime', 'isActive', 'currency'
+  ];
+
+  const sanitized = {};
+  for (const field of allowedFields) {
+    if (venueData[field] !== undefined) {
+      sanitized[field] = venueData[field];
+    }
+  }
+
   let savedVenue;
   if (index >= 0) {
-    savedVenue = { ...db.venues[index], ...venueData, id: venueId };
+    savedVenue = {
+      ...db.venues[index],
+      ...sanitized,
+      id: venueId,
+      updatedAt: new Date().toISOString()
+    };
     db.venues[index] = savedVenue;
   } else {
-    savedVenue = { id: venueId, ...venueData };
+    savedVenue = {
+      id: venueId,
+      ownerId: req.admin.id || req.admin.email || 'owner',
+      ownerEmail: req.admin.email || undefined,
+      ownerPhone: req.admin.phone || undefined,
+      ...sanitized,
+      createdAt: new Date().toISOString()
+    };
     db.venues.push(savedVenue);
   }
+
+  if (db.auditLog) {
+    db.auditLog.push({
+      id: 'aud_' + crypto.randomUUID().slice(0, 8),
+      timestamp: new Date().toISOString(),
+      actor: req.admin.email || req.admin.id || 'admin',
+      action: index >= 0 ? 'VENUE_UPDATE' : 'VENUE_CREATE',
+      venueId,
+      details: { name: savedVenue.name }
+    });
+  }
+
   saveDb(db);
   await syncVenueToFirebase(savedVenue);
   return res.json({ success: true, venue: savedVenue });
 });
 
-// Delete Venue
+// Soft Delete Venue (Preserve bookings for history & fulfillment)
 app.delete('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
   const venueId = req.params.id;
-  db.venues = db.venues.filter(v => v.id !== venueId);
-  db.bookings = db.bookings.filter(b => b.venueId !== venueId);
+  const venue = db.venues.find(v => v.id === venueId);
+  if (!venue) {
+    return res.status(404).json({ error: 'Venue not found' });
+  }
+
+  if (!req.isPlatformOwner) {
+    const isOwner = (req.admin.id && venue.ownerId === req.admin.id) ||
+                    (req.admin.email && venue.ownerEmail && venue.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
+                    (req.admin.phone && venue.ownerPhone === req.admin.phone);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to delete this venue' });
+    }
+  }
+
+  venue.isDeleted = true;
+  venue.isActive = false;
+  venue.deletedAt = new Date().toISOString();
+
+  if (db.auditLog) {
+    db.auditLog.push({
+      id: 'aud_' + crypto.randomUUID().slice(0, 8),
+      timestamp: new Date().toISOString(),
+      actor: req.admin.email || req.admin.id || 'admin',
+      action: 'VENUE_SOFT_DELETE',
+      venueId
+    });
+  }
+
   saveDb(db);
   await deleteVenueFromFirebase(venueId);
   return res.json({ success: true, message: 'Venue deleted' });
@@ -2304,9 +2409,99 @@ app.post('/api/venues/:id/reviews', optionalAuth, async (req, res) => {
 // 4. BOOKINGS & OPERATIONS
 // ==========================================
 
-// Admin Bookings List
+// Admin Bookings List (Scoped to partner venues unless platform owner)
 app.get('/api/admin/bookings', authenticateAdmin, (req, res) => {
-  return res.json({ success: true, bookings: db.bookings });
+  if (req.isPlatformOwner) {
+    return res.json({ success: true, bookings: db.bookings });
+  }
+  const partnerVenueIds = new Set(
+    (db.venues || [])
+      .filter(v => (req.admin.id && v.ownerId === req.admin.id) ||
+                   (req.admin.email && v.ownerEmail && v.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
+                   (req.admin.phone && v.ownerPhone === req.admin.phone))
+      .map(v => v.id)
+  );
+  const scopedBookings = (db.bookings || []).filter(b => partnerVenueIds.has(b.venueId));
+  return res.json({ success: true, bookings: scopedBookings });
+});
+
+// Admin Analytics (Server-side metrics scoped to partner)
+app.get('/api/admin/analytics', authenticateAdmin, (req, res) => {
+  const { startDate, endDate, venueId } = req.query;
+  let venues = (db.venues || []).filter(v => !v.isDeleted);
+  let bookings = db.bookings || [];
+
+  if (!req.isPlatformOwner) {
+    const partnerVenueIds = new Set(
+      venues
+        .filter(v => (req.admin.id && v.ownerId === req.admin.id) ||
+                     (req.admin.email && v.ownerEmail && v.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
+                     (req.admin.phone && v.ownerPhone === req.admin.phone))
+        .map(v => v.id)
+    );
+    venues = venues.filter(v => partnerVenueIds.has(v.id));
+    bookings = bookings.filter(b => partnerVenueIds.has(b.venueId));
+  }
+
+  if (venueId) {
+    bookings = bookings.filter(b => b.venueId === venueId);
+  }
+  if (startDate) {
+    const startMs = new Date(startDate).getTime();
+    bookings = bookings.filter(b => new Date(b.startsAt).getTime() >= startMs);
+  }
+  if (endDate) {
+    const endMs = new Date(endDate).getTime();
+    bookings = bookings.filter(b => new Date(b.startsAt).getTime() <= endMs);
+  }
+
+  let totalRevenueEgp = 0;
+  let totalDepositsEgp = 0;
+  let totalBalanceDueEgp = 0;
+  let lostRevenueEgp = 0;
+  let confirmedCount = 0;
+  let cancelledCount = 0;
+  let expiredCount = 0;
+  let noShowCount = 0;
+  let completedCount = 0;
+
+  for (const b of bookings) {
+    const p = Number(b.price) || 0;
+    const dep = Number(b.depositAmount) || 0;
+    const due = Number(b.dueNow) || 0;
+    if (b.status === 'confirmed' || b.status === 'completed') {
+      totalRevenueEgp += p;
+      totalDepositsEgp += (dep || due);
+      totalBalanceDueEgp += Math.max(0, p - (dep || due));
+      if (b.status === 'confirmed') confirmedCount++;
+      if (b.status === 'completed') completedCount++;
+    } else if (b.status === 'cancelled') {
+      cancelledCount++;
+      lostRevenueEgp += p;
+    } else if (b.status === 'expired') {
+      expiredCount++;
+      lostRevenueEgp += p;
+    } else if (b.status === 'no_show') {
+      noShowCount++;
+      lostRevenueEgp += p;
+    }
+  }
+
+  return res.json({
+    success: true,
+    analytics: {
+      totalBookings: bookings.length,
+      confirmedCount,
+      completedCount,
+      cancelledCount,
+      expiredCount,
+      noShowCount,
+      totalRevenueEgp,
+      totalDepositsEgp,
+      totalBalanceDueEgp,
+      lostRevenueEgp
+    }
+  });
 });
 
 // Create Booking
@@ -2616,6 +2811,19 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
+  // Cross-tenant permission check
+  if (!req.isPlatformOwner) {
+    const venue = db.venues.find(v => v.id === booking.venueId);
+    const isOwner = venue && (
+      (req.admin.id && venue.ownerId === req.admin.id) ||
+      (req.admin.email && venue.ownerEmail && venue.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
+      (req.admin.phone && venue.ownerPhone === req.admin.phone)
+    );
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to manage bookings for this venue' });
+    }
+  }
+
   // Atomic conflict check before confirming
   if (checkSlotConflict(booking.id, booking.venueId, booking.itemId, booking.startsAt, booking.durationMinutes)) {
     return res.status(409).json({ error: 'Cannot confirm: this slot is already booked by another confirmed booking.' });
@@ -2649,6 +2857,19 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
 app.delete('/api/admin/bookings/:id', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+  // Cross-tenant permission check
+  if (!req.isPlatformOwner) {
+    const venue = db.venues.find(v => v.id === booking.venueId);
+    const isOwner = venue && (
+      (req.admin.id && venue.ownerId === req.admin.id) ||
+      (req.admin.email && venue.ownerEmail && venue.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
+      (req.admin.phone && venue.ownerPhone === req.admin.phone)
+    );
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to manage bookings for this venue' });
+    }
+  }
 
   try {
     transitionBookingStatus(booking, BOOKING_STATUS.CANCELLED, {

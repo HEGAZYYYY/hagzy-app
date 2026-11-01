@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/models/models_v2.dart';
 
 /// Printable In-App Counter Standee Generator for Venue Merchants
@@ -97,22 +98,29 @@ class QrStandeeGenerator extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // QR Code Container Placeholder
+                // Real Dynamic QR Code Generator for Venue Deep-Link
                 Container(
-                  width: 190,
-                  height: 190,
+                  width: 210,
+                  height: 210,
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.black12, width: 2),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.qr_code_2_rounded, size: 120, color: Colors.black),
-                      const SizedBox(height: 4),
+                      QrImageView(
+                        data: bookingUrl,
+                        version: QrVersions.auto,
+                        size: 135.0,
+                        gapless: true,
+                        errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      ),
+                      const SizedBox(height: 6),
                       Text(
-                        'Scan to Book Instantly',
+                        isArabic ? 'امسح للحجز الفوري' : 'Scan to Book Instantly',
                         style: TextStyle(
                           color: Colors.black.withValues(alpha: 0.7),
                           fontSize: 11,

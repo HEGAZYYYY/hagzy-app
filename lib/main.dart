@@ -91,6 +91,21 @@ class HagzyApp extends StatelessWidget {
               adminMode: adminMode || _isWebPortalPath,
               initialMode: initialMode,
             ),
+            onGenerateRoute: (settings) {
+              final uri = Uri.tryParse(settings.name ?? '');
+              if (uri != null && uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'venue') {
+                final venueId = uri.pathSegments.length > 1 ? uri.pathSegments[1] : null;
+                return MaterialPageRoute(
+                  builder: (context) => HagzyHome(
+                    adminMode: adminMode || _isWebPortalPath,
+                    initialMode: initialMode,
+                    initialVenueId: venueId,
+                  ),
+                  settings: settings,
+                );
+              }
+              return null;
+            },
           ),
         ),
       );
@@ -101,10 +116,12 @@ class HagzyHome extends StatefulWidget {
     super.key,
     this.adminMode = false,
     this.initialMode,
+    this.initialVenueId,
   });
 
   final bool adminMode;
   final String? initialMode;
+  final String? initialVenueId;
 
   @override
   State<HagzyHome> createState() => _HagzyHomeState();
@@ -153,6 +170,13 @@ class _HagzyHomeState extends State<HagzyHome> {
   @override
   void initState() {
     super.initState();
+    _targetVenueId = widget.initialVenueId;
+    if (kIsWeb && _targetVenueId == null) {
+      final segments = Uri.base.pathSegments;
+      if (segments.length >= 2 && segments[0] == 'venue') {
+        _targetVenueId = segments[1];
+      }
+    }
     _mode = widget.initialMode ?? (widget.adminMode ? 'adminLogin' : 'customer');
     _load();
 
@@ -5030,6 +5054,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               ),
                                             1 => ManageTab(
                                                 venues: _venues,
+                                                ownerId: _savedCustomerEmail.isNotEmpty
+                                                    ? _savedCustomerEmail
+                                                    : (_savedCustomerPhone.isNotEmpty
+                                                        ? _savedCustomerPhone
+                                                        : 'owner'),
                                                 onAddVenue: _addVenue,
                                                 onAddVenueModel: (venue) async {
                                                   await _runSave(() async {
@@ -5120,6 +5149,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           ),
                                         1 => ManageTab(
                                             venues: _venues,
+                                            ownerId: _savedCustomerEmail.isNotEmpty
+                                                ? _savedCustomerEmail
+                                                : (_savedCustomerPhone.isNotEmpty
+                                                    ? _savedCustomerPhone
+                                                    : 'owner'),
                                             onAddVenue: _addVenue,
                                             onAddVenueModel: (venue) async {
                                               await _runSave(() async {

@@ -10,8 +10,8 @@ class MerchantLossAversionBanner extends StatelessWidget {
 
   const MerchantLossAversionBanner({
     super.key,
-    this.estimatedLostRevenueEgp = 1450.0,
-    this.noShowCount = 6,
+    this.estimatedLostRevenueEgp = 0.0,
+    this.noShowCount = 0,
     required this.onUpgradePro,
     required this.onDismissAbsorbLosses,
     this.isArabic = false,
@@ -19,6 +19,9 @@ class MerchantLossAversionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (noShowCount <= 0 || estimatedLostRevenueEgp <= 0) {
+      return const SizedBox.shrink();
+    }
     final lostEgp = estimatedLostRevenueEgp.toStringAsFixed(0);
 
     return Container(

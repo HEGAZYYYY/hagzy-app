@@ -24,6 +24,7 @@ dependencies:
   firebase_auth: ^7.0.1
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^8.2.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

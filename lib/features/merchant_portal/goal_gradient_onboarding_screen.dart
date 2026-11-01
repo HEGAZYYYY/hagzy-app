@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/models/models_v2.dart';
 import 'category_templates.dart';
 
-/// Merchant Onboarding Flow Enforcing Principle 3 (The Goal Gradient Effect)
-/// Progress starts at 40% Complete (steps 1 & 2 pre-completed) to maximize completion rates
+/// Merchant Onboarding Flow
+/// Clean, validated 2-step setup for venue merchants
 class GoalGradientOnboardingScreen extends StatefulWidget {
   final String ownerId;
   final ValueChanged<HagzyVenue> onVenueCreated;
@@ -33,7 +33,7 @@ class _GoalGradientOnboardingScreenState
   final double _lat = 31.1107;
   final double _lng = 30.9388;
 
-  int _currentStepIndex = 2; // Step 0 and 1 are 100% complete (40% initial head-start!)
+  int _currentStepIndex = 1; // Honest 2-step onboarding (Step 1: Info, Step 2: Payouts)
 
   final List<String> _availableCities = [
     'Kafr El Sheikh',
@@ -54,10 +54,47 @@ class _GoalGradientOnboardingScreenState
   }
 
   void _finishOnboarding() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.isArabic ? 'يرجى إدخال اسم المكان' : 'Please enter venue name')),
+      );
+      return;
+    }
+
+    final address = _addressController.text.trim();
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.isArabic ? 'يرجى إدخال العنوان بالتفصيل' : 'Please enter detailed address')),
+      );
+      return;
+    }
+
+    final instapay = _instapayController.text.trim();
+    final wallet = _walletController.text.trim();
+    if (instapay.isEmpty && wallet.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.isArabic
+              ? 'يرجى إدخال عنوان إنستاباي أو رقم محفظة إلكترونية لاستلام العربون'
+              : 'Please enter an InstaPay address or mobile wallet number to receive deposits'),
+        ),
+      );
+      return;
+    }
+
+    if (wallet.isNotEmpty && !RegExp(r'^01[0125]\d{8}$').hasMatch(wallet)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.isArabic
+              ? 'رقم المحفظة غير صالح (يجب أن يتكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)'
+              : 'Invalid mobile wallet number (must be 11 Egyptian digits)'),
+        ),
+      );
+      return;
+    }
+
     final venueId = 'ven_${DateTime.now().millisecondsSinceEpoch}';
-    final name = _nameController.text.trim().isNotEmpty
-        ? _nameController.text.trim()
-        : 'My Lounge / Venue';
 
     // Collect pre-loaded units from selected category templates
     final allUnits = <BookableUnit>[];
@@ -75,18 +112,12 @@ class _GoalGradientOnboardingScreenState
       ownerId: widget.ownerId,
       name: name,
       city: _selectedCity,
-      address: _addressController.text.trim().isNotEmpty
-          ? _addressController.text.trim()
-          : 'Central Street, $_selectedCity',
+      address: address,
       lat: _lat,
       lng: _lng,
       categories: _selectedCategories.toList(),
-      instapayAddress: _instapayController.text.trim().isNotEmpty
-          ? _instapayController.text.trim()
-          : null,
-      walletNumber: _walletController.text.trim().isNotEmpty
-          ? _walletController.text.trim()
-          : null,
+      instapayAddress: instapay.isNotEmpty ? instapay : null,
+      walletNumber: wallet.isNotEmpty ? wallet : null,
       units: allUnits,
       createdAt: DateTime.now(),
     );
@@ -99,20 +130,20 @@ class _GoalGradientOnboardingScreenState
     final theme = Theme.of(context);
     final isAr = widget.isArabic;
 
-    // Progress: Step 3 = 70%, Step 4 = 100%
-    final progress = _currentStepIndex == 2 ? 0.40 : 0.85;
+    // Honest 2-step progress: Step 1 = 50%, Step 2 = 100%
+    final progress = _currentStepIndex == 1 ? 0.50 : 1.0;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          isAr ? 'تسجيل مكان جديد (خطوات سريعة)' : 'List Your Venue (Fast-Track)',
+          isAr ? 'تسجيل مكان جديد' : 'List Your Venue',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         elevation: 0,
       ),
       body: Column(
         children: [
-          // Goal Gradient Progress Card (Principle 3)
+          // Step Progress Card
           Container(
             padding: const EdgeInsets.all(16),
             color: theme.cardColor,
@@ -149,28 +180,18 @@ class _GoalGradientOnboardingScreenState
                 const SizedBox(height: 12),
                 // Checklist Items
                 _buildChecklistRow(
-                  isDone: true,
-                  text: isAr ? 'تم تفعيل حساب الشريك ✅' : 'Partner Account Initialized ✅',
-                ),
-                _buildChecklistRow(
-                  isDone: true,
+                  isDone: _currentStepIndex > 1,
+                  isCurrent: _currentStepIndex == 1,
                   text: isAr
-                      ? 'تم تحميل قوالب الأسعار والغرف تلقائياً ✅'
-                      : 'Default Category Templates Loaded ✅',
-                ),
-                _buildChecklistRow(
-                  isDone: _currentStepIndex > 2,
-                  isCurrent: _currentStepIndex == 2,
-                  text: isAr
-                      ? 'اسم المكان وموقع الـ GPS 🔄'
-                      : 'Venue Name & 1-Tap GPS Pin 🔄',
+                      ? 'الخطوة ١: بيانات المكان والموقع 📍'
+                      : 'Step 1: Venue Info & Location 📍',
                 ),
                 _buildChecklistRow(
                   isDone: false,
-                  isCurrent: _currentStepIndex == 3,
+                  isCurrent: _currentStepIndex == 2,
                   text: isAr
-                      ? 'حساب إنستاباي / المحفظة لاستلام الأرباح ⏳'
-                      : 'Instapay / Wallet Number for Payouts ⏳',
+                      ? 'الخطوة ٢: بيانات استلام العربون والأرباح 💳'
+                      : 'Step 2: Payout & Deposit Details 💳',
                 ),
               ],
             ),
@@ -182,10 +203,10 @@ class _GoalGradientOnboardingScreenState
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                if (_currentStepIndex == 2) ...[
-                  // Step 3 Content: Name, Categories & Location
+                if (_currentStepIndex == 1) ...[
+                  // Step 1 Content: Name, Categories & Location
                   Text(
-                    isAr ? 'الخطوة ٣: بيانات المكان والموقع' : 'Step 3: Venue Info & Location',
+                    isAr ? 'الخطوة ١: بيانات المكان والموقع' : 'Step 1: Venue Info & Location',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 14),
@@ -261,9 +282,9 @@ class _GoalGradientOnboardingScreenState
                     ),
                   ),
                 ] else ...[
-                  // Step 4 Content: Payouts & Payout details
+                  // Step 2 Content: Payouts & Payout details
                   Text(
-                    isAr ? 'الخطوة ٤: بيانات استلام العربون والأرباح' : 'Step 4: Payout Details',
+                    isAr ? 'الخطوة ٢: بيانات استلام العربون والأرباح' : 'Step 2: Payout & Deposit Details',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -312,8 +333,22 @@ class _GoalGradientOnboardingScreenState
               height: 46,
               child: ElevatedButton(
                 onPressed: () {
-                  if (_currentStepIndex == 2) {
-                    setState(() => _currentStepIndex = 3);
+                  if (_currentStepIndex == 1) {
+                    final name = _nameController.text.trim();
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(isAr ? 'يرجى إدخال اسم المكان' : 'Please enter venue name')),
+                      );
+                      return;
+                    }
+                    final address = _addressController.text.trim();
+                    if (address.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(isAr ? 'يرجى إدخال العنوان بالتفصيل' : 'Please enter detailed address')),
+                      );
+                      return;
+                    }
+                    setState(() => _currentStepIndex = 2);
                   } else {
                     _finishOnboarding();
                   }
@@ -324,7 +359,7 @@ class _GoalGradientOnboardingScreenState
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
-                  _currentStepIndex == 2
+                  _currentStepIndex == 1
                       ? (isAr ? 'متابعة للخطوة الأخيرة ←' : 'Continue to Final Step →')
                       : (isAr ? 'نشر المكان وبدء استقبال الحجوزات 🚀' : 'Publish Venue & Launch 🚀'),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),

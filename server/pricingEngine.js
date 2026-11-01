@@ -48,7 +48,7 @@ function calculateServerPricing({
   }
 
   // 1. Find bookable unit / space
-  const items = venue.items || venue.spaces || [];
+  const items = venue.units || venue.items || venue.spaces || [];
   const unit = items.find(i => String(i.id) === String(itemId));
   if (!unit) {
     throw new PricingError(`Bookable unit '${itemId}' not found in venue`, { statusCode: 404 });
