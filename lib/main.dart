@@ -134,6 +134,11 @@ class _HagzyHomeState extends State<HagzyHome> {
   String? _loginError;
   String? _adminToken;
   bool _adminPhoneLogin = false;
+  bool _adminShowPhoneAuth = false;
+  bool _adminPhoneCodeSent = false;
+  final TextEditingController _adminPhoneController =
+      TextEditingController(text: '01027371804');
+  final TextEditingController _adminOtpController = TextEditingController();
   String _mode = 'landing';
   int _tab = 0;
   String? _targetVenueId;
@@ -148,14 +153,6 @@ class _HagzyHomeState extends State<HagzyHome> {
     super.initState();
     _mode = widget.initialMode ?? (widget.adminMode ? 'adminLogin' : 'customer');
     _load();
-
-  @override
-  void didUpdateWidget(covariant HagzyHome oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialMode != null && widget.initialMode != oldWidget.initialMode) {
-      setState(() => _mode = widget.initialMode!);
-    }
-  }
 
     // Check for real OAuth 2.0 callback credentials in URL query parameters or Firebase redirect result
     if (kIsWeb) {
@@ -231,6 +228,14 @@ class _HagzyHomeState extends State<HagzyHome> {
           }
         } catch (_) {}
       });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HagzyHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMode != null && widget.initialMode != oldWidget.initialMode) {
+      setState(() => _mode = widget.initialMode!);
     }
   }
 
@@ -384,6 +389,8 @@ class _HagzyHomeState extends State<HagzyHome> {
     _api.close();
     _emailController.dispose();
     _passwordController.dispose();
+    _adminPhoneController.dispose();
+    _adminOtpController.dispose();
     super.dispose();
   }
 
@@ -528,6 +535,100 @@ class _HagzyHomeState extends State<HagzyHome> {
       _mode = 'admin';
       _tab = 0;
     });
+  }
+
+  Future<void> _sendAdminPhoneOtp() async {
+    final phone = _adminPhoneController.text.trim();
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (!cleanPhone.endsWith('1027371804') && cleanPhone != '01027371804') {
+      setState(() => _loginError =
+          'Access denied: Only authorized owner phone numbers are permitted.');
+      return;
+    }
+    setState(() {
+      _working = true;
+      _loginError = null;
+    });
+    try {
+      await _api.requestVerificationOtp(phone: phone);
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _adminPhoneCodeSent = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _loginError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _verifyAdminPhoneOtp() async {
+    final phone = _adminPhoneController.text.trim();
+    final code = _adminOtpController.text.trim();
+    if (code.length < 4) {
+      setState(() => _loginError = 'Please enter the 6-digit code sent to your phone.');
+      return;
+    }
+    setState(() {
+      _working = true;
+      _loginError = null;
+    });
+    try {
+      final res = await _api.verifyVerificationOtp(phone: phone, code: code);
+      final token = res['token'] as String?;
+      final isAdmin = res['isAdmin'] == true;
+      if (!isAdmin || token == null) {
+        throw Exception('Access denied: Unauthorized phone number.');
+      }
+      _adminToken = token;
+      _savedCustomerPhone = phone;
+      _savedCustomerName = res['customer']?['name'] as String? ?? 'Admin';
+      _customerSignedIn = true;
+      await _saveCustomerProfile(
+        name: _savedCustomerName,
+        email: _savedCustomerEmail,
+        phone: phone,
+        isSignedIn: true,
+        token: token,
+      );
+
+      List<dynamic> venues = [];
+      List<dynamic> bookings = [];
+      if (_api.isConfigured) {
+        try {
+          venues = await _api.venues(adminToken: token);
+        } catch (_) {
+          try {
+            venues = await _api.venues();
+          } catch (_) {}
+        }
+        try {
+          bookings = await _api.bookings(token);
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _mode = 'admin';
+        _tab = 0;
+        _venues = venues
+            .map((v) => Venue.fromJson(v as Map<String, dynamic>))
+            .toList();
+        _bookings = bookings
+            .map((b) => Booking.fromJson(b as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _loginError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   Future<void> _loginAdminWithGoogle() async {
@@ -5084,35 +5185,161 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       const SizedBox(height: 22),
                       if (_api.isConfigured) ...[
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: kGreen,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        if (!_adminShowPhoneAuth) ...[
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: kGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: _working ? null : _loginAdminWithGoogle,
+                            icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                            label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                           ),
-                          onPressed: _working ? null : _loginAdminWithGoogle,
-                          icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-                          label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: kInk,
-                            side: BorderSide(color: kBorder),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kInk,
+                              side: BorderSide(color: kBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: _working
+                                ? null
+                                : () => setState(() {
+                                      _adminShowPhoneAuth = true;
+                                      _adminPhoneCodeSent = false;
+                                      _loginError = null;
+                                    }),
+                            icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
+                            label: const Text('Continue with Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                           ),
-                          onPressed: _working
-                              ? null
-                              : () => setState(() {
-                                    _adminPhoneLogin = true;
-                                    _mode = 'customer';
-                                    _tab = 2; // Open Customer Login Screen for Phone OTP
-                                  }),
-                          icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
-                          label: const Text('Continue with Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                        ),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: kSurfaceTint,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.verified_user_rounded, color: kGreen, size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _adminPhoneCodeSent ? 'Enter SMS Code' : 'Owner Phone Login',
+                                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 20),
+                                      onPressed: _working
+                                          ? null
+                                          : () => setState(() {
+                                                _adminShowPhoneAuth = false;
+                                                _adminPhoneCodeSent = false;
+                                                _loginError = null;
+                                              }),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                if (!_adminPhoneCodeSent) ...[
+                                  TextField(
+                                    controller: _adminPhoneController,
+                                    keyboardType: TextInputType.phone,
+                                    decoration: InputDecoration(
+                                      labelText: 'Owner Phone Number',
+                                      hintText: '01027371804',
+                                      prefixIcon: const Icon(Icons.phone_rounded, color: kGreen, size: 20),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: kGreen,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: _working ? null : _sendAdminPhoneOtp,
+                                    child: _working
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Text('Send Verification Code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    'Code sent to ${_adminPhoneController.text}. Enter the 6-digit code:',
+                                    style: TextStyle(fontSize: 13, color: kMuted),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _adminOtpController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 6,
+                                    autofocus: true,
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 8),
+                                    textAlign: TextAlign.center,
+                                    decoration: InputDecoration(
+                                      hintText: '123456',
+                                      counterText: '',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onSubmitted: (_) {
+                                      if (!_working) _verifyAdminPhoneOtp();
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: kGreen,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: _working ? null : _verifyAdminPhoneOtp,
+                                    child: _working
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Text('Verify & Enter Owner Workspace', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      TextButton(
+                                        onPressed: _working
+                                            ? null
+                                            : () => setState(() {
+                                                  _adminPhoneCodeSent = false;
+                                                  _adminOtpController.clear();
+                                                }),
+                                        child: const Text('Change Phone Number', style: TextStyle(fontSize: 12.5)),
+                                      ),
+                                      TextButton(
+                                        onPressed: _working ? null : _sendAdminPhoneOtp,
+                                        child: const Text('Resend Code', style: TextStyle(fontSize: 12.5)),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                         if (!kReleaseMode) ...[
                           const SizedBox(height: 12),
                           OutlinedButton.icon(
