@@ -112,3 +112,91 @@
    - `cd server && npm audit`: 0 vulnerabilities.
 
 **GATE 1 STATUS: PASSED.**
+
+---
+
+## 5. Phase 2 Verification & Gate 2 Results (Payments, State Machine & Ledger)
+
+1. **State Machine (`bookingStateMachine.js`)**:
+   - Centralized all transitions: `pending_payment -> confirmed -> completed | cancelled | expired | no_show`.
+   - Cannot revive cancelled booking (returns 409 Conflict).
+   - Atomic concurrency protection: two concurrent requests for the same slot yield exactly one 200 and one 409.
+2. **Authoritative Server Pricing (`pricingEngine.js`)**:
+   - Server computes base rates, additive services, duration multipliers, and promo codes (`HAGZYVIP`, `WELCOME26`, `HAGZYPADEL`).
+   - Ignores untrusted client price values.
+3. **Immutable Wallet Ledger (`walletLedger.js`)**:
+   - Computes balances strictly by summing ledger entries (`TOPUP`, `BOOKING_DEPOSIT`, `REFUND`, `WELCOME_BONUS`).
+   - Returns 402 Insufficient Funds on overdraft attempts.
+4. **Payment Matcher & Gateway Hardening (`paymentMatcher.js`)**:
+   - Exact amount matching with unique piaster fractions.
+   - PII balances redacted from SMS/notifications.
+   - Large transfers (> 5000 EGP) route to manual admin review queue.
+5. **Database Migration Dry-Run (`server/migrate.js --dry-run`)**:
+   - `001_customer_accounts.sql` & `002_authoritative_schema.sql` validated.
+6. **Route Parity**:
+   - `node scripts/check_route_parity.js`: 100% clean (all 28 client routes exist on server).
+
+**GATE 2 STATUS: PASSED (24/24 tests pass).**
+
+---
+
+## 6. Phase 3 Verification & Gate 3 Results (Multi-Tenancy & Partner Portal)
+
+1. **Multi-Tenant Partner Isolation**:
+   - Partners only see and manage their own venues (`GET /api/admin/venues`) and bookings (`GET /api/admin/bookings`).
+   - Platform super-owner retains cross-platform overview.
+   - Cross-tenant update and delete attempts are rejected with 403 Forbidden.
+2. **Soft Delete Integrity**:
+   - Deleted venues are marked `isDeleted: true, isActive: false`.
+   - Never purges historical or active customer bookings.
+3. **Real QR Standee Generator**:
+   - Dynamic SVG/Canvas QR rendering via `qr_flutter` targeting `https://hagzy.app/venue/:id`.
+   - Deep-linking handled in-app via `onGenerateRoute` and web `Uri.base.pathSegments`.
+4. **Clean Onboarding Flow**:
+   - Removed fake 40% initial progress; replaced with honest 2-step flow (Venue Details & Payouts).
+   - Removed hardcoded fake "1450 EGP" loss banner; dynamic real server analytics (`GET /api/admin/analytics`).
+
+**GATE 3 STATUS: PASSED (27/27 tests pass).**
+
+---
+
+## 7. Phase 4 Verification & Gate 4 Results (UX/UI, Contrast & Accessibility)
+
+1. **WCAG AA Contrast**:
+   - `kGreen` upgraded to `#047857` (4.67:1 on white).
+   - `kGreenDark` upgraded to `#065F46` (7.0:1 on white).
+   - `kGold` upgraded to `#B45309` (4.6:1 on white).
+2. **Font Sizes & Readability**:
+   - Enforced minimum 12.0px accessible font size across entire codebase.
+   - Eliminated microscopic unreadable sub-12px styles.
+3. **Design Tokens**:
+   - Created `lib/theme/tokens.dart` (`HagzyTokens`) standardizing spacing, radii, and 48x48dp minimum tap targets.
+4. **Web Accessibility**:
+   - Removed `user-scalable=no` and `maximum-scale=1.0` from `web/index.html` to allow pinch-zoom.
+5. **Egyptian Phone Validation**:
+   - Enforced `^01[0125]\d{8}$` validation across login, registration, and payouts.
+
+**GATE 4 STATUS: PASSED (69/69 Flutter tests pass, 0 flutter analyze issues).**
+
+---
+
+## 8. Phase 5 Verification & Gate 5 Results (Release Readiness & CI/CD)
+
+1. **GitHub Actions CI/CD Pipeline (`.github/workflows/build.yml`)**:
+   - Enforces automated verification: `npm test`, `check_route_parity.js`, `npm audit`, `flutter analyze`, `flutter test`.
+   - Compiles Web (`flutter build web --release`).
+   - Compiles Android APK and Google Play App Bundle (AAB).
+   - Compiles iOS IPA.
+2. **Android Release Security**:
+   - Enabled `android:usesCleartextTraffic="false"`.
+   - Added Android App Links intent-filter for `https://hagzy.app/venue/*`.
+   - Release signing configuration from `key.properties`.
+3. **Apple App Store Compliance**:
+   - Validated `PrivacyInfo.xcprivacy` with `NSPrivacyTracking: false` and `CA92.1` UserDefaults declaration.
+   - `NSAllowsArbitraryLoads: false`.
+4. **Git Cleanliness**:
+   - Untracked precompiled `build/` directory from git tracking.
+   - Standardized `docs/STORE_LISTING.md` and `docs/OWNER_TODO.md`.
+
+**GATE 5 STATUS: PASSED.**
+

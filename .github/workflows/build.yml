@@ -4,14 +4,61 @@ on:
   push:
     branches: [ main, master ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  verify:
+    name: Verify Tests, Analysis & Parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      - name: Run server test suite
+        run: npm test --prefix server
+
+      - name: Check client-to-server route parity
+        run: node scripts/check_route_parity.js
+
+      - name: Audit server dependencies
+        run: npm audit --prefix server --audit-level=high
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter codebase
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Build Web
+        run: flutter build web --release --base-href /
+
   build-ios:
     name: Build iPhone App (IPA)
+    needs: [verify]
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -46,7 +93,8 @@ jobs:
           retention-days: 14
 
   build-android:
-    name: Build Android App (APK)
+    name: Build Android App (APK & AAB)
+    needs: [verify]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -67,14 +115,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze & test
-        run: |
-          flutter analyze
-          flutter test
-
       - name: Build Android APK
         run: |
           flutter build apk --release \
+            --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
+
+      - name: Build Android App Bundle (AAB for Google Play)
+        run: |
+          flutter build appbundle --release \
             --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
 
       - name: Upload Android APK Artifact
@@ -82,6 +130,13 @@ jobs:
         with:
           name: Hagzy-Android-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+      - name: Upload Android AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hagzy-Android-AAB
+          path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 14
 
   publish-release:
