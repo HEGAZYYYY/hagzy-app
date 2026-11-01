@@ -33,3 +33,4 @@
 5. **Every fix requires tests**: Include adversarial tests (forged tokens, unverified claims, replayed requests).
 6. **No weakened tests**: Do not relax test assertions to make broken code pass.
 7. **Document decisions**: Any ambiguous choice or architectural assumption must be recorded in `docs/DECISIONS.md`.
+

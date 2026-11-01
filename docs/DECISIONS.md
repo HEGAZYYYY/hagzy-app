@@ -43,7 +43,37 @@ This document records key technical decisions, trade-offs, and defaults selected
 
 ---
 
-## ADR 005: System of Record (Phase 2 Preview)
-- **Context**: State currently spans local JSON files, PostgreSQL JSONB snapshots, and Firestore mirrors.
-- **Default Choice**: PostgreSQL is the single source of truth for all transactional entities (users, venues, bookings, payments, wallet ledger). Firestore acts as an optional read mirror if needed. Direct client writes to Firestore for bookings/payments are disabled via security rules.
-- **Status**: Proposed; will be finalized in Phase 2.
+## ADR 005: System of Record & Relational Schema
+- **Context**: State previously spanned JSON files, JSONB blobs in PostgreSQL, and Firestore mirrors with no authoritative relational constraints.
+- **Decision**:
+  1. PostgreSQL is the authoritative system of record for all business-critical entities (`users`, `venues`, `bookable_units`, `bookings`, `payment_intents`, `payment_events`, `wallet_ledger`, `audit_log`).
+  2. Database migrations are managed via versioned `.sql` files in `server/migrations/` and executed transactionally using `server/migrate.js`.
+  3. Firestore serves strictly as an optional read mirror; direct client writes for financial/booking records are blocked.
+- **Status**: Implemented in Phase 2 (`server/migrations/002_authoritative_schema.sql` and `server/migrate.js`).
+
+---
+
+## ADR 006: Centralized Booking State Machine & Invariants
+- **Context**: Booking actions were previously handled via unconstrained status mutations, allowing cancelled bookings to be confirmed and failed payments to revive holds.
+- **Decision**:
+  1. Centralized lifecycle state machine in `server/bookingStateMachine.js` governs all transitions:
+     `pending_payment -> confirmed -> completed | cancelled | expired | no_show`.
+  2. Illegal transitions (such as reviving a cancelled booking) strictly throw `StateMachineError` returning HTTP 409 Conflict.
+  3. Every status transition appends an immutable entry to `db.auditLog`.
+  4. Confirmation re-checks slot overlap atomically before transitioning to confirmed.
+  5. A background sweeper automatically transitions unpaid holds older than 15 minutes to `expired`.
+- **Status**: Implemented in Phase 2.
+
+---
+
+## ADR 007: Exact Payment Matching, Idempotency & Review Queue
+- **Context**: The payment listener previously accepted `amount >= expected_amount`, leading to booking misattribution, and lacked idempotency and collision handling for transfers to the same receiver.
+- **Decision**:
+  1. `generateUniquePayableAmount` dynamically assigns unique 2-digit piaster fractions (e.g. 150.37 EGP) when collisions exist on the same receiving wallet.
+  2. Incoming payment events are fingerprinted with SHA-256 (`eventHash`) to ensure exact once-only processing (idempotency). Replayed events return `{ duplicate: true }`.
+  3. Exact amount matching is enforced with underpayments strictly rejected from auto-confirming.
+  4. Large transfers (> 5,000 EGP), ambiguous matches (>1 intent), and stale transfers (> 24 hours) are quarantined in `db.reviewQueue` for manual merchant attachment via `POST /api/admin/payments/review-queue/:id/attach`.
+  5. Sensitive balance figures in raw SMS/push notifications are redacted before storage.
+  6. Listener phone heartbeat tracking is established via `POST /api/payments/listener/heartbeat`.
+- **Status**: Implemented in Phase 2.
+

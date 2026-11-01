@@ -60,3 +60,4 @@ Go to [Render Dashboard](https://dashboard.render.com/) -> Select `hagzy-api` ->
 2. Battery optimization disabled for the listener application.
 3. Notification access granted for InstaPay and SMS permissions for Vodafone Cash.
 4. Verify HTTP target URL points to `https://hagzy-api.onrender.com/api/payments/listener` with header `X-Listener-Key` matching `PAYMENT_LISTENER_KEY`.
+

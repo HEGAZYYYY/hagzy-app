@@ -4,7 +4,7 @@ import 'package:hagzy_app/core/models/models_v2.dart';
 void main() {
   group('Phase 1: Polymorphic BookableUnit & Pricing Modes', () {
     test('1. hourly_flat: Sports Courts, Billiards, Ping Pong', () {
-      final unit = BookableUnit(
+      const unit = BookableUnit(
         id: 'unit_court_1',
         venueId: 'venue_1',
         category: 'court',
@@ -26,7 +26,7 @@ void main() {
     });
 
     test('2. hourly_tiered_capacity: PlayStation VIP Lounge', () {
-      final ps5Unit = BookableUnit(
+      const ps5Unit = BookableUnit(
         id: 'unit_ps5_vip',
         venueId: 'venue_lounge',
         category: 'playstation',
@@ -38,7 +38,7 @@ void main() {
           '4': 100, // 4 players = 100 EGP/hr
         },
         addons: [
-          const UnitAddon(id: 'add_ctrl', name: 'Extra DualSense Controller', price: 20),
+          UnitAddon(id: 'add_ctrl', name: 'Extra DualSense Controller', price: 20),
         ],
         minCapacity: 1,
         maxCapacity: 4,
@@ -61,7 +61,7 @@ void main() {
     });
 
     test('3. per_person_tiered: Escape Rooms & Group Hangouts', () {
-      final escapeUnit = BookableUnit(
+      const escapeUnit = BookableUnit(
         id: 'unit_escape_1',
         venueId: 'venue_escape',
         category: 'escape_room',
@@ -92,7 +92,7 @@ void main() {
     });
 
     test('4. time_pass: Workspaces & Study Zones', () {
-      final workspaceUnit = BookableUnit(
+      const workspaceUnit = BookableUnit(
         id: 'desk_silent_1',
         venueId: 'venue_hub',
         category: 'workspace',
@@ -126,14 +126,14 @@ void main() {
     });
 
     test('5. service_menu: Barbershops & Additive Checklist', () {
-      final barberChair = BookableUnit(
+      const barberChair = BookableUnit(
         id: 'chair_ahmed',
         venueId: 'venue_barber',
         category: 'barber',
         unitName: 'Master Barber Ahmed Chair',
         pricingMode: PricingMode.serviceMenu,
         basePriceEgp: 100.0,
-        serviceMenu: const [
+        serviceMenu: [
           ServiceMenuItem(id: 's_hair', name: 'Haircut & Styling', price: 100, durationMins: 30),
           ServiceMenuItem(id: 's_beard', name: 'Beard Contour & Hot Towel', price: 60, durationMins: 20),
           ServiceMenuItem(id: 's_facial', name: 'Charcoal Facial Mask', price: 50, durationMins: 15),

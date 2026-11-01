@@ -44,7 +44,7 @@ void main() {
     });
 
     test('ShillaSizePreset filters units by capacity', () {
-      final soloUnit = BookableUnit(
+      const soloUnit = BookableUnit(
         id: 'u1',
         venueId: 'v1',
         category: 'workspace',
@@ -55,7 +55,7 @@ void main() {
         maxCapacity: 1,
       );
 
-      final squadUnit = BookableUnit(
+      const squadUnit = BookableUnit(
         id: 'u2',
         venueId: 'v1',
         category: 'court',

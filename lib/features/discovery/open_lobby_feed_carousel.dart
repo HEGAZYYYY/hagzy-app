@@ -230,7 +230,7 @@ class _LobbyCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: lobby.totalSlots > 0 ? (lobby.filledSlots / lobby.totalSlots) : 0.5,
-                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       isChallenger ? Colors.amber : theme.colorScheme.primary,
                     ),

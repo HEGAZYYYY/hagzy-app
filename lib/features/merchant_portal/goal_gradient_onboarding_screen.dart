@@ -30,8 +30,8 @@ class _GoalGradientOnboardingScreenState
 
   String _selectedCity = 'Kafr El Sheikh';
   final Set<String> _selectedCategories = {'playstation'};
-  double? _lat = 31.1107;
-  double? _lng = 30.9388;
+  final double _lat = 31.1107;
+  final double _lng = 30.9388;
 
   int _currentStepIndex = 2; // Step 0 and 1 are 100% complete (40% initial head-start!)
 
@@ -142,7 +142,7 @@ class _GoalGradientOnboardingScreenState
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 8,
-                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                   ),
                 ),
@@ -240,7 +240,7 @@ class _GoalGradientOnboardingScreenState
 
                   // City Dropdown
                   DropdownButtonFormField<String>(
-                    value: _selectedCity,
+                    initialValue: _selectedCity,
                     decoration: InputDecoration(
                       labelText: isAr ? 'المدينة / المحافظة' : 'City / Governorate',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

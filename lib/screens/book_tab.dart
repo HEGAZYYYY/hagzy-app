@@ -993,6 +993,7 @@ class _BookTabState extends State<BookTab> {
             : venue.services.first.minutes
         : 60;
     return ListView(
+      // ignore: deprecated_member_use
       cacheExtent: 3000,
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),

@@ -16,7 +16,7 @@ void main() {
   group('Phase 3: Universal Polymorphic Booking Bottom Sheet UI', () {
     testWidgets('1. Switches to Hourly & Tiered Capacity for PlayStation VIP Room',
         (tester) async {
-      final ps5Unit = BookableUnit(
+      const ps5Unit = BookableUnit(
         id: 'ps5_vip_1',
         venueId: 'venue_1',
         category: 'playstation',
@@ -64,7 +64,7 @@ void main() {
 
     testWidgets('2. Switches to Escape Room Tiered Headcount with discount callout',
         (tester) async {
-      final escapeUnit = BookableUnit(
+      const escapeUnit = BookableUnit(
         id: 'escape_tomb',
         venueId: 'venue_1',
         category: 'escape_room',
@@ -96,7 +96,7 @@ void main() {
 
     testWidgets('3. Switches to Workspace Pass Mode (Hourly vs Day Pass)',
         (tester) async {
-      final deskUnit = BookableUnit(
+      const deskUnit = BookableUnit(
         id: 'desk_quiet_1',
         venueId: 'venue_1',
         category: 'workspace',
@@ -135,14 +135,14 @@ void main() {
 
     testWidgets('4. Switches to Barbershop Additive Checklist',
         (tester) async {
-      final barberUnit = BookableUnit(
+      const barberUnit = BookableUnit(
         id: 'chair_master',
         venueId: 'venue_1',
         category: 'barber',
         unitName: 'Barber Ahmed VIP Chair',
         pricingMode: PricingMode.serviceMenu,
         basePriceEgp: 100.0,
-        serviceMenu: const [
+        serviceMenu: [
           ServiceMenuItem(id: 's_cut', name: 'Haircut', price: 100, durationMins: 30),
           ServiceMenuItem(id: 's_beard', name: 'Beard Grooming', price: 60, durationMins: 20),
         ],

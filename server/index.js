@@ -7,8 +7,23 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 
+const { BOOKING_STATUS, transitionBookingStatus, StateMachineError } = require('./bookingStateMachine');
+const { calculateServerPricing, PricingError, VALID_PROMO_CODES } = require('./pricingEngine');
+const { LEDGER_ENTRY_TYPE, calculateWalletBalance, recordLedgerEntry, WalletError } = require('./walletLedger');
+const {
+  generateUniquePayableAmount,
+  computePaymentEventHash,
+  redactRawPaymentText,
+  matchPaymentEvent,
+  MAX_AUTO_CONFIRM_AMOUNT
+} = require('./paymentMatcher');
+
 const IS_PROD = process.env.NODE_ENV === 'production';
 const IS_TEST = process.env.NODE_ENV === 'test';
+
+// Payment deduplication & listener heartbeat tracking
+const processedPaymentHashes = new Set();
+let lastListenerHeartbeatAt = null;
 
 // Token Revocation Store with Expiring Denylist (Bounded memory)
 const revokedTokens = new Map(); // tokenHash -> expiryTimestamp
@@ -591,15 +606,19 @@ const DB_FILE = path.join(DATA_DIR, 'hagzy_db.json');
 
 let isHydrated = false;
 
-function markBookingConfirmed(b, { method, providerRef, amount, excess } = {}) {
+function markBookingConfirmed(b, { method, providerRef, amount, excess, actor = 'system', reason = 'Payment confirmed' } = {}) {
   if (!b) return b;
-  b.status = 'confirmed';
-  b.confirmed = true;
-  b.isPendingPayment = false;
-  b.depositPaid = true;
-  b.paymentStatus = 'paid';
-  b.dueNow = 0;
-  b.holdExpiresAt = null;
+  try {
+    transitionBookingStatus(b, BOOKING_STATUS.CONFIRMED, { actor, reason, auditLog: (db && db.auditLog) || [] });
+  } catch (_) {
+    b.status = 'confirmed';
+    b.confirmed = true;
+    b.isPendingPayment = false;
+    b.depositPaid = true;
+    b.paymentStatus = 'paid';
+    b.dueNow = 0;
+    b.holdExpiresAt = null;
+  }
   if (method) b.paymentMethod = method;
   if (providerRef) b.paymentReference = providerRef;
   if (amount != null) b.actualPaidAmount = Number(amount);
@@ -621,6 +640,9 @@ function loadDb() {
           }
         }
       }
+      if (!data.walletLedger || !Array.isArray(data.walletLedger)) data.walletLedger = [];
+      if (!data.auditLog || !Array.isArray(data.auditLog)) data.auditLog = [];
+      if (!data.reviewQueue || !Array.isArray(data.reviewQueue)) data.reviewQueue = [];
       return data;
     } catch (_) {}
   }
@@ -640,7 +662,10 @@ function loadDb() {
     users: [],
     venues: initialVenues,
     bookings: [],
-    otps: {}
+    otps: {},
+    walletLedger: [],
+    auditLog: [],
+    reviewQueue: [],
   };
 }
 
@@ -704,6 +729,56 @@ async function hydratePostgres() {
 }
 
 let db = loadDb();
+db.walletLedger = db.walletLedger || [];
+db.auditLog = db.auditLog || [];
+db.reviewQueue = db.reviewQueue || [];
+
+// Backfill wallet ledger entries for existing users if ledger is empty
+if (Array.isArray(db.users)) {
+  for (const u of db.users) {
+    const currentBal = Number(u.walletBalance || 0);
+    if (currentBal > 0 && !db.walletLedger.some(e => e.userId === u.id)) {
+      db.walletLedger.push({
+        id: `led_init_${u.id}`,
+        userId: u.id,
+        amount: currentBal,
+        type: LEDGER_ENTRY_TYPE.ADMIN_ADJUSTMENT,
+        referenceId: 'legacy_balance_migration',
+        description: 'Initial balance migration to immutable ledger',
+        actor: 'migration',
+        balanceAfter: currentBal,
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+}
+
+// Background Hold Sweeper (Expires unpaid holds after 15m)
+const holdSweeperInterval = setInterval(() => {
+  try {
+    const now = Date.now();
+    let changed = false;
+    if (db && Array.isArray(db.bookings)) {
+      for (const b of db.bookings) {
+        if (b.status === BOOKING_STATUS.PENDING_PAYMENT && b.holdExpiresAt && new Date(b.holdExpiresAt).getTime() < now) {
+          try {
+            transitionBookingStatus(b, BOOKING_STATUS.EXPIRED, {
+              actor: 'hold_sweeper',
+              reason: 'Reservation hold window expired',
+              auditLog: db.auditLog
+            });
+            changed = true;
+          } catch (_) {}
+        }
+      }
+    }
+    if (changed) saveDb(db);
+  } catch (err) {
+    console.error('Hold sweeper error:', err.message);
+  }
+}, 60 * 1000);
+if (holdSweeperInterval.unref) holdSweeperInterval.unref();
+
 if (db.bookings && Array.isArray(db.bookings)) {
   let initialFixed = false;
   for (const b of db.bookings) {
@@ -1688,6 +1763,15 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
       createdAt: new Date().toISOString()
     };
     db.users.push(user);
+    try {
+      recordLedgerEntry(db.walletLedger, {
+        userId: user.id,
+        amount: 50.0,
+        type: LEDGER_ENTRY_TYPE.WELCOME_BONUS,
+        description: 'Welcome gift balance',
+        actor: 'system'
+      });
+    } catch (_) {}
   } else if (name && (!user.name || user.name === 'Hagzy Member')) {
     user.name = String(name).slice(0, 80);
   }
@@ -1993,7 +2077,7 @@ app.delete('/api/customer/account', authenticateCustomer, async (req, res) => {
   return res.json({ success: true, message: 'Account deleted permanently.' });
 });
 
-// Wallet Operations
+// Wallet Operations (Ledger-Backed)
 app.post('/api/customer/wallet/deduct', authenticateCustomer, (req, res) => {
   const user = db.users.find(u => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -2001,27 +2085,57 @@ app.post('/api/customer/wallet/deduct', authenticateCustomer, (req, res) => {
   if (!Number.isFinite(numAmount) || numAmount <= 0) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
-  if ((user.walletBalance || 0) < numAmount) {
-    return res.status(400).json({ error: 'Insufficient wallet balance' });
+  try {
+    recordLedgerEntry(db.walletLedger, {
+      userId: user.id,
+      amount: -numAmount,
+      type: LEDGER_ENTRY_TYPE.BOOKING_DEPOSIT,
+      description: (req.body && req.body.description) || 'Wallet payment deduction',
+      actor: 'customer'
+    });
+    user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
+    saveDb(db);
+    syncUserToFirebase(user);
+    return res.json({ success: true, walletBalance: user.walletBalance });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
   }
-  user.walletBalance = (user.walletBalance || 0) - numAmount;
-  saveDb(db);
-  syncUserToFirebase(user);
-  return res.json({ success: true, walletBalance: user.walletBalance });
 });
 
 app.post('/api/customer/wallet/add', authenticateAdmin, (req, res) => {
-  const { amount, userId, email } = req.body || {};
-  const user = db.users.find(u => (userId && u.id === userId) || (email && u.email === email));
+  const { amount, userId, email, phone } = req.body || {};
+  const user = db.users.find(u => (userId && u.id === userId) || (email && u.email === email) || (phone && u.phone === phone));
   if (!user) return res.status(404).json({ error: 'User not found' });
   const numAmount = Number(amount);
   if (!Number.isFinite(numAmount) || numAmount <= 0 || numAmount > 100000) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
-  user.walletBalance = (user.walletBalance || 0) + numAmount;
-  saveDb(db);
-  syncUserToFirebase(user);
-  return res.json({ success: true, walletBalance: user.walletBalance });
+  try {
+    recordLedgerEntry(db.walletLedger, {
+      userId: user.id,
+      amount: numAmount,
+      type: LEDGER_ENTRY_TYPE.ADMIN_ADJUSTMENT,
+      description: (req.body && req.body.description) || 'Admin adjustment',
+      actor: req.admin ? (req.admin.email || 'admin') : 'admin'
+    });
+    user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
+    saveDb(db);
+    syncUserToFirebase(user);
+    return res.json({ success: true, walletBalance: user.walletBalance });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
+  }
+});
+
+app.get('/api/customer/wallet/transactions', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const transactions = (db.walletLedger || []).filter(e => e.userId === user.id);
+  return res.json({
+    success: true,
+    walletBalance: calculateWalletBalance(user.id, db.walletLedger),
+    transactions
+  });
 });
 
 // ==========================================
@@ -2203,10 +2317,24 @@ const BOOKING_FIELDS = [
 ];
 
 function bookingBlocksSlot(b, now) {
-  if (b.cancelled || b.status === 'cancelled') return false;
+  if (b.cancelled || b.status === 'cancelled' || b.status === 'expired') return false;
   if (b.status === 'confirmed') return true;
   // pending holds only block while they have not expired
   return !b.holdExpiresAt || new Date(b.holdExpiresAt).getTime() > now;
+}
+
+function checkSlotConflict(excludeBookingId, venueId, itemId, startsAt, durationMinutes) {
+  const start = new Date(startsAt).getTime();
+  const end = start + Number(durationMinutes) * 60000;
+  const now = Date.now();
+  return (db.bookings || []).some(b =>
+    b.id !== excludeBookingId &&
+    b.venueId === venueId &&
+    b.itemId === itemId &&
+    bookingBlocksSlot(b, now) &&
+    new Date(b.startsAt).getTime() < end &&
+    new Date(b.startsAt).getTime() + Number(b.durationMinutes) * 60000 > start
+  );
 }
 
 app.post('/api/bookings', optionalAuth, async (req, res) => {
@@ -2219,12 +2347,10 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
 
   const start = new Date(body.startsAt);
   const duration = Number(body.durationMinutes);
-  const price = Number(body.price);
   if (isNaN(start.getTime())) return res.status(400).json({ error: 'Invalid start time' });
   if (!Number.isInteger(duration) || duration < 15 || duration > 720) {
     return res.status(400).json({ error: 'Invalid duration' });
   }
-  if (!Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'Invalid price' });
   if (!isAdmin && start.getTime() < now - 5 * 60 * 1000) {
     return res.status(400).json({ error: 'Cannot book a time in the past' });
   }
@@ -2232,25 +2358,60 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     return res.status(400).json({ error: 'itemId is required' });
   }
 
+  // Server-side authoritative pricing
+  let calculatedPricing = null;
+  try {
+    calculatedPricing = calculateServerPricing({
+      venue,
+      itemId: body.itemId,
+      durationMinutes: duration,
+      serviceIds: body.services || body.serviceIds || [],
+      splitCount: body.splitCount,
+      promoCode: body.promoCode
+    });
+  } catch (err) {
+    if (isAdmin && Number.isFinite(Number(body.price))) {
+      calculatedPricing = {
+        finalPrice: Number(body.price),
+        subtotal: Number(body.price),
+        discountAmount: 0,
+        promoCode: null,
+        dueNow: Number(body.dueNow || body.price),
+        requiredDeposit: Number(body.price) * (Number(venue.depositPercent) || 30) / 100,
+        depositPercent: Number(venue.depositPercent) || 30,
+        services: []
+      };
+    } else {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+  }
+
+  // Allow higher price if custom package/override was explicitly requested, but NEVER allow under-paying
+  let finalPrice = calculatedPricing.finalPrice;
+  if (Number.isFinite(Number(body.price)) && Number(body.price) > finalPrice) {
+    finalPrice = Number(body.price);
+  }
+
   // Whitelist fields: never persist arbitrary client-supplied keys.
   const booking = {};
   for (const k of BOOKING_FIELDS) if (body[k] !== undefined) booking[k] = body[k];
   booking.customer = String(booking.customer || '').slice(0, 80);
   booking.durationMinutes = duration;
-  booking.price = price;
+  booking.price = finalPrice;
+  booking.subtotal = calculatedPricing.subtotal;
+  booking.discountAmount = calculatedPricing.discountAmount;
+  booking.promoCode = calculatedPricing.promoCode;
+  booking.services = calculatedPricing.services;
   booking.startsAt = start.toISOString();
 
   if (!booking.id || !/^[\w-]{1,64}$/.test(String(booking.id)) || db.bookings.some(b => b.id === booking.id)) {
     booking.id = 'bk_' + crypto.randomUUID();
   }
 
-  // Double-booking guard. No `await` between this check and the push, so it is atomic.
-  const end = start.getTime() + duration * 60000;
-  const conflict = db.bookings.find(b =>
-    b.venueId === booking.venueId && b.itemId === booking.itemId && bookingBlocksSlot(b, now) &&
-    new Date(b.startsAt).getTime() < end &&
-    new Date(b.startsAt).getTime() + Number(b.durationMinutes) * 60000 > start.getTime());
-  if (conflict) return res.status(409).json({ error: 'Overlap conflict. This slot is already booked.' });
+  // Double-booking guard. Atomic check against active slots
+  if (checkSlotConflict(booking.id, booking.venueId, booking.itemId, booking.startsAt, booking.durationMinutes)) {
+    return res.status(409).json({ error: 'Overlap conflict. This slot is already booked.' });
+  }
 
   booking.createdAt = new Date().toISOString();
   booking.cancelled = false;
@@ -2283,24 +2444,47 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     if (body.paymentMethod === 'wallet') {
       const user = req.user && db.users.find(u => u.id === req.user.id);
       if (!user) return res.status(401).json({ error: 'Sign in to pay with your wallet' });
-      // The wallet pays the venue's deposit (same rule the app uses to quote it),
-      // computed here from server-side venue data rather than a client number.
+
+      // Ensure ledger has user balance if legacy user had balance without ledger
+      if (user.walletBalance > 0 && !db.walletLedger.some(e => e.userId === user.id)) {
+        try {
+          recordLedgerEntry(db.walletLedger, {
+            userId: user.id,
+            amount: Number(user.walletBalance),
+            type: LEDGER_ENTRY_TYPE.ADMIN_ADJUSTMENT,
+            description: 'Legacy balance hydration',
+            actor: 'system'
+          });
+        } catch (_) {}
+      }
+
       const split = Math.max(1, Math.floor(Number(body.splitCount) || 1));
-      const requiredDeposit = price * (Number(venue.depositPercent) || 0) / 100;
-      const deposit = Math.round((split > 1 && price / split > requiredDeposit
-        ? price / split : requiredDeposit) * 100) / 100;
+      const requiredDeposit = Math.round((finalPrice * (Number(venue.depositPercent || 30) / 100)) * 100) / 100;
+      const deposit = Math.round((split > 1 && finalPrice / split > requiredDeposit
+        ? finalPrice / split : requiredDeposit) * 100) / 100;
       if (deposit <= 0) {
         return res.status(400).json({ error: 'This venue has no deposit configured' });
       }
-      if ((user.walletBalance || 0) < deposit) {
-        return res.status(402).json({ error: 'Insufficient wallet balance' });
+      try {
+        recordLedgerEntry(db.walletLedger, {
+          userId: user.id,
+          amount: -deposit,
+          type: LEDGER_ENTRY_TYPE.BOOKING_DEPOSIT,
+          referenceId: booking.id,
+          description: `Deposit for booking at ${venue.name || 'Venue'}`,
+          actor: 'customer'
+        });
+        user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
+      } catch (wErr) {
+        return res.status(wErr.statusCode || 402).json({ error: wErr.message });
       }
-      user.walletBalance -= deposit;
-      booking.status = 'confirmed';
-      booking.paymentStatus = 'paid';
+
+      transitionBookingStatus(booking, BOOKING_STATUS.CONFIRMED, {
+        actor: user.email || user.phone || 'customer',
+        reason: 'Wallet deposit confirmed',
+        auditLog: db.auditLog
+      });
       booking.paymentMethod = 'wallet';
-      booking.holdExpiresAt = null;
-      booking.dueNow = 0;
     } else {
       booking.paymentMethod = '';
     }
@@ -2379,9 +2563,37 @@ app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
     return res.status(400).json({ error: 'Cannot cancel a booking that has already started or elapsed.' });
   }
 
-  booking.status = 'cancelled';
-  booking.cancelled = true;
-  booking.updatedAt = new Date().toISOString();
+  try {
+    transitionBookingStatus(booking, BOOKING_STATUS.CANCELLED, {
+      actor: user.email || user.phone || 'customer',
+      reason: 'Customer cancelled booking',
+      auditLog: db.auditLog
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
+  }
+
+  // Wallet deposit refund: full refund if cancelled >= 6 hours before start
+  const hoursUntilStart = (new Date(booking.startsAt).getTime() - Date.now()) / (3600 * 1000);
+  if (booking.paymentMethod === 'wallet' && hoursUntilStart >= 6) {
+    const refundAmt = Number(booking.depositAmount || booking.dueNow || booking.actualPaidAmount || booking.price || 0);
+    if (refundAmt > 0) {
+      try {
+        recordLedgerEntry(db.walletLedger, {
+          userId: user.id,
+          amount: refundAmt,
+          type: LEDGER_ENTRY_TYPE.REFUND,
+          referenceId: booking.id,
+          description: `Full refund for cancellation >=6h before start (${booking.id})`,
+          actor: 'system'
+        });
+        user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
+      } catch (wErr) {
+        console.warn('Wallet refund ledger notice:', wErr.message);
+      }
+    }
+  }
+
   saveDb(db);
   syncBookingToFirebase(booking, user);
 
@@ -2404,7 +2616,21 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-  markBookingConfirmed(booking);
+  // Atomic conflict check before confirming
+  if (checkSlotConflict(booking.id, booking.venueId, booking.itemId, booking.startsAt, booking.durationMinutes)) {
+    return res.status(409).json({ error: 'Cannot confirm: this slot is already booked by another confirmed booking.' });
+  }
+
+  try {
+    transitionBookingStatus(booking, BOOKING_STATUS.CONFIRMED, {
+      actor: req.admin ? (req.admin.email || 'admin') : 'admin',
+      reason: 'Admin verified deposit',
+      auditLog: db.auditLog
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 409).json({ error: err.message });
+  }
+
   saveDb(db);
   syncBookingToFirebase(booking);
 
@@ -2422,12 +2648,51 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
 // Cancel Booking
 app.delete('/api/admin/bookings/:id', authenticateAdmin, (req, res) => {
   const booking = db.bookings.find(b => b.id === req.params.id);
-  if (booking) {
-    booking.cancelled = true;
-    booking.status = 'cancelled';
-    saveDb(db);
-    syncBookingToFirebase(booking);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+  try {
+    transitionBookingStatus(booking, BOOKING_STATUS.CANCELLED, {
+      actor: req.admin ? (req.admin.email || 'admin') : 'admin',
+      reason: 'Admin cancelled booking',
+      auditLog: db.auditLog
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 409).json({ error: err.message });
   }
+
+  // Refund wallet deposit if applicable
+  if (booking.paymentMethod === 'wallet' && (booking.ownerId || booking.customerId)) {
+    const targetUserId = booking.ownerId || booking.customerId;
+    const refundAmt = Number(booking.actualPaidAmount || booking.dueNow || booking.depositAmount || booking.price || 0);
+    if (refundAmt > 0) {
+      try {
+        recordLedgerEntry(db.walletLedger, {
+          userId: targetUserId,
+          amount: refundAmt,
+          type: LEDGER_ENTRY_TYPE.REFUND,
+          referenceId: booking.id,
+          description: `Admin cancellation refund for booking ${booking.id}`,
+          actor: req.admin ? (req.admin.email || 'admin') : 'admin'
+        });
+        const u = db.users.find(usr => usr.id === targetUserId);
+        if (u) u.walletBalance = calculateWalletBalance(targetUserId, db.walletLedger);
+      } catch (wErr) {
+        console.warn('Admin cancel refund notice:', wErr.message);
+      }
+    }
+  }
+
+  saveDb(db);
+  syncBookingToFirebase(booking);
+
+  if (booking.customerPhone || booking.phone) {
+    sendSmsOrWhatsApp({
+      phone: booking.customerPhone || booking.phone,
+      message: `⚠️ تم إلغاء حجزك في حجزي (رقم الحجز: ${booking.id}).`,
+      otp: ''
+    }).catch(() => {});
+  }
+
   return res.json({ success: true, message: 'Booking cancelled' });
 });
 
@@ -2457,6 +2722,41 @@ app.post('/api/bookings/:id/payment-proof', (req, res) => {
   saveDb(db);
   syncBookingToFirebase(booking);
   return res.json({ success: true, booking });
+});
+
+// Fawry Reference Number Generation
+app.post('/api/bookings/:id/fawry-reference', (req, res) => {
+  const booking = db.bookings.find(b => b.id === req.params.id);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.status === 'cancelled' || booking.cancelled) {
+    return res.status(409).json({ error: 'Cannot issue reference for a cancelled booking' });
+  }
+
+  const { customerName, phone } = req.body || {};
+  if (customerName) booking.customer = String(customerName).slice(0, 80);
+  if (phone) booking.phone = String(phone).slice(0, 30);
+
+  let hash = 918273645;
+  for (const c of String(booking.id)) {
+    hash = ((hash * 31) + c.charCodeAt(0)) & 0x7fffffff;
+  }
+  const digits = String(9000000000 + (hash % 999999999));
+  const referenceNumber = `${digits.substring(0, 3)} ${digits.substring(3, 6)} ${digits.substring(6)}`;
+
+  booking.paymentMethod = 'fawry';
+  booking.fawryReference = referenceNumber;
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  booking.holdExpiresAt = expiresAt;
+
+  saveDb(db);
+  syncBookingToFirebase(booking);
+
+  return res.json({
+    success: true,
+    referenceNumber,
+    expiresAt,
+    amount: booking.dueNow || booking.depositAmount || booking.price
+  });
 });
 
 // Paymob Intention Mock / Webhook
@@ -2600,7 +2900,7 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   };
 }
 
-async function finalizePaymentVerification({ paymentMethod, senderIdentifier, amount, providerRef, rawText = '' }) {
+async function finalizePaymentVerification({ paymentMethod, senderIdentifier, amount, providerRef, rawText = '', timestamp = null, receiverWallet = null }) {
   const method = paymentMethod === 'MOBILE_WALLET' ? 'MOBILE_WALLET' : 'INSTAPAY';
   const normalizedSender = normalizeSenderId(method, senderIdentifier);
   const numAmount = Number(amount);
@@ -2616,183 +2916,121 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
     provider_ref: providerRef,
     received_at: now.toISOString(),
     is_claimed: false,
-    raw_text: rawText,
+    raw_text: redactRawPaymentText(rawText),
   });
 
-  // 1. If Cloud Firestore is configured, check active intents
-  if (fbFirestore) {
-    try {
-      const intentSnap = await fbFirestore.collection('payment_intents')
-        .where('payment_method', '==', method)
-        .where('expected_sender_identifier', '==', normalizedSender)
-        .where('status', '==', 'AWAITING_TRANSFER')
-        .where('expires_at', '>', now)
-        .get();
+  // Call matching engine
+  const matchResult = matchPaymentEvent({
+    paymentMethod: method,
+    senderIdentifier: normalizedSender,
+    amount: numAmount,
+    providerRef,
+    timestamp,
+    rawText,
+    receiverWallet,
+    activeIntents: Array.from(localPaymentIntents.values()),
+    reviewQueue: db.reviewQueue,
+    processedHashes: processedPaymentHashes
+  });
 
-      const matchedDoc = intentSnap.docs.find(d => numAmount >= Number(d.data().expected_amount));
+  if (matchResult.status === 'DUPLICATE') {
+    return {
+      success: true,
+      duplicate: true,
+      matched: false,
+      eventHash: matchResult.eventHash,
+      message: matchResult.message
+    };
+  }
 
-      if (matchedDoc) {
-        const intentDoc = matchedDoc;
-        const intentData = intentDoc.data();
-        const intentId = intentDoc.id;
-        const expected = Number(intentData.expected_amount || 0);
-        const excess = Math.max(0, numAmount - expected);
+  if (matchResult.matched && matchResult.intent) {
+    const matchedIntent = matchResult.intent;
+    const excessAmount = matchResult.excessAmount || 0;
+    matchedIntent.status = 'VERIFIED';
+    matchedIntent.verified_at = now.toISOString();
+    matchedIntent.actual_amount = numAmount;
+    matchedIntent.excess_amount = excessAmount;
 
-        await intentDoc.ref.update({
-          status: 'VERIFIED',
-          verified_at: now,
-          matched_event_id: eventId,
-          actual_amount: numAmount,
-          excess_amount: excess,
-          provider_ref: providerRef,
-          updated_at: now,
-        });
-
-        await fbFirestore.collection('incoming_payment_events').doc(eventId).set({
-          payment_method: method,
-          sender_identifier: normalizedSender,
-          amount: numAmount,
-          provider_ref: providerRef,
-          received_at: now,
-          is_claimed: true,
-          claimed_by_intent_id: intentId,
-          claimed_by_booking_id: intentData.booking_id,
-          claimed_at: now,
-          raw_text: rawText,
-        });
-
-        const localIntent = localPaymentIntents.get(intentId);
-        if (localIntent) {
-          localIntent.status = 'VERIFIED';
-          localIntent.verified_at = now.toISOString();
-          localIntent.matched_event_id = eventId;
-          localIntent.actual_amount = numAmount;
-          localIntent.excess_amount = excess;
-        }
-
-        if (intentData.booking_id && intentData.booking_id.startsWith('wallet_topup_')) {
-          if (intentData.user_id) {
-            const userRef = fbFirestore.collection('users').doc(intentData.user_id);
-            const userDoc = await userRef.get();
-            if (userDoc.exists) {
-              const prev = Number(userDoc.data().walletBalance || 0);
-              await userRef.update({ walletBalance: Number((prev + numAmount).toFixed(2)) });
-            }
-            const localU = db.users ? db.users.find(u => u.id === intentData.user_id) : null;
-            if (localU) {
-              localU.walletBalance = Number(((localU.walletBalance || 0) + numAmount).toFixed(2));
-              saveDb(db);
-            }
-          }
-        } else if (intentData.booking_id) {
-          await fbFirestore.collection('bookings').doc(intentData.booking_id).set({
-            status: 'confirmed',
-            confirmed: true,
-            isPendingPayment: false,
-            depositPaid: true,
-            paymentStatus: 'paid',
-            dueNow: 0,
-            holdExpiresAt: null,
-            paymentMethod: method,
-            paymentReference: providerRef,
-            actualPaidAmount: numAmount,
-            excessDeposit: excess,
-            updatedAt: now.toISOString(),
-          }, { merge: true });
-
-          const b = db.bookings ? db.bookings.find(bk => bk.id === intentData.booking_id) : null;
-          if (b) {
-            markBookingConfirmed(b, { method, providerRef, amount: numAmount, excess });
+    if (matchedIntent.booking_id && matchedIntent.booking_id.startsWith('wallet_topup_')) {
+      if (matchedIntent.user_id) {
+        try {
+          recordLedgerEntry(db.walletLedger, {
+            userId: matchedIntent.user_id,
+            amount: numAmount,
+            type: LEDGER_ENTRY_TYPE.TOPUP,
+            referenceId: matchedIntent.intent_id || matchedIntent.id,
+            description: `Automated wallet top-up via ${method}`,
+            actor: 'payment_oracle'
+          });
+          const u = db.users ? db.users.find(usr => usr.id === matchedIntent.user_id) : null;
+          if (u) {
+            u.walletBalance = calculateWalletBalance(u.id, db.walletLedger);
             saveDb(db);
+            syncUserToFirebase(u);
           }
+        } catch (e) {
+          console.error('Ledger topup error:', e.message);
+        }
+      }
+      return { success: true, matched: true, walletTopUp: true, amount: numAmount, excessAmount };
+    }
+
+    if (matchedIntent.booking_id) {
+      const b = db.bookings ? db.bookings.find(bk => bk.id === matchedIntent.booking_id) : null;
+      if (b) {
+        // Re-check slot conflict before confirming!
+        if (checkSlotConflict(b.id, b.venueId, b.itemId, b.startsAt, b.durationMinutes)) {
+          const conflictEntry = {
+            id: `rev_conflict_${Date.now()}`,
+            paymentMethod: method,
+            senderIdentifier: normalizedSender,
+            amount: numAmount,
+            providerRef,
+            rawText: redactRawPaymentText(rawText),
+            status: 'SLOT_CONFLICT',
+            intentId: matchedIntent.id || matchedIntent.intent_id,
+            bookingId: b.id,
+            reason: 'Booking slot is already booked by another confirmed reservation.',
+            receivedAt: now.toISOString()
+          };
+          db.reviewQueue.push(conflictEntry);
+          saveDb(db);
+          return {
+            success: true,
+            matched: false,
+            requiresReview: true,
+            status: 'SLOT_CONFLICT',
+            message: 'Slot conflict: booking slot was taken by another reservation. Sent to review queue.'
+          };
         }
 
-        return { success: true, matched: true, intentId, bookingId: intentData.booking_id, amount: numAmount, excessAmount: excess };
-      } else {
-        await fbFirestore.collection('incoming_payment_events').doc(eventId).set({
-          payment_method: method,
-          sender_identifier: normalizedSender,
+        markBookingConfirmed(b, {
+          method,
+          providerRef,
           amount: numAmount,
-          provider_ref: providerRef,
-          received_at: now,
-          is_claimed: false,
-          raw_text: rawText,
+          excess: excessAmount,
+          actor: 'payment_oracle',
+          reason: 'Automated exact payment match'
         });
-      }
-    } catch (fsErr) {
-      console.warn('Firestore payment matching notice:', fsErr.message);
-    }
-  }
-
-  // 2. In-memory check (supports amount >= expected_amount)
-  for (const [id, intent] of localPaymentIntents.entries()) {
-    if (intent.payment_method === method &&
-        intent.expected_sender_identifier === normalizedSender &&
-        numAmount >= Number(intent.expected_amount) &&
-        intent.status === 'AWAITING_TRANSFER') {
-      const expected = Number(intent.expected_amount || 0);
-      const excess = Math.max(0, numAmount - expected);
-
-      intent.status = 'VERIFIED';
-      intent.verified_at = now.toISOString();
-      intent.matched_event_id = eventId;
-      intent.actual_amount = numAmount;
-      intent.excess_amount = excess;
-
-      if (intent.booking_id && intent.booking_id.startsWith('wallet_topup_')) {
-        const u = db.users ? db.users.find(usr => usr.id === intent.user_id) : null;
-        if (u) {
-          u.walletBalance = Number(((u.walletBalance || 0) + numAmount).toFixed(2));
-          saveDb(db);
-        }
-      } else if (intent.booking_id) {
-        const b = db.bookings ? db.bookings.find(bk => bk.id === intent.booking_id) : null;
-        if (b) {
-          markBookingConfirmed(b, { method, providerRef, amount: numAmount, excess });
-          saveDb(db);
-          syncBookingToFirebase(b);
-        }
-      }
-
-      return { success: true, matched: true, intentId: id, bookingId: intent.booking_id, amount: numAmount, excessAmount: excess };
-    }
-  }
-
-  // 3. Direct booking match by customer phone (for direct transfers without active intent open)
-  if (method === 'MOBILE_WALLET') {
-    const directBooking = db.bookings ? db.bookings.find(b =>
-      b.status === 'pending_payment' &&
-      !b.cancelled &&
-      (b.phone === normalizedSender || b.customerPhone === normalizedSender)
-    ) : null;
-
-    if (directBooking) {
-      const reqDeposit = Number(directBooking.dueNow ?? directBooking.depositAmount ?? (directBooking.price * 0.2) ?? 5);
-      if (numAmount >= reqDeposit || numAmount >= 5) {
-        const excess = Math.max(0, numAmount - reqDeposit);
-        markBookingConfirmed(directBooking, { method, providerRef, amount: numAmount, excess });
         saveDb(db);
-        syncBookingToFirebase(directBooking);
-
-        return {
-          success: true,
-          matched: true,
-          directBookingMatch: true,
-          bookingId: directBooking.id,
-          amount: numAmount,
-          excessAmount: directBooking.excessDeposit,
-        };
+        syncBookingToFirebase(b);
+        return { success: true, matched: true, bookingId: b.id, amount: numAmount, excessAmount };
       }
     }
   }
 
+  // Not matched or requires review
+  saveDb(db);
   return {
     success: true,
     matched: false,
-    eventId,
+    status: matchResult.status || 'UNMATCHED',
+    eventId: matchResult.eventId || eventId,
     amount: numAmount,
     paymentMethod: method,
     senderIdentifier: normalizedSender,
+    requiresReview: !!matchResult.requiresReview,
+    message: matchResult.message || 'Payment notification recorded.'
   };
 }
 
@@ -2830,6 +3068,20 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     authoritativeAmount = 5.0;
   }
 
+  // Look up venue receiver wallet if available
+  let receiverWallet = null;
+  if (localBooking) {
+    const venue = db.venues ? db.venues.find(v => v.id === localBooking.venueId) : null;
+    if (venue && venue.receiverWallet) receiverWallet = venue.receiverWallet;
+  }
+
+  // Generate unique payable amount with piaster suffix to guarantee zero collisions
+  const payableAmount = generateUniquePayableAmount(
+    authoritativeAmount,
+    receiverWallet,
+    Array.from(localPaymentIntents.values())
+  );
+
   const intentId = `intent_${bookingId}_${method.toLowerCase()}`;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
@@ -2845,7 +3097,7 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
           fbFirestore.collection('payment_intents')
             .where('payment_method', '==', method)
             .where('expected_sender_identifier', '==', normalizedSender)
-            .where('expected_amount', '==', authoritativeAmount)
+            .where('expected_amount', '==', payableAmount)
             .where('status', '==', 'AWAITING_TRANSFER')
             .where('expires_at', '>', now)
         );
@@ -2856,61 +3108,13 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
           }
         }
 
-        // Retroactive match (supports transfer amount >= required amount)
-        const retroactiveSnap = await transaction.get(
-          fbFirestore.collection('incoming_payment_events')
-            .where('payment_method', '==', method)
-            .where('sender_identifier', '==', normalizedSender)
-            .where('amount', '>=', authoritativeAmount)
-            .where('is_claimed', '==', false)
-            .where('received_at', '>=', fifteenMinutesAgo)
-            .limit(1)
-        );
-
-        if (!retroactiveSnap.empty) {
-          const eventDoc = retroactiveSnap.docs[0];
-          const receivedAmt = Number(eventDoc.data().amount || authoritativeAmount);
-          const excess = Math.max(0, receivedAmt - authoritativeAmount);
-
-          transaction.update(eventDoc.ref, {
-            is_claimed: true,
-            claimed_by_intent_id: intentId,
-            claimed_by_booking_id: bookingId,
-            claimed_at: now,
-          });
-
-          const intentData = {
-            booking_id: bookingId,
-            user_id: req.user?.id || 'guest',
-            payment_method: method,
-            expected_sender_identifier: normalizedSender,
-            expected_amount: authoritativeAmount,
-            actual_amount: receivedAmt,
-            excess_amount: excess,
-            status: 'VERIFIED',
-            expires_at: expiresAt,
-            verified_at: now,
-            matched_event_id: eventDoc.id,
-            updated_at: now,
-          };
-          transaction.set(intentRef, intentData, { merge: true });
-
-          if (localBooking) {
-            localBooking.status = 'confirmed';
-            localBooking.depositPaid = true;
-            localBooking.actualPaidAmount = receivedAmt;
-            localBooking.excessDeposit = excess;
-          }
-
-          return { ...intentData, intentId, status: 'VERIFIED' };
-        }
-
         const intentData = {
           booking_id: bookingId,
           user_id: req.user?.id || 'guest',
           payment_method: method,
+          receiver_wallet: receiverWallet,
           expected_sender_identifier: normalizedSender,
-          expected_amount: authoritativeAmount,
+          expected_amount: payableAmount,
           status: 'AWAITING_TRANSFER',
           expires_at: expiresAt,
           verified_at: null,
@@ -2931,15 +3135,15 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     }
   }
 
-  // In-memory fallback with retroactive matching
+  // In-memory retroactive match if payment notification arrived within last 15m
   for (const [evtId, evt] of localPaymentEvents.entries()) {
     if (!evt.is_claimed &&
         evt.payment_method === method &&
         evt.sender_identifier === normalizedSender &&
-        Number(evt.amount) >= authoritativeAmount &&
+        Number(evt.amount) >= payableAmount &&
         (now.getTime() - new Date(evt.received_at).getTime()) <= 15 * 60 * 1000) {
       const receivedAmt = Number(evt.amount);
-      const excess = Math.max(0, receivedAmt - authoritativeAmount);
+      const excess = Math.max(0, receivedAmt - payableAmount);
 
       evt.is_claimed = true;
       evt.claimed_by_intent_id = intentId;
@@ -2950,8 +3154,9 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
         booking_id: bookingId,
         user_id: req.user?.id || 'guest',
         payment_method: method,
+        receiver_wallet: receiverWallet,
         expected_sender_identifier: normalizedSender,
-        expected_amount: authoritativeAmount,
+        expected_amount: payableAmount,
         actual_amount: receivedAmt,
         excess_amount: excess,
         status: 'VERIFIED',
@@ -2968,8 +3173,18 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
       } else if (bookingId.startsWith('wallet_topup_') && req.user) {
         const u = db.users ? db.users.find(usr => usr.id === req.user.id) : null;
         if (u) {
-          u.walletBalance = Number(((u.walletBalance || 0) + receivedAmt).toFixed(2));
-          saveDb(db);
+          try {
+            recordLedgerEntry(db.walletLedger, {
+              userId: u.id,
+              amount: receivedAmt,
+              type: LEDGER_ENTRY_TYPE.TOPUP,
+              referenceId: intentId,
+              description: `Wallet top-up via ${method}`,
+              actor: 'payment_oracle'
+            });
+            u.walletBalance = calculateWalletBalance(u.id, db.walletLedger);
+            saveDb(db);
+          } catch (_) {}
         }
       }
 
@@ -2982,8 +3197,9 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     booking_id: bookingId,
     user_id: req.user?.id || 'guest',
     payment_method: method,
+    receiver_wallet: receiverWallet,
     expected_sender_identifier: normalizedSender,
-    expected_amount: authoritativeAmount,
+    expected_amount: payableAmount,
     status: 'AWAITING_TRANSFER',
     expires_at: expiresAt.toISOString(),
   };
@@ -3053,14 +3269,91 @@ app.post('/api/payments/webhook', async (req, res) => {
 });
 
 // ==========================================
+// ADMIN PAYMENT REVIEW QUEUE
+// ==========================================
+app.get('/api/admin/payments/review-queue', authenticateAdmin, (req, res) => {
+  return res.json({
+    success: true,
+    count: (db.reviewQueue || []).length,
+    items: db.reviewQueue || [],
+  });
+});
+
+app.post('/api/admin/payments/review-queue/:id/attach', authenticateAdmin, (req, res) => {
+  const item = (db.reviewQueue || []).find(q => q.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'Review queue item not found' });
+  if (item.status === 'RESOLVED') return res.status(409).json({ error: 'Item already resolved' });
+
+  const { bookingId, userId } = req.body || {};
+  if (!bookingId && !userId) {
+    return res.status(400).json({ error: 'bookingId or userId is required to attach payment' });
+  }
+
+  if (bookingId) {
+    const booking = db.bookings.find(b => b.id === bookingId);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    markBookingConfirmed(booking, {
+      method: item.paymentMethod,
+      providerRef: item.providerRef,
+      amount: item.amount,
+      actor: req.admin ? req.admin.email : 'admin',
+      reason: 'Manual match from review queue',
+    });
+    syncBookingToFirebase(booking);
+  }
+
+  if (userId) {
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    recordLedgerEntry(db.walletLedger, {
+      userId: user.id,
+      amount: item.amount,
+      type: LEDGER_ENTRY_TYPE.ADMIN_ADJUSTMENT,
+      referenceId: item.id,
+      description: `Manual credit from review queue (${item.paymentMethod})`,
+      actor: req.admin ? req.admin.email : 'admin',
+    });
+    user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
+    syncUserToFirebase(user);
+  }
+
+  item.status = 'RESOLVED';
+  item.resolvedBy = req.admin ? req.admin.email : 'admin';
+  item.resolvedAt = new Date().toISOString();
+  item.attachedTo = { bookingId, userId };
+
+  saveDb(db);
+  return res.json({ success: true, item });
+});
+
+// ==========================================
 // ANDROID NOTIFICATION & SMS LISTENER ENDPOINT
 // ==========================================
 app.get(['/api/payments/listener/status', '/api/payments/android-listener/status'], (req, res) => {
+  const isHeartbeatActive = lastListenerHeartbeatAt ? (Date.now() - lastListenerHeartbeatAt < 15 * 60 * 1000) : false;
   return res.json({
     status: 'online',
     endpoint: 'POST /api/payments/listener',
     supportedMethods: ['VODAFONE_CASH (MOBILE_WALLET)', 'INSTAPAY'],
     authMethods: ['Header: x-signature with x-timestamp', 'Header: x-listener-key'],
+    serverTime: new Date().toISOString(),
+    isListenerActive: isHeartbeatActive,
+    lastHeartbeatAt: lastListenerHeartbeatAt ? new Date(lastListenerHeartbeatAt).toISOString() : null,
+  });
+});
+
+app.post(['/api/payments/listener/heartbeat', '/api/payments/android-listener/heartbeat'], (req, res) => {
+  const configuredSecret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET;
+  const listenerKey = req.headers['x-listener-key'] ||
+                      (req.headers['authorization'] ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : null);
+  if (!configuredSecret || !listenerKey || !safeEqual(listenerKey, configuredSecret)) {
+    return res.status(401).json({ error: 'Unauthorized heartbeat' });
+  }
+
+  lastListenerHeartbeatAt = Date.now();
+  return res.json({
+    success: true,
+    status: 'ok',
     serverTime: new Date().toISOString(),
   });
 });
@@ -3195,6 +3488,64 @@ app.post(['/api/payments/listener', '/api/payments/android-listener'], async (re
   }
 
   return res.json(result);
+});
+
+// ==========================================
+// ADMIN PAYMENT REVIEW QUEUE
+// ==========================================
+app.get('/api/admin/payments/review-queue', authenticateAdmin, (req, res) => {
+  return res.json({
+    success: true,
+    count: (db.reviewQueue || []).length,
+    items: db.reviewQueue || [],
+  });
+});
+
+app.post('/api/admin/payments/review-queue/:id/attach', authenticateAdmin, (req, res) => {
+  const item = (db.reviewQueue || []).find(q => q.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'Review queue item not found' });
+  if (item.status === 'RESOLVED') return res.status(409).json({ error: 'Item already resolved' });
+
+  const { bookingId, userId } = req.body || {};
+  if (!bookingId && !userId) {
+    return res.status(400).json({ error: 'bookingId or userId is required to attach payment' });
+  }
+
+  if (bookingId) {
+    const booking = db.bookings.find(b => b.id === bookingId);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    markBookingConfirmed(booking, {
+      method: item.paymentMethod,
+      providerRef: item.providerRef,
+      amount: item.amount,
+      actor: req.admin ? req.admin.email : 'admin',
+      reason: 'Manual match from review queue',
+    });
+    syncBookingToFirebase(booking);
+  }
+
+  if (userId) {
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    recordLedgerEntry(db.walletLedger, {
+      userId: user.id,
+      amount: item.amount,
+      type: LEDGER_ENTRY_TYPE.ADMIN_ADJUSTMENT,
+      referenceId: item.id,
+      description: `Manual credit from review queue (${item.paymentMethod})`,
+      actor: req.admin ? req.admin.email : 'admin',
+    });
+    user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
+    syncUserToFirebase(user);
+  }
+
+  item.status = 'RESOLVED';
+  item.resolvedBy = req.admin ? req.admin.email : 'admin';
+  item.resolvedAt = new Date().toISOString();
+  item.attachedTo = { bookingId, userId };
+
+  saveDb(db);
+  return res.json({ success: true, item });
 });
 
 // ==========================================

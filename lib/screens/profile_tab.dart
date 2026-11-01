@@ -249,6 +249,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     final signedIn = widget.isSignedIn;
 
     return ListView(
+      // ignore: deprecated_member_use
       cacheExtent: 3000,
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),

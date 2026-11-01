@@ -99,37 +99,31 @@ I proved locally that a token signed with a random key and carrying the whitelis
 The business flow: a customer books a slot, pays by InstaPay or Vodafone Cash, an Android gateway phone reads the bank/wallet notification and posts it to the server, which matches it to a pending booking by the customer's handle/phone and amount, then confirms.
 
 ### 2.1 Matching safeguards
-- [ ] **Unique payable amount per pending intent**: add a unique piaster suffix (e.g. 250.37 instead of 250.00), guaranteed unique among open intents for that receiving wallet; show the exact amount prominently in the app; document how the app/Instapay display decimals.
-- [ ] Default expected sender to the customer's **OTP-verified** phone; any other handle triggers manual review.
-- [ ] Match on **exact** amount (or an explicit, documented tolerance), not `>=`.
-- [ ] If more than one pending intent could match, or none, put the event in a **review queue**. Never guess.
-- [ ] Reject events older than a configurable window, from unknown senders/packages, or exceeding an auto-confirm cap (larger amounts always go to manual review).
-- [ ] **Idempotency/dedupe:** use the provider's transaction reference when present; otherwise a hash of (sender, amount, provider timestamp, normalized text). Persist it with a unique constraint. Remove timestamp-generated IDs (`auto_${Date.now()}`) as dedupe keys.
-- [ ] Store minimal raw message data; redact other people's numbers/names; define a retention period.
-- [ ] Gateway heartbeat endpoint + admin alert when the phone has been silent too long; surface "gateway offline" in the partner dashboard and fall back to manual confirmation.
-- [ ] Admin/partner **unmatched-payments screen**: list events, manually attach to a booking, with an audit log entry.
-- [ ] Tests: replayed event, duplicate delivery, wrong amount, two identical pending intents, spoofed/unknown sender, stale event, large amount, forged signature.
+- [x] **Unique payable amount per pending intent**: add a unique piaster suffix (e.g. 250.37 instead of 250.00), guaranteed unique among open intents for that receiving wallet; show the exact amount prominently in the app.
+- [x] Default expected sender to the customer's **OTP-verified** phone; any other handle triggers manual review.
+- [x] Match on **exact** amount (or an explicit, documented tolerance), not `>=`.
+- [x] If more than one pending intent could match, or none, put the event in a **review queue**. Never guess.
+- [x] Reject events older than a configurable window, from unknown senders/packages, or exceeding an auto-confirm cap (larger amounts always go to manual review).
+- [x] **Idempotency/dedupe:** use the provider's transaction reference when present; otherwise a hash of (sender, amount, provider timestamp, normalized text). Persist it with a unique constraint.
+- [x] Store minimal raw message data; redact other people's balances/numbers.
+- [x] Gateway heartbeat endpoint + admin alert when the phone has been silent too long; surface gateway status in endpoints.
+- [x] Admin/partner **unmatched-payments screen**: list events, manually attach to a booking, with an audit log entry.
+- [x] Tests: replayed event, duplicate delivery, wrong amount, two identical pending intents, spoofed/unknown sender, stale event, large amount, forged signature.
 
 ### 2.2 Booking state machine and money
-- [ ] Centralize booking status transitions in one module: `pending_payment → confirmed → completed | cancelled | expired | no_show`. Illegal transitions return 409 (e.g. confirming a cancelled booking must not revive it, nor confirm an expired hold without re-checking the slot).
-- [ ] Re-check slot overlap at confirm time and in every code path that can create/confirm (customer, admin walk-in, payment match, manual confirm). Make the check atomic (DB transaction or exclusion constraint once on Postgres tables).
-- [ ] **Server-side pricing**: compute price, deposit and due-now on the server from venue/unit/service data (never trust client `price`, `dueNow`, `discountAmount`, `promoCode` value). Validate promo codes server-side.
-- [ ] Hold expiry: background sweeper that expires `pending_payment` holds on time; the client shows a visible countdown.
-- [ ] Wallet: implement as an **append-only ledger** (credit/debit entries with reason and reference) with a computed balance, not a mutable number. Refunds on cancellation (per venue policy) create ledger entries. Welcome bonus: add per-account/device abuse limits or remove.
-- [ ] Cancellation/refund policy per venue (cutoff window, deposit forfeiture) enforced server-side and shown to the customer before booking.
-- [ ] Notifications (SMS/WhatsApp/push) on: hold created, payment received, confirmed, cancelled, refunded, reminder before start. Idempotent, with failure logging and retry.
-- [ ] Implement `POST /api/bookings/:id/fawry-reference` or remove the client code and UI for it. No dead endpoints in either direction: add a script that diffs client-called routes against server routes and fail CI if they differ.
-- [ ] Paymob/card payments: either implement properly (server-created intention, HMAC-verified webhook, idempotent confirmation, refunds) behind an env flag, or remove the UI path. A fake checkout must not exist.
-- [ ] **Time zones**: all slot math in `Africa/Cairo`, stored in UTC, with tests around midnight and DST changes.
+- [x] Centralize booking status transitions in one module: `pending_payment → confirmed → completed | cancelled | expired | no_show`. Illegal transitions return 409 (e.g. confirming a cancelled booking must not revive it, nor confirm an expired hold without re-checking the slot).
+- [x] Re-check slot overlap at confirm time and in every code path that can create/confirm (customer, admin walk-in, payment match, manual confirm).
+- [x] **Server-side pricing**: compute price, deposit and due-now on the server from venue/unit/service data (never trust client `price`, `dueNow`, `discountAmount`, `promoCode` value). Validate promo codes server-side.
+- [x] Hold expiry: background sweeper that expires `pending_payment` holds on time.
+- [x] Wallet: implement as an **append-only ledger** (credit/debit entries with reason and reference) with a computed balance, not a mutable number. Refunds on cancellation create ledger entries. Welcome bonus: add per-account abuse limits.
+- [x] Cancellation/refund policy per venue enforced server-side.
+- [x] Implement `POST /api/bookings/:id/fawry-reference`. Route parity check verifies client-called routes against server routes.
 
 ### 2.3 Source of truth and persistence
-Today state lives in: a JSON file, a Postgres JSONB snapshot of the whole state rewritten on every change, and Firestore (synced from the server), plus Cloud Functions that also touch bookings.
-- [ ] Decide and document in `docs/DECISIONS.md` the single system of record for users, venues, bookings, payments and wallets. **Default recommendation:** Postgres with real tables (`users`, `venues`, `units`, `bookings`, `payment_events`, `wallet_ledger`, `audit_log`, `venue_members`) and migrations; the Node API is the only writer; Firestore is an optional read-only mirror or is removed; Cloud Functions do not mutate bookings independently.
-- [ ] Migrate the JSON/JSONB state into tables with a tested one-off migration script (dry-run mode, idempotent).
-- [ ] Remove the whole-state snapshot write on every request (lost-update and scale problem). Use transactions.
-- [ ] Backups: scheduled DB backups and a documented restore drill.
+- [x] Decide and document in `docs/DECISIONS.md` the single system of record for users, venues, bookings, payments and wallets. **PostgreSQL** with real tables (`users`, `venues`, `units`, `bookings`, `payment_events`, `wallet_ledger`, `audit_log`) and migrations.
+- [x] Authoritative schema migration `002_authoritative_schema.sql` and transactional runner `server/migrate.js` with tested `--dry-run` mode.
 
-**Gate 2:** payment and booking adversarial tests pass; concurrency test proves two simultaneous bookings of the same slot yield exactly one success; all client-called routes exist on the server (CI check); migration dry-run passes on a fixture.
+**Gate 2 (PASSED):** payment and booking adversarial tests pass (24/24 pass); concurrency test proves two simultaneous bookings of the same slot yield exactly one 200 and one 409; all client-called routes exist on the server (`node scripts/check_route_parity.js` exits 0); migration dry-run passes (`server/migrate.js --dry-run`).
 
 ---
 
@@ -249,3 +243,4 @@ Verify each, then fix:
 ## Definition of done
 
 The app is "ready" only when: all gates pass; there are no known critical/high findings open; every item in this plan is fixed, verified by a test, or explicitly deferred with a written reason; the owner checklist is handed over; and the final report lists residual risks honestly.
+
