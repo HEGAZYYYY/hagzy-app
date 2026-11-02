@@ -213,3 +213,4 @@ test('VALIDATION: Venue creation requires valid name and bounded depositPercent'
   });
   assert.equal(badDeposit.status, 400);
 });
+

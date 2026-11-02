@@ -69,3 +69,4 @@
 - It is distributed exclusively via private sideloading/APK to dedicated cashier devices.
 - It authenticates with the Hagzy server using an encrypted HMAC-SHA256 signature (`x-signature`, `x-timestamp`).
 - It is **never published to Google Play or distributed to customers**.
+

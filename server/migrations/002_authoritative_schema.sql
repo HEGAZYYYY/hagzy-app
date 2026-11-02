@@ -128,3 +128,4 @@ CREATE INDEX IF NOT EXISTS wallet_ledger_user_idx ON wallet_ledger (user_id, cre
 CREATE INDEX IF NOT EXISTS payment_intents_sender_amt_idx ON payment_intents (payment_method, expected_sender_identifier, expected_amount, status);
 CREATE INDEX IF NOT EXISTS payment_events_hash_idx ON payment_events (event_hash);
 CREATE INDEX IF NOT EXISTS audit_log_entity_idx ON audit_log (entity_type, entity_id);
+

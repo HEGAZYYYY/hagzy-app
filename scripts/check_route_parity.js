@@ -89,3 +89,4 @@ if (missing.length > 0) {
   console.log('SUCCESS: All client-called routes are registered on the server.');
   process.exit(0);
 }
+

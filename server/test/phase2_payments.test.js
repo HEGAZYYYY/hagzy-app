@@ -230,3 +230,4 @@ test('MIGRATIONS: dry-run validates authoritative schema without DB connection',
   assert.ok(summary.executed.length >= 2);
   assert.ok(summary.executed.some(e => e.file.includes('002_authoritative_schema')));
 });
+

@@ -96,7 +96,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     }
 
     final digits = phone.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 8 || digits.length > 15) {
+    String normalized = digits;
+    if (normalized.startsWith('20') && normalized.length == 12) {
+      normalized = normalized.substring(2);
+    }
+    if (!RegExp(r'^01[0125]\d{8}$').hasMatch(normalized)) {
       setState(() {
         _errorMessage = localized(
           widget.arabic,
