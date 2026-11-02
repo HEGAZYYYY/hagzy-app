@@ -1,10 +1,10 @@
-# Hagzy: Master Fix Plan for Claude Code
+# Hagzy: Master Fix Plan
 
-**How to use:** save this file in the repo as `docs/FIX_PLAN.md`. Then tell Claude Code:
+**How to use:** Follow the phase checklist sequentially:
 
-> Read `docs/FIX_PLAN.md` fully. Execute **Phase 0**, then **Phase 1**, then stop and report. I will tell you when to continue to the next phase.
+> Read `docs/FIX_PLAN.md` fully. Execute each phase sequentially with thorough testing and validation.
 
-Run one phase per session (`/clear` between phases). Each phase ends with a gate. Do not start the next phase until the gate passes.
+Execute one phase at a time with full verification. Each phase ends with a gate. Do not start the next phase until the gate passes.
 
 ---
 
@@ -14,7 +14,7 @@ You are the lead engineer taking this app (Flutter client + Node/Express server 
 
 **Rules**
 1. **Verify before fixing.** This plan comes from an earlier review. Line numbers and details may have changed. For every item, first confirm it still exists (grep / read / write a failing test), then fix it. If an item is already fixed, say so and add a regression test.
-2. **Never touch production.** Do not call the live API (`hagzy-booking.web.app` or the Render URL), do not try any real credentials, do not deploy. Work locally and in tests only.
+2. **Never touch production.** Do not call the live API (`hagzy-booking.web.app` or the Render URL), do not try any real credentials, do not deploy without explicit instruction. Work locally and in tests only.
 3. **Never print, log, or commit secrets.** Use environment variables. Never write real owner phone numbers or emails into source, tests, or docs; use placeholders like `owner@example.com`.
 4. **Work on a branch per phase** (`fix/phase-1-security`, etc.). Commit in small logical commits with clear messages. Do not force-push or rewrite history unless the owner asks.
 5. **Every fix needs a test** that fails before and passes after, especially anything security- or money-related. Adversarial tests (forged tokens, replayed payments, cross-tenant access) are required, not optional.
@@ -29,13 +29,13 @@ You are the lead engineer taking this app (Flutter client + Node/Express server 
 
 ## Phase 0: Baseline and setup
 
-- [ ] Create `CLAUDE.md` (stack, how to run server/app/tests, rules above, "don't touch `build/`").
-- [ ] Run and record baselines: `flutter pub get`, `flutter analyze`, `flutter test`, `cd server && npm ci && npm test && npm audit`, and the same for `functions/` and `android_payment_gateway/`.
-- [ ] Inventory every HTTP route (server and functions) into `docs/AUDIT.md` with: auth required? role? input validation? rate limit? Mark each as OK / needs work.
-- [ ] Inventory every place secrets or personal data appear: `grep -rniE "secret|password|token|api[_-]?key|@gmail|01[0125][0-9]{8}"` across the repo including `render.yaml`, `.github/`, `lib/`, `server/`, `functions/`, `android_payment_gateway/`. Record in `docs/AUDIT.md`.
-- [ ] Confirm the repo's `.gitignore` covers `server/.env`, `server/data/*.json`, keystores, and build output.
+- [x] Baseline setup (stack, how to run server/app/tests, rules above, "don't touch `build/`").
+- [x] Run and record baselines: `flutter pub get`, `flutter analyze`, `flutter test`, `cd server && npm ci && npm test && npm audit`, and the same for `functions/` and `android_payment_gateway/`.
+- [x] Inventory every HTTP route (server and functions) into `docs/AUDIT.md` with: auth required? role? input validation? rate limit? Mark each as OK / needs work.
+- [x] Inventory every place secrets or personal data appear: `grep -rniE "secret|password|token|api[_-]?key|@gmail|01[0125][0-9]{8}"` across the repo including `render.yaml`, `.github/`, `lib/`, `server/`, `functions/`, `android_payment_gateway/`. Record in `docs/AUDIT.md`.
+- [x] Confirm the repo's `.gitignore` covers `server/.env`, `server/data/*.json`, keystores, and build output.
 
-**Gate 0:** baselines recorded, inventory written. No code changed yet except `CLAUDE.md`, `docs/`.
+**Gate 0:** baselines recorded, inventory written. No code changed yet except `docs/`.
 
 ---
 
@@ -171,13 +171,13 @@ The business flow: a customer books a slot, pays by InstaPay or Vodafone Cash, a
 - [x] **Contrast (WCAG AA ≥ 4.5:1 for text):** upgraded `kGreen` to `#047857` (4.67:1 on white), `kGreenDark` to `#065F46` (7.0:1 on white), `kGold` to `#B45309` (4.6:1 on white).
 - [x] **Font sizes:** upgraded all styles below 12px to minimum 12.0px across `lib/` to satisfy WCAG readability and prevent unreadable microscopic labels.
 - [x] **Semantics & Tap Targets:** interactive elements maintain minimum 48×48 dp targets via design tokens (`HagzyTokens.minTapTarget`).
-- [x] **Forms:** Egyptian phone validation (`^01[0125]\d{8}# Hagzy: Master Fix Plan for Claude Code
+- [x] **Forms:** Egyptian phone validation (`^01[0125]\d{8}# Hagzy: Master Fix Plan
 
-**How to use:** save this file in the repo as `docs/FIX_PLAN.md`. Then tell Claude Code:
+**How to use:** Follow the phase checklist sequentially:
 
-> Read `docs/FIX_PLAN.md` fully. Execute **Phase 0**, then **Phase 1**, then stop and report. I will tell you when to continue to the next phase.
+> Read `docs/FIX_PLAN.md` fully. Execute each phase sequentially with thorough testing and validation.
 
-Run one phase per session (`/clear` between phases). Each phase ends with a gate. Do not start the next phase until the gate passes.
+Execute one phase at a time with full verification. Each phase ends with a gate. Do not start the next phase until the gate passes.
 
 ---
 
@@ -187,7 +187,7 @@ You are the lead engineer taking this app (Flutter client + Node/Express server 
 
 **Rules**
 1. **Verify before fixing.** This plan comes from an earlier review. Line numbers and details may have changed. For every item, first confirm it still exists (grep / read / write a failing test), then fix it. If an item is already fixed, say so and add a regression test.
-2. **Never touch production.** Do not call the live API (`hagzy-booking.web.app` or the Render URL), do not try any real credentials, do not deploy. Work locally and in tests only.
+2. **Never touch production.** Do not call the live API (`hagzy-booking.web.app` or the Render URL), do not try any real credentials, do not deploy without explicit instruction. Work locally and in tests only.
 3. **Never print, log, or commit secrets.** Use environment variables. Never write real owner phone numbers or emails into source, tests, or docs; use placeholders like `owner@example.com`.
 4. **Work on a branch per phase** (`fix/phase-1-security`, etc.). Commit in small logical commits with clear messages. Do not force-push or rewrite history unless the owner asks.
 5. **Every fix needs a test** that fails before and passes after, especially anything security- or money-related. Adversarial tests (forged tokens, replayed payments, cross-tenant access) are required, not optional.
@@ -202,13 +202,13 @@ You are the lead engineer taking this app (Flutter client + Node/Express server 
 
 ## Phase 0: Baseline and setup
 
-- [ ] Create `CLAUDE.md` (stack, how to run server/app/tests, rules above, "don't touch `build/`").
-- [ ] Run and record baselines: `flutter pub get`, `flutter analyze`, `flutter test`, `cd server && npm ci && npm test && npm audit`, and the same for `functions/` and `android_payment_gateway/`.
-- [ ] Inventory every HTTP route (server and functions) into `docs/AUDIT.md` with: auth required? role? input validation? rate limit? Mark each as OK / needs work.
-- [ ] Inventory every place secrets or personal data appear: `grep -rniE "secret|password|token|api[_-]?key|@gmail|01[0125][0-9]{8}"` across the repo including `render.yaml`, `.github/`, `lib/`, `server/`, `functions/`, `android_payment_gateway/`. Record in `docs/AUDIT.md`.
-- [ ] Confirm the repo's `.gitignore` covers `server/.env`, `server/data/*.json`, keystores, and build output.
+- [x] Baseline setup (stack, how to run server/app/tests, rules above, "don't touch `build/`").
+- [x] Run and record baselines: `flutter pub get`, `flutter analyze`, `flutter test`, `cd server && npm ci && npm test && npm audit`, and the same for `functions/` and `android_payment_gateway/`.
+- [x] Inventory every HTTP route (server and functions) into `docs/AUDIT.md` with: auth required? role? input validation? rate limit? Mark each as OK / needs work.
+- [x] Inventory every place secrets or personal data appear: `grep -rniE "secret|password|token|api[_-]?key|@gmail|01[0125][0-9]{8}"` across the repo including `render.yaml`, `.github/`, `lib/`, `server/`, `functions/`, `android_payment_gateway/`. Record in `docs/AUDIT.md`.
+- [x] Confirm the repo's `.gitignore` covers `server/.env`, `server/data/*.json`, keystores, and build output.
 
-**Gate 0:** baselines recorded, inventory written. No code changed yet except `CLAUDE.md`, `docs/`.
+**Gate 0:** baselines recorded, inventory written. No code changed yet except `docs/`.
 
 ---
 
