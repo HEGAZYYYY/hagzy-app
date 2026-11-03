@@ -1,6 +1,24 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/models/models_v2.dart';
+
+String resolveVenueBookingUrl(String venueId) {
+  const envUrl = String.fromEnvironment('HAGZY_PUBLIC_URL');
+  if (envUrl.isNotEmpty) {
+    final clean = envUrl.endsWith('/') ? envUrl.substring(0, envUrl.length - 1) : envUrl;
+    return '$clean/#/venue/$venueId';
+  }
+  if (kIsWeb) {
+    try {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.contains('localhost') && !origin.contains('127.0.0.1')) {
+        return '$origin/#/venue/$venueId';
+      }
+    } catch (_) {}
+  }
+  return 'https://hagzy-booking.web.app/#/venue/$venueId';
+}
 
 /// Printable In-App Counter Standee Generator for Venue Merchants
 class QrStandeeGenerator extends StatelessWidget {
@@ -17,7 +35,7 @@ class QrStandeeGenerator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bookingUrl = 'https://hagzy.app/venue/${venue.id}';
+    final bookingUrl = resolveVenueBookingUrl(venue.id);
 
     return Scaffold(
       appBar: AppBar(

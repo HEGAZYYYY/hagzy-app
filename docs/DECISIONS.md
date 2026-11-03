@@ -43,13 +43,14 @@ This document records key technical decisions, trade-offs, and defaults selected
 
 ---
 
-## ADR 005: System of Record & Relational Schema
-- **Context**: State previously spanned JSON files, JSONB blobs in PostgreSQL, and Firestore mirrors with no authoritative relational constraints.
-- **Decision**:
-  1. PostgreSQL is the authoritative system of record for all business-critical entities (`users`, `venues`, `bookable_units`, `bookings`, `payment_intents`, `payment_events`, `wallet_ledger`, `audit_log`).
-  2. Database migrations are managed via versioned `.sql` files in `server/migrations/` and executed transactionally using `server/migrate.js`.
-  3. Firestore serves strictly as an optional read mirror; direct client writes for financial/booking records are blocked.
-- **Status**: Implemented in Phase 2 (`server/migrations/002_authoritative_schema.sql` and `server/migrate.js`).
+## ADR 005: System of Record & Storage Architecture
+- **Context**: State originally spanned JSON files, JSONB blobs in PostgreSQL, and Firestore mirrors with no authoritative relational constraints.
+- **Current Architecture**:
+  1. The Node.js backend operates a low-latency in-memory state engine backed by an asynchronous, serialised write chain that commits snapshots atomically to local disk (`hagzy_db.json`) and to cloud PostgreSQL (`hagzy_state` table).
+  2. Authoritative PostgreSQL relational schema migrations (`server/migrations/`) are tracked via `schema_migrations` and executed transactionally on boot via `server/migrate.js` whenever `DATABASE_URL` is configured.
+  3. Firestore serves strictly as an optional real-time read mirror; direct client writes for financial/booking records are blocked.
+  4. Migration roadmap: Full dual-write / write-through relational persistence from the in-memory state engine directly into individual normalized tables is scheduled after pilot venue deployment.
+- **Status**: Schema migrations runner wired into startup; hybrid in-memory + JSONB state snapshot active in Phase 2 & 6.
 
 ---
 

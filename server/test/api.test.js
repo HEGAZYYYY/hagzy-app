@@ -169,6 +169,52 @@ test('customer registration grants 0 EGP balance and login works with bcrypt', a
   assert.equal(wrong.status, 401);
 });
 
+test('unverified email registration cannot hijack past bookings; OTP verification claims them', async () => {
+  const victimEmail = `victim_${Date.now()}@test.dev`;
+  
+  // Create an unauthenticated booking with victimEmail
+  const bRes = await call('POST', '/api/bookings', {
+    body: booking({ email: victimEmail, phone: '01099998888' })
+  });
+  assert.equal(bRes.status, 200);
+  const bookingId = bRes.json.booking.id;
+
+  // Attacker attempts to register with victimEmail
+  const attackerReg = await call('POST', '/api/auth/customer/register', {
+    body: { name: 'Attacker', email: victimEmail, password: 'Password123' }
+  });
+  assert.equal(attackerReg.status, 201);
+  assert.equal(attackerReg.json.customer.emailVerified, false);
+  const attackerToken = attackerReg.json.token;
+
+  // Attacker should NOT have claimed the booking because email is unverified
+  const attackerBookings = await call('GET', '/api/bookings', { token: attackerToken });
+  assert.equal(attackerBookings.status, 200);
+  const hasBooking = attackerBookings.json.bookings.some(b => b.id === bookingId);
+  assert.equal(hasBooking, false, 'Unverified account should not claim victim booking');
+
+  // Request verification code for victimEmail
+  const otpReq = await call('POST', '/api/auth/customer-otp/request', {
+    body: { email: victimEmail }
+  });
+  assert.equal(otpReq.status, 200);
+  const code = otpReq.json.testOtp;
+  assert.ok(code);
+
+  // Verify email via OTP
+  const verifyRes = await call('POST', '/api/auth/customer/verify-email', {
+    body: { email: victimEmail, code }
+  });
+  assert.equal(verifyRes.status, 200);
+  assert.equal(verifyRes.json.emailVerified, true);
+
+  // After verification, the booking is claimed!
+  const verifiedBookings = await call('GET', '/api/bookings', { token: attackerToken });
+  assert.equal(verifiedBookings.status, 200);
+  const hasClaimed = verifiedBookings.json.bookings.some(b => b.id === bookingId);
+  assert.equal(hasClaimed, true, 'Verified email account claims matching booking');
+});
+
 test('customer profile editing, duplicate rejection, and logout invalidation', async () => {
   const email = `profile_${Date.now()}@test.dev`;
   const reg = await call('POST', '/api/auth/customer/register', {

@@ -514,6 +514,7 @@ async function hydrateVenuesFromFirebase() {
 }
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
+const { runMigrations } = require('./migrate');
 require('dotenv').config();
 
 const app = express();
@@ -705,6 +706,16 @@ async function hydratePostgres() {
     return;
   }
   try {
+    // 1. Run authoritative relational schema migrations on the database
+    try {
+      console.log('🐘 Executing PostgreSQL schema migrations...');
+      await runMigrations({ pool: pgPool });
+      console.log('🐘 Schema migrations up-to-date.');
+    } catch (migErr) {
+      console.warn('🐘 Schema migration notice:', migErr.message);
+    }
+
+    // 2. Hydrate in-memory state from PostgreSQL
     await pgPool.query(`CREATE TABLE IF NOT EXISTS hagzy_state (
       id INT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())`);
     const { rows } = await pgPool.query('SELECT data FROM hagzy_state WHERE id = 1');
@@ -714,6 +725,9 @@ async function hydratePostgres() {
       db.venues = Array.isArray(cloudData.venues) && cloudData.venues.length ? cloudData.venues : db.venues;
       db.bookings = Array.isArray(cloudData.bookings) ? cloudData.bookings : [];
       db.otps = cloudData.otps || {};
+      db.walletLedger = Array.isArray(cloudData.walletLedger) ? cloudData.walletLedger : (db.walletLedger || []);
+      db.auditLog = Array.isArray(cloudData.auditLog) ? cloudData.auditLog : (db.auditLog || []);
+      db.reviewQueue = Array.isArray(cloudData.reviewQueue) ? cloudData.reviewQueue : (db.reviewQueue || []);
       try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); } catch (_) {}
       console.log(`🐘 State restored from PostgreSQL: ${db.users.length} users, ${db.bookings.length} bookings.`);
     } else {
@@ -1760,6 +1774,8 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
       email: isEmail ? target : '',
       name: resolvedName,
       walletBalance: 50.0, // 50 EGP welcome gift balance
+      emailVerified: isEmail,
+      phoneVerified: !isEmail,
       createdAt: new Date().toISOString()
     };
     db.users.push(user);
@@ -1772,8 +1788,12 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
         actor: 'system'
       });
     } catch (_) {}
-  } else if (name && (!user.name || user.name === 'Hagzy Member')) {
-    user.name = String(name).slice(0, 80);
+  } else {
+    if (isEmail) user.emailVerified = true;
+    else user.phoneVerified = true;
+    if (name && (!user.name || user.name === 'Hagzy Member')) {
+      user.name = String(name).slice(0, 80);
+    }
   }
   claimCustomerBookings(user);
   saveDb(db);
@@ -1852,8 +1872,9 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
 
 function claimCustomerBookings(user) {
   if (!user || !user.id) return;
-  const userPhone = normalizeLocalPhone(user.phone);
-  const userEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+  // Security: only claim past bookings by identifier if that identifier has been verified!
+  const userPhone = user.phoneVerified ? normalizeLocalPhone(user.phone) : '';
+  const userEmail = user.emailVerified ? String(user.email).trim().toLowerCase() : '';
   let changed = false;
   for (const b of db.bookings) {
     const bPhone = normalizeLocalPhone(b.phone || b.customerPhone);
@@ -1908,6 +1929,21 @@ app.post('/api/auth/customer/register', async (req, res) => {
     }
   }
 
+  let emailVerified = false;
+  if (req.body.code || req.body.otp) {
+    const inputCode = String(req.body.code || req.body.otp).trim();
+    const record = db.otps[cleanEmail];
+    if (record && Date.now() <= record.expiresAt) {
+      const inputHash = crypto.createHash('sha256').update(inputCode).digest('hex');
+      const a = Buffer.from(record.hashedCode);
+      const b = Buffer.from(inputHash);
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+        emailVerified = true;
+        delete db.otps[cleanEmail];
+      }
+    }
+  }
+
   const passwordHash = await hashPassword(password);
   const newUser = {
     id: buildCleanUserId({ name: cleanName || cleanEmail.split('@')[0], email: cleanEmail, phone: cleanPhone }),
@@ -1917,6 +1953,8 @@ app.post('/api/auth/customer/register', async (req, res) => {
     passwordHash,
     walletBalance: 0.0,
     authProvider: 'email_password',
+    emailVerified,
+    phoneVerified: false,
     createdAt: new Date().toISOString()
   };
 
@@ -1939,7 +1977,8 @@ app.post('/api/auth/customer/register', async (req, res) => {
       name: newUser.name,
       email: newUser.email,
       phone: newUser.phone,
-      walletBalance: 0.0
+      walletBalance: 0.0,
+      emailVerified: newUser.emailVerified
     }
   });
 });
@@ -2001,6 +2040,47 @@ app.post('/api/auth/customer/login', async (req, res) => {
       isAdmin
     }
   });
+});
+
+// Customer Email Verification via OTP
+app.post('/api/auth/customer/verify-email', async (req, res) => {
+  const { email, code } = req.body || {};
+  const cleanEmail = normalizeTarget(email);
+  if (!cleanEmail || !cleanEmail.includes('@') || !code) {
+    return res.status(400).json({ error: 'Email and verification code are required' });
+  }
+
+  const record = db.otps[cleanEmail];
+  if (!record) {
+    return res.status(400).json({ error: 'No verification code was requested for this email, or it has expired.' });
+  }
+  if (Date.now() > record.expiresAt) {
+    delete db.otps[cleanEmail];
+    saveDb(db);
+    return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+  }
+
+  const inputHash = crypto.createHash('sha256').update(String(code).trim()).digest('hex');
+  const a = Buffer.from(record.hashedCode);
+  const b = Buffer.from(inputHash);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    saveDb(db);
+    return res.status(400).json({ error: 'Invalid verification code.' });
+  }
+
+  delete db.otps[cleanEmail];
+  const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  if (!user) {
+    saveDb(db);
+    return res.status(404).json({ error: 'User account not found' });
+  }
+
+  user.emailVerified = true;
+  claimCustomerBookings(user);
+  saveDb(db);
+  syncUserToFirebase(user);
+
+  return res.json({ success: true, emailVerified: true, message: 'Email verified successfully.' });
 });
 
 // Customer Logout & Session Invalidation
@@ -2713,8 +2793,8 @@ app.get('/api/bookings', authenticateCustomer, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
   claimCustomerBookings(user);
 
-  const userPhone = user.phone ? String(user.phone).replace(/\D/g, '') : '';
-  const userEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+  const userPhone = user.phoneVerified ? String(user.phone).replace(/\D/g, '') : '';
+  const userEmail = user.emailVerified ? String(user.email).trim().toLowerCase() : '';
 
   const mine = db.bookings.filter(b => {
     if (b.ownerId === user.id || b.customerId === user.id) return true;
@@ -2741,8 +2821,8 @@ app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const isOwner = (booking.ownerId === user.id) || (booking.customerId === user.id) ||
-    (user.phone && booking.phone && user.phone.replace(/\D/g, '') === String(booking.phone).replace(/\D/g, '')) ||
-    (user.email && booking.email && user.email.toLowerCase() === String(booking.email).toLowerCase());
+    (user.phoneVerified && user.phone && booking.phone && user.phone.replace(/\D/g, '') === String(booking.phone).replace(/\D/g, '')) ||
+    (user.emailVerified && user.email && booking.email && user.email.toLowerCase() === String(booking.email).toLowerCase());
 
   if (!isOwner) {
     return res.status(403).json({ error: 'You are not authorized to cancel this booking.' });

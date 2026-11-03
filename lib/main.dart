@@ -66,6 +66,30 @@ class HagzyApp extends StatelessWidget {
     }
   }
 
+  static String? get _initialVenueFromUri {
+    if (!kIsWeb) return null;
+    try {
+      final segments = Uri.base.pathSegments;
+      if (segments.isNotEmpty && segments[0] == 'venue' && segments.length > 1) {
+        return segments[1];
+      }
+      final frag = Uri.base.fragment;
+      if (frag.isNotEmpty) {
+        final normalized = frag.startsWith('/') ? frag : '/$frag';
+        final fragUri = Uri.tryParse(normalized);
+        if (fragUri != null &&
+            fragUri.pathSegments.isNotEmpty &&
+            fragUri.pathSegments[0] == 'venue' &&
+            fragUri.pathSegments.length > 1) {
+          return fragUri.pathSegments[1];
+        }
+      }
+      final q = Uri.base.queryParameters['venue'];
+      if (q != null && q.isNotEmpty) return q;
+    } catch (_) {}
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<String>(
         valueListenable: kAppLanguage,
@@ -90,6 +114,7 @@ class HagzyApp extends StatelessWidget {
             home: HagzyHome(
               adminMode: adminMode || _isWebPortalPath,
               initialMode: initialMode,
+              initialVenueId: _initialVenueFromUri,
             ),
             onGenerateRoute: (settings) {
               final uri = Uri.tryParse(settings.name ?? '');
