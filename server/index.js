@@ -835,6 +835,20 @@ app.use(express.json({
     req.rawBody = buf;
   }
 }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: '200kb',
+  verify: (req, res, buf) => {
+    if (!req.rawBody) req.rawBody = buf;
+  }
+}));
+app.use(express.text({
+  type: ['text/*', 'application/text', 'application/octet-stream'],
+  limit: '200kb',
+  verify: (req, res, buf) => {
+    if (!req.rawBody) req.rawBody = buf;
+  }
+}));
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -3133,8 +3147,9 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   if (amount === null) {
     const amountRegexes = [
       /(?:مبلغ|بمبلغ|بقيمة|قيمة|استلام|استلمت|تحويل|إيداع|ايداع)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|ج م|egp|le)/i,
-      /(?:received|you have received|you received|transfer of)\s+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
-      /([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le|جنيه|ج\.م|جم)\s+(?:received|from|من)/i,
+      /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)\s+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
+      /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le)?/i,
+      /([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le|جنيه|ج\.م|جم)\s+(?:received|recieved|from|من)/i,
       /(?:مبلغ|بمبلغ|بقيمة)\s+([0-9]+(?:\.[0-9]+)?)/i,
       /([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|egp|le)/i,
     ];
@@ -3326,6 +3341,78 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
         saveDb(db);
         syncBookingToFirebase(b);
         return { success: true, matched: true, bookingId: b.id, amount: numAmount, excessAmount };
+      }
+    }
+  }
+
+  // Fallback: Check open pending bookings directly if no payment intent was active
+  if (!matchResult.matched && Array.isArray(db.bookings)) {
+    const candidateBookings = db.bookings.filter(b => {
+      if (b.status !== 'pending_payment' && b.status !== 'awaiting_payment') return false;
+      if (b.cancelled) return false;
+
+      // Check amount: b.dueNow or b.depositAmount or b.price
+      const bAmount = Number(b.dueNow ?? b.depositAmount ?? b.totalPrice ?? b.price ?? 0);
+      if (bAmount > 0 && Math.abs(bAmount - numAmount) > 0.005 && numAmount < bAmount) {
+        return false;
+      }
+
+      // Check sender match
+      const proofRef = (b.paymentProof && b.paymentProof.reference) ? String(b.paymentProof.reference).trim().toLowerCase() : '';
+      const bCustomer = String(b.customer || '').trim().toLowerCase();
+      const bPhone = normalizeLocalPhone(b.phone || b.customerPhone || '');
+      const bProofPhone = normalizeLocalPhone(proofRef);
+
+      if (method === 'INSTAPAY') {
+        const handle = normalizedSender.toLowerCase().replace(/@instapay$/i, '');
+        // Match against proof reference (with or without @instapay), customer name, or handle
+        if (proofRef && (proofRef === handle || proofRef === normalizedSender.toLowerCase() || proofRef.replace(/@instapay$/i, '') === handle)) {
+          return true;
+        }
+        if (bCustomer && handle && (bCustomer.includes(handle) || handle.includes(bCustomer))) {
+          return true;
+        }
+        if (bPhone && normalizedSender.includes(bPhone)) {
+          return true;
+        }
+      } else if (method === 'MOBILE_WALLET') {
+        // Mobile wallet: match against customer phone or proof phone
+        if (bPhone && bPhone === normalizedSender) return true;
+        if (bProofPhone && bProofPhone === normalizedSender) return true;
+      }
+
+      return false;
+    });
+
+    if (candidateBookings.length === 1) {
+      const b = candidateBookings[0];
+      const bAmount = Number(b.dueNow ?? b.depositAmount ?? b.totalPrice ?? b.price ?? 0);
+      const excessAmount = Math.max(0, numAmount - bAmount);
+
+      // Check slot conflict before confirming!
+      if (!checkSlotConflict(b.id, b.venueId, b.itemId, b.startsAt, b.durationMinutes)) {
+        markBookingConfirmed(b, {
+          method,
+          providerRef: providerRef || `auto_${Date.now()}`,
+          amount: numAmount,
+          excess: excessAmount,
+          actor: 'payment_listener',
+          reason: `Automated match via incoming ${method} transfer notification`
+        });
+        saveDb(db);
+        syncBookingToFirebase(b);
+        processedPaymentHashes.add(matchResult.eventHash || computePaymentEventHash({ providerRef, senderIdentifier: normalizedSender, amount: numAmount, rawText }));
+        return {
+          success: true,
+          matched: true,
+          bookingId: b.id,
+          amount: numAmount,
+          excessAmount,
+          paymentMethod: method,
+          senderIdentifier: normalizedSender,
+          status: 'CONFIRMED',
+          message: `Booking ${b.id} confirmed successfully.`
+        };
       }
     }
   }
@@ -3686,11 +3773,21 @@ app.get(['/api/payments/listener', '/api/payments/android-listener'], (req, res)
 
 app.post(['/api/payments/listener', '/api/payments/android-listener'], async (req, res) => {
   const isHtml = req.headers.accept && req.headers.accept.includes('text/html');
-  const payload = req.body || {};
 
-  // Disallow query parameter secrets
+  let payload = req.body;
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload);
+    } catch (_) {
+      payload = { text: payload };
+    }
+  } else if (!payload || typeof payload !== 'object') {
+    payload = {};
+  }
+
+  // Disallow query parameter secrets (prevents credential leakage in server access logs)
   if (req.query.secret || req.query.key) {
-    return res.status(401).json({ error: 'Secrets in query parameters are strictly forbidden. Use authorization headers.' });
+    return res.status(401).json({ error: 'Secrets in query parameters are strictly forbidden. Use authorization headers or request body.' });
   }
 
   const configuredSecret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET;
@@ -3701,7 +3798,8 @@ app.post(['/api/payments/listener', '/api/payments/android-listener'], async (re
   const signature = req.headers['x-signature'] || req.headers['x-hagzy-signature'];
   const timestamp = req.headers['x-timestamp'];
   const listenerKey = req.headers['x-listener-key'] ||
-                      (req.headers['authorization'] ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : null);
+                      (req.headers['authorization'] ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : null) ||
+                      payload.secret;
 
   let authenticated = false;
 
@@ -3718,7 +3816,7 @@ app.post(['/api/payments/listener', '/api/payments/android-listener'], async (re
     const expectedSig = crypto.createHmac('sha256', configuredSecret).update(rawPayload).update('.').update(String(timestamp)).digest('hex');
     authenticated = safeEqual(signature, expectedSig);
   } else if (listenerKey) {
-    // 2. Header-based listener key constant-time comparison
+    // 2. Secret-based listener key constant-time comparison (Header or Body)
     authenticated = safeEqual(listenerKey, configuredSecret);
   }
 
@@ -3726,7 +3824,19 @@ app.post(['/api/payments/listener', '/api/payments/android-listener'], async (re
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing listener authentication' });
   }
 
-  const rawText = payload.text || payload.smsBody || payload.body || payload.message || payload.not_text || '';
+  let rawText = payload.text || payload.smsBody || payload.body || payload.message || payload.not_text || payload.notification_text || '';
+  if (!rawText && req.rawBody) {
+    const rawStr = req.rawBody.toString('utf8').trim();
+    if (rawStr) {
+      try {
+        const parsedJson = JSON.parse(rawStr);
+        payload = { ...parsedJson, ...payload };
+        rawText = payload.text || payload.smsBody || payload.body || payload.message || payload.not_text || payload.notification_text || rawStr;
+      } catch (_) {
+        rawText = rawStr;
+      }
+    }
+  }
 
   const parsed = parseIncomingTransferText(rawText, payload);
   if (!parsed || !parsed.amount || !parsed.senderIdentifier) {

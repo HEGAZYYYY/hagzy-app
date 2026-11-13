@@ -477,6 +477,34 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   assert.equal(dualPhoneRes.status, 200);
   assert.equal(dualPhoneRes.json.matched, true);
   assert.equal(dualPhoneRes.json.bookingId, instaBookingId);
+
+  // 9. English InstaPay notification with 'recieved' typo, fallback proof matching, and body-based secret
+  const bResEnglish = await call('POST', '/api/bookings', { token: cust, body: booking({ startsAt: slot(9) }) });
+  assert.equal(bResEnglish.status, 200);
+  const englishBookingId = bResEnglish.json.booking.id;
+  const englishAmount = bResEnglish.json.booking.dueNow ?? bResEnglish.json.booking.price ?? 100;
+
+  const proofRes = await call('POST', `/api/bookings/${englishBookingId}/payment-proof`, {
+    token: cust,
+    body: { method: 'instapay', reference: 'mohamedra4adhegazy' }
+  });
+  assert.equal(proofRes.status, 200);
+
+  const englishNotifRes = await call('POST', '/api/payments/listener', {
+    body: {
+      secret: 'test-listener-secret',
+      text: `You have recieved ${Number(englishAmount).toFixed(2)} EGP from mohamedra4adhegazy@instapay`,
+      appName: 'InstaPay'
+    }
+  });
+  assert.equal(englishNotifRes.status, 200);
+  assert.equal(englishNotifRes.json.matched, true);
+  assert.equal(englishNotifRes.json.bookingId, englishBookingId);
+
+  const checkEnglishBooking = await call('GET', `/api/bookings/${englishBookingId}`, { token: cust });
+  assert.equal(checkEnglishBooking.status, 200);
+  assert.equal(checkEnglishBooking.json.booking.status, 'confirmed');
+  assert.equal(checkEnglishBooking.json.booking.depositPaid, true);
 });
 
 test('whitelisted admin identity is granted owner privileges via OTP and login', async () => {
