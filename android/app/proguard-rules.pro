@@ -17,3 +17,4 @@
     @com.google.gson.annotations.SerializedName <fields>;
 }
 -keepattributes *Annotation*,EnclosingMethod,Signature,InnerClasses
+

@@ -137,7 +137,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               headcount: 1,
               initialMethod: 'instapay',
               receiverIpa: 'hagzy@instapay',
-              receiverWallet: '01000000000',
+              receiverWallet: '01015325250',
               onPaymentVerified: () async {
                 final newBal = await HagzyWallet.addFunds(amount);
                 widget.onWalletUpdated?.call(newBal);

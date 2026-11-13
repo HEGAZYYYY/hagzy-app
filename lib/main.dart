@@ -311,7 +311,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
       return result;
     } catch (_) {
-      return upsertNaderSalon(venues);
+      return kSeedNaderSalon ? upsertNaderSalon(venues) : venues;
     }
   }
 
@@ -2906,7 +2906,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                 : 'venue@instapay',
             receiverWallet: venue?.vodafoneCashNumber.isNotEmpty == true
                 ? venue!.vodafoneCashNumber
-                : '01000000000',
+                : '01015325250',
             prefilledSenderPhone: booking.phone.isNotEmpty
                 ? booking.phone
                 : _savedCustomerPhone,
@@ -3706,7 +3706,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             : 'hagzy@instapay';
         final vf = venue?.vodafoneCashNumber.isNotEmpty == true
             ? venue!.vodafoneCashNumber
-            : '01024129393';
+            : '01015325250';
         return localized(
           arabic,
           'Deposit Payment Options:\n1. Paymob: Instant Visa, Mastercard & Meeza checkout.\n2. FawryPay: Service Code 78890 (generate your 10-digit code in 1 tap).\n3. InstaPay: Send to $insta\n4. Vodafone Cash: Send to $vf\n\nTip: You can also paste your transfer reference code right here in the chat!',

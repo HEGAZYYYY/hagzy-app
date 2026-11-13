@@ -98,7 +98,7 @@ class UnifiedPaymentScreen extends StatefulWidget {
     required this.arabic,
     this.initialMethod = 'instapay',
     this.receiverIpa = 'hagzy@instapay',
-    this.receiverWallet = '01000000000',
+    this.receiverWallet = '01015325250',
     this.prefilledSenderPhone = '',
     this.authToken,
     this.onPaymentVerified,

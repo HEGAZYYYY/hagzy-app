@@ -3152,12 +3152,13 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   }
 
   // 3. Parse Sender Identifier
+  const RECEIVER_WALLETS = new Set([
+    normalizeLocalPhone(process.env.ADMIN_PHONE || '01015325250'),
+    ...(process.env.RECEIVER_WALLETS || '').split(',').map(normalizeLocalPhone)
+  ].filter(Boolean));
+
   if (!senderIdentifier) {
     if (paymentMethod === 'MOBILE_WALLET') {
-      const RECEIVER_WALLETS = new Set([
-  normalizeLocalPhone(process.env.ADMIN_PHONE || ''),
-  ...(process.env.RECEIVER_WALLETS || '').split(',').map(normalizeLocalPhone)
-].filter(Boolean));
       const phoneMatches = fullText.match(/(?:من\s+رقم|من|from\s+number|from)?\s*(01[0125][0-9]{8})/i);
       if (phoneMatches && phoneMatches[1] && !RECEIVER_WALLETS.has(phoneMatches[1])) {
         senderIdentifier = phoneMatches[1];
@@ -3172,14 +3173,23 @@ function parseIncomingTransferText(rawText, metadata = {}) {
       }
     } else {
       const handleMatch = fullText.match(/([a-zA-Z0-9._-]+@instapay)/i);
-      if (handleMatch && handleMatch[1]) {
+      if (handleMatch && handleMatch[1] && !RECEIVER_WALLETS.has(normalizeLocalPhone(handleMatch[1]))) {
         senderIdentifier = handleMatch[1];
       } else {
         const fromMatch = fullText.match(/(?:من|from)\s+([a-zA-Z0-9._-]+)/i);
         if (fromMatch && fromMatch[1]) {
           const raw = fromMatch[1].trim();
-          if (!/^(رقم|حساب|بنك|bank|account)$/i.test(raw)) {
+          if (!/^(رقم|حساب|بنك|bank|account)$/i.test(raw) && !RECEIVER_WALLETS.has(normalizeLocalPhone(raw))) {
             senderIdentifier = raw;
+          }
+        }
+        if (!senderIdentifier) {
+          const allPhones = fullText.match(/01[0125][0-9]{8}/g) || [];
+          for (const p of allPhones) {
+            if (!RECEIVER_WALLETS.has(p)) {
+              senderIdentifier = p;
+              break;
+            }
           }
         }
       }
@@ -3904,7 +3914,7 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
   // 3. Deposit / Payment methods ("دفع", "عربون", "انستاباي", "فودافون كاش", "فوري", "pay", "deposit")
   if (lower.includes('pay') || lower.includes('deposit') || lower.includes('دفع') || lower.includes('عربون') || lower.includes('انستاباي') || lower.includes('فودافون')) {
     const insta = venue?.instaPayAddress || 'hagzy@instapay';
-    const vf = venue?.vodafoneCashNumber || '01024129393';
+    const vf = venue?.vodafoneCashNumber || process.env.ADMIN_PHONE || '01015325250';
     return arabic
       ? `💳 طرق دفع العربون المتاحة في حجزي:\n\n` +
         `١. فوري باي (FawryPay): كود الخدمة 78890\n` +

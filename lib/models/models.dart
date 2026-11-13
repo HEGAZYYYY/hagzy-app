@@ -922,6 +922,50 @@ class Booking {
   }
 }
 
+Venue demo5EgpVenueSample() => Venue(
+      id: 'hagzy-demo-5egp',
+      name: 'Hagzy 5 EGP Test Lab (تجربة ٥ جنيه)',
+      location: 'Kafr El Sheikh & Cairo',
+      type: VenueType.lounge,
+      subCategories: const ['playstation'],
+      ownerPhone: '01015325250',
+      depositPercent: 100,
+      latitude: 30.0444,
+      longitude: 31.2357,
+      staffMembers: const ['Demo Host / كابتن التجربة'],
+      imageUrl:
+          'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1000&q=80',
+      galleryUrls: const [
+        'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80',
+      ],
+      googleMapsUrl: 'https://maps.google.com/?q=Cairo+Egypt',
+      description:
+          'مختبر حجزي التجريبي لاختبار دفع ٥ جنيه عبر إنستاباي وفودافون كاش والتأكيد الفوري.',
+      instaPayAddress: '01015325250',
+      vodafoneCashNumber: '01015325250',
+      openHour: 0,
+      closeHour: 24,
+      rating: 5.0,
+      amenities: const ['Instant Verification', '5 EGP Demo', 'AC', 'Wi-Fi'],
+      items: [
+        VenueItem(
+          id: 'demo-slot-5egp',
+          name: '5 EGP Test Slot (حجز تجريبي ٥ جنيه)',
+          kind: 'PlayStation / PS5',
+          hourlyRate: 5.0,
+          multiRate: 0.0,
+        ),
+      ],
+      services: [
+        SalonService(
+          id: 'demo-svc-5egp',
+          name: '5 EGP Test Booking',
+          minutes: 60,
+          price: 5.0,
+        ),
+      ],
+    );
+
 Venue naderSalonSample() => Venue(
       id: 'nader-el-khawaga-kafr-el-sheikh',
       name: 'Nader El Khawaga',
@@ -1000,6 +1044,7 @@ Venue naderSalonSample() => Venue(
     );
 
 List<Venue> defaultPrototypeVenues() => [
+      demo5EgpVenueSample(),
       naderSalonSample(),
       Venue(
         id: 'kafr-sports-arena',

@@ -40,7 +40,8 @@ before(async () => {
   const otp = (await call('POST', '/api/auth/customer-otp/request', { body: { phone: '01011112222' } })).json.testOtp;
   cust = (await call('POST', '/api/auth/customer-otp/verify', { body: { phone: '01011112222', code: otp } })).json.token;
   let venues = (await call('GET', '/api/venues')).json.venues || [];
-  if (venues.length === 0) {
+  let testVenue = venues.find(v => v.id === 'test-venue');
+  if (!testVenue) {
     await call('PUT', '/api/admin/venues/test-venue', {
       token: admin,
       body: {
@@ -54,8 +55,9 @@ before(async () => {
       }
     });
     venues = (await call('GET', '/api/venues')).json.venues;
+    testVenue = venues.find(v => v.id === 'test-venue');
   }
-  venueId = venues[0].id;
+  venueId = testVenue ? testVenue.id : venues[0].id;
 });
 after(() => { proc.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); });
 
@@ -452,6 +454,29 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   assert.equal(checkOverBooking.json.booking.depositPaid, true);
   assert.equal(checkOverBooking.json.booking.actualPaidAmount, 150);
   assert.equal(checkOverBooking.json.booking.excessDeposit, 50);
+
+  // 8. Test InstaPay transfer to receiver number 01015325250
+  const bResInsta = await call('POST', '/api/bookings', { token: cust, body: booking({ price: 120 }) });
+  const instaBookingId = bResInsta.json.booking.id;
+
+  await call('POST', '/api/payments/intent', {
+    token: cust,
+    body: {
+      bookingId: instaBookingId,
+      paymentMethod: 'INSTAPAY',
+      senderIdentifier: '01091122334',
+    },
+  });
+
+  // Notification from InstaPay mentioning the receiver wallet 01015325250
+  const dualPhoneText = 'تم استلام مبلغ 120.00 جم بنجاح من 01091122334 إلى حسابك المرتبط برقم 01015325250 مرجع IP9921';
+  const dualPhoneRes = await call('POST', '/api/payments/listener', {
+    headers: { 'x-listener-key': 'test-listener-secret' },
+    body: { text: dualPhoneText, appName: 'InstaPay' },
+  });
+  assert.equal(dualPhoneRes.status, 200);
+  assert.equal(dualPhoneRes.json.matched, true);
+  assert.equal(dualPhoneRes.json.bookingId, instaBookingId);
 });
 
 test('whitelisted admin identity is granted owner privileges via OTP and login', async () => {

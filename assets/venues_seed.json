@@ -1,1 +1,105 @@
-[]
+[
+  {
+    "id": "hagzy-demo-5egp",
+    "name": "Hagzy 5 EGP Test Lab (تجربة ٥ جنيه)",
+    "location": "Kafr El Sheikh & Cairo",
+    "type": "lounge",
+    "ownerPhone": "01015325250",
+    "depositPercent": 100,
+    "imageUrl": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1000&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Cairo+Egypt",
+    "description": "مختبر حجزي التجريبي لاختبار دفع ٥ جنيه عبر إنستاباي وفودافون كاش والتأكيد الفوري.",
+    "instaPayAddress": "01015325250",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 0,
+    "closeHour": 24,
+    "rating": 5.0,
+    "amenities": ["Instant Verification", "5 EGP Demo", "AC", "Wi-Fi"],
+    "subCategories": ["playstation"],
+    "staffMembers": ["Demo Host / كابتن التجربة"],
+    "items": [
+      {
+        "id": "demo-slot-5egp",
+        "name": "5 EGP Test Slot (حجز تجريبي ٥ جنيه)",
+        "kind": "PlayStation / PS5",
+        "hourlyRate": 5.0,
+        "multiRate": 0.0
+      }
+    ],
+    "services": [
+      {
+        "id": "demo-svc-5egp",
+        "name": "5 EGP Test Booking",
+        "minutes": 60,
+        "price": 5.0
+      }
+    ]
+  },
+  {
+    "id": "nader-el-khawaga-kafr-el-sheikh",
+    "name": "Nader El Khawaga",
+    "location": "Kafr El Sheikh",
+    "type": "salon",
+    "ownerPhone": "01024129393",
+    "depositPercent": 30,
+    "imageUrl": "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1000&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Nader+El+Khawaga+Kafr+El+Sheikh",
+    "description": "Premier men's grooming & barbershop in Kafr El Sheikh offering precision haircuts, beard styling, and VIP chair service.",
+    "instaPayAddress": "nader.salon@instapay",
+    "vodafoneCashNumber": "01024129393",
+    "openHour": 10,
+    "closeHour": 22,
+    "rating": 4.9,
+    "amenities": ["AC", "Wi-Fi", "VIP Chair", "Kids Friendly"],
+    "items": [
+      {
+        "id": "nader-el-khawaga-chair-1",
+        "name": "Barber Chair 1",
+        "kind": "Barber / chair",
+        "hourlyRate": 150.0,
+        "multiRate": 0.0
+      },
+      {
+        "id": "nader-el-khawaga-chair-2",
+        "name": "Barber Chair 2 (VIP)",
+        "kind": "Barber / chair",
+        "hourlyRate": 200.0,
+        "multiRate": 0.0
+      }
+    ],
+    "services": [
+      {
+        "id": "nader-haircut",
+        "name": "Haircut",
+        "minutes": 30,
+        "price": 150.0
+      },
+      {
+        "id": "nader-beard-trim",
+        "name": "Beard trim",
+        "minutes": 20,
+        "price": 100.0
+      },
+      {
+        "id": "nader-haircut-beard",
+        "name": "Haircut + beard",
+        "minutes": 45,
+        "price": 220.0
+      },
+      {
+        "id": "nader-kids-haircut",
+        "name": "Kids haircut",
+        "minutes": 25,
+        "price": 100.0
+      }
+    ]
+  }
+]
