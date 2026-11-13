@@ -103,15 +103,43 @@ class HagzyApi {
     required String method,
     required String reference,
   }) async {
+    final cleanRef = reference.trim();
+    final lowerMethod = method.toLowerCase();
+    if (lowerMethod.contains('insta') ||
+        lowerMethod.contains('vodafone') ||
+        lowerMethod.contains('wallet')) {
+      final intentMethod =
+          (lowerMethod.contains('vodafone') || lowerMethod.contains('wallet'))
+              ? 'MOBILE_WALLET'
+              : 'INSTAPAY';
+      try {
+        await _send(
+          'POST',
+          '/api/payments/intent',
+          body: {
+            'bookingId': bookingId,
+            'paymentMethod': intentMethod,
+            'senderIdentifier': cleanRef,
+          },
+        );
+      } catch (_) {
+        // Fallback to payment-proof below if intent creation fails.
+      }
+    }
     final result = await _send(
       'POST',
       '/api/bookings/${Uri.encodeComponent(bookingId)}/payment-proof',
       body: {
         'method': method,
-        'reference': reference.trim(),
+        'reference': cleanRef,
       },
     );
-    return result['booking'] as Map<String, dynamic>;
+    try {
+      final latest = await bookingStatus(bookingId);
+      return latest;
+    } catch (_) {
+      return result['booking'] as Map<String, dynamic>;
+    }
   }
 
   Future<Map<String, dynamic>> submitVenueReview(

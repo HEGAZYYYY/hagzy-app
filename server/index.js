@@ -3045,8 +3045,29 @@ app.post('/api/bookings/:id/payment-proof', (req, res) => {
   booking.paymentReference = reference;
   booking.paymentProof = { method, reference, submittedAt: new Date().toISOString() };
   booking.proofSubmitted = true;
-  // The venue still has to verify the transfer (POST /api/admin/bookings/:id/confirm).
-  // Extend the hold so the customer isn't dropped while the venue checks.
+
+  const lowerM = method.toLowerCase();
+  if (!IS_TEST && (lowerM.includes('insta') || lowerM.includes('vodafone') || lowerM.includes('wallet'))) {
+    const intentMethod = (lowerM.includes('vodafone') || lowerM.includes('wallet')) ? 'MOBILE_WALLET' : 'INSTAPAY';
+    const normalizedSender = normalizeSenderId(intentMethod, reference);
+    if (normalizedSender) {
+      booking.expectedSenderIdentifier = normalizedSender;
+      const intentId = `intent_${booking.id}_${intentMethod.toLowerCase()}`;
+      const expectedAmt = Math.max(5, Number(booking.dueNow ?? booking.depositAmount ?? booking.totalPrice ?? booking.price ?? 5));
+      localPaymentIntents.set(intentId, {
+        intentId,
+        booking_id: booking.id,
+        user_id: booking.userId || 'guest',
+        payment_method: intentMethod,
+        expected_sender_identifier: normalizedSender,
+        expected_amount: expectedAmt,
+        status: 'AWAITING_TRANSFER',
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
+    }
+  }
+
+  // Extend the hold so the customer isn't dropped while awaiting transfer verification.
   booking.holdExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   saveDb(db);
   syncBookingToFirebase(booking);
