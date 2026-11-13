@@ -942,7 +942,7 @@ Venue demo5EgpVenueSample() => Venue(
       description:
           'مختبر حجزي التجريبي لاختبار دفع ٥ جنيه عبر إنستاباي وفودافون كاش والتأكيد الفوري.',
       instaPayAddress: '01015325250',
-      vodafoneCashNumber: '01015325250',
+      vodafoneCashNumber: '01041570557',
       openHour: 0,
       closeHour: 24,
       rating: 5.0,

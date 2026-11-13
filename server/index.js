@@ -3148,7 +3148,9 @@ function normalizeSenderId(method, raw) {
 function parseIncomingTransferText(rawText, metadata = {}) {
   const fullText = convertEasternArabicNumerals(
     `${rawText || ''} ${metadata.title || ''} ${metadata.text || ''} ${metadata.body || ''} ${metadata.smsBody || ''} ${metadata.appName || ''} ${metadata.package || ''}`
-  ).trim();
+  )
+    .replace(/[\[\{](?:not_text|not_title|sms_body|sms_number|notification_text)[\]\}]/gi, ' ')
+    .trim();
 
   let amount = null;
   let paymentMethod = null;
@@ -3219,6 +3221,9 @@ function parseIncomingTransferText(rawText, metadata = {}) {
             senderIdentifier = p;
             break;
           }
+        }
+        if (!senderIdentifier && allPhones.length === 1) {
+          senderIdentifier = allPhones[0];
         }
       }
     } else {
@@ -4130,7 +4135,7 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
   // 3. Deposit / Payment methods ("دفع", "عربون", "انستاباي", "فودافون كاش", "فوري", "pay", "deposit")
   if (lower.includes('pay') || lower.includes('deposit') || lower.includes('دفع') || lower.includes('عربون') || lower.includes('انستاباي') || lower.includes('فودافون')) {
     const insta = venue?.instaPayAddress || 'hagzy@instapay';
-    const vf = venue?.vodafoneCashNumber || process.env.ADMIN_PHONE || '01015325250';
+    const vf = venue?.vodafoneCashNumber || process.env.ADMIN_PHONE || '01041570557';
     return arabic
       ? `💳 طرق دفع العربون المتاحة في حجزي:\n\n` +
         `١. فوري باي (FawryPay): كود الخدمة 78890\n` +

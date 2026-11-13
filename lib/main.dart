@@ -2906,7 +2906,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                 : 'venue@instapay',
             receiverWallet: venue?.vodafoneCashNumber.isNotEmpty == true
                 ? venue!.vodafoneCashNumber
-                : '01015325250',
+                : '01041570557',
             prefilledSenderPhone: booking.phone.isNotEmpty
                 ? booking.phone
                 : _savedCustomerPhone,
@@ -2943,6 +2943,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   .toList();
               await _commit(_venues, nextBookings);
               if (mounted) setState(() => _tab = 1);
+              _startPendingBookingVerificationPoll(booking.id);
             },
           ),
         ),
@@ -2954,6 +2955,8 @@ class _HagzyHomeState extends State<HagzyHome> {
             arabic,
             'Payment verified! Booking is now confirmed.',
             'تم التحقق من الدفع وتأكيد الحجز بنجاح!'));
+      } else if (mounted) {
+        _startPendingBookingVerificationPoll(booking.id);
       }
     } else if (method == 'later') {
       if (mounted) setState(() => _tab = 1);
@@ -2966,6 +2969,49 @@ class _HagzyHomeState extends State<HagzyHome> {
     } else if (method == 'whatsapp') {
       await _openWhatsAppChatbotSheet(booking: booking);
     }
+  }
+
+  void _startPendingBookingVerificationPoll(String bookingId) {
+    final isTestEnv = WidgetsBinding.instance.runtimeType
+        .toString()
+        .toLowerCase()
+        .contains('test');
+    if (isTestEnv || !_api.isConfigured) return;
+
+    var pollCount = 0;
+    _paymentPollingTimer?.cancel();
+    _paymentPollingTimer =
+        Timer.periodic(const Duration(seconds: 3), (timer) async {
+      pollCount++;
+      if (!mounted || pollCount > 200) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final remote = await _api.bookingStatus(bookingId);
+        final updated = Booking.fromJson(remote);
+        if (updated.isConfirmed) {
+          timer.cancel();
+          final newBookings =
+              _bookings.map((b) => b.id == bookingId ? updated : b).toList();
+          final newCustomerBookings = _customerBookings
+              .map((b) => b.id == bookingId ? updated : b)
+              .toList();
+          await _commit(_venues, newBookings);
+          if (mounted) {
+            setState(() {
+              _customerBookings = newCustomerBookings;
+              _tab = 1;
+            });
+            _message(localized(
+              _language == 'AR',
+              'Payment verified! Your booking is now confirmed ✓',
+              'تم التحقق من الدفع وتأكيد حجزك تلقائياً! ✓',
+            ));
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   Future<void> _submitManualTransferProof({
@@ -3307,6 +3353,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           _bookings.map((b) => b.id == booking.id ? updated : b).toList();
       await _commit(_venues, nextBookings);
       if (mounted) setState(() => _tab = 1);
+      _startPendingBookingVerificationPoll(booking.id);
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3547,6 +3594,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           _bookings.map((b) => b.id == booking.id ? updated : b).toList();
       await _commit(_venues, nextBookings);
       if (mounted) setState(() => _tab = 1);
+      _startPendingBookingVerificationPoll(booking.id);
       _message(localized(
         arabic,
         'Fawry reference ($cleanRef) submitted! Awaiting verification.',
@@ -3706,7 +3754,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             : 'hagzy@instapay';
         final vf = venue?.vodafoneCashNumber.isNotEmpty == true
             ? venue!.vodafoneCashNumber
-            : '01015325250';
+            : '01041570557';
         return localized(
           arabic,
           'Deposit Payment Options:\n1. Paymob: Instant Visa, Mastercard & Meeza checkout.\n2. FawryPay: Service Code 78890 (generate your 10-digit code in 1 tap).\n3. InstaPay: Send to $insta\n4. Vodafone Cash: Send to $vf\n\nTip: You can also paste your transfer reference code right here in the chat!',
