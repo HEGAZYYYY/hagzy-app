@@ -5,12 +5,8 @@ WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm install --omit=dev
 
-# Copy server code
+# Copy server code and assets
 COPY server/ ./server/
-
-# Copy prebuilt Flutter web bundles and assets
-COPY build/web/ ./build/web/
-COPY build/web-admin/ ./build/web-admin/
 COPY assets/ ./assets/
 
 ENV PORT=10000
