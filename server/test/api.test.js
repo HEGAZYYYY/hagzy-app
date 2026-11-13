@@ -505,6 +505,30 @@ test('Android listener automates Vodafone Cash & InstaPay zero-touch verificatio
   assert.equal(checkEnglishBooking.status, 200);
   assert.equal(checkEnglishBooking.json.booking.status, 'confirmed');
   assert.equal(checkEnglishBooking.json.booking.depositPaid, true);
+
+  // 10. Real multi-line VF-Cash SMS to 01041570557 with sender 01063330948, balance, and ref 025754378007
+  const bResVfReal = await call('POST', '/api/bookings', { token: cust, body: booking({ startsAt: slot(10) }) });
+  assert.equal(bResVfReal.status, 200);
+  const vfRealBookingId = bResVfReal.json.booking.id;
+  const vfRealAmount = bResVfReal.json.booking.dueNow ?? bResVfReal.json.booking.price ?? 100;
+
+  await call('POST', '/api/payments/intent', {
+    token: cust,
+    body: {
+      bookingId: vfRealBookingId,
+      paymentMethod: 'MOBILE_WALLET',
+      senderIdentifier: '01063330948',
+    },
+  });
+
+  const realVfSms = `تم استلام مبلغ ${Number(vfRealAmount).toFixed(2)} جنيه من 01063330948؛\nالمسجل بإسم OMAR ISMAEL ABDELHAF\nعلى رقم محفظتك 01041570557 بتاريخ 20:16 26-11-13.\nرصيدك الحالي: 7.10 جنيه\nرقم العملية: 025754378007\n تقدر تتابع كل مصروفاتك من تاريخ المعاملات على أبلكيشن أنا فودافون http://vf.eg/vfcash`;
+  const vfRealRes = await call('POST', '/api/payments/listener', {
+    headers: { 'x-listener-key': 'test-listener-secret' },
+    body: { text: realVfSms, sender: 'VF-Cash' },
+  });
+  assert.equal(vfRealRes.status, 200);
+  assert.equal(vfRealRes.json.matched, true);
+  assert.equal(vfRealRes.json.bookingId, vfRealBookingId);
 });
 
 test('whitelisted admin identity is granted owner privileges via OTP and login', async () => {

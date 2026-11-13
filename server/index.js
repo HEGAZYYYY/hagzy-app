@@ -3206,24 +3206,30 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   // 3. Parse Sender Identifier
   const RECEIVER_WALLETS = new Set([
     normalizeLocalPhone(process.env.ADMIN_PHONE || '01015325250'),
+    '01041570557',
     ...(process.env.RECEIVER_WALLETS || '').split(',').map(normalizeLocalPhone)
   ].filter(Boolean));
 
   if (!senderIdentifier) {
     if (paymentMethod === 'MOBILE_WALLET') {
-      const phoneMatches = fullText.match(/(?:من\s+رقم|من|from\s+number|from)?\s*(01[0125][0-9]{8})/i);
-      if (phoneMatches && phoneMatches[1] && !RECEIVER_WALLETS.has(phoneMatches[1])) {
-        senderIdentifier = phoneMatches[1];
+      const explicitFrom = fullText.match(/(?:من\s+رقم|من|from\s+number|from)\s+(01[0125][0-9]{8})/i);
+      if (explicitFrom && explicitFrom[1] && !RECEIVER_WALLETS.has(explicitFrom[1])) {
+        senderIdentifier = explicitFrom[1];
       } else {
-        const allPhones = fullText.match(/01[0125][0-9]{8}/g) || [];
-        for (const p of allPhones) {
-          if (!RECEIVER_WALLETS.has(p)) {
-            senderIdentifier = p;
-            break;
+        const phoneMatches = fullText.match(/(?:من\s+رقم|من|from\s+number|from)?\s*(01[0125][0-9]{8})/i);
+        if (phoneMatches && phoneMatches[1] && !RECEIVER_WALLETS.has(phoneMatches[1])) {
+          senderIdentifier = phoneMatches[1];
+        } else {
+          const allPhones = fullText.match(/01[0125][0-9]{8}/g) || [];
+          for (const p of allPhones) {
+            if (!RECEIVER_WALLETS.has(p)) {
+              senderIdentifier = p;
+              break;
+            }
           }
-        }
-        if (!senderIdentifier && allPhones.length === 1) {
-          senderIdentifier = allPhones[0];
+          if (!senderIdentifier && allPhones.length === 1) {
+            senderIdentifier = allPhones[0];
+          }
         }
       }
     } else {
