@@ -851,14 +851,41 @@ class _HagzyHomeState extends State<HagzyHome> {
       return;
     }
     final token = _adminToken ?? _customerToken;
-    if (token != null && _api.isConfigured) {
+    if (_api.isConfigured) {
+      if (token == null || token.isEmpty) {
+        setState(() {
+          _mode = 'adminLogin';
+          _loginError = 'Please sign in to access the Partner Portal.';
+        });
+        return;
+      }
       try {
         final venues = await _api.venues(adminToken: token);
         final bookings = await _api.bookings(token);
         _venues = venues.map((v) => Venue.fromJson(v as Map<String, dynamic>)).toList();
         _bookings = bookings.map((b) => Booking.fromJson(b as Map<String, dynamic>)).toList();
-      } catch (_) {}
+      } catch (e) {
+        _adminToken = null;
+        _savedCustomerIsAdmin = false;
+        _savedCustomerIsPartner = false;
+        _savedUserRole = 'customer';
+        _savedPartnerStatus = 'none';
+        await _saveCustomerProfile(
+          name: _savedCustomerName,
+          email: _savedCustomerEmail,
+          phone: _savedCustomerPhone,
+          isSignedIn: _customerSignedIn,
+          token: _customerToken,
+        );
+        if (!mounted) return;
+        setState(() {
+          _mode = 'adminLogin';
+          _loginError = e.toString().replaceFirst('Exception: ', '');
+        });
+        return;
+      }
     }
+    if (!mounted) return;
     setState(() {
       _adminToken = token;
       _mode = 'admin';
@@ -4822,8 +4849,11 @@ class _HagzyHomeState extends State<HagzyHome> {
       final errStr = error.toString().toLowerCase();
       if (errStr.contains('account has been deleted') ||
           errStr.contains('account not found or has been deleted') ||
-          errStr.contains('session has been logged out')) {
-        // Account was explicitly deleted in Firebase or revoked on server
+          errStr.contains('session has been logged out') ||
+          errStr.contains('invalid or expired token') ||
+          errStr.contains('authentication required') ||
+          errStr.contains('401')) {
+        // Account was deleted, logged out, or token is no longer valid on server
         await _handleCustomerSignOut();
         return;
       }
