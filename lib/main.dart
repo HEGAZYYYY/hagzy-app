@@ -1319,7 +1319,6 @@ class _HagzyHomeState extends State<HagzyHome> {
                     location: location.trim(),
                     type: type,
                     ownerEmail: ownerEmail.trim().toLowerCase(),
-                    ownerEmail: ownerEmail.trim().toLowerCase(),
                     ownerPhone: ownerPhone.trim(),
                     depositPercent: double.parse(depositPercent.trim()),
                   ),
