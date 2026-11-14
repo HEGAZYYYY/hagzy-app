@@ -24,6 +24,7 @@ Venue venueFromHagzyVenue(HagzyVenue v) {
     name: v.name,
     location: (v.address != null && v.address!.isNotEmpty) ? v.address! : v.city,
     type: type,
+    ownerId: v.ownerId,
     ownerPhone: v.walletNumber ?? v.phone ?? '',
     depositPercent: 25.0,
     instaPayAddress: v.instapayAddress ?? '',
@@ -188,6 +189,11 @@ class ManageTab extends StatefulWidget {
     super.key,
     required this.venues,
     this.ownerId,
+    this.isSingularPartner = false,
+    this.partnerRequests = const [],
+    this.onApprovePartnerRequest,
+    this.onRejectPartnerRequest,
+    this.onRefreshPartnerRequests,
     required this.onAddVenue,
     this.onAddVenueModel,
     required this.onEditVenue,
@@ -201,6 +207,11 @@ class ManageTab extends StatefulWidget {
 
   final List<Venue> venues;
   final String? ownerId;
+  final bool isSingularPartner;
+  final List<Map<String, dynamic>> partnerRequests;
+  final Future<void> Function(String requestId)? onApprovePartnerRequest;
+  final Future<void> Function(String requestId)? onRejectPartnerRequest;
+  final VoidCallback? onRefreshPartnerRequests;
   final VoidCallback onAddVenue;
   final ValueChanged<Venue>? onAddVenueModel;
   final ValueChanged<Venue> onEditVenue;
@@ -223,22 +234,141 @@ class _ManageTabState extends State<ManageTab> {
     final filteredVenues = _filterType == null
         ? widget.venues
         : widget.venues.where((v) => v.type == _filterType).toList();
+    final pendingRequests = widget.partnerRequests
+        .where((r) => (r['status'] ?? 'pending') == 'pending')
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
-        IntroCard(
-          title: 'Your self-service builder',
-          subtitle:
-              'Add a venue after contacting its owner, then list bookable spaces and services.',
-          icon: Icons.add_business_outlined,
-          action: FilledButton.icon(
-            onPressed: widget.onAddVenue,
-            icon: const Icon(Icons.add),
-            label: const Text('Add venue'),
+        if (!widget.isSingularPartner &&
+            (pendingRequests.isNotEmpty || widget.onRefreshPartnerRequests != null)) ...[
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.verified_user_outlined, color: kGreen),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Partner Requests (${pendingRequests.length} pending)',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (widget.onRefreshPartnerRequests != null)
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          tooltip: 'Refresh partner requests',
+                          onPressed: widget.onRefreshPartnerRequests,
+                        ),
+                    ],
+                  ),
+                  if (pendingRequests.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'No pending venue owner verification requests.',
+                        style: TextStyle(fontSize: 12.5),
+                      ),
+                    )
+                  else
+                    ...pendingRequests.map((req) {
+                      final reqId = (req['id'] ?? '').toString();
+                      final venueName = (req['venueName'] ?? 'Venue').toString();
+                      final ownerName = (req['ownerName'] ?? '').toString();
+                      final contact = [
+                        (req['email'] ?? '').toString(),
+                        (req['phone'] ?? '').toString(),
+                      ].where((s) => s.isNotEmpty).join(' · ');
+                      final city = (req['city'] ?? '').toString();
+                      final venueType = (req['venueType'] ?? '').toString();
+                      return Container(
+                        margin: const EdgeInsets.only(top: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: kSurfaceTint,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              venueName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              [
+                                if (ownerName.isNotEmpty) ownerName,
+                                if (venueType.isNotEmpty) venueType,
+                                if (city.isNotEmpty) city,
+                              ].join(' • '),
+                              style: TextStyle(fontSize: 12.5, color: kMuted),
+                            ),
+                            if (contact.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                contact,
+                                style: TextStyle(fontSize: 12, color: kMuted),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (widget.onApprovePartnerRequest != null)
+                                  FilledButton.icon(
+                                    onPressed: () =>
+                                        widget.onApprovePartnerRequest!(reqId),
+                                    icon: const Icon(Icons.check_rounded, size: 16),
+                                    label: const Text('Approve'),
+                                  ),
+                                const SizedBox(width: 8),
+                                if (widget.onRejectPartnerRequest != null)
+                                  OutlinedButton(
+                                    onPressed: () =>
+                                        widget.onRejectPartnerRequest!(reqId),
+                                    child: const Text('Reject'),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
           ),
+        ],
+        IntroCard(
+          title: widget.isSingularPartner
+              ? 'My Venue Dashboard'
+              : 'Your self-service builder',
+          subtitle: widget.isSingularPartner
+              ? 'Manage your venue details, bookable spaces, services, and pricing.'
+              : 'Add a venue after contacting its owner, then list bookable spaces and services.',
+          icon: Icons.add_business_outlined,
+          action: widget.isSingularPartner
+              ? null
+              : FilledButton.icon(
+                  onPressed: widget.onAddVenue,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add venue'),
+                ),
         ),
-        if (widget.venues.length > 1) ...[
+        if (!widget.isSingularPartner && widget.venues.length > 1) ...[
           const SizedBox(height: 10),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -270,39 +400,44 @@ class _ManageTabState extends State<ManageTab> {
         ],
         const SizedBox(height: 14),
         if (filteredVenues.isEmpty) ...[
-          const EmptyCard(
+          EmptyCard(
             icon: Icons.add_business_outlined,
-            title: 'Build your first venue',
-            body:
-                'Choose a venue type, add spaces or chairs, then set prices.',
+            title: widget.isSingularPartner
+                ? 'No venue assigned yet'
+                : 'Build your first venue',
+            body: widget.isSingularPartner
+                ? 'Your approved venue will appear here automatically. Contact platform support if you need assistance.'
+                : 'Choose a venue type, add spaces or chairs, then set prices.',
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (ctx) => GoalGradientOnboardingScreen(
-                      ownerId: widget.ownerId ?? 'owner',
-                      onVenueCreated: (newHagzyVenue) {
-                        Navigator.pop(ctx);
-                        final created = venueFromHagzyVenue(newHagzyVenue);
-                        if (widget.onAddVenueModel != null) {
-                          widget.onAddVenueModel!(created);
-                        } else {
-                          widget.onAddVenue();
-                        }
-                      },
+          if (!widget.isSingularPartner) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => GoalGradientOnboardingScreen(
+                        ownerId: widget.ownerId ?? 'owner',
+                        onVenueCreated: (newHagzyVenue) {
+                          Navigator.pop(ctx);
+                          final created = venueFromHagzyVenue(newHagzyVenue);
+                          if (widget.onAddVenueModel != null) {
+                            widget.onAddVenueModel!(created);
+                          } else {
+                            widget.onAddVenue();
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add_business_rounded, size: 16),
-              label: const Text('Step-by-Step Venue Setup'),
+                  );
+                },
+                icon: const Icon(Icons.add_business_rounded, size: 16),
+                label: const Text('Step-by-Step Venue Setup'),
+              ),
             ),
-          ),
+          ],
         ],
         ...filteredVenues.map((venue) => Card(
               margin: const EdgeInsets.only(bottom: 12),

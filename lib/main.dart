@@ -162,6 +162,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   List<Venue> _venues = kSeedNaderSalon ? defaultPrototypeVenues() : [];
   List<Booking> _bookings = [];
   List<Booking> _customerBookings = [];
+  String _savedCustomerId = '';
   String _savedCustomerName = '';
   String _savedCustomerPhone = '';
   String _savedCustomerEmail = '';
@@ -181,8 +182,20 @@ class _HagzyHomeState extends State<HagzyHome> {
   bool _adminShowPasswordAuth = false;
   bool _showAdminPassword = false;
   bool _savedCustomerIsAdmin = false;
+  bool _savedCustomerIsPartner = false;
+  String _savedUserRole = 'customer';
+  String _savedPartnerStatus = 'none';
+  bool _partnerShowRequestForm = false;
+  Map<String, dynamic>? _myPartnerRequest;
+  List<Map<String, dynamic>> _partnerRequests = const [];
+  String _partnerVenueType = 'padel';
   final TextEditingController _adminPhoneController = TextEditingController();
   final TextEditingController _adminOtpController = TextEditingController();
+  final TextEditingController _partnerOwnerNameController = TextEditingController();
+  final TextEditingController _partnerVenueNameController = TextEditingController();
+  final TextEditingController _partnerCityController = TextEditingController(text: 'Cairo');
+  final TextEditingController _partnerAddressController = TextEditingController();
+  final TextEditingController _partnerNotesController = TextEditingController();
   String _mode = 'landing';
   int _tab = 0;
   String? _targetVenueId;
@@ -325,6 +338,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (profileRaw != null) {
         try {
           final profile = jsonDecode(profileRaw) as Map<String, dynamic>;
+          _savedCustomerId = profile['id'] as String? ?? '';
           _savedCustomerName = profile['name'] as String? ?? '';
           _savedCustomerPhone = profile['phone'] as String? ?? '';
           _savedCustomerEmail = profile['email'] as String? ?? '';
@@ -333,6 +347,11 @@ class _HagzyHomeState extends State<HagzyHome> {
               _customerToken != null &&
               _customerToken!.isNotEmpty;
           _savedCustomerIsAdmin = profile['isAdmin'] == true;
+          _savedCustomerIsPartner = profile['isPartner'] == true;
+          _savedUserRole = profile['role'] as String? ??
+              (_savedCustomerIsAdmin ? 'owner' : (_savedCustomerIsPartner ? 'partner' : 'customer'));
+          _savedPartnerStatus = profile['partnerStatus'] as String? ??
+              ((_savedCustomerIsAdmin || _savedCustomerIsPartner) ? 'approved' : 'none');
           if (kIsWeb) {
             try {
               final tokenParam = Uri.base.queryParameters['token'] ??
@@ -565,8 +584,193 @@ class _HagzyHomeState extends State<HagzyHome> {
     });
   }
 
+  bool get _isSingularPartner {
+    if (_savedCustomerIsAdmin || _savedUserRole == 'owner') return false;
+    return _savedCustomerIsPartner || _savedUserRole == 'partner';
+  }
+
   bool get _isAuthorizedAdmin {
-    return _savedCustomerIsAdmin || (_adminToken != null && _adminToken!.isNotEmpty);
+    return _savedCustomerIsAdmin ||
+        _savedCustomerIsPartner ||
+        (_adminToken != null && _adminToken!.isNotEmpty);
+  }
+
+  List<Venue> get _portalVenues {
+    if (!_isSingularPartner) return _venues;
+    final owned = _venues
+        .where((v) => v.isOwnedBy(
+              userId: _savedCustomerId,
+              email: _savedCustomerEmail,
+              phone: _savedCustomerPhone,
+            ))
+        .toList();
+    return owned.length <= 1 ? owned : owned.take(1).toList();
+  }
+
+  List<Booking> get _portalBookings {
+    if (!_isSingularPartner) return _bookings;
+    final ownedIds = _portalVenues.map((v) => v.id).toSet();
+    return _bookings.where((b) => ownedIds.contains(b.venueId)).toList();
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _loadAdminPartnerRequests([String? tokenOverride]) async {
+    final token = tokenOverride ?? _adminToken ?? _customerToken;
+    if (!_api.isConfigured || token == null || token.isEmpty || _isSingularPartner) {
+      return;
+    }
+    try {
+      final list = await _api.getAdminPartnerRequests(adminToken: token);
+      if (mounted) {
+        setState(() => _partnerRequests = list);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _approvePartnerRequest(String requestId) async {
+    final token = _adminToken ?? _customerToken;
+    if (!_api.isConfigured || token == null || token.isEmpty) return;
+    try {
+      await _api.approvePartnerRequest(adminToken: token, requestId: requestId);
+      final venues = await _api.venues(adminToken: token);
+      final reqs = await _api.getAdminPartnerRequests(adminToken: token);
+      if (!mounted) return;
+      setState(() {
+        _venues = venues.map((v) => Venue.fromJson(v as Map<String, dynamic>)).toList();
+        _partnerRequests = reqs;
+      });
+      _snack('Partner request approved and venue dashboard created.');
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _rejectPartnerRequest(String requestId) async {
+    final token = _adminToken ?? _customerToken;
+    if (!_api.isConfigured || token == null || token.isEmpty) return;
+    try {
+      await _api.rejectPartnerRequest(adminToken: token, requestId: requestId);
+      final reqs = await _api.getAdminPartnerRequests(adminToken: token);
+      if (!mounted) return;
+      setState(() => _partnerRequests = reqs);
+      _snack('Partner request rejected.');
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _submitPartnerRequest() async {
+    final token = _customerToken;
+    final venueName = _partnerVenueNameController.text.trim();
+    if (token == null || token.isEmpty) {
+      setState(() => _loginError = 'Please verify your email or phone first.');
+      return;
+    }
+    if (venueName.isEmpty) {
+      setState(() => _loginError = 'Please enter your venue name.');
+      return;
+    }
+    setState(() {
+      _working = true;
+      _loginError = null;
+    });
+    try {
+      final res = await _api.submitPartnerRequest(
+        token: token,
+        venueName: venueName,
+        venueType: _partnerVenueType,
+        city: _partnerCityController.text.trim().isEmpty
+            ? 'Cairo'
+            : _partnerCityController.text.trim(),
+        address: _partnerAddressController.text.trim(),
+        ownerName: _partnerOwnerNameController.text.trim().isEmpty
+            ? _savedCustomerName
+            : _partnerOwnerNameController.text.trim(),
+        notes: _partnerNotesController.text.trim(),
+      );
+      _savedPartnerStatus = res['partnerStatus'] as String? ?? 'pending';
+      _myPartnerRequest = res['request'] is Map
+          ? Map<String, dynamic>.from(res['request'] as Map)
+          : null;
+      _partnerShowRequestForm = false;
+      await _saveCustomerProfile(
+        name: _savedCustomerName,
+        email: _savedCustomerEmail,
+        phone: _savedCustomerPhone,
+        isSignedIn: true,
+        token: token,
+      );
+      if (!mounted) return;
+      setState(() => _working = false);
+      _snack('Request submitted! Your venue dashboard will unlock once verified.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _loginError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _refreshPartnerApprovalStatus() async {
+    final token = _customerToken ?? _adminToken;
+    if (!_api.isConfigured || token == null || token.isEmpty) return;
+    setState(() {
+      _working = true;
+      _loginError = null;
+    });
+    try {
+      final me = await _api.getMyPartnerRequest(token: token);
+      final isOwner = me['isOwner'] == true || me['isAdmin'] == true;
+      final isPartner = me['isPartner'] == true;
+      final freshToken = (me['token'] as String?) ?? token;
+      _savedUserRole = me['role'] as String? ?? _savedUserRole;
+      _savedPartnerStatus = me['partnerStatus'] as String? ?? _savedPartnerStatus;
+      _myPartnerRequest = me['request'] is Map
+          ? Map<String, dynamic>.from(me['request'] as Map)
+          : null;
+      if (isOwner || isPartner) {
+        final portalRes = await _api.loginWithToken(freshToken);
+        final portalToken = (portalRes['token'] as String?) ?? freshToken;
+        _adminToken = portalToken;
+        _savedCustomerIsAdmin = isOwner;
+        _savedCustomerIsPartner = isPartner && !isOwner;
+        await _saveCustomerProfile(
+          name: _savedCustomerName,
+          email: _savedCustomerEmail,
+          phone: _savedCustomerPhone,
+          isSignedIn: true,
+          token: portalToken,
+        );
+        final venues = await _api.venues(adminToken: portalToken);
+        final bookings = await _api.bookings(portalToken);
+        if (!mounted) return;
+        setState(() {
+          _working = false;
+          _mode = 'admin';
+          _tab = 0;
+          _venues = venues.map((v) => Venue.fromJson(v as Map<String, dynamic>)).toList();
+          _bookings = bookings.map((b) => Booking.fromJson(b as Map<String, dynamic>)).toList();
+        });
+        if (!_isSingularPartner) unawaited(_loadAdminPartnerRequests(portalToken));
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _working = false);
+      _snack('Your request is still pending verification.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _loginError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   Future<void> _loginAdminWithPassword() async {
@@ -583,13 +787,20 @@ class _HagzyHomeState extends State<HagzyHome> {
     try {
       final res = await _api.login(email, password);
       final token = res['token'] as String;
+      final isOwner = res['isAdmin'] == true || res['role'] == 'owner';
+      final isPartner = !isOwner && (res['isPartner'] == true || res['role'] == 'partner');
+      final adminObj = res['admin'] is Map ? Map<String, dynamic>.from(res['admin'] as Map) : const <String, dynamic>{};
       _adminToken = token;
-      _savedCustomerIsAdmin = true;
+      _savedCustomerId = (adminObj['id'] ?? _savedCustomerId).toString();
+      _savedCustomerIsAdmin = isOwner;
+      _savedCustomerIsPartner = isPartner;
+      _savedUserRole = res['role'] as String? ?? (isOwner ? 'owner' : 'partner');
+      _savedPartnerStatus = 'approved';
       _savedCustomerEmail = email;
-      _savedCustomerName = 'Admin';
+      _savedCustomerName = (adminObj['name'] ?? 'Partner').toString();
       _customerSignedIn = true;
       await _saveCustomerProfile(
-        name: 'Admin',
+        name: _savedCustomerName,
         email: email,
         phone: _savedCustomerPhone,
         isSignedIn: true,
@@ -601,11 +812,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (_api.isConfigured) {
         try {
           venues = await _api.venues(adminToken: token);
-        } catch (_) {
-          try {
-            venues = await _api.venues();
-          } catch (_) {}
-        }
+        } catch (_) {}
         try {
           bookings = await _api.bookings(token);
         } catch (_) {}
@@ -624,6 +831,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             .toList();
         _passwordController.clear();
       });
+      if (!_isSingularPartner) unawaited(_loadAdminPartnerRequests(token));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -635,6 +843,13 @@ class _HagzyHomeState extends State<HagzyHome> {
 
 
   Future<void> _switchToAdminPortal() async {
+    if (!_isAuthorizedAdmin) {
+      setState(() {
+        _mode = 'adminLogin';
+        _loginError = null;
+      });
+      return;
+    }
     final token = _adminToken ?? _customerToken;
     if (token != null && _api.isConfigured) {
       try {
@@ -649,20 +864,26 @@ class _HagzyHomeState extends State<HagzyHome> {
       _mode = 'admin';
       _tab = 0;
     });
+    if (!_isSingularPartner) unawaited(_loadAdminPartnerRequests(token));
   }
 
   Future<void> _sendAdminPhoneOtp() async {
-    final phone = _adminPhoneController.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _loginError = 'Please enter your registered owner phone number.');
+    final target = _adminPhoneController.text.trim();
+    if (target.isEmpty) {
+      setState(() => _loginError = 'Please enter your email or phone number.');
       return;
     }
+    final isEmail = target.contains('@');
     setState(() {
       _working = true;
       _loginError = null;
     });
     try {
-      await _api.requestVerificationOtp(phone: phone);
+      await _api.requestVerificationOtp(
+        phone: isEmail ? null : target,
+        email: isEmail ? target : null,
+        isPartner: true,
+      );
       if (!mounted) return;
       setState(() {
         _working = false;
@@ -678,10 +899,11 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _verifyAdminPhoneOtp() async {
-    final phone = _adminPhoneController.text.trim();
+    final target = _adminPhoneController.text.trim();
+    final isEmail = target.contains('@');
     final code = _adminOtpController.text.trim();
     if (code.length < 4) {
-      setState(() => _loginError = 'Please enter the 6-digit code sent to your phone.');
+      setState(() => _loginError = 'Please enter the 6-digit verification code.');
       return;
     }
     setState(() {
@@ -689,21 +911,66 @@ class _HagzyHomeState extends State<HagzyHome> {
       _loginError = null;
     });
     try {
-      final res = await _api.verifyVerificationOtp(phone: phone, code: code);
+      final res = await _api.verifyVerificationOtp(
+        phone: isEmail ? null : target,
+        email: isEmail ? target : null,
+        code: code,
+        isPartner: true,
+      );
       final token = res['token'] as String?;
-      final isAdmin = res['isAdmin'] == true;
-      if (!isAdmin || token == null) {
-        throw Exception('Access denied: Unauthorized phone number.');
+      if (token == null || token.isEmpty) {
+        throw Exception('Verification failed.');
       }
-      _adminToken = token;
-      _savedCustomerIsAdmin = true;
-      _savedCustomerPhone = phone;
-      _savedCustomerName = res['customer']?['name'] as String? ?? 'Admin';
+      final customer = res['customer'] is Map
+          ? Map<String, dynamic>.from(res['customer'] as Map)
+          : const <String, dynamic>{};
+      final isOwner = res['isAdmin'] == true || res['role'] == 'owner';
+      final isPartner = !isOwner && (res['isPartner'] == true || res['role'] == 'partner');
+      _savedCustomerId = (customer['id'] ?? _savedCustomerId).toString();
+      _savedCustomerName = (customer['name'] ?? _savedCustomerName).toString();
+      if (isEmail) {
+        _savedCustomerEmail = target.toLowerCase();
+      } else {
+        _savedCustomerPhone = target;
+      }
+      _customerToken = token;
       _customerSignedIn = true;
+      _savedCustomerIsAdmin = isOwner;
+      _savedCustomerIsPartner = isPartner;
+      _savedUserRole = res['role'] as String? ?? (isOwner ? 'owner' : (isPartner ? 'partner' : 'customer'));
+      _savedPartnerStatus = res['partnerStatus'] as String? ?? ((isOwner || isPartner) ? 'approved' : 'none');
+
+      if (!isOwner && !isPartner) {
+        await _saveCustomerProfile(
+          name: _savedCustomerName,
+          email: _savedCustomerEmail,
+          phone: _savedCustomerPhone,
+          isSignedIn: true,
+          token: token,
+        );
+        try {
+          final me = await _api.getMyPartnerRequest(token: token);
+          _savedPartnerStatus = me['partnerStatus'] as String? ?? _savedPartnerStatus;
+          _myPartnerRequest = me['request'] is Map
+              ? Map<String, dynamic>.from(me['request'] as Map)
+              : null;
+        } catch (_) {}
+        if (!mounted) return;
+        setState(() {
+          _working = false;
+          _adminShowPhoneAuth = false;
+          _adminPhoneCodeSent = false;
+          _partnerShowRequestForm = _savedPartnerStatus != 'pending';
+          _mode = 'adminLogin';
+        });
+        return;
+      }
+
+      _adminToken = token;
       await _saveCustomerProfile(
         name: _savedCustomerName,
         email: _savedCustomerEmail,
-        phone: phone,
+        phone: _savedCustomerPhone,
         isSignedIn: true,
         token: token,
       );
@@ -713,11 +980,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (_api.isConfigured) {
         try {
           venues = await _api.venues(adminToken: token);
-        } catch (_) {
-          try {
-            venues = await _api.venues();
-          } catch (_) {}
-        }
+        } catch (_) {}
         try {
           bookings = await _api.bookings(token);
         } catch (_) {}
@@ -735,6 +998,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             .map((b) => Booking.fromJson(b as Map<String, dynamic>))
             .toList();
       });
+      if (!_isSingularPartner) unawaited(_loadAdminPartnerRequests(token));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -767,17 +1031,48 @@ class _HagzyHomeState extends State<HagzyHome> {
           email: email,
           name: name,
           idToken: idToken,
+          isPartner: true,
         );
         final token = backendRes['token'] as String? ?? idToken;
-        final isAdmin = backendRes['isAdmin'] == true || backendRes['role'] == 'owner';
-        if (!isAdmin) {
-          throw Exception('Access denied: Account is not authorized for administrative access.');
-        }
-        _adminToken = token;
-        _savedCustomerIsAdmin = true;
+        final customer = backendRes['customer'] is Map
+            ? Map<String, dynamic>.from(backendRes['customer'] as Map)
+            : const <String, dynamic>{};
+        final isOwner = backendRes['isAdmin'] == true || backendRes['role'] == 'owner';
+        final isPartner = !isOwner && (backendRes['isPartner'] == true || backendRes['role'] == 'partner');
+        _savedCustomerId = (customer['id'] ?? _savedCustomerId).toString();
         _savedCustomerEmail = email;
         _savedCustomerName = name;
+        _customerToken = token;
         _customerSignedIn = true;
+        _savedCustomerIsAdmin = isOwner;
+        _savedCustomerIsPartner = isPartner;
+        _savedUserRole = backendRes['role'] as String? ?? (isOwner ? 'owner' : (isPartner ? 'partner' : 'customer'));
+        _savedPartnerStatus = backendRes['partnerStatus'] as String? ?? ((isOwner || isPartner) ? 'approved' : 'none');
+
+        if (!isOwner && !isPartner) {
+          await _saveCustomerProfile(
+            name: name,
+            email: email,
+            phone: _savedCustomerPhone,
+            isSignedIn: true,
+            token: token,
+          );
+          try {
+            final me = await _api.getMyPartnerRequest(token: token);
+            _savedPartnerStatus = me['partnerStatus'] as String? ?? _savedPartnerStatus;
+            _myPartnerRequest = me['request'] is Map
+                ? Map<String, dynamic>.from(me['request'] as Map)
+                : null;
+          } catch (_) {}
+          if (!mounted) return;
+          setState(() {
+            _partnerShowRequestForm = _savedPartnerStatus != 'pending';
+            _mode = 'adminLogin';
+          });
+          return;
+        }
+
+        _adminToken = token;
         await _saveCustomerProfile(
           name: name,
           email: email,
@@ -791,11 +1086,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         if (_api.isConfigured) {
           try {
             venues = await _api.venues(adminToken: token);
-          } catch (_) {
-            try {
-              venues = await _api.venues();
-            } catch (_) {}
-          }
+          } catch (_) {}
           try {
             bookings = await _api.bookings(token);
           } catch (_) {}
@@ -812,6 +1103,7 @@ class _HagzyHomeState extends State<HagzyHome> {
               .map((value) => Booking.fromJson(value as Map<String, dynamic>))
               .toList();
         });
+        if (!_isSingularPartner) unawaited(_loadAdminPartnerRequests(token));
       }
     } catch (e) {
       if (mounted) setState(() => _loginError = e.toString().replaceFirst('Exception: ', ''));
@@ -4287,12 +4579,16 @@ class _HagzyHomeState extends State<HagzyHome> {
       await prefs.setString(
         kCustomerProfileStorageKey,
         jsonEncode({
+          'id': _savedCustomerId,
           'name': _savedCustomerName,
           'email': _savedCustomerEmail,
           'phone': _savedCustomerPhone,
           'isSignedIn': _customerSignedIn,
           'token': _customerToken,
           'isAdmin': _savedCustomerIsAdmin,
+          'isPartner': _savedCustomerIsPartner,
+          'role': _savedUserRole,
+          'partnerStatus': _savedPartnerStatus,
         }),
       );
       if (kIsWeb &&
@@ -4460,6 +4756,21 @@ class _HagzyHomeState extends State<HagzyHome> {
         final cloudName = cust['name'] as String? ?? '';
         final cloudEmail = cust['email'] as String? ?? '';
         final cloudPhone = cust['phone'] as String? ?? '';
+        if (cust['id'] is String && (cust['id'] as String).isNotEmpty) {
+          _savedCustomerId = cust['id'] as String;
+        }
+        if (cust.containsKey('isAdmin')) {
+          _savedCustomerIsAdmin = cust['isAdmin'] == true;
+        }
+        if (cust.containsKey('isPartner')) {
+          _savedCustomerIsPartner = cust['isPartner'] == true && !_savedCustomerIsAdmin;
+        }
+        if (cust['role'] is String && (cust['role'] as String).isNotEmpty) {
+          _savedUserRole = cust['role'] as String;
+        }
+        if (cust['partnerStatus'] is String && (cust['partnerStatus'] as String).isNotEmpty) {
+          _savedPartnerStatus = cust['partnerStatus'] as String;
+        }
 
         await _saveCustomerProfile(
           name: cloudName.isNotEmpty ? cloudName : _savedCustomerName,
@@ -4578,11 +4889,20 @@ class _HagzyHomeState extends State<HagzyHome> {
       } catch (_) {}
     }
     setState(() {
+      _savedCustomerId = '';
       _savedCustomerName = '';
       _savedCustomerEmail = '';
       _savedCustomerPhone = '';
       _customerSignedIn = false;
       _customerToken = null;
+      _adminToken = null;
+      _savedCustomerIsAdmin = false;
+      _savedCustomerIsPartner = false;
+      _savedUserRole = 'customer';
+      _savedPartnerStatus = 'none';
+      _myPartnerRequest = null;
+      _partnerRequests = const [];
+      _partnerShowRequestForm = false;
       _walletBalance = 0.0;
       _customerBookings = [];
       _bookings = [];
@@ -5200,8 +5520,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           }
                                         : switch (_tab) {
                                             0 => PosTab(
-                                            venues: _venues,
-                                            bookings: _bookings,
+                                            venues: _portalVenues,
+                                            bookings: _portalBookings,
                                             onWalkIn: (venue, item) =>
                                                 _createBooking(
                                               venue: venue,
@@ -5221,12 +5541,27 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onConfirm: _confirmBooking,
                                           ),
                                         1 => ManageTab(
-                                            venues: _venues,
-                                            ownerId: _savedCustomerEmail.isNotEmpty
-                                                ? _savedCustomerEmail
-                                                : (_savedCustomerPhone.isNotEmpty
-                                                    ? _savedCustomerPhone
-                                                    : 'owner'),
+                                            venues: _portalVenues,
+                                            ownerId: _savedCustomerId.isNotEmpty
+                                                ? _savedCustomerId
+                                                : (_savedCustomerEmail.isNotEmpty
+                                                    ? _savedCustomerEmail
+                                                    : (_savedCustomerPhone.isNotEmpty
+                                                        ? _savedCustomerPhone
+                                                        : 'owner')),
+                                            isSingularPartner: _isSingularPartner,
+                                            partnerRequests: _isSingularPartner
+                                                ? const []
+                                                : _partnerRequests,
+                                            onApprovePartnerRequest: _isSingularPartner
+                                                ? null
+                                                : _approvePartnerRequest,
+                                            onRejectPartnerRequest: _isSingularPartner
+                                                ? null
+                                                : _rejectPartnerRequest,
+                                            onRefreshPartnerRequests: _isSingularPartner
+                                                ? null
+                                                : () => _loadAdminPartnerRequests(),
                                             onAddVenue: _addVenue,
                                             onAddVenueModel: (venue) async {
                                               await _runSave(() async {
@@ -5243,16 +5578,16 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onSyncFirebase: _syncAllVenuesToFirebase,
                                           ),
                                         2 => AnalyticsTab(
-                                            venues: _venues,
-                                            bookings: _bookings,
+                                            venues: _portalVenues,
+                                            bookings: _portalBookings,
                                           ),
                                         3 => PaymentTab(
                                             apiConfigured: _api.isConfigured,
                                             localPreview: isPreview,
                                           ),
                                         _ => PosTab(
-                                            venues: _venues,
-                                            bookings: _bookings,
+                                            venues: _portalVenues,
+                                            bookings: _portalBookings,
                                             onWalkIn: (venue, item) =>
                                                 _createBooking(
                                               venue: venue,
@@ -5286,6 +5621,7 @@ class _HagzyHomeState extends State<HagzyHome> {
               selectedIndex: _tab,
               customerMode: isCustomer,
               previewMode: isPreview,
+              singularPartner: _isSingularPartner,
               arabic: arabic,
               badgeCount: bookingCount,
               onDestinationSelected: (value) {
@@ -5379,13 +5715,209 @@ class _HagzyHomeState extends State<HagzyHome> {
                       const SizedBox(height: 8),
                       Text(
                         _api.isConfigured
-                            ? 'Sign in with your authorized owner Google account or Phone to manage venues.'
+                            ? (_customerSignedIn && !_isAuthorizedAdmin
+                                ? 'Partner Verification'
+                                : 'Sign in with your email, phone number, or Google account to access your venue dashboard or request partner verification.')
                             : 'Connect your Hagzy API to sign in and sync venue data across devices.',
                         style: TextStyle(color: kMuted, height: 1.4),
                       ),
                       const SizedBox(height: 22),
                       if (_api.isConfigured) ...[
-                        if (!_adminShowPhoneAuth && !_adminShowPasswordAuth) ...[
+                        if (_customerSignedIn &&
+                            _customerToken != null &&
+                            !_isAuthorizedAdmin) ...[
+                          if (_savedPartnerStatus == 'pending' &&
+                              !_partnerShowRequestForm) ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: kSurfaceTint,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Icon(Icons.hourglass_top_rounded,
+                                      size: 36, color: kGreen),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Verification Pending',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: kInk,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Your request for "${(_myPartnerRequest?['venueName'] ?? 'your venue').toString()}" is awaiting platform owner verification.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: kMuted, fontSize: 13.5),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: kGreen,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                    ),
+                                    onPressed: _working ? null : _refreshPartnerApprovalStatus,
+                                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                                    label: const Text('Check Approval Status'),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: _working
+                                        ? null
+                                        : () => setState(() => _partnerShowRequestForm = true),
+                                    child: const Text('Edit Request Details'),
+                                  ),
+                                  TextButton(
+                                    onPressed: _working
+                                        ? null
+                                        : () async {
+                                            await _handleCustomerSignOut();
+                                            if (mounted) {
+                                              setState(() => _mode = 'adminLogin');
+                                            }
+                                          },
+                                    child: const Text('Switch Account'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: kSurfaceTint,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    _savedPartnerStatus == 'rejected'
+                                        ? 'Request Rejected — Update & Resubmit'
+                                        : 'Request Your Venue Dashboard',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: kInk,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Signed in as ${_savedCustomerEmail.isNotEmpty ? _savedCustomerEmail : _savedCustomerPhone}',
+                                    style: TextStyle(fontSize: 12.5, color: kMuted),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: _partnerOwnerNameController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Owner Full Name',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _partnerVenueNameController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Venue Name *',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  DropdownButtonFormField<String>(
+                                    initialValue: _partnerVenueType,
+                                    isExpanded: true,
+                                    decoration: InputDecoration(
+                                      labelText: 'Venue Category',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(value: 'padel', child: Text('Padel / Football')),
+                                      DropdownMenuItem(value: 'salon', child: Text('Salon / Barber')),
+                                      DropdownMenuItem(value: 'playstation', child: Text('PlayStation / Lounge')),
+                                      DropdownMenuItem(value: 'workspace', child: Text('Workspace / Studio')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => _partnerVenueType = val);
+                                    },
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _partnerCityController,
+                                    decoration: InputDecoration(
+                                      labelText: 'City',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _partnerAddressController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Address',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _partnerNotesController,
+                                    maxLines: 2,
+                                    decoration: InputDecoration(
+                                      labelText: 'Notes (optional)',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: kGreen,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                    onPressed: _working ? null : _submitPartnerRequest,
+                                    child: _working
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Text('Submit Request for Verification',
+                                            style: TextStyle(fontWeight: FontWeight.w800)),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    alignment: WrapAlignment.spaceBetween,
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      TextButton(
+                                        onPressed: _working ? null : _refreshPartnerApprovalStatus,
+                                        child: const Text('Check Status'),
+                                      ),
+                                      TextButton(
+                                        onPressed: _working
+                                            ? null
+                                            : () async {
+                                                await _handleCustomerSignOut();
+                                                if (mounted) {
+                                                  setState(() => _mode = 'adminLogin');
+                                                }
+                                              },
+                                        child: const Text('Switch Account'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ] else if (!_adminShowPhoneAuth && !_adminShowPasswordAuth) ...[
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
                               backgroundColor: kGreen,
@@ -5414,7 +5946,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _loginError = null;
                                     }),
                             icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
-                            label: const Text('Continue with Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                            label: const Text('Continue with Email or Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                           ),
                           const SizedBox(height: 10),
                           TextButton.icon(
@@ -5539,7 +6071,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        _adminPhoneCodeSent ? 'Enter SMS Code' : 'Owner Phone Login',
+                                        _adminPhoneCodeSent ? 'Enter Verification Code' : 'Email or Phone Login',
                                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk),
                                       ),
                                     ),
@@ -5559,11 +6091,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 if (!_adminPhoneCodeSent) ...[
                                   TextField(
                                     controller: _adminPhoneController,
-                                    keyboardType: TextInputType.phone,
+                                    keyboardType: TextInputType.emailAddress,
                                     decoration: InputDecoration(
-                                      labelText: 'Owner Phone Number',
-                                      hintText: '010XXXXXXXX',
-                                      prefixIcon: const Icon(Icons.phone_rounded, color: kGreen, size: 20),
+                                      labelText: 'Email or Phone Number',
+                                      hintText: 'owner@venue.com or 010XXXXXXXX',
+                                      prefixIcon: const Icon(Icons.alternate_email_rounded, color: kGreen, size: 20),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -5634,7 +6166,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                   _adminPhoneCodeSent = false;
                                                   _adminOtpController.clear();
                                                 }),
-                                        child: const Text('Change Phone Number', style: TextStyle(fontSize: 12.5)),
+                                        child: const Text('Change Email / Phone', style: TextStyle(fontSize: 12.5)),
                                       ),
                                       TextButton(
                                         onPressed: _working ? null : _sendAdminPhoneOtp,

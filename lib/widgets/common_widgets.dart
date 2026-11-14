@@ -661,6 +661,7 @@ class FloatingDock extends StatelessWidget {
     required this.selectedIndex,
     required this.customerMode,
     this.previewMode = false,
+    this.singularPartner = false,
     required this.arabic,
     required this.onDestinationSelected,
     this.badgeCount = 0,
@@ -669,6 +670,7 @@ class FloatingDock extends StatelessWidget {
   final int selectedIndex;
   final bool customerMode;
   final bool previewMode;
+  final bool singularPartner;
   final bool arabic;
   final ValueChanged<int> onDestinationSelected;
   final int badgeCount;
@@ -704,8 +706,9 @@ class FloatingDock extends StatelessWidget {
                 'Profile' => localized(arabic, 'Profile', 'حسابي'),
                 'POS timeline' =>
                   localized(arabic, 'POS timeline', 'المواعيد ونقاط البيع'),
-                'Manage Venues' =>
-                  localized(arabic, 'Manage Venues', 'إدارة الأماكن والملاعب'),
+                'Manage Venues' => singularPartner
+                    ? localized(arabic, 'My Venue', 'مكاني وملعبي')
+                    : localized(arabic, 'Manage Venues', 'إدارة الأماكن والملاعب'),
                 'Analytics' =>
                   localized(arabic, 'Analytics', 'الأرباح والتقارير'),
                 'Payment Settings' =>

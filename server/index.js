@@ -574,6 +574,69 @@ function isUserAdmin(identity) {
   return false;
 }
 
+function doesPartnerOwnVenue(identity, venue) {
+  if (!identity || !venue || venue.isDeleted) return false;
+  if (identity.id && venue.ownerId && venue.ownerId === identity.id) return true;
+  const idEmail = String(identity.email || '').trim().toLowerCase();
+  const vEmail = String(venue.ownerEmail || '').trim().toLowerCase();
+  if (idEmail && vEmail && idEmail === vEmail) return true;
+  const idPhone = normalizeLocalPhone(identity.phone || identity.customerPhone || identity.phoneNumber || '');
+  const vPhone = normalizeLocalPhone(venue.ownerPhone || venue.phone || '');
+  if (idPhone && vPhone && idPhone === vPhone) return true;
+  return false;
+}
+
+function claimPartnerVenues(user) {
+  if (!user || !user.id || typeof db === 'undefined' || !Array.isArray(db.venues)) return false;
+  const verifiedEmail = user.emailVerified && user.email ? String(user.email).trim().toLowerCase() : '';
+  const verifiedPhone = user.phoneVerified && user.phone ? normalizeLocalPhone(user.phone) : '';
+  let changed = false;
+  for (const v of db.venues) {
+    if (v.isDeleted) continue;
+    const byId = v.ownerId && v.ownerId === user.id;
+    const byEmail = verifiedEmail && v.ownerEmail && String(v.ownerEmail).trim().toLowerCase() === verifiedEmail;
+    const byPhone = verifiedPhone && v.ownerPhone && normalizeLocalPhone(v.ownerPhone) === verifiedPhone;
+    if (byId || byEmail || byPhone) {
+      if (v.ownerId !== user.id) { v.ownerId = user.id; changed = true; }
+      if (verifiedEmail && !v.ownerEmail) { v.ownerEmail = verifiedEmail; changed = true; }
+      if (verifiedPhone && !v.ownerPhone) { v.ownerPhone = verifiedPhone; changed = true; }
+      if (user.role !== 'owner') {
+        user.role = 'partner';
+        user.partnerStatus = 'approved';
+      }
+      syncVenueToFirebase(v);
+    }
+  }
+  if (changed) saveDb(db);
+  return changed;
+}
+
+function buildPartnerAuthMeta(user) {
+  const isOwner = isUserAdmin(user);
+  const ownedVenues = (!isOwner && user && typeof db !== 'undefined' && Array.isArray(db.venues))
+    ? db.venues.filter(v => doesPartnerOwnVenue(user, v))
+    : [];
+  const isPartner = !isOwner && Boolean(
+    user && (
+      user.partnerStatus === 'approved' ||
+      user.role === 'partner' ||
+      ownedVenues.length > 0
+    )
+  );
+  const role = isOwner ? 'owner' : (isPartner ? 'partner' : 'customer');
+  const partnerStatus = isOwner
+    ? 'approved'
+    : (isPartner ? 'approved' : (user && user.partnerStatus ? user.partnerStatus : 'none'));
+  return {
+    isOwner,
+    isAdmin: isOwner,
+    isPartner,
+    role,
+    partnerStatus,
+    venueIds: ownedVenues.map(v => v.id),
+  };
+}
+
 // App Store / Play review login. Disabled unless explicitly configured.
 const REVIEWER_TARGET = process.env.REVIEWER_TARGET || '';
 const REVIEWER_CODE = process.env.REVIEWER_CODE || '';
@@ -644,6 +707,7 @@ function loadDb() {
       if (!data.walletLedger || !Array.isArray(data.walletLedger)) data.walletLedger = [];
       if (!data.auditLog || !Array.isArray(data.auditLog)) data.auditLog = [];
       if (!data.reviewQueue || !Array.isArray(data.reviewQueue)) data.reviewQueue = [];
+      if (!data.partnerRequests || !Array.isArray(data.partnerRequests)) data.partnerRequests = [];
       return data;
     } catch (_) {}
   }
@@ -667,6 +731,7 @@ function loadDb() {
     walletLedger: [],
     auditLog: [],
     reviewQueue: [],
+    partnerRequests: [],
   };
 }
 
@@ -728,6 +793,7 @@ async function hydratePostgres() {
       db.walletLedger = Array.isArray(cloudData.walletLedger) ? cloudData.walletLedger : (db.walletLedger || []);
       db.auditLog = Array.isArray(cloudData.auditLog) ? cloudData.auditLog : (db.auditLog || []);
       db.reviewQueue = Array.isArray(cloudData.reviewQueue) ? cloudData.reviewQueue : (db.reviewQueue || []);
+      db.partnerRequests = Array.isArray(cloudData.partnerRequests) ? cloudData.partnerRequests : (db.partnerRequests || []);
       try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); } catch (_) {}
       console.log(`🐘 State restored from PostgreSQL: ${db.users.length} users, ${db.bookings.length} bookings.`);
     } else {
@@ -746,6 +812,7 @@ let db = loadDb();
 db.walletLedger = db.walletLedger || [];
 db.auditLog = db.auditLog || [];
 db.reviewQueue = db.reviewQueue || [];
+db.partnerRequests = db.partnerRequests || [];
 
 // Backfill wallet ledger entries for existing users if ledger is empty
 if (Array.isArray(db.users)) {
@@ -1242,14 +1309,30 @@ function optionalAuth(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-      if (decoded.isAdmin) req.admin = decoded; else req.user = decoded;
+      if (decoded.isAdmin || decoded.role === 'owner' || decoded.role === 'partner' || decoded.role === 'merchant') {
+        req.admin = decoded;
+      } else {
+        req.user = decoded;
+      }
     } catch (_) { /* treated as anonymous */ }
   }
   next();
 }
 
 function sanitizeUser(u) {
-  return { id: u.id, name: u.name, phone: u.phone || '', email: u.email || '', walletBalance: u.walletBalance || 0 };
+  const meta = buildPartnerAuthMeta(u);
+  return {
+    id: u.id,
+    name: u.name,
+    phone: u.phone || '',
+    email: u.email || '',
+    walletBalance: u.walletBalance || 0,
+    role: meta.role,
+    isAdmin: meta.isOwner,
+    isPartner: meta.isPartner,
+    partnerStatus: meta.partnerStatus,
+    venueIds: meta.venueIds,
+  };
 }
 
 function normalizeTarget(value) {
@@ -1306,7 +1389,7 @@ async function verifyAppleIdentityToken(identityToken) {
 
 // Request 6-digit OTP via SMS or Email
 app.post('/api/auth/customer-otp/request', async (req, res) => {
-  const { phone, email, name, isSignUp } = req.body || {};
+  const { phone, email, name, isSignUp, isPartner } = req.body || {};
   const target = normalizeTarget(phone || email);
 
   if (!target || target.length > 120) {
@@ -1343,7 +1426,7 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   const accountExists = !!(existingLocalUser || existingFbUser);
 
   // If client specified Log In mode (isSignUp === false) and account does NOT exist anywhere:
-  if (isSignUp === false && !accountExists) {
+  if (isPartner !== true && isSignUp === false && !accountExists) {
     return res.status(404).json({
       error: 'No account found with this phone number. Please click "Create Account" below to register.',
       notFound: true
@@ -1351,7 +1434,7 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   }
 
   // If client specified Sign Up mode (isSignUp === true) and account ALREADY exists:
-  if (isSignUp === true && accountExists) {
+  if (isPartner !== true && isSignUp === true && accountExists) {
     return res.status(409).json({
       error: 'This phone number is already registered. Please click "Log In" to access your account.',
       alreadyExists: true
@@ -1368,7 +1451,8 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
     expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     name: String(name || '').slice(0, 80),
-    isSignUp: isSignUp === true
+    isSignUp: isSignUp === true,
+    isPartner: isPartner === true
   };
   saveDb(db);
 
@@ -1628,13 +1712,27 @@ app.post('/api/auth/social/google', async (req, res) => {
       if (verifiedAvatar && !user.avatar) user.avatar = verifiedAvatar;
       if (!user.authProvider) user.authProvider = 'google';
     }
+    user.emailVerified = true;
     claimCustomerBookings(user);
+    claimPartnerVenues(user);
     saveDb(db);
     syncUserToFirebase(user);
 
-    const isAdmin = isUserAdmin(user) || isUserAdmin({ email: verifiedEmail });
+    const partnerMeta = buildPartnerAuthMeta(user);
+    const isAdmin = partnerMeta.isOwner || isUserAdmin({ email: verifiedEmail });
+    const role = isAdmin ? 'owner' : partnerMeta.role;
+    const isPartner = isAdmin || partnerMeta.isPartner;
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, provider: 'google', isAdmin, role: isAdmin ? 'owner' : 'customer' },
+      {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || '',
+        name: user.name,
+        provider: 'google',
+        isAdmin,
+        isPartner,
+        role
+      },
       JWT_SECRET,
       { expiresIn: '90d' }
     );
@@ -1643,16 +1741,19 @@ app.post('/api/auth/social/google', async (req, res) => {
       success: true,
       token,
       isAdmin,
-      role: isAdmin ? 'owner' : 'customer',
+      isPartner,
+      partnerStatus: isAdmin ? 'approved' : partnerMeta.partnerStatus,
+      role,
+      venueIds: partnerMeta.venueIds,
       customer: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone || '',
+        ...sanitizeUser(user),
         avatar: user.avatar || '',
-        walletBalance: user.walletBalance || 0,
         authProvider: 'google',
-        isAdmin
+        isAdmin,
+        isPartner,
+        partnerStatus: isAdmin ? 'approved' : partnerMeta.partnerStatus,
+        role,
+        venueIds: partnerMeta.venueIds,
       }
     });
   } catch (e) {
@@ -1724,13 +1825,29 @@ app.post('/api/auth/social/apple', async (req, res) => {
       if (verifiedName && (!user.name || user.name === 'Hagzy Member')) user.name = verifiedName;
       if (!user.authProvider) user.authProvider = 'apple';
     }
+    if (verifiedEmail && !verifiedEmail.endsWith('@privaterelay.appleid.com')) {
+      user.emailVerified = true;
+    }
     claimCustomerBookings(user);
+    claimPartnerVenues(user);
     saveDb(db);
     syncUserToFirebase(user);
 
-    const isAdmin = isUserAdmin(user) || isUserAdmin({ email: verifiedEmail });
+    const partnerMeta = buildPartnerAuthMeta(user);
+    const isAdmin = partnerMeta.isOwner || isUserAdmin({ email: verifiedEmail });
+    const role = isAdmin ? 'owner' : partnerMeta.role;
+    const isPartner = isAdmin || partnerMeta.isPartner;
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, provider: 'apple', isAdmin, role: isAdmin ? 'owner' : 'customer' },
+      {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || '',
+        name: user.name,
+        provider: 'apple',
+        isAdmin,
+        isPartner,
+        role
+      },
       JWT_SECRET,
       { expiresIn: '90d' }
     );
@@ -1739,15 +1856,18 @@ app.post('/api/auth/social/apple', async (req, res) => {
       success: true,
       token,
       isAdmin,
-      role: isAdmin ? 'owner' : 'customer',
+      isPartner,
+      partnerStatus: isAdmin ? 'approved' : partnerMeta.partnerStatus,
+      role,
+      venueIds: partnerMeta.venueIds,
       customer: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone || '',
-        walletBalance: user.walletBalance || 0,
+        ...sanitizeUser(user),
         authProvider: 'apple',
-        isAdmin
+        isAdmin,
+        isPartner,
+        partnerStatus: isAdmin ? 'approved' : partnerMeta.partnerStatus,
+        role,
+        venueIds: partnerMeta.venueIds,
       }
     });
   } catch (e) {
@@ -1824,12 +1944,25 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
     }
   }
   claimCustomerBookings(user);
+  claimPartnerVenues(user);
   saveDb(db);
   syncUserToFirebase(user);
 
-  const isAdmin = isUserAdmin(user) || isUserAdmin({ phone: target, email: target });
+  const partnerMeta = buildPartnerAuthMeta(user);
+  const isAdmin = partnerMeta.isOwner || isUserAdmin({ phone: target, email: target });
+  const role = isAdmin ? 'owner' : partnerMeta.role;
+  const isPartner = isAdmin || partnerMeta.isPartner;
+  const partnerStatus = isAdmin ? 'approved' : partnerMeta.partnerStatus;
   const token = jwt.sign(
-    { id: user.id, phone: user.phone, email: user.email, name: user.name, isAdmin, role: isAdmin ? 'owner' : 'customer' },
+    {
+      id: user.id,
+      phone: user.phone,
+      email: user.email,
+      name: user.name,
+      isAdmin,
+      isPartner,
+      role
+    },
     JWT_SECRET,
     { expiresIn: '30d' }
   );
@@ -1892,9 +2025,12 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
     success: true,
     token,
     isAdmin,
-    role: isAdmin ? 'owner' : 'customer',
+    isPartner,
+    partnerStatus,
+    role,
+    venueIds: partnerMeta.venueIds,
     firebaseCustomToken,
-    customer: { ...sanitizeUser(user), isAdmin }
+    customer: { ...sanitizeUser(user), isAdmin, isPartner, partnerStatus, role, venueIds: partnerMeta.venueIds }
   });
 });
 
@@ -2047,9 +2183,19 @@ app.post('/api/auth/customer/login', async (req, res) => {
   saveDb(db);
   syncUserToFirebase(user);
 
-  const isAdmin = user.role === 'owner' && isUserAdmin(user);
+  const meta = buildPartnerAuthMeta(user);
   const token = jwt.sign(
-    { id: user.id, email: user.email, name: user.name, phone: user.phone, isAdmin, role: isAdmin ? 'owner' : 'customer' },
+    {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      isAdmin: meta.isAdmin,
+      isPartner: meta.isPartner,
+      partnerStatus: meta.partnerStatus,
+      role: meta.role,
+      venueIds: meta.venueIds
+    },
     JWT_SECRET,
     { expiresIn: '30d' }
   );
@@ -2057,15 +2203,22 @@ app.post('/api/auth/customer/login', async (req, res) => {
   return res.json({
     success: true,
     token,
-    isAdmin,
-    role: isAdmin ? 'owner' : 'customer',
+    isAdmin: meta.isAdmin,
+    isPartner: meta.isPartner,
+    partnerStatus: meta.partnerStatus,
+    role: meta.role,
+    venueIds: meta.venueIds,
     customer: {
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
       walletBalance: user.walletBalance !== undefined ? user.walletBalance : 0.0,
-      isAdmin
+      isAdmin: meta.isAdmin,
+      isPartner: meta.isPartner,
+      partnerStatus: meta.partnerStatus,
+      role: meta.role,
+      venueIds: meta.venueIds
     }
   });
 });
@@ -2211,6 +2364,9 @@ app.post('/api/customer/wallet/deduct', authenticateCustomer, (req, res) => {
 });
 
 app.post('/api/customer/wallet/add', authenticateAdmin, (req, res) => {
+  if (!req.isPlatformOwner) {
+    return res.status(403).json({ error: 'Forbidden: Only platform owner can adjust customer wallets' });
+  }
   const { amount, userId, email, phone } = req.body || {};
   const user = db.users.find(u => (userId && u.id === userId) || (email && u.email === email) || (phone && u.phone === phone));
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -2254,20 +2410,77 @@ app.get('/api/customer/wallet/transactions', authenticateCustomer, (req, res) =>
 app.post('/api/auth/login', async (req, res) => {
   const { email, password, token } = req.body || {};
 
-  // Token-based admin verification (e.g., from Google or Phone OTP)
+  // Token-based admin/partner verification (e.g., from Google, Apple, or Email/Phone OTP)
   if (token && typeof token === 'string') {
     try {
       const decoded = jwt.verify(token.replace(/^Bearer\s+/i, ''), JWT_SECRET);
-      if (decoded.role === 'owner' || isUserAdmin(decoded)) {
+      const liveUser = decoded.id ? db.users.find(u => u.id === decoded.id) : null;
+      if (liveUser) {
+        claimPartnerVenues(liveUser);
+        const meta = buildPartnerAuthMeta(liveUser);
+        if (meta.isAdmin || meta.isPartner) {
+          const adminToken = jwt.sign(
+            {
+              id: liveUser.id,
+              email: liveUser.email,
+              phone: liveUser.phone,
+              isAdmin: meta.isAdmin,
+              isPartner: meta.isPartner,
+              partnerStatus: meta.partnerStatus,
+              role: meta.role,
+              venueIds: meta.venueIds
+            },
+            JWT_SECRET,
+            { expiresIn: '12h' }
+          );
+          return res.json({
+            success: true,
+            token: adminToken,
+            isAdmin: meta.isAdmin,
+            isPartner: meta.isPartner,
+            partnerStatus: meta.partnerStatus,
+            role: meta.role,
+            venueIds: meta.venueIds,
+            admin: {
+              id: liveUser.id,
+              name: liveUser.name,
+              email: liveUser.email,
+              phone: liveUser.phone,
+              role: meta.role,
+              isAdmin: meta.isAdmin,
+              isPartner: meta.isPartner,
+              partnerStatus: meta.partnerStatus,
+              venueIds: meta.venueIds
+            }
+          });
+        }
+      } else if (decoded.role === 'owner' || isUserAdmin(decoded) ||
+                 ((decoded.role === 'partner' || decoded.role === 'merchant') && decoded.partnerStatus === 'approved')) {
+        const isOwner = decoded.role === 'owner' || isUserAdmin(decoded);
+        const role = isOwner ? 'owner' : 'partner';
         const adminToken = jwt.sign(
-          { id: decoded.id, email: decoded.email, phone: decoded.phone, isAdmin: true, role: 'owner' },
+          {
+            id: decoded.id,
+            email: decoded.email,
+            phone: decoded.phone,
+            isAdmin: isOwner,
+            isPartner: !isOwner,
+            partnerStatus: isOwner ? 'approved' : 'approved',
+            role,
+            venueIds: Array.isArray(decoded.venueIds) ? decoded.venueIds : []
+          },
           JWT_SECRET,
           { expiresIn: '12h' }
         );
         return res.json({
           success: true,
           token: adminToken,
-          admin: { email: decoded.email, phone: decoded.phone, role: 'owner' }
+          isAdmin: isOwner,
+          isPartner: !isOwner,
+          partnerStatus: 'approved',
+          role,
+          venueIds: Array.isArray(decoded.venueIds) ? decoded.venueIds : [],
+          admin: { email: decoded.email, phone: decoded.phone, role, isAdmin: isOwner, isPartner: !isOwner }
         });
       }
     } catch (_) {}
@@ -2276,39 +2489,70 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  // Password-based admin verification (strictly bcrypt or safeEqual against authorized user)
+  // Password-based admin/partner verification (strictly bcrypt or safeEqual against authorized user)
   if (typeof email === 'string' && typeof password === 'string') {
     const cleanEmail = email.trim().toLowerCase();
-    if (!ADMIN_WHITELIST_EMAILS.includes(cleanEmail)) {
-      return res.status(401).json({
-        error: 'Invalid email or password.'
-      });
-    }
-    if (ADMIN_PASSWORD && safeEqual(password, ADMIN_PASSWORD)) {
+    if (ADMIN_WHITELIST_EMAILS.includes(cleanEmail) && ADMIN_PASSWORD && safeEqual(password, ADMIN_PASSWORD)) {
       const adminToken = jwt.sign(
-        { email: cleanEmail, isAdmin: true, role: 'owner' },
+        { email: cleanEmail, isAdmin: true, isPartner: false, partnerStatus: 'approved', role: 'owner' },
         JWT_SECRET,
         { expiresIn: '12h' }
       );
       return res.json({
         success: true,
         token: adminToken,
-        admin: { email: cleanEmail, role: 'owner' }
+        isAdmin: true,
+        isPartner: false,
+        partnerStatus: 'approved',
+        role: 'owner',
+        admin: { email: cleanEmail, role: 'owner', isAdmin: true }
       });
     }
     const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
     if (user && user.passwordHash) {
       const match = await comparePassword(password, user.passwordHash);
       if (match) {
+        claimPartnerVenues(user);
+        const meta = buildPartnerAuthMeta(user);
+        if (!meta.isAdmin && !meta.isPartner) {
+          return res.status(403).json({
+            error: 'Partner account is pending verification.',
+            partnerStatus: meta.partnerStatus
+          });
+        }
         const adminToken = jwt.sign(
-          { id: user.id, email: user.email, phone: user.phone, isAdmin: true, role: 'owner' },
+          {
+            id: user.id,
+            email: user.email,
+            phone: user.phone,
+            isAdmin: meta.isAdmin,
+            isPartner: meta.isPartner,
+            partnerStatus: meta.partnerStatus,
+            role: meta.role,
+            venueIds: meta.venueIds
+          },
           JWT_SECRET,
           { expiresIn: '12h' }
         );
         return res.json({
           success: true,
           token: adminToken,
-          admin: { email: user.email, role: 'owner' }
+          isAdmin: meta.isAdmin,
+          isPartner: meta.isPartner,
+          partnerStatus: meta.partnerStatus,
+          role: meta.role,
+          venueIds: meta.venueIds,
+          admin: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            role: meta.role,
+            isAdmin: meta.isAdmin,
+            isPartner: meta.isPartner,
+            partnerStatus: meta.partnerStatus,
+            venueIds: meta.venueIds
+          }
         });
       }
     }
@@ -2318,6 +2562,225 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   return res.status(400).json({ error: 'Email and password or valid auth token required.' });
+});
+
+// ==========================================
+// 2B. PARTNER REQUESTS & APPROVAL WORKFLOW
+// ==========================================
+
+app.post('/api/partner/requests', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const body = req.body || {};
+  const venueName = String(body.venueName || '').trim();
+  const venueType = String(body.venueType || 'padel').trim();
+  const city = String(body.city || 'Cairo').trim();
+  const address = String(body.address || '').trim();
+  const notes = String(body.notes || '').trim();
+  const ownerName = String(body.ownerName || user.name || '').trim();
+
+  if (!venueName || venueName.length > 100) {
+    return res.status(400).json({ error: 'Valid venue name is required (max 100 chars).' });
+  }
+
+  if (!Array.isArray(db.partnerRequests)) db.partnerRequests = [];
+
+  const existing = db.partnerRequests.find(
+    r => r.userId === user.id && (r.status === 'pending' || r.status === 'approved')
+  );
+  if (existing && existing.status === 'approved') {
+    const meta = buildPartnerAuthMeta(user);
+    return res.json({ success: true, request: existing, ...meta });
+  }
+
+  const nowIso = new Date().toISOString();
+  let requestDoc;
+  if (existing) {
+    existing.ownerName = ownerName || existing.ownerName;
+    existing.venueName = venueName;
+    existing.venueType = venueType;
+    existing.city = city;
+    existing.address = address;
+    existing.notes = notes;
+    existing.email = user.email || existing.email || '';
+    existing.phone = user.phone || existing.phone || '';
+    existing.updatedAt = nowIso;
+    requestDoc = existing;
+  } else {
+    requestDoc = {
+      id: 'preq_' + crypto.randomUUID().slice(0, 10),
+      userId: user.id,
+      ownerName,
+      email: user.email || '',
+      phone: user.phone || '',
+      venueName,
+      venueType,
+      city,
+      address,
+      notes,
+      status: 'pending',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    db.partnerRequests.push(requestDoc);
+  }
+
+  if (user.partnerStatus !== 'approved') {
+    user.partnerStatus = 'pending';
+  }
+  saveDb(db);
+
+  const meta = buildPartnerAuthMeta(user);
+  return res.json({ success: true, request: requestDoc, ...meta });
+});
+
+app.get('/api/partner/requests/me', authenticateCustomer, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  claimPartnerVenues(user);
+  const meta = buildPartnerAuthMeta(user);
+  const myRequests = (db.partnerRequests || [])
+    .filter(r =>
+      r.userId === user.id ||
+      (user.email && r.email && r.email.toLowerCase() === user.email.toLowerCase()) ||
+      (user.phone && r.phone && normalizeLocalPhone(r.phone) === normalizeLocalPhone(user.phone))
+    )
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+
+  let freshToken = null;
+  if (meta.isAdmin || meta.isPartner) {
+    freshToken = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        isAdmin: meta.isAdmin,
+        isPartner: meta.isPartner,
+        partnerStatus: meta.partnerStatus,
+        role: meta.role,
+        venueIds: meta.venueIds
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+  }
+
+  return res.json({
+    success: true,
+    request: myRequests[0] || null,
+    ...(freshToken ? { token: freshToken } : {}),
+    ...meta
+  });
+});
+
+app.get('/api/admin/partner-requests', authenticateAdmin, (req, res) => {
+  if (!req.isPlatformOwner) {
+    return res.status(403).json({ error: 'Forbidden: Only platform owner can review partner requests' });
+  }
+  const list = [...(db.partnerRequests || [])].sort(
+    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+  );
+  return res.json({ success: true, requests: list });
+});
+
+app.post('/api/admin/partner-requests/:id/approve', authenticateAdmin, async (req, res) => {
+  if (!req.isPlatformOwner) {
+    return res.status(403).json({ error: 'Forbidden: Only platform owner can approve partner requests' });
+  }
+  const reqDoc = (db.partnerRequests || []).find(r => r.id === req.params.id);
+  if (!reqDoc) return res.status(404).json({ error: 'Partner request not found' });
+
+  const nowIso = new Date().toISOString();
+  let user = db.users.find(
+    u =>
+      (reqDoc.userId && u.id === reqDoc.userId) ||
+      (reqDoc.email && u.email && u.email.toLowerCase() === reqDoc.email.toLowerCase()) ||
+      (reqDoc.phone && u.phone && normalizeLocalPhone(u.phone) === normalizeLocalPhone(reqDoc.phone))
+  );
+  if (!user) {
+    user = {
+      id: reqDoc.userId || ('usr_' + crypto.randomUUID().slice(0, 8)),
+      name: reqDoc.ownerName || 'Venue Owner',
+      email: reqDoc.email || '',
+      phone: reqDoc.phone || '',
+      walletBalance: 0,
+      role: 'partner',
+      partnerStatus: 'approved',
+      createdAt: nowIso
+    };
+    db.users.push(user);
+  } else {
+    if (user.role !== 'owner') user.role = 'partner';
+    user.partnerStatus = 'approved';
+  }
+
+  let venue = (db.venues || []).find(v => !v.isDeleted && doesPartnerOwnVenue(user, v));
+  if (!venue) {
+    const venueId = 'ven_' + crypto.randomUUID().slice(0, 8);
+    venue = {
+      id: venueId,
+      name: reqDoc.venueName || 'My Venue',
+      type: reqDoc.venueType || 'padel',
+      city: reqDoc.city || 'Cairo',
+      address: reqDoc.address || '',
+      ownerId: user.id,
+      ownerEmail: user.email || reqDoc.email || undefined,
+      ownerPhone: user.phone || reqDoc.phone || undefined,
+      phone: user.phone || reqDoc.phone || '',
+      depositPercent: 30,
+      isActive: true,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    db.venues.push(venue);
+    await syncVenueToFirebase(venue);
+  } else {
+    venue.ownerId = venue.ownerId || user.id;
+    venue.ownerEmail = venue.ownerEmail || user.email || reqDoc.email || undefined;
+    venue.ownerPhone = venue.ownerPhone || user.phone || reqDoc.phone || undefined;
+    venue.updatedAt = nowIso;
+    await syncVenueToFirebase(venue);
+  }
+
+  reqDoc.status = 'approved';
+  reqDoc.venueId = venue.id;
+  reqDoc.reviewedAt = nowIso;
+  reqDoc.reviewedBy = req.admin.email || req.admin.id || 'owner';
+  reqDoc.updatedAt = nowIso;
+
+  saveDb(db);
+  syncUserToFirebase(user);
+  return res.json({ success: true, request: reqDoc, venue });
+});
+
+app.post('/api/admin/partner-requests/:id/reject', authenticateAdmin, (req, res) => {
+  if (!req.isPlatformOwner) {
+    return res.status(403).json({ error: 'Forbidden: Only platform owner can reject partner requests' });
+  }
+  const reqDoc = (db.partnerRequests || []).find(r => r.id === req.params.id);
+  if (!reqDoc) return res.status(404).json({ error: 'Partner request not found' });
+
+  const nowIso = new Date().toISOString();
+  reqDoc.status = 'rejected';
+  reqDoc.rejectionReason = String((req.body && req.body.reason) || '').trim();
+  reqDoc.reviewedAt = nowIso;
+  reqDoc.reviewedBy = req.admin.email || req.admin.id || 'owner';
+  reqDoc.updatedAt = nowIso;
+
+  const user = db.users.find(
+    u =>
+      (reqDoc.userId && u.id === reqDoc.userId) ||
+      (reqDoc.email && u.email && u.email.toLowerCase() === reqDoc.email.toLowerCase()) ||
+      (reqDoc.phone && u.phone && normalizeLocalPhone(u.phone) === normalizeLocalPhone(reqDoc.phone))
+  );
+  if (user && user.partnerStatus !== 'approved') {
+    user.partnerStatus = 'rejected';
+  }
+
+  saveDb(db);
+  return res.json({ success: true, request: reqDoc });
 });
 
 // ==========================================
@@ -2335,15 +2798,7 @@ app.get('/api/admin/venues', authenticateAdmin, (req, res) => {
   if (req.isPlatformOwner) {
     return res.json({ success: true, venues: (db.venues || []).filter(v => !v.isDeleted) });
   }
-  const adminId = req.admin.id;
-  const adminEmail = (req.admin.email || '').toLowerCase();
-  const adminPhone = req.admin.phone;
-  const partnerVenues = (db.venues || []).filter(v => {
-    if (v.isDeleted) return false;
-    return (adminId && v.ownerId === adminId) ||
-           (adminEmail && v.ownerEmail && v.ownerEmail.toLowerCase() === adminEmail) ||
-           (adminPhone && v.ownerPhone === adminPhone);
-  });
+  const partnerVenues = (db.venues || []).filter(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v));
   return res.json({ success: true, venues: partnerVenues });
 });
 
@@ -2367,16 +2822,16 @@ app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
     return res.status(400).json({ error: 'depositPercent must be between 0 and 100' });
   }
 
-  // Cross-tenant permission check
+  // Cross-tenant permission check & singular-venue limit for partners
   if (index >= 0) {
     const existing = db.venues[index];
-    if (!req.isPlatformOwner) {
-      const isOwner = (req.admin.id && existing.ownerId === req.admin.id) ||
-                      (req.admin.email && existing.ownerEmail && existing.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
-                      (req.admin.phone && existing.ownerPhone === req.admin.phone);
-      if (!isOwner) {
-        return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
-      }
+    if (!req.isPlatformOwner && !doesPartnerOwnVenue(req.admin, existing)) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
+    }
+  } else if (!req.isPlatformOwner) {
+    const hasActiveVenue = (db.venues || []).some(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v));
+    if (hasActiveVenue) {
+      return res.status(403).json({ error: 'Forbidden: Partners are limited to one active venue' });
     }
   }
 
@@ -2393,6 +2848,11 @@ app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
     if (venueData[field] !== undefined) {
       sanitized[field] = venueData[field];
     }
+  }
+  if (!req.isPlatformOwner && index >= 0) {
+    delete sanitized.ownerPhone;
+    delete sanitized.ownerEmail;
+    delete sanitized.ownerId;
   }
 
   let savedVenue;
@@ -2440,13 +2900,8 @@ app.delete('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
     return res.status(404).json({ error: 'Venue not found' });
   }
 
-  if (!req.isPlatformOwner) {
-    const isOwner = (req.admin.id && venue.ownerId === req.admin.id) ||
-                    (req.admin.email && venue.ownerEmail && venue.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
-                    (req.admin.phone && venue.ownerPhone === req.admin.phone);
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Forbidden: You do not have permission to delete this venue' });
-    }
+  if (!req.isPlatformOwner && !doesPartnerOwnVenue(req.admin, venue)) {
+    return res.status(403).json({ error: 'Forbidden: You do not have permission to delete this venue' });
   }
 
   venue.isDeleted = true;
@@ -2468,17 +2923,20 @@ app.delete('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
   return res.json({ success: true, message: 'Venue deleted' });
 });
 
-// Bulk Sync All Venues to Cloud Firestore
+// Bulk Sync Venues to Cloud Firestore (Scoped to partner unless platform owner)
 app.post('/api/admin/venues/sync-firebase', authenticateAdmin, async (req, res) => {
+  const targetVenues = req.isPlatformOwner
+    ? (db.venues || [])
+    : (db.venues || []).filter(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v));
   let syncedCount = 0;
-  for (const v of db.venues) {
+  for (const v of targetVenues) {
     const ok = await syncVenueToFirebase(v);
     if (ok) syncedCount++;
   }
   return res.json({
     success: true,
     syncedCount,
-    totalVenues: db.venues.length,
+    totalVenues: targetVenues.length,
     firebaseReady: !!fbFirestore
   });
 });
@@ -2524,9 +2982,7 @@ app.get('/api/admin/bookings', authenticateAdmin, (req, res) => {
   }
   const partnerVenueIds = new Set(
     (db.venues || [])
-      .filter(v => (req.admin.id && v.ownerId === req.admin.id) ||
-                   (req.admin.email && v.ownerEmail && v.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
-                   (req.admin.phone && v.ownerPhone === req.admin.phone))
+      .filter(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v))
       .map(v => v.id)
   );
   const scopedBookings = (db.bookings || []).filter(b => partnerVenueIds.has(b.venueId));
@@ -2542,9 +2998,7 @@ app.get('/api/admin/analytics', authenticateAdmin, (req, res) => {
   if (!req.isPlatformOwner) {
     const partnerVenueIds = new Set(
       venues
-        .filter(v => (req.admin.id && v.ownerId === req.admin.id) ||
-                     (req.admin.email && v.ownerEmail && v.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
-                     (req.admin.phone && v.ownerPhone === req.admin.phone))
+        .filter(v => doesPartnerOwnVenue(req.admin, v))
         .map(v => v.id)
     );
     venues = venues.filter(v => partnerVenueIds.has(v.id));
@@ -2647,6 +3101,9 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
 
   const venue = db.venues.find(v => v.id === body.venueId);
   if (!venue) return res.status(404).json({ error: 'Venue not found' });
+  if (isAdmin && !req.isPlatformOwner && !doesPartnerOwnVenue(req.admin, venue)) {
+    return res.status(403).json({ error: 'Forbidden: You can only create walk-in bookings for your own venue' });
+  }
 
   const start = new Date(body.startsAt);
   const duration = Number(body.durationMinutes);
@@ -2922,12 +3379,7 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
   // Cross-tenant permission check
   if (!req.isPlatformOwner) {
     const venue = db.venues.find(v => v.id === booking.venueId);
-    const isOwner = venue && (
-      (req.admin.id && venue.ownerId === req.admin.id) ||
-      (req.admin.email && venue.ownerEmail && venue.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
-      (req.admin.phone && venue.ownerPhone === req.admin.phone)
-    );
-    if (!isOwner) {
+    if (!venue || !doesPartnerOwnVenue(req.admin, venue)) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to manage bookings for this venue' });
     }
   }
@@ -2969,12 +3421,7 @@ app.delete('/api/admin/bookings/:id', authenticateAdmin, (req, res) => {
   // Cross-tenant permission check
   if (!req.isPlatformOwner) {
     const venue = db.venues.find(v => v.id === booking.venueId);
-    const isOwner = venue && (
-      (req.admin.id && venue.ownerId === req.admin.id) ||
-      (req.admin.email && venue.ownerEmail && venue.ownerEmail.toLowerCase() === req.admin.email.toLowerCase()) ||
-      (req.admin.phone && venue.ownerPhone === req.admin.phone)
-    );
-    if (!isOwner) {
+    if (!venue || !doesPartnerOwnVenue(req.admin, venue)) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to manage bookings for this venue' });
     }
   }

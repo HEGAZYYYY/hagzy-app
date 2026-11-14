@@ -1184,6 +1184,28 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                             ),
                     ),
                     const SizedBox(height: 16),
+                    if (widget.onSwitchToAdmin != null) ...[
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: widget.onSwitchToAdmin,
+                          icon: const Icon(Icons.storefront_rounded,
+                              size: 16, color: kGreen),
+                          label: Text(
+                            localized(
+                              arabic,
+                              'Are you a Venue Owner? Open Partner Portal',
+                              'هل أنت صاحب مكان أو ملعب؟ افتح بوابة الشركاء',
+                            ),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kGreen,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
 
                     // Footer
                     Center(

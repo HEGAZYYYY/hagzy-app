@@ -214,3 +214,88 @@ test('VALIDATION: Venue creation requires valid name and bounded depositPercent'
   assert.equal(badDeposit.status, 400);
 });
 
+test('APPROVAL-GATED SINGULAR PARTNER: Join with phone OTP -> submit request -> owner approves -> singular dashboard', async () => {
+  const partnerPhone = '01099887766';
+
+  // 1. New venue owner requests OTP with isPartner: true
+  const otpReq = await call('POST', '/api/auth/customer-otp/request', {
+    body: { phone: partnerPhone, isPartner: true },
+  });
+  assert.equal(otpReq.status, 200);
+  assert.ok(otpReq.json.testOtp, 'Expected testOtp in test mode');
+
+  // 2. Verify OTP -> creates user with partnerStatus: none and isPartner: false
+  const otpVerify = await call('POST', '/api/auth/customer-otp/verify', {
+    body: { phone: partnerPhone, code: otpReq.json.testOtp, name: 'Tarek Venue Owner', isPartner: true },
+  });
+  assert.equal(otpVerify.status, 200);
+  assert.equal(otpVerify.json.isPartner, false);
+  assert.equal(otpVerify.json.partnerStatus, 'none');
+  const unapprovedToken = otpVerify.json.token;
+
+  // 3. Unapproved user cannot access /api/admin/venues (403)
+  const blockedRes = await call('GET', '/api/admin/venues', { token: unapprovedToken });
+  assert.equal(blockedRes.status, 403);
+
+  // 4. User submits a partner dashboard request
+  const submitReq = await call('POST', '/api/partner/requests', {
+    token: unapprovedToken,
+    body: {
+      ownerName: 'Tarek Venue Owner',
+      venueName: 'Tarek Padel Club',
+      venueType: 'padel',
+      city: 'Cairo',
+      address: 'New Cairo 5th Settlement',
+    },
+  });
+  assert.equal(submitReq.status, 200);
+  assert.equal(submitReq.json.partnerStatus, 'pending');
+  const reqId = submitReq.json.request.id;
+
+  // 5. Partner cannot list all partner requests (403); Platform owner can
+  const partnerListReqs = await call('GET', '/api/admin/partner-requests', { token: partnerAToken });
+  assert.equal(partnerListReqs.status, 403);
+
+  const ownerListReqs = await call('GET', '/api/admin/partner-requests', { token: ownerToken });
+  assert.equal(ownerListReqs.status, 200);
+  assert.ok(ownerListReqs.json.requests.some(r => r.id === reqId));
+
+  // 6. Platform owner approves the request -> creates singular venue
+  const approveRes = await call('POST', `/api/admin/partner-requests/${reqId}/approve`, {
+    token: ownerToken,
+  });
+  assert.equal(approveRes.status, 200);
+  assert.equal(approveRes.json.request.status, 'approved');
+  const assignedVenueId = approveRes.json.venue.id;
+  assert.ok(assignedVenueId);
+
+  // 7. Partner checks /api/partner/requests/me -> receives fresh approved partner token
+  const meRes = await call('GET', '/api/partner/requests/me', { token: unapprovedToken });
+  assert.equal(meRes.status, 200);
+  assert.equal(meRes.json.isPartner, true);
+  assert.equal(meRes.json.partnerStatus, 'approved');
+  assert.equal(meRes.json.role, 'partner');
+  assert.ok(meRes.json.token);
+
+  // 8. Exchange for admin/partner portal session via /api/auth/login
+  const portalLogin = await call('POST', '/api/auth/login', {
+    body: { token: meRes.json.token },
+  });
+  assert.equal(portalLogin.status, 200);
+  assert.equal(portalLogin.json.role, 'partner');
+  assert.equal(portalLogin.json.isPartner, true);
+  const approvedPartnerToken = portalLogin.json.token;
+
+  // 9. Approved partner sees ONLY their single venue and cannot create a 2nd venue
+  const myVenues = await call('GET', '/api/admin/venues', { token: approvedPartnerToken });
+  assert.equal(myVenues.status, 200);
+  assert.equal(myVenues.json.venues.length, 1);
+  assert.equal(myVenues.json.venues[0].id, assignedVenueId);
+
+  const secondVenueRes = await call('PUT', '/api/admin/venues/ven_second_attempt', {
+    token: approvedPartnerToken,
+    body: { name: 'Second Venue Attempt', depositPercent: 30 },
+  });
+  assert.equal(secondVenueRes.status, 403);
+});
+

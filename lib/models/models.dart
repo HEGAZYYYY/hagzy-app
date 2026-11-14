@@ -451,12 +451,26 @@ List<SubCategoryDef> subCategoriesForParent(VenueType? parent) {
   return kAllSubCategories.where((s) => s.parentType == parent).toList();
 }
 
+String normalizeEgyptPhone(String raw) {
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return '';
+  if (digits.startsWith('20') && digits.length >= 12) {
+    return '0${digits.substring(2)}';
+  }
+  if (digits.length == 10 && digits.startsWith('1')) {
+    return '0$digits';
+  }
+  return digits;
+}
+
 class Venue {
   Venue({
     required this.id,
     required this.name,
     required this.location,
     required this.type,
+    this.ownerId = '',
+    this.ownerEmail = '',
     this.ownerPhone = '',
     this.depositPercent = 25,
     this.imageUrl,
@@ -488,7 +502,24 @@ class Venue {
   final String name;
   final String location;
   final VenueType type;
+  final String ownerId;
+  final String ownerEmail;
   final String ownerPhone;
+
+  bool isOwnedBy({String? userId, String? email, String? phone}) {
+    final cleanId = (userId ?? '').trim();
+    if (cleanId.isNotEmpty && ownerId.trim() == cleanId) return true;
+    final cleanEmail = (email ?? '').trim().toLowerCase();
+    if (cleanEmail.isNotEmpty && ownerEmail.trim().toLowerCase() == cleanEmail) {
+      return true;
+    }
+    final cleanPhone = normalizeEgyptPhone(phone ?? '');
+    final venuePhone = normalizeEgyptPhone(ownerPhone);
+    if (cleanPhone.isNotEmpty && venuePhone.isNotEmpty && cleanPhone == venuePhone) {
+      return true;
+    }
+    return false;
+  }
   final double depositPercent;
   final String? imageUrl;
   final String description;
@@ -612,12 +643,16 @@ class Venue {
     List<VenueReview>? reviews,
     List<VenueItem>? items,
     List<SalonService>? services,
+    String? ownerId,
+    String? ownerEmail,
   }) =>
       Venue(
         id: id ?? this.id,
         name: name ?? this.name,
         location: location ?? this.location,
         type: type ?? this.type,
+        ownerId: ownerId ?? this.ownerId,
+        ownerEmail: ownerEmail ?? this.ownerEmail,
         ownerPhone: ownerPhone ?? this.ownerPhone,
         depositPercent: depositPercent ?? this.depositPercent,
         imageUrl: imageUrl ?? this.imageUrl,
@@ -644,6 +679,8 @@ class Venue {
         'name': name,
         'location': location,
         'type': type.name,
+        if (ownerId.isNotEmpty) 'ownerId': ownerId,
+        if (ownerEmail.isNotEmpty) 'ownerEmail': ownerEmail,
         'ownerPhone': ownerPhone,
         'depositPercent': depositPercent,
         if (imageUrl != null && imageUrl!.isNotEmpty) 'imageUrl': imageUrl,
@@ -672,6 +709,8 @@ class Venue {
         name: json['name'] as String,
         location: json['location'] as String? ?? '',
         type: VenueType.values.byName(json['type'] as String),
+        ownerId: json['ownerId'] as String? ?? '',
+        ownerEmail: json['ownerEmail'] as String? ?? '',
         ownerPhone: json['ownerPhone'] as String? ?? '',
         depositPercent: (json['depositPercent'] as num?)?.toDouble() ?? 25,
         imageUrl: json['imageUrl'] as String?,

@@ -204,6 +204,7 @@ class HagzyApi {
     String? email,
     String? name,
     bool? isSignUp,
+    bool? isPartner,
   ]) async =>
       _send(
         'POST',
@@ -213,6 +214,7 @@ class HagzyApi {
           if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
           if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
           if (isSignUp != null) 'isSignUp': isSignUp,
+          if (isPartner != null) 'isPartner': isPartner,
         },
       );
 
@@ -222,8 +224,9 @@ class HagzyApi {
     String? email,
     String? name,
     bool? isSignUp,
+    bool? isPartner,
   }) async =>
-      requestCustomerOtp(phone, email, name, isSignUp);
+      requestCustomerOtp(phone, email, name, isSignUp, isPartner);
 
   /// Verifies a customer OTP code (SMS or Email) and returns session token & customer profile.
   Future<Map<String, dynamic>> verifyCustomerOtp([
@@ -231,6 +234,7 @@ class HagzyApi {
     String? code,
     String? email,
     String? name,
+    bool? isPartner,
   ]) async =>
       _send(
         'POST',
@@ -240,6 +244,7 @@ class HagzyApi {
           if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
           if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
           if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
+          if (isPartner != null) 'isPartner': isPartner,
         },
       );
 
@@ -249,8 +254,9 @@ class HagzyApi {
     String? email,
     required String code,
     String? name,
+    bool? isPartner,
   }) async =>
-      verifyCustomerOtp(phone, code, email, name);
+      verifyCustomerOtp(phone, code, email, name, isPartner);
 
   /// Retrieves customer profile by email or phone.
   Future<Map<String, dynamic>> customerSignIn({
@@ -268,6 +274,7 @@ class HagzyApi {
     String? providerId,
     String? avatar,
     String? idToken,
+    bool? isPartner,
   }) async =>
       _send(
         'POST',
@@ -285,6 +292,76 @@ class HagzyApi {
             'avatar': avatar.trim(),
           if (idToken != null && idToken.trim().isNotEmpty)
             provider == 'google' ? 'idToken' : 'identityToken': idToken.trim(),
+          if (isPartner != null) 'isPartner': isPartner,
+        },
+      );
+
+  /// Exchanges a verified customer/partner token for an admin/partner portal token.
+  Future<Map<String, dynamic>> loginWithToken(String token) async =>
+      _send('POST', '/api/auth/login', body: {'token': token});
+
+  /// Submits or updates a venue owner's partner dashboard request.
+  Future<Map<String, dynamic>> submitPartnerRequest({
+    required String token,
+    required String venueName,
+    String venueType = 'padel',
+    String city = 'Cairo',
+    String address = '',
+    String ownerName = '',
+    String notes = '',
+  }) async =>
+      _send(
+        'POST',
+        '/api/partner/requests',
+        token: token,
+        body: {
+          'venueName': venueName.trim(),
+          'venueType': venueType.trim(),
+          'city': city.trim(),
+          if (address.trim().isNotEmpty) 'address': address.trim(),
+          if (ownerName.trim().isNotEmpty) 'ownerName': ownerName.trim(),
+          if (notes.trim().isNotEmpty) 'notes': notes.trim(),
+        },
+      );
+
+  /// Fetches the authenticated user's partner request & live approval status.
+  Future<Map<String, dynamic>> getMyPartnerRequest({
+    required String token,
+  }) async =>
+      _send('GET', '/api/partner/requests/me', token: token);
+
+  /// Lists all partner requests for platform super-owner review.
+  Future<List<Map<String, dynamic>>> getAdminPartnerRequests({
+    required String adminToken,
+  }) async {
+    final res = await _send('GET', '/api/admin/partner-requests', token: adminToken);
+    final raw = (res['requests'] as List<dynamic>?) ?? const [];
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Approves a partner request and creates/binds their singular venue.
+  Future<Map<String, dynamic>> approvePartnerRequest({
+    required String adminToken,
+    required String requestId,
+  }) async =>
+      _send(
+        'POST',
+        '/api/admin/partner-requests/${Uri.encodeComponent(requestId)}/approve',
+        token: adminToken,
+      );
+
+  /// Rejects a partner request with an optional reason.
+  Future<Map<String, dynamic>> rejectPartnerRequest({
+    required String adminToken,
+    required String requestId,
+    String reason = '',
+  }) async =>
+      _send(
+        'POST',
+        '/api/admin/partner-requests/${Uri.encodeComponent(requestId)}/reject',
+        token: adminToken,
+        body: {
+          if (reason.trim().isNotEmpty) 'reason': reason.trim(),
         },
       );
 
