@@ -2857,7 +2857,16 @@ app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
       sanitized[field] = venueData[field];
     }
   }
-  if (!req.isPlatformOwner && index >= 0) {
+  if (req.isPlatformOwner) {
+    if (typeof sanitized.ownerEmail === 'string') {
+      sanitized.ownerEmail = sanitized.ownerEmail.trim().toLowerCase();
+      if (!sanitized.ownerEmail) delete sanitized.ownerEmail;
+    }
+    if (typeof sanitized.ownerPhone === 'string') {
+      sanitized.ownerPhone = sanitized.ownerPhone.trim();
+      if (!sanitized.ownerPhone) delete sanitized.ownerPhone;
+    }
+  } else if (index >= 0) {
     delete sanitized.ownerPhone;
     delete sanitized.ownerEmail;
     delete sanitized.ownerId;
@@ -2873,15 +2882,35 @@ app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
     };
     db.venues[index] = savedVenue;
   } else {
+    const hasAssignedOwner = !!(sanitized.ownerEmail || sanitized.ownerPhone);
     savedVenue = {
       id: venueId,
-      ownerId: req.admin.id || req.admin.email || 'owner',
-      ownerEmail: req.admin.email || undefined,
-      ownerPhone: req.admin.phone || undefined,
+      ownerId: hasAssignedOwner ? '' : (req.admin.id || req.admin.email || 'owner'),
+      ...(hasAssignedOwner ? {} : {
+        ownerEmail: req.admin.email || undefined,
+        ownerPhone: req.admin.phone || undefined,
+      }),
       ...sanitized,
       createdAt: new Date().toISOString()
     };
     db.venues.push(savedVenue);
+  }
+
+  if (req.isPlatformOwner && (savedVenue.ownerEmail || savedVenue.ownerPhone)) {
+    const targetEmail = (savedVenue.ownerEmail || '').toLowerCase();
+    const targetPhone = normalizeLocalPhone(savedVenue.ownerPhone || '');
+    const assignedUser = (db.users || []).find(u =>
+      (targetEmail && u.email && u.email.toLowerCase() === targetEmail) ||
+      (targetPhone && u.phone && normalizeLocalPhone(u.phone) === targetPhone)
+    );
+    if (assignedUser) {
+      savedVenue.ownerId = assignedUser.id;
+      if (assignedUser.role !== 'owner') {
+        assignedUser.role = 'partner';
+        assignedUser.partnerStatus = 'approved';
+        syncUserToFirebase(assignedUser);
+      }
+    }
   }
 
   if (db.auditLog) {

@@ -1218,6 +1218,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   Future<void> _addVenue({VenueType initialType = VenueType.sports}) async {
     var name = '';
     var location = '';
+    var ownerEmail = '';
     var ownerPhone = '';
     var depositPercent = '25';
     final formKey = GlobalKey<FormState>();
@@ -1258,12 +1259,26 @@ class _HagzyHomeState extends State<HagzyHome> {
                     decoration:
                         const InputDecoration(labelText: 'Area / address'),
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    onChanged: (value) => ownerPhone = value,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: 'Owner phone'),
-                  ),
+                  if (!_isSingularPartner) ...[
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      onChanged: (value) => ownerEmail = value,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Assign Owner Email',
+                        hintText: 'partner@venue.com',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      onChanged: (value) => ownerPhone = value,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Assign Owner Phone',
+                        hintText: '010XXXXXXXX',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   TextFormField(
                     initialValue: depositPercent,
@@ -1303,6 +1318,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                     name: name.trim(),
                     location: location.trim(),
                     type: type,
+                    ownerEmail: ownerEmail.trim().toLowerCase(),
+                    ownerEmail: ownerEmail.trim().toLowerCase(),
                     ownerPhone: ownerPhone.trim(),
                     depositPercent: double.parse(depositPercent.trim()),
                   ),
@@ -1325,6 +1342,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     var type = venue.type;
     var name = venue.name;
     var location = venue.location;
+    var ownerEmail = venue.ownerEmail;
     var ownerPhone = venue.ownerPhone;
     var depositPercent = venue.depositPercent.toStringAsFixed(0);
     var instaPay = venue.instaPayAddress;
@@ -1402,13 +1420,28 @@ class _HagzyHomeState extends State<HagzyHome> {
                         hintText: 'Parking, Wi-Fi, AC, VIP Lounge, Showers',
                       ),
                     ),
+                    if (!_isSingularPartner) ...[
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        initialValue: ownerEmail,
+                        onChanged: (v) => ownerEmail = v,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Assign Owner Email',
+                          hintText: 'partner@venue.com',
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     TextFormField(
                       initialValue: ownerPhone,
                       onChanged: (v) => ownerPhone = v,
                       keyboardType: TextInputType.phone,
-                      decoration:
-                          const InputDecoration(labelText: 'Owner phone'),
+                      decoration: InputDecoration(
+                        labelText: _isSingularPartner
+                            ? 'Owner phone'
+                            : 'Assign Owner Phone',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextFormField(
@@ -1515,6 +1548,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     description: description.trim(),
                     imageUrl: imageUrl.trim(),
                     amenities: parsedAmenities,
+                    ownerEmail: ownerEmail.trim().toLowerCase(),
                     ownerPhone: ownerPhone.trim(),
                     depositPercent: double.parse(depositPercent.trim()),
                     instaPayAddress: instaPay.trim(),

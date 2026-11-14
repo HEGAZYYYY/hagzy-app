@@ -460,6 +460,19 @@ class _ManageTabState extends State<ManageTab> {
                                       fontSize: 17)),
                               Text(venue.type.label,
                                   style: TextStyle(color: kMuted)),
+                              if (!widget.isSingularPartner &&
+                                  (venue.ownerEmail.isNotEmpty ||
+                                      venue.ownerPhone.isNotEmpty))
+                                Text(
+                                  'Owner: ${[
+                                    if (venue.ownerEmail.isNotEmpty)
+                                      venue.ownerEmail,
+                                    if (venue.ownerPhone.isNotEmpty)
+                                      venue.ownerPhone,
+                                  ].join(' · ')}',
+                                  style: TextStyle(
+                                      fontSize: 12, color: kMuted),
+                                ),
                             ],
                           ),
                         ),
