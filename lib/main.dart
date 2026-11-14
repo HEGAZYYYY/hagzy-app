@@ -186,6 +186,8 @@ class _HagzyHomeState extends State<HagzyHome> {
   String _savedUserRole = 'customer';
   String _savedPartnerStatus = 'none';
   bool _partnerShowRequestForm = false;
+  bool _partnerConfirmedInterest = false;
+  bool _partnerSwitchedToCustomerApp = false;
   Map<String, dynamic>? _myPartnerRequest;
   List<Map<String, dynamic>> _partnerRequests = const [];
   String _partnerVenueType = 'padel';
@@ -435,6 +437,24 @@ class _HagzyHomeState extends State<HagzyHome> {
                   .length !=
               _bookings.length) {
         await _persistExpiredBookingRemoval(prefs);
+      }
+      if (_customerSignedIn && _isSingularPartner && !_partnerSwitchedToCustomerApp) {
+        _adminToken = _customerToken;
+        _mode = 'admin';
+        _tab = 0;
+        if (_api.isConfigured && _customerToken != null && _customerToken!.isNotEmpty) {
+          try {
+            final scopedVenues = await _api.venues(adminToken: _customerToken!);
+            final scopedBookings = await _api.bookings(_customerToken!);
+            _venues = scopedVenues
+                .map((value) => Venue.fromJson(value as Map<String, dynamic>))
+                .toList();
+            _bookings = scopedBookings
+                .map((value) => Booking.fromJson(value as Map<String, dynamic>))
+                .toList();
+          } catch (_) {}
+        }
+        if (mounted) setState(() {});
       }
       if (_customerSignedIn ||
           _savedCustomerPhone.isNotEmpty ||
@@ -843,8 +863,11 @@ class _HagzyHomeState extends State<HagzyHome> {
 
 
   Future<void> _switchToAdminPortal() async {
+    _partnerSwitchedToCustomerApp = false;
     if (!_isAuthorizedAdmin) {
       setState(() {
+        _partnerConfirmedInterest = false;
+        _partnerShowRequestForm = false;
         _mode = 'adminLogin';
         _loginError = null;
       });
@@ -4810,6 +4833,30 @@ class _HagzyHomeState extends State<HagzyHome> {
           token: _customerToken,
         );
 
+        if (_isSingularPartner &&
+            _mode == 'customer' &&
+            !_partnerSwitchedToCustomerApp &&
+            _customerToken != null &&
+            _customerToken!.isNotEmpty) {
+          try {
+            final scopedVenues = await _api.venues(adminToken: _customerToken!);
+            final scopedBookings = await _api.bookings(_customerToken!);
+            if (mounted) {
+              setState(() {
+                _adminToken = _customerToken;
+                _mode = 'admin';
+                _tab = 0;
+                _venues = scopedVenues
+                    .map((v) => Venue.fromJson(v as Map<String, dynamic>))
+                    .toList();
+                _bookings = scopedBookings
+                    .map((b) => Booking.fromJson(b as Map<String, dynamic>))
+                    .toList();
+              });
+            }
+          } catch (_) {}
+        }
+
         if (cloudBalance != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setDouble(HagzyWallet.keyWallet, cloudBalance);
@@ -4936,6 +4983,8 @@ class _HagzyHomeState extends State<HagzyHome> {
       _myPartnerRequest = null;
       _partnerRequests = const [];
       _partnerShowRequestForm = false;
+      _partnerConfirmedInterest = false;
+      _partnerSwitchedToCustomerApp = false;
       _walletBalance = 0.0;
       _customerBookings = [];
       _bookings = [];
@@ -5313,8 +5362,40 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ],
                           ),
                         ),
+                      if (!isCustomer &&
+                          !_isSingularPartner &&
+                          _partnerRequests.any(
+                              (r) => (r['status'] ?? 'pending') == 'pending')) ...[
+                        const SizedBox(width: 6),
+                        ActionChip(
+                          avatar: const Icon(Icons.verified_user_rounded,
+                              size: 16, color: Colors.white),
+                          backgroundColor: kGreen,
+                          label: Text(
+                            '${_partnerRequests.where((r) => (r['status'] ?? 'pending') == 'pending').length} Req',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12),
+                          ),
+                          onPressed: () => setState(() => _tab = 1),
+                        ),
+                      ],
                       if (!isCustomer) ...[
                         const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: localized(arabic, 'Switch to Customer App',
+                              'الانتقال لتطبيق العملاء'),
+                          onPressed: () {
+                            setState(() {
+                              _partnerSwitchedToCustomerApp = true;
+                              _mode = 'customer';
+                              _tab = 0;
+                            });
+                          },
+                          icon: const Icon(Icons.explore_rounded),
+                        ),
+                        const SizedBox(width: 2),
                         IconButton(
                           tooltip: 'Sign out',
                           onPressed: _returnToPortal,
@@ -5804,7 +5885,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   TextButton(
                                     onPressed: _working
                                         ? null
-                                        : () => setState(() => _partnerShowRequestForm = true),
+                                        : () => setState(() {
+                                              _partnerConfirmedInterest = true;
+                                              _partnerShowRequestForm = true;
+                                            }),
                                     child: const Text('Edit Request Details'),
                                   ),
                                   TextButton(
@@ -5817,6 +5901,66 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             }
                                           },
                                     child: const Text('Switch Account'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (!_partnerConfirmedInterest &&
+                              _savedPartnerStatus != 'rejected') ...[
+                            Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: kSurfaceTint,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Icon(Icons.storefront_rounded,
+                                      size: 40, color: kGreen),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Become a Hagzy Venue Owner?',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: kInk,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Do you own a padel court, salon, PlayStation lounge, or workspace and want to list and manage bookings on Hagzy?',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      color: kMuted,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: kGreen,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                    onPressed: () => setState(
+                                        () => _partnerConfirmedInterest = true),
+                                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                                    label: const Text(
+                                      'Yes, I want to be a Venue Owner',
+                                      style: TextStyle(fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton(
+                                    onPressed: () => setState(() {
+                                      _mode = 'customer';
+                                      _tab = 0;
+                                    }),
+                                    child: const Text('No, return to Customer App'),
                                   ),
                                 ],
                               ),
