@@ -564,13 +564,15 @@ const ADMIN_WHITELIST_PHONES = [
 
 function isUserAdmin(identity) {
   if (!identity) return false;
-  if (identity.role === 'owner' || identity.role === 'super_admin') return true;
-  if (identity.isAdmin === true && identity.role === 'owner') return true;
   const email = String(identity.email || '').trim().toLowerCase();
   if (email && ADMIN_WHITELIST_EMAILS.length > 0 && ADMIN_WHITELIST_EMAILS.includes(email)) return true;
   const rawPhone = identity.phone || identity.customerPhone || identity.target || identity.phoneNumber;
   const cleanPhone = normalizeLocalPhone(rawPhone);
   if (cleanPhone && ADMIN_WHITELIST_PHONES.length > 0 && ADMIN_WHITELIST_PHONES.includes(cleanPhone)) return true;
+  if (ADMIN_WHITELIST_EMAILS.length === 0 && ADMIN_WHITELIST_PHONES.length === 0) {
+    if (identity.role === 'owner' || identity.role === 'super_admin') return true;
+    if (identity.isAdmin === true && identity.role === 'owner') return true;
+  }
   return false;
 }
 
@@ -623,6 +625,12 @@ function buildPartnerAuthMeta(user) {
       ownedVenues.length > 0
     )
   );
+  if (!isOwner && user && user.role === 'owner') {
+    user.role = isPartner ? 'partner' : 'customer';
+    user.partnerStatus = isPartner ? 'approved' : 'none';
+    if (typeof db !== 'undefined') saveDb(db);
+    syncUserToFirebase(user);
+  }
   const role = isOwner ? 'owner' : (isPartner ? 'partner' : 'customer');
   const partnerStatus = isOwner
     ? 'approved'

@@ -4771,6 +4771,9 @@ class _HagzyHomeState extends State<HagzyHome> {
         if (cust['partnerStatus'] is String && (cust['partnerStatus'] as String).isNotEmpty) {
           _savedPartnerStatus = cust['partnerStatus'] as String;
         }
+        if (!_savedCustomerIsAdmin && !_savedCustomerIsPartner) {
+          _adminToken = null;
+        }
 
         await _saveCustomerProfile(
           name: cloudName.isNotEmpty ? cloudName : _savedCustomerName,
