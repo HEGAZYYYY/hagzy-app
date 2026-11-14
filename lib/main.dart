@@ -5456,7 +5456,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               setState(() => _tab = 0);
                                             },
                                             onToggleDarkMode: _toggleDarkMode,
-                                            onSwitchToAdmin: _isAuthorizedAdmin ? _switchToAdminPortal : null,
+                                            onSwitchToAdmin: _switchToAdminPortal,
                                           ),
                                       }
                                     : isPreview

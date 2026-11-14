@@ -739,13 +739,13 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               if (widget.onSwitchToAdmin != null) ...[
                 const Divider(height: 1),
                 _SettingTile(
-                  icon: Icons.admin_panel_settings_outlined,
+                  icon: Icons.storefront_rounded,
                   title: localized(
-                      arabic, 'Owner & Venue Management Portal', 'لوحة إدارة الأماكن والملاعب'),
+                      arabic, 'Partner Portal', 'بوابة الشركاء وأصحاب الأماكن'),
                   subtitle: localized(
                     arabic,
-                    'Add venues, manage slots & track revenue',
-                    'إضافة ملاعب وأماكن جديدة ومتابعة الأرباح',
+                    'Manage your venue or request partner access',
+                    'إدارة مكانك أو طلب الانضمام كشريك',
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded,
                       size: 14, color: kGreen),
