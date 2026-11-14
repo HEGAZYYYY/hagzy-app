@@ -118,7 +118,9 @@ void main() {
       baseUrl: 'https://api.example.test',
       client: MockClient((request) async {
         requests.add(request);
-        if (request.url.path.endsWith('/payment-proof')) {
+        if (request.url.path.endsWith('/payment-proof') ||
+            (request.method == 'GET' &&
+                request.url.path.endsWith('/bookings/booking-1'))) {
           return http.Response(
             jsonEncode({
               'booking': {

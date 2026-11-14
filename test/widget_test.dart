@@ -868,7 +868,11 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Sign Out'),
       200,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find
+          .byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          )
+          .last,
     );
     await tester.pumpAndSettle();
     expect(find.text('Sign Out'), findsOneWidget);
