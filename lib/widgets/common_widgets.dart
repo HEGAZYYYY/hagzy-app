@@ -27,8 +27,8 @@ class HagzyAmbientBackground extends StatelessWidget {
               colors: isDark
                   ? const [
                       Color(0xFF0A1622),
-                      Color(0xFF0B1120),
-                      Color(0xFF0B1120),
+                      Color(0xFF090F0D),
+                      Color(0xFF090F0D),
                     ]
                   : const [
                       Color(0xFFF4FBF7),
@@ -344,12 +344,12 @@ class CustomPill extends StatelessWidget {
           gradient: selected ? HagzyTheme.brandGradient : null,
           color: selected
               ? null
-              : (isDark ? const Color(0xFF131C31) : kPanel),
+              : (isDark ? const Color(0xFF111B17) : kPanel),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: selected
                 ? kGreen
-                : (isDark ? const Color(0xFF283552) : kBorder),
+                : (isDark ? const Color(0xFF1F352D) : kBorder),
             width: selected ? 1.5 : 1,
           ),
           boxShadow: selected
@@ -732,11 +732,9 @@ class FloatingDock extends StatelessWidget {
                 height: 58,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF131C31) : kPanel,
+                  color: kPanel,
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                      color: isDark ? const Color(0xFF283552) : kBorder,
-                      width: 1.2),
+                  border: Border.all(color: kBorder, width: 1.2),
                   boxShadow: [
                     BoxShadow(
                       color: (isDark ? Colors.black : kInk)
@@ -764,7 +762,7 @@ class FloatingDock extends StatelessWidget {
                             curve: Curves.easeOutCubic,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: selected ? kGreen : Colors.transparent,
+                              color: selected ? kGreenDark : Colors.transparent,
                               borderRadius: BorderRadius.circular(999),
                               boxShadow: selected
                                   ? [
@@ -2138,9 +2136,9 @@ class _HagzyShimmerBoxState extends State<HagzyShimmerBox>
   Widget build(BuildContext context) {
     final isDark = kDarkMode.value;
     final baseColor =
-        isDark ? const Color(0xFF19243D) : const Color(0xFFE2E8F0);
+        isDark ? const Color(0xFF162822) : const Color(0xFFE2E8F0);
     final highlightColor =
-        isDark ? const Color(0xFF283552) : const Color(0xFFF8FAFC);
+        isDark ? const Color(0xFF1F352D) : const Color(0xFFF8FAFC);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -2173,10 +2171,10 @@ class VenueCardSkeleton extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131C31) : kPanel,
+        color: isDark ? const Color(0xFF111B17) : kPanel,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark ? const Color(0xFF283552) : kBorder,
+          color: isDark ? const Color(0xFF1F352D) : kBorder,
         ),
         boxShadow: HagzyTheme.softShadow,
       ),

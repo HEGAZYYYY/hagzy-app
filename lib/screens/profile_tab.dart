@@ -34,6 +34,7 @@ class CustomerProfileTab extends StatefulWidget {
     required this.onAutoAssignGps,
     this.onSwitchToAdmin,
     this.onToggleDarkMode,
+    this.onGoToSignIn,
   });
 
   final bool arabic;
@@ -69,6 +70,7 @@ class CustomerProfileTab extends StatefulWidget {
   final VoidCallback onAutoAssignGps;
   final VoidCallback? onSwitchToAdmin;
   final VoidCallback? onToggleDarkMode;
+  final VoidCallback? onGoToSignIn;
 
   @override
   State<CustomerProfileTab> createState() => _CustomerProfileTabState();
@@ -307,10 +309,13 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                           children: [
                             Flexible(
                               child: Text(
-                                widget.customerName.isNotEmpty
-                                    ? widget.customerName
-                                    : localized(
-                                        arabic, 'Hagzy Member', 'عضو حجزي'),
+                                !signedIn
+                                    ? localized(
+                                        arabic, 'Guest Visitor', 'تصفح كضيف')
+                                    : (widget.customerName.isNotEmpty
+                                        ? widget.customerName
+                                        : localized(arabic, 'Hagzy Member',
+                                            'عضو حجزي')),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 18,
@@ -321,25 +326,33 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.verified_rounded,
-                              color: kGreen,
-                              size: 18,
-                            ),
+                            if (signedIn) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: kGreen,
+                                size: 18,
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          widget.customerEmail.isNotEmpty
-                              ? widget.customerEmail
-                              : (widget.customerPhone.isNotEmpty
-                                  ? widget.customerPhone
-                                  : localized(
-                                      arabic,
-                                      'Verified Hagzy Account',
-                                      'حساب حجزي موثق',
-                                    )),
+                          !signedIn
+                              ? localized(
+                                  arabic,
+                                  'Sign in to sync bookings & wallet',
+                                  'سجل الدخول لمزامنة الحجوزات والمحفظة',
+                                )
+                              : (widget.customerEmail.isNotEmpty
+                                  ? widget.customerEmail
+                                  : (widget.customerPhone.isNotEmpty
+                                      ? widget.customerPhone
+                                      : localized(
+                                          arabic,
+                                          'Verified Hagzy Account',
+                                          'حساب حجزي موثق',
+                                        ))),
                           style: TextStyle(
                             fontSize: 12.5,
                             color: kInk,
@@ -351,28 +364,40 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: localized(
-                      arabic,
-                      _isEditing ? 'Cancel Edit' : 'Edit Profile',
-                      _isEditing ? 'إلغاء التعديل' : 'تعديل البيانات',
+                  if (signedIn)
+                    IconButton(
+                      tooltip: localized(
+                        arabic,
+                        _isEditing ? 'Cancel Edit' : 'Edit Profile',
+                        _isEditing ? 'إلغاء التعديل' : 'تعديل البيانات',
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: kSurfaceTint,
+                        foregroundColor: kInk,
+                      ),
+                      icon: Icon(
+                        _isEditing ? Icons.close : Icons.edit_outlined,
+                        size: 18,
+                      ),
+                      onPressed: () => setState(() {
+                        _isEditing = !_isEditing;
+                        _errorMessage = null;
+                      }),
+                    )
+                  else if (widget.onGoToSignIn != null)
+                    TextButton(
+                      onPressed: widget.onGoToSignIn,
+                      child: Text(
+                        localized(arabic, 'Sign In', 'دخول'),
+                        style: const TextStyle(
+                          color: kGreen,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: kSurfaceTint,
-                      foregroundColor: kInk,
-                    ),
-                    icon: Icon(
-                      _isEditing ? Icons.close : Icons.edit_outlined,
-                      size: 18,
-                    ),
-                    onPressed: () => setState(() {
-                      _isEditing = !_isEditing;
-                      _errorMessage = null;
-                    }),
-                  ),
                 ],
               ),
-              if (!_isEditing) ...[
+              if (signedIn && !_isEditing) ...[
                 const SizedBox(height: 16),
                 const Divider(height: 1),
                 const SizedBox(height: 14),
@@ -400,9 +425,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       )
                     else if (widget.customerEmail.endsWith('@gmail.com') ||
                         widget.customerEmail.endsWith('@google.com'))
-                      const _InfoChip(
+                      _InfoChip(
                         icon: Icons.g_mobiledata_rounded,
-                        label: 'Google Account',
+                        label: localized(arabic, 'Google Account', 'حساب جوجل'),
                       ),
                     _InfoChip(
                       icon: Icons.location_on_rounded,
@@ -598,10 +623,13 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             Expanded(
               child: _StatCard(
                 icon: Icons.account_balance_wallet_rounded,
-                title: '${widget.walletBalance.toStringAsFixed(0)} EGP',
+                title:
+                    '${widget.walletBalance.toStringAsFixed(0)} ${localized(arabic, 'EGP', 'ج.م')}',
                 subtitle: localized(arabic, 'Wallet', 'المحفظة'),
-                badge: localized(arabic, 'Top Up', 'شحن'),
-                onTap: () => _topUpWalletDialog(widget.walletBalance),
+                badge: signedIn ? localized(arabic, 'Top Up', 'شحن') : null,
+                onTap: signedIn
+                    ? () => _topUpWalletDialog(widget.walletBalance)
+                    : widget.onGoToSignIn,
               ),
             ),
             const SizedBox(width: 10),
@@ -621,10 +649,10 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         // Settings & Options Card
         Container(
           decoration: BoxDecoration(
-            color: kDarkMode.value ? const Color(0xFF131C31) : kPanel,
+            color: kDarkMode.value ? const Color(0xFF111B17) : kPanel,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-                color: kDarkMode.value ? const Color(0xFF283552) : kBorder),
+                color: kDarkMode.value ? const Color(0xFF1F352D) : kBorder),
             boxShadow: HagzyTheme.softShadow,
           ),
           child: Column(
@@ -660,12 +688,12 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: kDarkMode.value
-                        ? const Color(0xFF19243D)
+                        ? const Color(0xFF162822)
                         : kSurfaceTint,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
                         color: kDarkMode.value
-                            ? const Color(0xFF283552)
+                            ? const Color(0xFF1F352D)
                             : kBorder),
                   ),
                   child: Text(
@@ -729,7 +757,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     localized(arabic, 'Privacy & Security', 'الخصوصية والأمان'),
                 subtitle: localized(
                   arabic,
-                  'End-to-end booking protection & Paymob escrow',
+                  'End-to-end payment protection & verified bookings',
                   'حماية كاملة للمدفوعات وحجز مؤكد',
                 ),
                 trailing: Icon(Icons.arrow_forward_ios_rounded,
@@ -757,25 +785,106 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
         ),
 
         const SizedBox(height: 16),
-        UserReliabilityPassportCard(
-          profile: UserProfile(
-            id: widget.customerPhone.isNotEmpty ? widget.customerPhone : 'guest',
-            phoneNumber: widget.customerPhone.isNotEmpty ? widget.customerPhone : '01011112222',
-            displayName: widget.customerName.isNotEmpty ? widget.customerName : 'Hagzy Member',
-            city: widget.currentArea,
-            completedBookingsCount: widget.bookingCount,
-            reliabilityScore: 100.0,
-            hagzyWalletBalance: widget.walletBalance,
-            badges: const ['reliable', 'shilla_leader', 'gamer_vip'],
-            createdAt: DateTime(2026, 1, 1),
+        if (!signedIn) ...[
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: kDarkMode.value ? const Color(0xFF111B17) : kPanel,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                  color: kDarkMode.value ? const Color(0xFF1F352D) : kBorder),
+              boxShadow: HagzyTheme.softShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: kGreen.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.verified_user_rounded,
+                          color: kGreen, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            localized(
+                              arabic,
+                              'Sign In for Hagzy Passport & Wallet',
+                              'سجّل الدخول لتفعيل جواز السفر والمحفظة',
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: kInk,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            localized(
+                              arabic,
+                              'Earn reliability perks, sync bookings & top up your wallet.',
+                              'اجمع نقاط الموثوقية وزامن حجوزاتك واشحن محفظتك.',
+                            ),
+                            style: TextStyle(fontSize: 12.5, color: kMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.onGoToSignIn != null) ...[
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: widget.onGoToSignIn,
+                    icon: const Icon(Icons.login_rounded, size: 18),
+                    label: Text(localized(
+                        arabic, 'Sign In / Create Account', 'تسجيل الدخول / إنشاء حساب')),
+                  ),
+                ],
+              ],
+            ),
           ),
-          isArabic: arabic,
-          onTopUpTap: () => _topUpWalletDialog(widget.walletBalance),
-        ),
-        const SizedBox(height: 12),
-        CrossCategoryVouchersCarousel(
-          isArabic: arabic,
-        ),
+        ] else ...[
+          UserReliabilityPassportCard(
+            profile: UserProfile(
+              id: widget.customerPhone.isNotEmpty
+                  ? widget.customerPhone
+                  : 'member',
+              phoneNumber: widget.customerPhone.isNotEmpty
+                  ? widget.customerPhone
+                  : '01000000000',
+              displayName: widget.customerName.isNotEmpty
+                  ? widget.customerName
+                  : 'Hagzy Member',
+              city: widget.currentArea,
+              completedBookingsCount: widget.bookingCount,
+              reliabilityScore: widget.bookingCount == 0
+                  ? 85.0
+                  : (85.0 + (widget.bookingCount * 5.0)).clamp(85.0, 100.0),
+              hagzyWalletBalance: widget.walletBalance,
+              badges: [
+                if (widget.bookingCount >= 1) 'reliable',
+                if (widget.bookingCount >= 3) 'shilla_leader',
+                if (widget.bookingCount >= 5) 'gamer_vip',
+              ],
+              createdAt: DateTime(2026, 1, 1),
+            ),
+            isArabic: arabic,
+            onTopUpTap: () => _topUpWalletDialog(widget.walletBalance),
+          ),
+          const SizedBox(height: 12),
+          CrossCategoryVouchersCarousel(
+            isArabic: arabic,
+          ),
+        ],
 
         const SizedBox(height: 20),
 
@@ -1735,10 +1844,10 @@ class _StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF131C31) : kPanel,
+          color: isDark ? const Color(0xFF111B17) : kPanel,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-              color: isDark ? const Color(0xFF283552) : kBorder),
+              color: isDark ? const Color(0xFF1F352D) : kBorder),
           boxShadow: HagzyTheme.softShadow,
         ),
         child: Column(
@@ -1825,10 +1934,10 @@ class _SettingTile extends StatelessWidget {
               height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF19243D) : kSurfaceTint,
+                color: isDark ? const Color(0xFF162822) : kSurfaceTint,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF283552) : kBorder,
+                  color: isDark ? const Color(0xFF1F352D) : kBorder,
                 ),
               ),
               child: iconWidget ??

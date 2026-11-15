@@ -36,6 +36,8 @@ void main() async {
   runApp(const HagzyApp());
 }
 
+const bool kDemoLogin = bool.fromEnvironment('HAGZY_DEMO_LOGIN');
+
 /// The app language, lifted above MaterialApp so that dialogs, bottom sheets
 /// and snackbars (which live in the Navigator overlay, above the home screen)
 /// get the right locale and text direction, not the device's.
@@ -199,6 +201,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   final TextEditingController _partnerAddressController = TextEditingController();
   final TextEditingController _partnerNotesController = TextEditingController();
   String _mode = 'landing';
+  bool _browsingAsGuest = false;
   int _tab = 0;
   String? _targetVenueId;
   String _language = 'EN';
@@ -218,6 +221,13 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
     }
     _mode = widget.initialMode ?? (widget.adminMode ? 'adminLogin' : 'customer');
+    if (kDebugMode && kDemoLogin) {
+      _customerSignedIn = true;
+      _savedCustomerId = 'demo_customer';
+      _savedCustomerName = 'Demo User';
+      _savedCustomerPhone = '01012345678';
+      _savedCustomerEmail = 'demo@hagzy.app';
+    }
     _load();
 
     // Check for real OAuth 2.0 callback credentials in URL query parameters or Firebase redirect result
@@ -363,6 +373,7 @@ class _HagzyHomeState extends State<HagzyHome> {
               if (tokenParam != null && tokenParam.isNotEmpty) {
                 _customerToken = tokenParam;
                 _customerSignedIn = true;
+        _browsingAsGuest = false;
                 if (nameParam != null && nameParam.isNotEmpty) {
                   _savedCustomerName = nameParam;
                 }
@@ -382,6 +393,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           if (tokenParam != null && tokenParam.isNotEmpty) {
             _customerToken = tokenParam;
             _customerSignedIn = true;
+        _browsingAsGuest = false;
             _savedCustomerName = nameParam ??
                 (emailParam?.split('@')[0] ?? 'Hagzy Member');
             _savedCustomerEmail = emailParam ?? '';
@@ -1094,6 +1106,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         _savedCustomerName = name;
         _customerToken = token;
         _customerSignedIn = true;
+        _browsingAsGuest = false;
         _savedCustomerIsAdmin = isOwner;
         _savedCustomerIsPartner = isPartner;
         _savedUserRole = backendRes['role'] as String? ?? (isOwner ? 'owner' : (isPartner ? 'partner' : 'customer'));
@@ -1199,9 +1212,17 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   void _message(String text, {bool error = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
-        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Text(
+          text,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: error ? Colors.red.shade700 : kInk,
       ),
     );
@@ -1930,7 +1951,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       );
 
       if (shouldSignIn == true) {
-        setState(() => _tab = 2);
+        setState(() => _browsingAsGuest = false);
       }
       return;
     }
@@ -1980,7 +2001,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       final rate =
           multi && item.multiRate > 0 ? item.multiRate : item.hourlyRate;
       if (venue.type == VenueType.salon) {
-        return rate * duration() / 15;
+        return rate * duration() / 30;
       }
       return rate * duration() / 60;
     }
@@ -1995,11 +2016,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (offer != null) {
         return offer.calculateDiscount(base, venue.type);
       }
-      if (selectedPromo == 'HAGZY20') {
-        final d = base * 0.20;
-        return d > 100 ? 100 : d;
-      }
-      if (selectedPromo == 'FIRST50' || selectedPromo == 'HAGZY50') {
+      if (selectedPromo == 'FIRST50') {
         return base > 100 ? 50 : base * 0.25;
       }
       return 0;
@@ -2021,6 +2038,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           end.isAfter(booking.startsAt));
     }
 
+    String? dialogError;
     if (!mounted) return;
     final booking = await showDialog<Booking>(
       context: context,
@@ -2029,20 +2047,20 @@ class _HagzyHomeState extends State<HagzyHome> {
           backgroundColor: kPanel,
           surfaceTintColor: Colors.transparent,
           insetPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 22),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          contentPadding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 2, 20, 14),
           title: Row(
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   gradient: HagzyTheme.brandGradient,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
                       color: kGreen.withValues(alpha: 0.25),
@@ -2051,9 +2069,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                     ),
                   ],
                 ),
-                child: Icon(venue.type.icon, color: Colors.white, size: 24),
+                child: Icon(venue.type.icon, color: Colors.white, size: 22),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2063,7 +2081,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                           ? localized(arabic, 'Add Walk-in', 'إضافة حجز مباشر')
                           : localized(arabic, 'Book Your Time', 'احجز موعدك'),
                       style: TextStyle(
-                        fontSize: 21,
+                        fontSize: 19,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
                         color: kInk,
@@ -2079,6 +2097,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       child: Text(
                         '${venue.name} · ${item.name}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: kGreen,
                           fontSize: 12.0,
@@ -2387,14 +2407,17 @@ class _HagzyHomeState extends State<HagzyHome> {
                             .map((offer) {
                           final active =
                               selectedPromo.toUpperCase() == offer.code;
+                          final currencyLabel =
+                              localized(arabic, 'EGP', 'ج.م');
                           final promoBadge = offer.discountType == 'fixed'
-                              ? '-${offer.value.toInt()} EGP'
+                              ? '-${offer.value.toInt()} $currencyLabel'
                               : '-${offer.value.toInt()}%';
                           return CustomPill(
                             icon: Icons.local_offer_outlined,
                             label: '${offer.code} ($promoBadge)',
                             selected: active,
                             onTap: () => setDialogState(() {
+                              dialogError = null;
                               selectedPromo = active ? '' : offer.code;
                             }),
                           );
@@ -2407,6 +2430,25 @@ class _HagzyHomeState extends State<HagzyHome> {
                               .where((o) => o.code == selectedPromo)
                               .firstOrNull;
                           if (selectedOffer == null) return const SizedBox();
+                          final appliedAmount = selectedOffer.calculateDiscount(
+                              subtotal(), venue.type);
+                          if (appliedAmount <= 0 &&
+                              subtotal() < selectedOffer.minSpend) {
+                            final remaining =
+                                (selectedOffer.minSpend - subtotal()).ceil();
+                            return Text(
+                              localized(
+                                arabic,
+                                'Add $remaining EGP more to apply ${selectedOffer.code} (min ${selectedOffer.minSpend.toInt()} EGP)',
+                                'أضف $remaining ج.م لتفعيل كود ${selectedOffer.code} (الحد الأدنى ${selectedOffer.minSpend.toInt()} ج.م)',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 12.0,
+                                color: Color(0xFFF59E0B),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            );
+                          }
                           return Text(
                             localized(arabic, selectedOffer.englishDescription,
                                 selectedOffer.arabicDescription),
@@ -2727,9 +2769,39 @@ class _HagzyHomeState extends State<HagzyHome> {
             ),
           ),
           actions: [
+            if (dialogError != null) ...[
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline_rounded,
+                        size: 16, color: Colors.red.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        dialogError!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.red.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 50,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: kGreen,
@@ -2742,18 +2814,36 @@ class _HagzyHomeState extends State<HagzyHome> {
                   if (!formKey.currentState!.validate()) return;
                   formKey.currentState!.save();
                   if (venue.type == VenueType.salon &&
+                      item.hourlyRate <= 0 &&
                       venue.services.isNotEmpty &&
                       selectedServices.isEmpty) {
-                    _message('Choose at least one salon service.');
+                    setDialogState(() {
+                      dialogError = localized(
+                        arabic,
+                        'Choose at least one salon service.',
+                        'اختر خدمة واحدة على الأقل.',
+                      );
+                    });
                     return;
                   }
                   if (!walkIn && !startsAt().isAfter(DateTime.now())) {
-                    _message('Choose a start time in the future.');
+                    setDialogState(() {
+                      dialogError = localized(
+                        arabic,
+                        'Choose a start time in the future.',
+                        'اختر وقت بداية في المستقبل.',
+                      );
+                    });
                     return;
                   }
                   if (!isAvailable()) {
-                    _message('This time is already held or booked.',
-                        error: true);
+                    setDialogState(() {
+                      dialogError = localized(
+                        arabic,
+                        'This time is already held or booked.',
+                        'هذا الموعد محجوز أو معلق بالفعل.',
+                      );
+                    });
                     return;
                   }
                   final requiredDeposit =
@@ -2807,7 +2897,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       holdExpiresAt: walkIn || isWalletPaid
                           ? null
                           : DateTime.now().add(const Duration(minutes: 15)),
-                      promoCode: selectedPromo,
+                      promoCode: discount() > 0 ? selectedPromo : '',
                       discountAmount: discount(),
                       staffMember: venue.type == VenueType.salon
                           ? selectedBarber
@@ -2911,10 +3001,41 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
     } catch (error) {
       final ar = _language == 'AR';
+      final errDetail = friendlyError(error, arabic: ar);
       _message(
           '${localized(ar, 'Could not create the reservation', 'تعذّر إنشاء الحجز')}: '
-          '${friendlyError(error, arabic: ar)}',
+          '$errDetail',
           error: true);
+      if (mounted && !isTest) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    localized(ar, 'Booking Failed', 'تعذّر إتمام الحجز'),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              errDetail,
+              style: TextStyle(color: kInk, height: 1.45),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(localized(ar, 'OK', 'حسناً')),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -3442,7 +3563,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: kDarkMode.value ? const Color(0xFF19243D) : kPage,
+                    color: kDarkMode.value ? const Color(0xFF162822) : kPage,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: kGreen.withValues(alpha: 0.35),
@@ -3504,12 +3625,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: kDarkMode.value
-                              ? const Color(0xFF131C31)
+                              ? const Color(0xFF111B17)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: kDarkMode.value
-                                ? const Color(0xFF283552)
+                                ? const Color(0xFF1F352D)
                                 : kBorder,
                           ),
                         ),
@@ -4746,6 +4867,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         _mode = shouldOpenAdmin ? 'admin' : 'customer';
         _tab = 0;
         _customerSignedIn = true;
+        _browsingAsGuest = false;
         _savedCustomerName = name;
         _savedCustomerEmail = email;
         _savedCustomerPhone = phone;
@@ -5007,6 +5129,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _savedCustomerEmail = '';
       _savedCustomerPhone = '';
       _customerSignedIn = false;
+      _browsingAsGuest = false;
       _customerToken = null;
       _adminToken = null;
       _savedCustomerIsAdmin = false;
@@ -5054,6 +5177,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       _savedCustomerEmail = '';
       _savedCustomerPhone = '';
       _customerSignedIn = false;
+      _browsingAsGuest = false;
       _customerToken = null;
       _walletBalance = 0;
       _customerBookings = [];
@@ -5218,19 +5342,60 @@ class _HagzyHomeState extends State<HagzyHome> {
         ),
         child: Directionality(
           textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
-          child: _prefsLoaded && isCustomer && !_customerSignedIn
-              ? CustomerLoginScreen(
-                  arabic: arabic,
-                  language: _language,
-                  api: _api,
-                  apiConfigured: _api.isConfigured,
-                  onSignIn: _handleCustomerSignIn,
-                  onChangeLanguage: _changeLanguage,
-                  onToggleDarkMode: _toggleDarkMode,
-                  onSwitchToAdmin: () => setState(() {
-                    _mode = 'adminLogin';
-                    _tab = 2;
-                  }),
+          child: _prefsLoaded &&
+                  isCustomer &&
+                  !_customerSignedIn &&
+                  !_browsingAsGuest &&
+                  !(kDebugMode && kDemoLogin)
+              ? Scaffold(
+                  body: Column(
+                    children: [
+                      Expanded(
+                        child: CustomerLoginScreen(
+                          arabic: arabic,
+                          language: _language,
+                          api: _api,
+                          apiConfigured: _api.isConfigured,
+                          onSignIn: _handleCustomerSignIn,
+                          onChangeLanguage: _changeLanguage,
+                          onToggleDarkMode: _toggleDarkMode,
+                          onSwitchToAdmin: () => setState(() {
+                            _mode = 'adminLogin';
+                            _tab = 2;
+                          }),
+                        ),
+                      ),
+                      SafeArea(
+                        top: false,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                          decoration: BoxDecoration(
+                            color: kPanel,
+                            border: Border(top: BorderSide(color: kBorder)),
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: OutlinedButton.icon(
+                              onPressed: () => setState(() {
+                                _browsingAsGuest = true;
+                                _tab = 0;
+                              }),
+                              icon: const Icon(Icons.explore_outlined, size: 18),
+                              label: Text(
+                                localized(
+                                  arabic,
+                                  'Explore Venues as Guest',
+                                  'تصفح الأماكن أولاً كضيف',
+                                ),
+                                style: const TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 )
               : Scaffold(
             appBar: AppBar(
@@ -5284,7 +5449,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         onPressed: () => _openWhatsAppChatbotSheet(),
                         style: IconButton.styleFrom(
                           backgroundColor: kDarkMode.value
-                              ? const Color(0xFF19243D)
+                              ? const Color(0xFF162822)
                               : kSurfaceTint,
                           foregroundColor: kGreen,
                         ),
@@ -5325,7 +5490,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         onPressed: _toggleDarkMode,
                         style: IconButton.styleFrom(
                           backgroundColor: kDarkMode.value
-                              ? const Color(0xFF19243D)
+                              ? const Color(0xFF162822)
                               : kSurfaceTint,
                           foregroundColor:
                               kDarkMode.value ? kGold : kGreen,
@@ -5344,7 +5509,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                             _customerSignedIn ? 'My Profile' : 'Sign In',
                             _customerSignedIn ? 'الملف الشخصي' : 'تسجيل الدخول',
                           ),
-                          onPressed: () => setState(() => _tab = 2),
+                          onPressed: () {
+                            if (!_customerSignedIn) {
+                              setState(() => _browsingAsGuest = false);
+                            } else {
+                              setState(() => _tab = 2);
+                            }
+                          },
                           style: IconButton.styleFrom(
                             backgroundColor: _tab == 2 ? kGreen : kSurfaceTint,
                             foregroundColor:
@@ -5523,7 +5694,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             arabic: arabic,
                                             isSignedIn: _customerSignedIn,
                                             onSignIn: _handleCustomerSignIn,
-                                            onGoToSignIn: () => setState(() => _tab = 2),
+                                            onGoToSignIn: () => setState(
+                                                () => _browsingAsGuest = false),
                                             onChoosePayment: (booking) =>
                                                 _showPaymentMethods(
                                               booking,
@@ -5557,6 +5729,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             apiConfigured: _api.isConfigured,
                                             onSignIn: _handleCustomerSignIn,
                                             onSignOut: _handleCustomerSignOut,
+                                            onGoToSignIn: () => setState(
+                                                () => _browsingAsGuest = false),
                                             onDeleteAccount: _handleCustomerDeleteAccount,
                                             onUpdateProfile: _handleCustomerUpdateProfile,
                                             onChangeLanguage: () =>
@@ -5810,7 +5984,7 @@ class _HagzyHomeState extends State<HagzyHome> {
               onPressed: _toggleDarkMode,
               style: IconButton.styleFrom(
                 backgroundColor: kDarkMode.value
-                    ? const Color(0xFF19243D)
+                    ? const Color(0xFF162822)
                     : kSurfaceTint,
                 foregroundColor: kDarkMode.value ? kGold : kGreen,
                 side: BorderSide(color: kBorder),
@@ -5846,7 +6020,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Align(
-                        alignment: Alignment.centerLeft,
+                        alignment: AlignmentDirectional.centerStart,
                         child: HagzyLogoMark(size: 54, withGlow: true),
                       ),
                       const SizedBox(height: 20),

@@ -29,7 +29,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
               ? const [Color(0xFF0F3D2E), Color(0xFF062319)]
               : (isHighRisk
                   ? const [Color(0xFF450A0A), Color(0xFF1E0505)]
-                  : const [Color(0xFF1E293B), Color(0xFF0F172A)]),
+                  : const [Color(0xFF1F352D), Color(0xFF0F172A)]),
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -177,6 +177,33 @@ class UserReliabilityPassportCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
+          ] else if (profile.completedBookingsCount == 0 && profile.noShowCount == 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.emoji_events_outlined, size: 16, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isArabic
+                          ? 'أكمل ٣ حجوزات بموثوقية ≥٩٥٪ لفتح ميزة الحجز بدون عربون'
+                          : 'Complete 3 bookings with ≥95% score to unlock Zero-Deposit Weekday Perks',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.88),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
           ],
 
           // Stats Counters (Bookings, No-Shows, Wallet)
@@ -205,12 +232,15 @@ class UserReliabilityPassportCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       isArabic ? 'غياب بدون إلغاء' : 'No-Shows',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 12.0,
@@ -228,6 +258,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
               Expanded(
                 child: InkWell(
                   onTap: onTopUpTap,
@@ -236,13 +267,16 @@ class UserReliabilityPassportCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            isArabic ? 'رصيد محفظة حجزي' : 'Hagzy Balance',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 12.0,
+                          Flexible(
+                            child: Text(
+                              isArabic ? 'رصيد المحفظة' : 'Hagzy Balance',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 12.0,
+                              ),
                             ),
                           ),
                           if (onTopUpTap != null) ...[
@@ -257,7 +291,7 @@ class UserReliabilityPassportCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${profile.hagzyWalletBalance.toStringAsFixed(0)} EGP',
+                        '${profile.hagzyWalletBalance.toStringAsFixed(0)} ${isArabic ? 'ج.م' : 'EGP'}',
                         style: const TextStyle(
                           color: Colors.greenAccent,
                           fontSize: 17,

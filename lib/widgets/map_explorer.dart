@@ -744,7 +744,12 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                                       size: 16, color: Color(0xFFF59E0B)),
                                   const SizedBox(width: 3),
                                   Text(
-                                    activeVenue.rating.toStringAsFixed(1),
+                                    activeVenue.reviews.isEmpty
+                                        ? localized(arabic, 'New', 'جديد')
+                                        : (activeVenue.reviews.fold<double>(0,
+                                                    (s, r) => s + r.rating) /
+                                                activeVenue.reviews.length)
+                                            .toStringAsFixed(1),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 12.5,

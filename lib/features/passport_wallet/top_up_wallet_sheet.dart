@@ -98,7 +98,7 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
         margin: EdgeInsets.fromLTRB(12, 0, 12, bottomInset + 12),
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF131C31) : kPanel,
+          color: isDark ? const Color(0xFF111B17) : kPanel,
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: kGreen.withValues(alpha: 0.35), width: 1.5),
           boxShadow: [

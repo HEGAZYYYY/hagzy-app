@@ -2,6 +2,35 @@
 // Calculates true prices, deposits, and due-now amounts. Never trusts client values.
 
 const VALID_PROMO_CODES = {
+  HAGZY50: {
+    type: 'fixed',
+    value: 50,
+    maxDiscount: 50,
+    minBookingAmount: 150,
+    validUntil: '2027-12-31T23:59:59Z',
+  },
+  HAGZY20: {
+    type: 'percentage',
+    value: 20,
+    maxDiscount: 100,
+    minBookingAmount: 0,
+    validUntil: '2027-12-31T23:59:59Z',
+  },
+  WELCOME: {
+    type: 'percentage',
+    value: 25,
+    maxDiscount: 120,
+    minBookingAmount: 0,
+    validUntil: '2027-12-31T23:59:59Z',
+  },
+  PADEL100: {
+    type: 'fixed',
+    value: 100,
+    maxDiscount: 100,
+    category: 'sports',
+    minBookingAmount: 350,
+    validUntil: '2027-12-31T23:59:59Z',
+  },
   HAGZYVIP: {
     type: 'percentage',
     value: 20,
@@ -74,7 +103,13 @@ function calculateServerPricing({
     }
   }
 
-  const subtotal = Math.round((basePrice + servicesTotal) * 100) / 100;
+  // Salons treat the unit's rate as a 30-min default chair price when no service
+  // menu item is picked, or price strictly by the chosen services when picked.
+  const isSalon = String(venue.type || '').toLowerCase() === 'salon';
+  const effectiveBase = isSalon
+    ? (verifiedServices.length > 0 ? 0 : Math.round((hourlyRate * (duration / 30)) * 100) / 100)
+    : basePrice;
+  const subtotal = Math.round((effectiveBase + servicesTotal) * 100) / 100;
 
   // 3. Promo code verification
   let discountAmount = 0;

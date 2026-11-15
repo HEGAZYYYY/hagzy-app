@@ -94,6 +94,30 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final v = vouchers[index];
+              final localizedTitle = isArabic
+                  ? switch (v.id) {
+                      'v_ps5_workspace' => 'غرفة بلايستيشن VIP',
+                      'v_barber_sports' => 'حلاقة شعر وتحديد لحية',
+                      'v_escape_billiards' => 'تذكرة غرفة الهروب للشلة',
+                      _ => v.title,
+                    }
+                  : v.title;
+              final localizedDiscount = isArabic
+                  ? switch (v.id) {
+                      'v_ps5_workspace' => 'خصم ٢٠٪',
+                      'v_barber_sports' => 'خصم ٥٠ ج.م',
+                      'v_escape_billiards' => 'خصم ١٠٠ ج.م',
+                      _ => v.discountLabel,
+                    }
+                  : v.discountLabel;
+              final localizedUnlockDesc = isArabic
+                  ? switch (v.id) {
+                      'v_ps5_workspace' => 'يُفتح بعد ٥+ ساعات مذاكرة في مساحات العمل 📚',
+                      'v_barber_sports' => 'يُفتح بعد حجز مباراة بادل أو كرة قدم ⚽',
+                      'v_escape_billiards' => 'يُفتح بعد ٣+ جلسات بلياردو 🎱',
+                      _ => v.unlockedByDescription,
+                    }
+                  : v.unlockedByDescription;
               return Container(
                 width: 260,
                 padding: const EdgeInsets.all(14.0),
@@ -101,7 +125,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [
                       v.color.withValues(alpha: 0.2),
-                      const Color(0xFF0F172A),
+                      const Color(0xFF090F0D),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -126,7 +150,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            v.title,
+                            localizedTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -143,7 +167,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            v.discountLabel,
+                            localizedDiscount,
                             style: TextStyle(
                               color: v.color,
                               fontSize: 12.0,
@@ -154,7 +178,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      v.unlockedByDescription,
+                      localizedUnlockDesc,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -172,7 +196,7 @@ class CrossCategoryVouchersCarousel extends StatelessWidget {
                               backgroundColor: Colors.green,
                               content: Text(
                                 isArabic
-                                    ? 'تم تفعيل خصم ${v.discountLabel} على حجزك القادم!'
+                                    ? 'تم تفعيل $localizedDiscount على حجزك القادم!'
                                     : 'Applied ${v.discountLabel} discount to your next booking!',
                               ),
                             ),

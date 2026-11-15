@@ -89,10 +89,36 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
   Widget build(BuildContext context) {
     final pendingCount =
         widget.bookings.where((b) => b.isPendingPayment).length;
+    final confirmedCount =
+        widget.bookings.where((b) => !b.cancelled && !b.isPendingPayment).length;
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              _AdminKpiTile(
+                label: 'Bookings',
+                value: '${widget.bookings.length}',
+                accent: kInk,
+              ),
+              const SizedBox(width: 8),
+              _AdminKpiTile(
+                label: 'Confirmed',
+                value: '$confirmedCount',
+                accent: kGreenDark,
+              ),
+              const SizedBox(width: 8),
+              _AdminKpiTile(
+                label: 'Pending',
+                value: '$pendingCount',
+                accent: pendingCount > 0 ? const Color(0xFFD97706) : kMuted,
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Wrap(
             spacing: 8,
             runSpacing: 6,
@@ -384,7 +410,7 @@ class _ManageTabState extends State<ManageTab> {
                   final count = widget.venues.where((v) => v.type == t).length;
                   if (count == 0) return const SizedBox.shrink();
                   return Padding(
-                    padding: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsetsDirectional.only(end: 6),
                     child: CustomPill(
                       label: '${t.label} ($count)',
                       icon: t.icon,
@@ -717,6 +743,54 @@ class _ManageTabState extends State<ManageTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AdminKpiTile extends StatelessWidget {
+  const _AdminKpiTile({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kBorder),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: accent,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1759,7 +1833,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                         horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: isDark
-                                          ? const Color(0xFF19243D)
+                                          ? const Color(0xFF162822)
                                           : kSurfaceTint,
                                       borderRadius: BorderRadius.circular(999),
                                       border: Border.all(color: kBorder),
@@ -1909,7 +1983,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                             margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF131C31) : kPanel,
+                              color: isDark ? const Color(0xFF111B17) : kPanel,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: kBorder),
                             ),

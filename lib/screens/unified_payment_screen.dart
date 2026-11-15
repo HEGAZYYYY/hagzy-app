@@ -63,7 +63,7 @@ class PaymentIntentData {
             (json['expires_at']['_seconds'] as int) * 1000);
       }
     }
-    expires ??= DateTime.now().add(const Duration(minutes: 10));
+    expires ??= DateTime.now().add(const Duration(minutes: 15));
 
     DateTime? verified;
     if (json['verified_at'] != null && json['verified_at'] is String) {
@@ -149,7 +149,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
   StreamController<PaymentIntentData>? _intentStreamController;
   Timer? _pollingTimer;
   Timer? _countdownTimer;
-  Duration _remainingTime = const Duration(minutes: 10);
+  Duration _remainingTime = const Duration(minutes: 15);
 
   late AnimationController _verifiedAnimController;
   late Animation<double> _scaleAnimation;
@@ -276,7 +276,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
           _isCreatingIntent = false;
           _remainingTime = intent.expiresAt.difference(DateTime.now());
           if (_remainingTime.isNegative) {
-            _remainingTime = const Duration(minutes: 10);
+            _remainingTime = const Duration(minutes: 15);
           }
         });
 
@@ -459,7 +459,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             const SizedBox(height: 10),
             Text(
               _localized(
-                'Correcting your sender address will immediately check our payment oracle for matching transfers from the last 15 minutes.',
+                'Correcting your sender address will immediately re-check our automatic verification system for matching transfers from the last 15 minutes.',
                 'تصحيح البيانات سيعيد فحص التحويلات الواردة خلال آخر 15 دقيقة فوراً لتأكيد الحجز.',
               ),
               style: TextStyle(fontSize: 13, color: kMuted),
@@ -528,7 +528,13 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     );
   }
 
+  bool _instaPayCopied = false;
+
   Future<void> _handleBackPress() async {
+    if (_activeIntent == null) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
     final shouldRelease = await LossAversionExitDialog.show(
       context: context,
       slotTimeFormatted: widget.slotTimeFormatted ?? 'Today',
@@ -564,7 +570,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             ),
           ),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new_rounded, color: kInk, size: 20),
+            icon: Icon(Icons.arrow_back_rounded, color: kInk, size: 22),
             onPressed: _handleBackPress,
           ),
         ),
@@ -686,7 +692,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                color: isDark ? const Color(0xFF1F352D) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
@@ -888,44 +894,112 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     );
   }
 
+  Widget _buildHoldStatusHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.lock_clock_rounded, color: kGreenDark, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              _localized('15-min slot hold active', 'حجز مؤقت ١٥ دقيقة'),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: kGreenDark,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          '${effectivePayableAmount.toStringAsFixed(0)} ${_localized('EGP', 'ج.م')}',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: kInk,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInstaPayInput(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: kPanel,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kGreenDark.withValues(alpha: 0.35)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.bolt_rounded, color: Color(0xFF6366F1), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _localized('Send to InstaPay Address:', 'حوّل إلى عنوان إنستاباي:'),
-                      style: TextStyle(fontSize: 12.0, color: kMuted),
+              _buildHoldStatusHeader(),
+              const Divider(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _localized('Send to InstaPay Address:', 'حوّل إلى عنوان إنستاباي:'),
+                          style: TextStyle(fontSize: 12.0, color: kMuted),
+                        ),
+                        const SizedBox(height: 2),
+                        SelectableText(
+                          widget.receiverIpa,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: kInk,
+                          ),
+                        ),
+                      ],
                     ),
-                    SelectableText(
-                      widget.receiverIpa,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        _copyToClipboard(
+                          widget.receiverIpa,
+                          _localized('Address copied!', 'تم نسخ الحساب!'),
+                        );
+                        setState(() => _instaPayCopied = true);
+                        Future.delayed(const Duration(seconds: 2), () {
+                          if (mounted) setState(() => _instaPayCopied = false);
+                        });
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: kGreenDark,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: Icon(
+                        _instaPayCopied ? Icons.check_rounded : Icons.copy_rounded,
+                        size: 16,
+                      ),
+                      label: Text(
+                        _instaPayCopied
+                            ? _localized('Copied', 'تم النسخ')
+                            : _localized('Copy', 'نسخ'),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.copy_rounded, size: 18),
-                onPressed: () => _copyToClipboard(
-                  widget.receiverIpa,
-                  _localized('Address copied!', 'تم نسخ الحساب!'),
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -979,7 +1053,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
         const SizedBox(height: 8),
         Text(
           _localized(
-            'Important: Enter the exact username of the bank account sending the funds so the payment oracle can match it in seconds.',
+            'Important: Enter the exact username of the bank account sending the funds so our automatic verification system can match it in seconds.',
             'تنبيه: اكتب اسم حساب انستاباي الذي ستقوم بالتحويل منه ليتعرف النظام الآلي على عملية الدفع خلال ثوانٍ.',
           ),
           style: TextStyle(fontSize: 12.0, color: kMuted),
@@ -993,39 +1067,46 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             color: kPanel,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kGreenDark.withValues(alpha: 0.35)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.phone_iphone_rounded, color: Color(0xFFE11D48), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _localized('Send to Wallet Number:', 'حوّل إلى رقم المحفظة:'),
-                      style: TextStyle(fontSize: 12.0, color: kMuted),
+              _buildHoldStatusHeader(),
+              const Divider(height: 18),
+              Row(
+                children: [
+                  const Icon(Icons.phone_iphone_rounded, color: Color(0xFFE11D48), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _localized('Send to Wallet Number:', 'حوّل إلى رقم المحفظة:'),
+                          style: TextStyle(fontSize: 12.0, color: kMuted),
+                        ),
+                        SelectableText(
+                          widget.receiverWallet,
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                      ],
                     ),
-                    SelectableText(
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    onPressed: () => _copyToClipboard(
                       widget.receiverWallet,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      _localized('Wallet number copied!', 'تم نسخ رقم المحفظة!'),
                     ),
-                  ],
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.copy_rounded, size: 18),
-                onPressed: () => _copyToClipboard(
-                  widget.receiverWallet,
-                  _localized('Wallet number copied!', 'تم نسخ رقم المحفظة!'),
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1047,7 +1128,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             prefixIcon: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Text(
-                '🇪🇬 +20',
+                '🇪🇬 EG',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: kInk,

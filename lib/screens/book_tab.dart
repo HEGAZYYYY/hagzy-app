@@ -7,8 +7,6 @@ import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/map_explorer.dart';
-import '../core/utils/smart_defaults.dart';
-import '../features/discovery/discovery.dart';
 
 class BookTab extends StatefulWidget {
   const BookTab({
@@ -55,7 +53,6 @@ class _BookTabState extends State<BookTab> {
   bool _sortByPrice = false;
   bool _showMapView = false;
   bool _isAutoAssigningGps = false;
-  ShillaSizePreset _shillaFilter = ShillaSizePreset.all;
   DateTime _date = () {
     final now = DateTime.now();
     return now.hour >= 21
@@ -69,6 +66,7 @@ class _BookTabState extends State<BookTab> {
   final GlobalKey _spaceStepKey = GlobalKey();
   final GlobalKey _timeStepKey = GlobalKey();
   final GlobalKey _quoteStepKey = GlobalKey();
+  String? _suppressCollapseAnimVenueId;
   final Map<String, GlobalKey> _venueCardKeys = {};
 
   @override
@@ -144,14 +142,14 @@ class _BookTabState extends State<BookTab> {
           ctx,
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeOutCubic,
-          alignment: 0.02,
+          alignment: 0.06,
         );
         return;
       }
       if (_scrollController.hasClients) {
         final matching = _getMatchingVenues();
         final index = matching.indexWhere((v) => v.id == venueId);
-        final targetOffset = 520.0 + (index >= 0 ? index * 320.0 : 0.0);
+        final targetOffset = 380.0 + (index >= 0 ? index * 320.0 : 0.0);
         final maxScroll = _scrollController.position.maxScrollExtent;
         final clamped = targetOffset.clamp(0.0, maxScroll);
         await _scrollController.animateTo(
@@ -166,7 +164,7 @@ class _BookTabState extends State<BookTab> {
             ctxAfter,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-            alignment: 0.02,
+            alignment: 0.06,
           );
         }
       }
@@ -196,6 +194,14 @@ class _BookTabState extends State<BookTab> {
       if (!_locationMatchesArea(value.location)) {
         _area = kAllEgyptAreas;
       }
+      if (_venueId != value.id) {
+        final now = DateTime.now();
+        _date = DateTime(now.year, now.month, now.day);
+        _suppressCollapseAnimVenueId = _venueId;
+      }
+      if (_suppressCollapseAnimVenueId == value.id) {
+        _suppressCollapseAnimVenueId = null;
+      }
       _venueId = value.id;
       _itemId = value.items.firstOrNull?.id;
       _selectedStart = null;
@@ -204,9 +210,21 @@ class _BookTabState extends State<BookTab> {
   }
 
   void _selectSpace(String itemId) {
+    final prevStart = _selectedStart;
+    final venue = _venuesInSelectedArea()
+        .where((v) => v.id == _venueId)
+        .firstOrNull;
+    final nextItem =
+        venue?.items.where((i) => i.id == itemId).firstOrNull;
+    var keepStart = false;
+    if (prevStart != null && venue != null && nextItem != null) {
+      final estMin = venue.type == VenueType.salon ? 30 : 60;
+      keepStart = _timesFor(venue, nextItem, estMin)
+          .any((s) => s.start == prevStart && s.available);
+    }
     setState(() {
       _itemId = itemId;
-      _selectedStart = null;
+      _selectedStart = keepStart ? prevStart : null;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -879,11 +897,18 @@ class _BookTabState extends State<BookTab> {
     await _assignArea(result.area, viaGps: result.viaGps);
   }
 
+  bool _isPublicCatalogVenue(Venue v) =>
+      v.id != 'test-venue' && v.id != 'hagzy-demo-5egp';
+
+  Iterable<Venue> _venuesInSelectedArea() => upsertNaderSalon(widget.venues)
+      .where((v) => _isPublicCatalogVenue(v) && _locationMatchesArea(v.location));
+
   bool _locationMatchesArea(String location) {
-    if (_area == kAllEgyptAreas ||
-        location.trim().isEmpty ||
-        location.toLowerCase().contains('kafr el sheikh')) {
+    if (_area == kAllEgyptAreas) {
       return true;
+    }
+    if (location.trim().isEmpty) {
+      return false;
     }
     final normalized = location.toLowerCase();
     final governorate =
@@ -930,25 +955,8 @@ class _BookTabState extends State<BookTab> {
     );
   }
 
-  bool _venueMatchesShilla(Venue venue, ShillaSizePreset preset) {
-    if (preset == ShillaSizePreset.all) return true;
-    if (preset == ShillaSizePreset.solo) {
-      return venue.type == VenueType.salon || venue.items.any((i) => i.hourlyRate > 0);
-    }
-    if (preset == ShillaSizePreset.duo) {
-      return venue.type == VenueType.lounge || venue.type == VenueType.sports || venue.items.any((i) => i.multiRate > 0 || i.hourlyRate > 0);
-    }
-    if (preset == ShillaSizePreset.group) {
-      return venue.type == VenueType.lounge || venue.type == VenueType.sports || venue.items.any((i) => i.multiRate > 0);
-    }
-    if (preset == ShillaSizePreset.squad) {
-      return venue.type == VenueType.sports;
-    }
-    return true;
-  }
-
   List<Venue> _getMatchingVenues() {
-    final list = upsertNaderSalon(widget.venues).where((venue) {
+    final list = _venuesInSelectedArea().where((venue) {
       final matchesCategory = _type == null || venue.type == _type;
       final matchesSubCategory = _subCategory == null ||
           venue.effectiveSubCategories.contains(_subCategory);
@@ -959,13 +967,11 @@ class _BookTabState extends State<BookTab> {
       final matchesFavorite =
           !_favoritesOnly || _favoriteIds.contains(venue.id);
       final matchesArea = _locationMatchesArea(venue.location);
-      final matchesShilla = _shillaFilter == ShillaSizePreset.all || _venueMatchesShilla(venue, _shillaFilter);
       return matchesCategory &&
           matchesSubCategory &&
           matchesSearch &&
           matchesFavorite &&
-          matchesArea &&
-          matchesShilla;
+          matchesArea;
     }).toList()
       ..sort((a, b) {
         if (!_sortByPrice) return a.name.compareTo(b.name);
@@ -980,6 +986,7 @@ class _BookTabState extends State<BookTab> {
     final bookAgainVenues = widget.venues
         .where((v) =>
             !_dismissedBookAgainVenueIds.contains(v.id) &&
+            _isPublicCatalogVenue(v) &&
             widget.bookings.any((b) => b.venueId == v.id && !b.cancelled))
         .toList();
     final venue =
@@ -1005,7 +1012,7 @@ class _BookTabState extends State<BookTab> {
           onGpsTap: () => _autoAssignGpsAreaDirectly(silentIfDenied: false),
           isLocating: _isAutoAssigningGps,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
@@ -1046,19 +1053,19 @@ class _BookTabState extends State<BookTab> {
                       icon: const Icon(Icons.close_rounded, size: 18),
                     ),
               filled: true,
-              fillColor: kDarkMode.value ? const Color(0xFF131C31) : Colors.white,
+              fillColor: kDarkMode.value ? const Color(0xFF111B17) : Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(24),
                 borderSide: BorderSide(
-                  color: kDarkMode.value ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                  color: kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFFE2E8F0),
                   width: 1,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(24),
                 borderSide: BorderSide(
-                  color: kDarkMode.value ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                  color: kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFFE2E8F0),
                   width: 1,
                 ),
               ),
@@ -1075,10 +1082,10 @@ class _BookTabState extends State<BookTab> {
             }),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         RepaintBoundary(
           child: CustomerHero(
-            venueCount: widget.venues.length,
+            venueCount: _venuesInSelectedArea().length,
             type: _type,
             arabic: widget.arabic,
           ),
@@ -1245,14 +1252,12 @@ class _BookTabState extends State<BookTab> {
             ),
           ),
         ],
-        const SizedBox(height: 14),
-        SectionHeading(
-          title: localized(
-              widget.arabic, 'Explore Categories', 'استكشف التصنيفات'),
-          subtitle: localized(widget.arabic,
-              'Something good is around the corner', 'أماكن مميزة بانتظارك'),
+        const SizedBox(height: 10),
+        Text(
+          localized(widget.arabic, 'Categories', 'استكشف التصنيفات'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
@@ -1265,7 +1270,7 @@ class _BookTabState extends State<BookTab> {
                 isSelected: _type == null,
                 gradient: const [Color(0xFF064E3B), Color(0xFF047857)],
                 glowColor: kGreen,
-                count: matchingVenues.length,
+                count: _venuesInSelectedArea().length,
                 arabic: widget.arabic,
                 onTap: () => _selectCategory(null),
               ),
@@ -1275,12 +1280,10 @@ class _BookTabState extends State<BookTab> {
                 subtitle: localized(widget.arabic, 'Hair & Beauty', 'صالونات وحلاقة'),
                 icon: Icons.content_cut_rounded,
                 isSelected: _type == VenueType.salon,
-                gradient: const [Color(0xFF1E1B4B), Color(0xFF4338CA)],
-                glowColor: const Color(0xFF6366F1),
-                count: upsertNaderSalon(widget.venues)
-                    .where((v) =>
-                        v.type == VenueType.salon &&
-                        _locationMatchesArea(v.location))
+                gradient: const [Color(0xFF115E59), Color(0xFF0F766E)],
+                glowColor: const Color(0xFF0F766E),
+                count: _venuesInSelectedArea()
+                    .where((v) => v.type == VenueType.salon)
                     .length,
                 arabic: widget.arabic,
                 onTap: () => _selectCategory(VenueType.salon),
@@ -1291,12 +1294,10 @@ class _BookTabState extends State<BookTab> {
                 subtitle: localized(widget.arabic, 'Gaming & Tables', 'ألعاب وبلايستيشن'),
                 icon: Icons.sports_esports_rounded,
                 isSelected: _type == VenueType.lounge,
-                gradient: const [Color(0xFF311042), Color(0xFF6D28D9)],
-                glowColor: const Color(0xFF8B5CF6),
-                count: widget.venues
-                    .where((v) =>
-                        v.type == VenueType.lounge &&
-                        _locationMatchesArea(v.location))
+                gradient: const [Color(0xFF0F172A), Color(0xFF064E3B)],
+                glowColor: kGreenDark,
+                count: _venuesInSelectedArea()
+                    .where((v) => v.type == VenueType.lounge)
                     .length,
                 arabic: widget.arabic,
                 onTap: () => _selectCategory(VenueType.lounge),
@@ -1309,10 +1310,8 @@ class _BookTabState extends State<BookTab> {
                 isSelected: _type == VenueType.sports,
                 gradient: const [Color(0xFF064E3B), Color(0xFF059669)],
                 glowColor: kGreen,
-                count: widget.venues
-                    .where((v) =>
-                        v.type == VenueType.sports &&
-                        _locationMatchesArea(v.location))
+                count: _venuesInSelectedArea()
+                    .where((v) => v.type == VenueType.sports)
                     .length,
                 arabic: widget.arabic,
                 onTap: () => _selectCategory(VenueType.sports),
@@ -1322,60 +1321,21 @@ class _BookTabState extends State<BookTab> {
         ),
         const SizedBox(height: 10),
         _buildSubCategoryFilterRow(matchingVenues),
-        const SizedBox(height: 12),
-        VibeSmartBanner(
-          vibe: DiscoveryVibe.fromDateTime(),
-          openVenuesCount: matchingVenues.length,
-          isArabic: widget.arabic,
-          onCtaPressed: () {
-            _scrollController.animateTo(
-              600,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          },
-        ),
-        const SizedBox(height: 8),
-        ShillaGroupSizeFilterBar(
-          selectedPreset: _shillaFilter,
-          onPresetSelected: (preset) {
-            setState(() {
-              _shillaFilter = preset;
-              _venueId = null;
-              _itemId = null;
-            });
-          },
-          isArabic: widget.arabic,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                _favoritesOnly
-                    ? localized(
-                        widget.arabic, 'Your Saved Places', 'أماكنك المفضلة')
-                    : localized(
-                        widget.arabic, 'Places to Book', 'أماكن للحجز'),
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-            ),
-            IconButton(
-              tooltip: localized(
-                  widget.arabic,
-                  _sortByPrice ? 'Sort Alphabetically' : 'Sort by Price',
-                  _sortByPrice ? 'ترتيب أبجدي' : 'ترتيب حسب السعر'),
-              onPressed: () => setState(() => _sortByPrice = !_sortByPrice),
-              icon: Icon(
-                  _sortByPrice ? Icons.sort_by_alpha : Icons.swap_vert_rounded),
-            ),
-          ],
-        ),
+        const SizedBox(height: 6),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
+              IconButton(
+                tooltip: localized(
+                    widget.arabic,
+                    _sortByPrice ? 'Sort Alphabetically' : 'Sort by Price',
+                    _sortByPrice ? 'ترتيب أبجدي' : 'ترتيب حسب السعر'),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => _sortByPrice = !_sortByPrice),
+                icon: Icon(
+                    _sortByPrice ? Icons.sort_by_alpha : Icons.swap_vert_rounded),
+              ),
               CustomPill(
                 selected: !_favoritesOnly,
                 label: localized(widget.arabic, 'All Places', 'كل الأماكن'),
@@ -1589,12 +1549,12 @@ class _BookTabState extends State<BookTab> {
       VenueType.salon => (
           localized(widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
           Icons.content_cut_rounded,
-          isDark ? const Color(0xFFA5B4FC) : const Color(0xFF6366F1),
+          isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E),
         ),
       VenueType.lounge => (
           localized(widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
           Icons.sports_esports_rounded,
-          isDark ? const Color(0xFFC4B5FD) : const Color(0xFF8B5CF6),
+          isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
         ),
       VenueType.sports => (
           localized(widget.arabic, 'Sports & Courts', 'ملاعب ورياضة'),
@@ -1726,10 +1686,8 @@ class _BookTabState extends State<BookTab> {
 
   Widget _buildSubCategoryFilterRow(List<Venue> matchingVenues) {
     final subList = subCategoriesForParent(_type);
-    final allVenuesInArea = upsertNaderSalon(widget.venues)
-        .where((v) =>
-            (_type == null || v.type == _type) &&
-            _locationMatchesArea(v.location))
+    final allVenuesInArea = _venuesInSelectedArea()
+        .where((v) => _type == null || v.type == _type)
         .toList();
 
     final allLabel = switch (_type) {
@@ -1775,12 +1733,12 @@ class _BookTabState extends State<BookTab> {
                     .length;
                 final isSelected = _subCategory == s.id;
                 final accentColor = switch (s.parentType) {
-                  VenueType.salon => const Color(0xFF6366F1),
-                  VenueType.lounge => const Color(0xFF8B5CF6),
+                  VenueType.salon => const Color(0xFF0F766E),
+                  VenueType.lounge => kGreenDark,
                   VenueType.sports => kGreen,
                 };
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsetsDirectional.only(end: 8),
                   child: _SubCategoryVisualPill(
                     label: s.title(widget.arabic),
                     emoji: s.emoji,
@@ -1925,7 +1883,7 @@ class _BookTabState extends State<BookTab> {
               'صالونات حلاقة، تصفيف شعر، عناية شخصية وحجز الكراسي'),
           icon: Icons.content_cut_rounded,
           count: groomingVenues.length,
-          accentColor: const Color(0xFF6366F1),
+          accentColor: const Color(0xFF0F766E),
           arabic: widget.arabic,
           onSeeAll: () => _selectCategory(VenueType.salon),
         ),
@@ -1945,7 +1903,7 @@ class _BookTabState extends State<BookTab> {
               'غرف بلايستيشن VIP، بلياردو، ألعاب وكافيهات'),
           icon: Icons.sports_esports_rounded,
           count: entertainmentVenues.length,
-          accentColor: const Color(0xFF8B5CF6),
+          accentColor: kGreenDark,
           arabic: widget.arabic,
           onSeeAll: () => _selectCategory(VenueType.lounge),
         ),
@@ -2007,7 +1965,11 @@ class _BookTabState extends State<BookTab> {
         ),
       ),
       AnimatedSize(
-        duration: const Duration(milliseconds: 320),
+        duration: selected
+            ? const Duration(milliseconds: 260)
+            : (_suppressCollapseAnimVenueId == value.id
+                ? Duration.zero
+                : const Duration(milliseconds: 220)),
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
         child: (selected && selectedVenue != null)
@@ -2028,7 +1990,7 @@ class _BookTabState extends State<BookTab> {
       key: _bookingSectionKey,
       margin: const EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131C31) : kPanel,
+        color: kPanel,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: kGreen.withValues(alpha: 0.45),
@@ -2187,11 +2149,11 @@ class _BookTabState extends State<BookTab> {
                               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? const Color(0xFF0B1120).withValues(alpha: 0.55)
+                                    ? const Color(0xFF090F0D).withValues(alpha: 0.55)
                                     : kSurfaceTint.withValues(alpha: 0.65),
                                 border: Border(
                                   bottom: BorderSide(
-                                    color: isDark ? const Color(0xFF283552) : kBorder,
+                                    color: isDark ? const Color(0xFF1F352D) : kBorder,
                                   ),
                                 ),
                               ),
@@ -2267,26 +2229,6 @@ class _BookTabState extends State<BookTab> {
                                 children: [
                                   Row(
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: kGreen.withValues(alpha: 0.10),
-                                          borderRadius:
-                                              BorderRadius.circular(999),
-                                        ),
-                                        child: Text(
-                                          localized(widget.arabic, 'STEP 1',
-                                              'خطوة ١'),
-                                          style: const TextStyle(
-                                            fontSize: 12.0,
-                                            fontWeight: FontWeight.w900,
-                                            color: kGreen,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           localized(widget.arabic,
@@ -2322,7 +2264,7 @@ class _BookTabState extends State<BookTab> {
                                               : venue.type.icon,
                                           selected: sel,
                                           label:
-                                              '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/15m', '/١٥ د') : localized(widget.arabic, '/h', '/س')}',
+                                              '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/30m', '/٣٠ د') : localized(widget.arabic, '/h', '/س')}',
                                           onTap: () => _selectSpace(val.id),
                                         );
                                       }).toList(),
@@ -2368,38 +2310,6 @@ class _BookTabState extends State<BookTab> {
                                                 children: [
                                                   Row(
                                                     children: [
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 3),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: kGreenLight
-                                                              .withValues(
-                                                                  alpha: 0.12),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(
-                                                                      999),
-                                                        ),
-                                                        child: Text(
-                                                          localized(
-                                                              widget.arabic,
-                                                              'STEP 2',
-                                                              'خطوة ٢'),
-                                                          style:
-                                                              const TextStyle(
-                                                            fontSize: 12.0,
-                                                            fontWeight:
-                                                                FontWeight.w900,
-                                                            color: kGreenLight,
-                                                            letterSpacing: 0.5,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
                                                       Expanded(
                                                         child: Text(
                                                           localized(
@@ -2959,7 +2869,11 @@ class _BookTabState extends State<BookTab> {
                     availableCount > 0
                         ? localized(arabic, '$availableCount available',
                             '$availableCount متاح')
-                        : localized(arabic, 'Fully booked', 'مكتمل'),
+                        : (slots.isNotEmpty &&
+                                slots.every(
+                                    (s) => !s.start.isAfter(DateTime.now()))
+                            ? localized(arabic, 'Passed today', 'انتهى اليوم')
+                            : localized(arabic, 'Fully booked', 'مكتمل')),
                     style: TextStyle(
                       fontSize: 12.0,
                       fontWeight: FontWeight.w700,
@@ -3009,11 +2923,11 @@ class ReservationQuote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = venue.type == VenueType.salon && venue.services.isNotEmpty
-        ? venue.services.first.price
-        : item.hourlyRate *
-            estimatedMinutes /
-            (venue.type == VenueType.salon ? 15 : 60);
+    final total = venue.type == VenueType.salon
+        ? (item.hourlyRate > 0
+            ? item.hourlyRate
+            : (venue.services.isNotEmpty ? venue.services.first.price : 0.0))
+        : item.hourlyRate * estimatedMinutes / 60;
     final rawDeposit = total * venue.depositPercent / 100;
     final deposit = rawDeposit > 0 && rawDeposit < 5.0 ? 5.0 : rawDeposit;
     return Container(
@@ -3256,7 +3170,7 @@ class TimeSlotPill extends StatelessWidget {
                 : available
                     ? kBorder
                     : (isDark
-                        ? const Color(0xFF1E293B)
+                        ? const Color(0xFF1F352D)
                         : const Color(0xFFE2E8F0)),
             width: selected ? 1.5 : 1,
           ),
@@ -3328,56 +3242,53 @@ class CustomerAreaBar extends StatelessWidget {
         onTap: onTap,
         scaleDown: 0.985,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            color: kPanel,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: kBorder),
-            boxShadow: HagzyTheme.softShadow,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  gradient: HagzyTheme.brandGradient,
-                  borderRadius: BorderRadius.circular(12),
+                  color: kGreenDark.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
                 ),
                 child: const Icon(Icons.location_on_rounded,
-                    color: Colors.white, size: 19),
+                    color: kGreenDark, size: 18),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      localized(arabic, 'YOUR AREA', 'محافظتك'),
+                      style: TextStyle(
+                        color: kMuted,
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const LivePulseDot(color: kGreen, size: 6),
-                        const SizedBox(width: 6),
-                        Text(
-                          localized(arabic, 'YOUR AREA', 'محافظتك'),
-                          style: TextStyle(
-                            color: kMuted,
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
+                        Flexible(
+                          child: Text(
+                            area,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: kInk,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down_rounded,
+                            color: kInk, size: 18),
                       ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      area,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14.5,
-                        color: kInk,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -3394,10 +3305,10 @@ class CustomerAreaBar extends StatelessWidget {
                           horizontal: 10, vertical: 6),
                       margin: const EdgeInsetsDirectional.only(end: 8),
                       decoration: BoxDecoration(
-                        color: kGreen.withValues(alpha: 0.1),
+                        color: kGreenDark.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(999),
                         border:
-                            Border.all(color: kGreen.withValues(alpha: 0.3)),
+                            Border.all(color: kGreenDark.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -3409,17 +3320,17 @@ class CustomerAreaBar extends StatelessWidget {
                               child: CircularProgressIndicator(
                                 strokeWidth: 1.8,
                                 valueColor:
-                                    AlwaysStoppedAnimation<Color>(kGreen),
+                                    AlwaysStoppedAnimation<Color>(kGreenDark),
                               ),
                             )
                           else
                             const Icon(Icons.my_location_rounded,
-                                color: kGreen, size: 14),
+                                color: kGreenDark, size: 14),
                           const SizedBox(width: 4),
                           const Text(
                             'GPS',
                             style: TextStyle(
-                              color: kGreen,
+                              color: kGreenDark,
                               fontSize: 12.0,
                               fontWeight: FontWeight.w800,
                             ),
@@ -3434,7 +3345,7 @@ class CustomerAreaBar extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: kInk.withValues(alpha: 0.04),
+                  color: kPanel,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: kBorder),
                 ),
@@ -3483,20 +3394,20 @@ class CustomerHero extends StatelessWidget {
             const Color(0xFFA7F3D0),
           ),
         VenueType.salon => (
-            const [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+            const [Color(0xFF134E4A), Color(0xFF0F766E), Color(0xFF14B8A6)],
             Icons.content_cut,
             localized(arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
             localized(arabic, 'Barbershops, Grooming & Chair Locks',
                 'حلاقة وعناية وحجز الكراسي'),
-            const Color(0xFFC7D2FE),
+            const Color(0xFF99F6E4),
           ),
         VenueType.lounge => (
-            const [Color(0xFF311042), Color(0xFF4C1D95), Color(0xFF6D28D9)],
+            const [Color(0xFF0F172A), Color(0xFF1F352D), Color(0xFF065F46)],
             Icons.sports_esports,
             localized(arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
             localized(arabic, 'PS5 VIP Rooms, Billiards & Ping Pong',
                 'غرف بلايستيشن وبلياردو وبينغ بونغ'),
-            const Color(0xFFDDD6FE),
+            const Color(0xFFA7F3D0),
           ),
         null => (
             const [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF059669)],
@@ -3525,23 +3436,31 @@ class CustomerHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = _content;
+    final borderColor = switch (type) {
+      VenueType.salon => const Color(0xFF5EEAD4).withValues(alpha: 0.28),
+      VenueType.lounge => const Color(0xFF34D399).withValues(alpha: 0.24),
+      _ => const Color(0xFF6EE7B7).withValues(alpha: 0.28),
+    };
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       child: Container(
         key: ValueKey(type),
-        height: 110,
+        constraints: const BoxConstraints(minHeight: 88),
         padding: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: content.$1,
-            begin: Alignment.bottomLeft,
-            end: Alignment.topRight,
+            begin: AlignmentDirectional.bottomStart,
+            end: AlignmentDirectional.topEnd,
           ),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(
+            color: borderColor,
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: content.$1.first.withValues(alpha: 0.25),
@@ -3589,6 +3508,7 @@ class CustomerHero extends StatelessWidget {
                 alignment:
                     arabic ? Alignment.centerRight : Alignment.centerLeft,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment:
                       arabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -3619,7 +3539,7 @@ class CustomerHero extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     SizedBox(
                       width: MediaQuery.sizeOf(context).width * .64,
                       child: Text(
@@ -3628,14 +3548,14 @@ class CustomerHero extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 15,
                           height: 1.15,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
+                          letterSpacing: -0.3,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -3791,8 +3711,8 @@ class VenueBrowseCard extends StatelessWidget {
 
   Color get _accent => switch (venue.type) {
         VenueType.sports => kGreen,
-        VenueType.salon => kGreenDark,
-        VenueType.lounge => kGreen,
+        VenueType.salon => const Color(0xFF0F766E),
+        VenueType.lounge => kGreenDark,
       };
 
   String get _image =>
@@ -3824,10 +3744,17 @@ class VenueBrowseCard extends StatelessWidget {
     final rateLabel = venue.type == VenueType.salon
         ? localized(arabic, 'per service', 'للخدمة')
         : localized(arabic, 'per hour', 'للساعة');
+    final itemCount = venue.items.length;
     final spaceLabel = switch (venue.type) {
-      VenueType.sports => localized(arabic, 'Courts', 'ملاعب'),
-      VenueType.salon => localized(arabic, 'Chairs', 'كراسي'),
-      VenueType.lounge => localized(arabic, 'Spaces', 'أماكن'),
+      VenueType.sports => itemCount == 1
+          ? localized(arabic, 'Court', 'ملعب')
+          : localized(arabic, 'Courts', 'ملاعب'),
+      VenueType.salon => itemCount == 1
+          ? localized(arabic, 'Chair', 'كرسي')
+          : localized(arabic, 'Chairs', 'كراسي'),
+      VenueType.lounge => itemCount == 1
+          ? localized(arabic, 'Space', 'مكان')
+          : localized(arabic, 'Spaces', 'أماكن'),
     };
     final ratingStr = venue.rating.toStringAsFixed(1);
     final hasReviews = venue.reviews.isNotEmpty;
@@ -3856,7 +3783,7 @@ class VenueBrowseCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: 162,
+                  height: 172,
                   width: double.infinity,
                   padding: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
@@ -3881,7 +3808,7 @@ class VenueBrowseCard extends StatelessWidget {
                             if (loadingProgress == null) return child;
                             return const HagzyShimmerBox(
                               width: double.infinity,
-                              height: 162,
+                              height: 172,
                               borderRadius: 0,
                             );
                           },
@@ -3897,9 +3824,9 @@ class VenueBrowseCard extends StatelessWidget {
                               end: Alignment.bottomCenter,
                               stops: const [0.0, 0.45, 1.0],
                               colors: [
-                                Colors.black.withValues(alpha: 0.35),
+                                Colors.black.withValues(alpha: 0.20),
                                 Colors.transparent,
-                                Colors.black.withValues(alpha: 0.78),
+                                Colors.black.withValues(alpha: 0.58),
                               ],
                             ),
                           ),
@@ -3950,7 +3877,7 @@ class VenueBrowseCard extends StatelessWidget {
                                 alignment: AlignmentDirectional.topEnd,
                                 child: Material(
                                   color: isDark
-                                      ? const Color(0xFF1E293B).withValues(alpha: 0.88)
+                                      ? const Color(0xFF1F352D).withValues(alpha: 0.88)
                                       : (favorite ? Colors.white : Colors.white.withValues(alpha: 0.94)),
                                   shape: const CircleBorder(),
                                   elevation: favorite ? 3 : 2,
@@ -4029,35 +3956,6 @@ class VenueBrowseCard extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    if (venue.instaPayAddress.isNotEmpty ||
-                                        venue.vodafoneCashNumber.isNotEmpty) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 9, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          gradient: HagzyTheme.brandGradient,
-                                          borderRadius: BorderRadius.circular(999),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.bolt_rounded,
-                                                size: 12, color: Colors.white),
-                                            const SizedBox(width: 2),
-                                            Text(
-                                              localized(arabic, 'Instant Transfer',
-                                                  'تحويل فوري'),
-                                              style: const TextStyle(
-                                                fontSize: 12.0,
-                                                fontWeight: FontWeight.w800,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -4079,9 +3977,9 @@ class VenueBrowseCard extends StatelessWidget {
                             child: Text(
                               venue.name,
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.4,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
                                 color: kInk,
                               ),
                             ),
@@ -4211,91 +4109,51 @@ class VenueBrowseCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                      if (venue.amenities.isNotEmpty || venue.items.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          [...venue.amenities.take(3), if (venue.items.isNotEmpty) '${venue.items.length} $spaceLabel'].join('  ·  '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: kMuted,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.verified_user_rounded,
+                            size: 14,
+                            color:
+                                isDark ? const Color(0xFF34D399) : kGreenDark,
+                          ),
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _accent.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
+                          Expanded(
                             child: Text(
-                              '${venue.items.length} $spaceLabel',
+                              localized(
+                                arabic,
+                                '15-min free hold · InstaPay & Wallet accepted',
+                                'حجز مبدئي ١٥ دقيقة · إنستاباي والمحفظة',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: _accent,
-                                fontSize: 12.0,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? const Color(0xFF34D399)
+                                    : kGreenDark,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      if (venue.effectiveSubCategories.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: venue.effectiveSubCategories.map((subId) {
-                            final def = findSubCategoryDef(subId);
-                            if (def == null) return const SizedBox.shrink();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3.5),
-                              decoration: BoxDecoration(
-                                color: _accent.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _accent.withValues(alpha: 0.22),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(def.icon, size: 13, color: _accent),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    def.title(arabic),
-                                    style: TextStyle(
-                                      color: _accent,
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                      if (venue.amenities.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: venue.amenities.take(4).map((amenity) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: kPage,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: kBorder),
-                              ),
-                              child: Text(
-                                amenity,
-                                style: TextStyle(
-                                  fontSize: 12.0,
-                                  fontWeight: FontWeight.w700,
-                                  color: kInk,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      const Divider(height: 1),
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -4318,9 +4176,13 @@ class VenueBrowseCard extends StatelessWidget {
                                             'السعر عند الطلب')
                                         : '${formatMoney(lowestPrice)} ${localized(arabic, 'EGP', 'ج.م')}',
                                     style: TextStyle(
-                                        color: kInk,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900),
+                                      color: kInk,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
                                   ),
                                   if (lowestPrice != null)
                                     TextSpan(
@@ -4352,14 +4214,15 @@ class VenueBrowseCard extends StatelessWidget {
                                 backgroundColor: selected
                                     ? const Color(0xFFEF4444)
                                         .withValues(alpha: 0.12)
-                                    : kGreen,
+                                    : kGreenDark,
                                 foregroundColor: selected
                                     ? const Color(0xFFEF4444)
                                     : Colors.white,
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(999)),
+                                minimumSize: const Size(108, 48),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 10),
+                                    horizontal: 20, vertical: 12),
                                 elevation: 0,
                               ),
                               onPressed: onTap,
@@ -4575,7 +4438,12 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                           size: 16, color: Color(0xFFF59E0B)),
                       const SizedBox(width: 4),
                       Text(
-                        venue.rating.toStringAsFixed(1),
+                        venue.reviews.isEmpty
+                            ? localized(arabic, 'New', 'جديد')
+                            : (venue.reviews.fold<double>(
+                                        0, (s, r) => s + r.rating) /
+                                    venue.reviews.length)
+                                .toStringAsFixed(1),
                         style: TextStyle(
                             color: isDark
                                 ? const Color(0xFFFEF3C7)
@@ -4592,7 +4460,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                     color: isDark
                         ? (widget.favorite
                             ? const Color(0xFFE11D48).withValues(alpha: 0.2)
-                            : const Color(0xFF1E293B))
+                            : const Color(0xFF1F352D))
                         : (widget.favorite
                             ? const Color(0xFFFFE4E6)
                             : const Color(0xFFF1F5F9)),
@@ -4878,7 +4746,7 @@ class _CategoryVisualCard extends StatelessWidget {
                   end: Alignment.bottomRight,
                 )
               : null,
-          color: isSelected ? null : (isDark ? const Color(0xFF131C31) : Colors.white),
+          color: isSelected ? null : (isDark ? const Color(0xFF111B17) : Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
@@ -4911,7 +4779,7 @@ class _CategoryVisualCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.white.withValues(alpha: 0.2)
-                    : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                    : (isDark ? const Color(0xFF1F352D) : const Color(0xFFF1F5F9)),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -4945,7 +4813,7 @@ class _CategoryVisualCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: isSelected
                               ? Colors.white.withValues(alpha: 0.22)
-                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                              : (isDark ? const Color(0xFF1F352D) : const Color(0xFFF1F5F9)),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -5011,30 +4879,16 @@ class _CategorySectionHeader extends StatelessWidget {
         : accentColor;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 18, bottom: 12),
+      padding: const EdgeInsets.only(top: 22, bottom: 12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark
-              ? color.withValues(alpha: 0.14)
-              : color.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? color.withValues(alpha: 0.38)
-                : color.withValues(alpha: 0.15),
-            width: 1.2,
-          ),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(7),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isDark
-                    ? color.withValues(alpha: 0.25)
-                    : color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(10),
+                color: color.withValues(alpha: isDark ? 0.22 : 0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 18),
             ),
@@ -5048,10 +4902,10 @@ class _CategorySectionHeader extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
                           color: isDark ? const Color(0xFFF1F5F9) : kInk,
-                          letterSpacing: -0.2,
+                          letterSpacing: -0.4,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -5241,28 +5095,28 @@ class _BookingStepPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           gradient: active ? HagzyTheme.brandGradient : null,
           color: active
               ? null
               : (done
                   ? kGreen.withValues(alpha: 0.12)
-                  : (isDark ? const Color(0xFF19243D) : Colors.white)),
+                  : (isDark ? const Color(0xFF162822) : Colors.white)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active
                 ? kGreen
                 : (done
                     ? kGreen.withValues(alpha: 0.35)
-                    : (isDark ? const Color(0xFF283552) : kBorder)),
+                    : (isDark ? const Color(0xFF1F352D) : kBorder)),
           ),
         ),
         child: Row(
           children: [
             Container(
-              width: 20,
-              height: 20,
+              width: 18,
+              height: 18,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: active
@@ -5271,11 +5125,11 @@ class _BookingStepPill extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: done && !active
-                  ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
+                  ? const Icon(Icons.check_rounded, size: 11, color: Colors.white)
                   : Text(
                       stepNumber,
                       style: TextStyle(
-                        fontSize: 12.0,
+                        fontSize: 11.0,
                         fontWeight: FontWeight.w900,
                         color: active || done
                             ? Colors.white
@@ -5283,36 +5137,42 @@ class _BookingStepPill extends StatelessWidget {
                       ),
                     ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w900,
-                      color: active
-                          ? Colors.white
-                          : (isDark ? const Color(0xFFF8FAFC) : kInk),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w900,
+                        color: active
+                            ? Colors.white
+                            : (isDark ? const Color(0xFFF8FAFC) : kInk),
+                      ),
                     ),
                   ),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w600,
-                      color: active
-                          ? Colors.white.withValues(alpha: 0.88)
-                          : (done
-                              ? (isDark ? kGreenLight : kGreenDark)
-                              : (isDark ? const Color(0xFF94A3B8) : kMuted)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      subtitle,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 11.0,
+                        fontWeight: FontWeight.w600,
+                        color: active
+                            ? Colors.white.withValues(alpha: 0.88)
+                            : (done
+                                ? (isDark ? kGreenLight : kGreenDark)
+                                : (isDark ? const Color(0xFF94A3B8) : kMuted)),
+                      ),
                     ),
                   ),
                 ],

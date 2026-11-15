@@ -678,3 +678,87 @@ test('SECURITY: forged tokens, expired tokens, unverified claims, password const
   });
   assert.equal(hmacForged.status, 403);
 });
+
+test('whitelisted admin can book unowned venue as customer while walk-in remains restricted; salon pricing & HAGZY50 work', async () => {
+  // Partner creates a salon venue they own (not owned by whitelisted admin)
+  const partnerToken = jwt.sign(
+    { id: 'usr_partner_salon', email: 'salon@partner.dev', phone: '01077776666', role: 'partner', isAdmin: false },
+    'test-secret',
+    { expiresIn: '2h' }
+  );
+
+  const partnerSalonId = 'partner-salon-test';
+  const createSalon = await call('PUT', `/api/admin/venues/${partnerSalonId}`, {
+    token: partnerToken,
+    body: {
+      id: partnerSalonId,
+      name: 'Partner Grooming Studio',
+      location: 'Cairo',
+      type: 'salon',
+      depositPercent: 30,
+      items: [
+        { id: 'chair-1', name: 'Barber Chair 1', hourlyRate: 150 },
+        { id: 'chair-vip', name: 'Barber Chair 2 (VIP)', hourlyRate: 200 },
+      ],
+      services: [
+        { id: 'svc-cut', name: 'Haircut', minutes: 30, price: 150 },
+      ],
+    },
+  });
+  assert.equal(createSalon.status, 200);
+
+  // Admin can book this unowned venue as a regular customer (walkIn: false)
+  const adminCustBook = await call('POST', '/api/bookings', {
+    token: admin,
+    body: {
+      venueId: partnerSalonId,
+      itemId: 'chair-vip',
+      customer: 'Mohamed Customer Mode',
+      startsAt: slot(15),
+      durationMinutes: 30,
+      walkIn: false,
+      promoCode: 'HAGZY50',
+      phone: '01000000001',
+    },
+  });
+  assert.equal(adminCustBook.status, 200);
+  // Chair VIP 200 EGP (30 min) - HAGZY50 (50 EGP off >= 150) = 150 EGP
+  assert.equal(adminCustBook.json.booking.subtotal, 200);
+  assert.equal(adminCustBook.json.booking.promoCode, 'HAGZY50');
+  assert.equal(adminCustBook.json.booking.discountAmount, 50);
+  assert.equal(adminCustBook.json.booking.price, 150);
+
+  // Below minSpend (150 EGP): Haircut/Beard 100 EGP does NOT apply HAGZY50
+  const partnerSalonBelowMin = await call('POST', '/api/bookings', {
+    token: admin,
+    body: {
+      venueId: partnerSalonId,
+      itemId: 'chair-1',
+      customer: 'Mohamed Customer Mode 2',
+      startsAt: slot(17),
+      durationMinutes: 30,
+      walkIn: false,
+      promoCode: 'HAGZY50',
+      phone: '01000000001',
+    },
+  });
+  assert.equal(partnerSalonBelowMin.status, 200);
+  assert.equal(partnerSalonBelowMin.json.booking.subtotal, 150);
+  assert.equal(partnerSalonBelowMin.json.booking.discountAmount, 50);
+  assert.equal(partnerSalonBelowMin.json.booking.price, 100);
+
+  // Walk-in on an unowned venue is still rejected with 403
+  const adminWalkInForbidden = await call('POST', '/api/bookings', {
+    token: admin,
+    body: {
+      venueId: partnerSalonId,
+      itemId: 'chair-1',
+      customer: 'Unauthorized Walk-in',
+      startsAt: slot(16),
+      durationMinutes: 30,
+      walkIn: true,
+      phone: '01012345678',
+    },
+  });
+  assert.equal(adminWalkInForbidden.status, 403);
+});

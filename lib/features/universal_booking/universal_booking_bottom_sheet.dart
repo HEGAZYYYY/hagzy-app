@@ -481,7 +481,7 @@ class _UniversalBookingBottomSheetState
             children: [1.0, 2.0, 3.0, 4.0, 6.0].map((h) {
               final isSel = _durationHours == h;
               return Padding(
-                padding: const EdgeInsets.only(right: 6.0),
+                padding: const EdgeInsetsDirectional.only(end: 6.0),
                 child: ChoiceChip(
                   label: Text('${h.toInt()}h'),
                   selected: isSel,
@@ -665,27 +665,41 @@ class _UniversalBookingBottomSheetState
           ),
           const SizedBox(height: 12),
 
-          // Dynamic Primary CTA (Principle 2: Reciprocity + IKEA Effect)
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: ElevatedButton(
-              onPressed: () => _handleLockAndProceed(pricing),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Dynamic Primary CTA (WCAG AA white on kGreenDark, >= 48dp thumb target, RTL-safe icon)
+          SafeArea(
+            top: false,
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: () => _handleLockAndProceed(pricing),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF047857),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-              ),
-              child: Text(
-                isAr
-                    ? 'احجز مكانك وولّد لينك الشلة ←'
-                    : 'Lock My Slot & Generate Invite Link →',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        isAr
+                            ? 'احجز مكانك وولّد لينك الشلة'
+                            : 'Lock My Slot & Generate Invite Link',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_rounded, size: 18),
+                  ],
                 ),
               ),
             ),

@@ -49,6 +49,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   bool _loading = false;
   String? _errorMessage;
+
+  @override
+  void didUpdateWidget(covariant CustomerLoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.arabic != widget.arabic && _errorMessage != null) {
+      setState(() => _errorMessage = null);
+    }
+  }
   bool _isPhoneSignUp = false;
   bool _isVerifyingOtp = false;
   int _resendCountdown = 60;
@@ -631,7 +639,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                               },
                           style: IconButton.styleFrom(
                             backgroundColor: kDarkMode.value
-                                ? const Color(0xFF19243D)
+                                ? const Color(0xFF162822)
                                 : kSurfaceTint,
                             foregroundColor:
                                 kDarkMode.value ? kGold : kGreen,
@@ -1277,7 +1285,7 @@ class _SocialSignInButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: isApple
               ? Colors.black
-              : (isDark ? const Color(0xFF19243D) : Colors.white),
+              : (isDark ? const Color(0xFF162822) : Colors.white),
           borderRadius: BorderRadius.circular(14),
           border: isApple
               ? null

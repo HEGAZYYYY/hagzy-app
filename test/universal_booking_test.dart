@@ -53,8 +53,8 @@ void main() {
       await tester.tap(find.text('2 hrs'));
       await tester.pump();
 
-      // Tap "Lock My Slot & Generate Invite Link →"
-      await tester.tap(find.text('Lock My Slot & Generate Invite Link →'));
+      // Tap "Lock My Slot & Generate Invite Link"
+      await tester.tap(find.text('Lock My Slot & Generate Invite Link'));
       await tester.pump();
 
       expect(createdBooking, isNotNull);

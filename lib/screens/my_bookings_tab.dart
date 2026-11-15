@@ -164,7 +164,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              colors: [Color(0xFF0F172A), Color(0xFF1F352D)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -623,7 +623,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       gradient: booking.isConfirmed
                           ? HagzyTheme.obsidianGradient
                           : const LinearGradient(
-                              colors: [Color(0xFF0A0F1D), Color(0xFF1E293B)],
+                              colors: [Color(0xFF0A0F1D), Color(0xFF1F352D)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),

@@ -104,6 +104,7 @@ class _GracePeriodCountdownBannerState
                     color: Colors.greenAccent,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
               ),

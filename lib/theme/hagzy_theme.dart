@@ -11,19 +11,23 @@ import 'google_fonts_stub.dart' if (dart.library.html) 'google_fonts_web.dart';
 Color get kInk => kDarkMode.value ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 const kDark = Color(0xFF064E3B);
 
-const kGreen = Color(0xFF047857);
+const kGreen = Color(0xFF059669);
 const kGreenDark = Color(0xFF047857);
 const kGreenLight = Color(0xFF10B981);
 
-const kGold = Color(0xFFB45309);
-const kCobalt = Color(0xFF059669);
-const kTerracotta = Color(0xFF047857);
+const kGold = Color(0xFFD97706);
+const kCobalt = Color(0xFF0F766E);
+const kTerracotta = Color(0xFFDC2626);
 
-Color get kPage => kDarkMode.value ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC);
-Color get kPanel => kDarkMode.value ? const Color(0xFF131C31) : const Color(0xFFFFFFFF);
-Color get kSurfaceTint => kDarkMode.value ? const Color(0xFF16253A) : const Color(0xFFF0FDF4);
-Color get kMuted => kDarkMode.value ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-Color get kBorder => kDarkMode.value ? const Color(0xFF283552) : const Color(0xFFE2E8F0);
+Color get kSuccess => kDarkMode.value ? const Color(0xFF34D399) : const Color(0xFF059669);
+Color get kWarning => kDarkMode.value ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+Color get kError => kDarkMode.value ? const Color(0xFFF87171) : const Color(0xFFDC2626);
+
+Color get kPage => kDarkMode.value ? const Color(0xFF090F0D) : const Color(0xFFF8FAFC);
+Color get kPanel => kDarkMode.value ? const Color(0xFF111B17) : const Color(0xFFFFFFFF);
+Color get kSurfaceTint => kDarkMode.value ? const Color(0xFF162822) : const Color(0xFFECFDF5);
+Color get kMuted => kDarkMode.value ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+Color get kBorder => kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFFE2E8F0);
 
 const kStorageKey = 'hagzy_app_data_v1';
 const kFavoriteStorageKey = 'hagzy_favorite_venues_v1';
@@ -94,16 +98,51 @@ class HagzyTheme {
     final base = Theme.of(context).textTheme;
     final isDark = kDarkMode.value;
     final textColor = isDark ? const Color(0xFFF8FAFC) : kInk;
-    if (_isTest) {
-      return base.apply(bodyColor: textColor, displayColor: textColor);
-    }
-    return (arabic
+    final fontThemed = _isTest
+        ? base
+        : (arabic
             ? GoogleFonts.cairoTextTheme(base)
-            : GoogleFonts.plusJakartaSansTextTheme(base))
+            : GoogleFonts.plusJakartaSansTextTheme(base));
+
+    final heightScale = arabic ? 1.32 : 1.24;
+    final bodyHeight = arabic ? 1.50 : 1.42;
+
+    return fontThemed
+        .copyWith(
+          displaySmall: (fontThemed.displaySmall ?? const TextStyle()).copyWith(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            letterSpacing: arabic ? 0 : -0.6,
+            height: heightScale,
+          ),
+          headlineSmall:
+              (fontThemed.headlineSmall ?? const TextStyle()).copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: arabic ? 0 : -0.4,
+            height: heightScale,
+          ),
+          titleMedium: (fontThemed.titleMedium ?? const TextStyle()).copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: arabic ? 0 : -0.2,
+            height: heightScale,
+          ),
+          bodyMedium: (fontThemed.bodyMedium ?? const TextStyle()).copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: bodyHeight,
+          ),
+          labelLarge: (fontThemed.labelLarge ?? const TextStyle()).copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: arabic ? 0 : 0.1,
+          ),
+        )
         .apply(
           bodyColor: textColor,
           displayColor: textColor,
-          fontFamilyFallback: emojiFontFallbacks,
+          fontFamilyFallback: _isTest ? null : emojiFontFallbacks,
         );
   }
 
@@ -136,6 +175,18 @@ class HagzyTheme {
               displayColor: kInk,
               fontFamilyFallback: emojiFontFallbacks,
             ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: kInk,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        textStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: kPanel,
         foregroundColor: kInk,
@@ -232,10 +283,10 @@ class HagzyTheme {
   }
 
   static ThemeData darkTheme() {
-    const darkPage = Color(0xFF0B1120);
-    const darkPanel = Color(0xFF131C31);
-    const darkInput = Color(0xFF19243D);
-    const darkBorder = Color(0xFF283552);
+    const darkPage = Color(0xFF090F0D);
+    const darkPanel = Color(0xFF111B17);
+    const darkInput = Color(0xFF162822);
+    const darkBorder = Color(0xFF1F352D);
     const darkText = Color(0xFFF8FAFC);
     final baseScheme = ColorScheme.fromSeed(
       seedColor: kGreen,
@@ -352,10 +403,23 @@ class HagzyTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF1F352D),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         contentTextStyle: const TextStyle(
             color: Colors.white, fontWeight: FontWeight.w600, height: 1.35),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: const Color(0xFF162822),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF1F352D)),
+        ),
+        textStyle: const TextStyle(
+          color: Color(0xFFF8FAFC),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(color: kGreenLight),
       outlinedButtonTheme: OutlinedButtonThemeData(

@@ -17,9 +17,14 @@ const {
   matchPaymentEvent,
   MAX_AUTO_CONFIRM_AMOUNT
 } = require('./paymentMatcher');
+const {
+  persistToPostgres: persistRelationalState,
+  hydrateFromPostgres: hydrateRelationalState,
+} = require('./postgresStore');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const IS_TEST = process.env.NODE_ENV === 'test';
+const USE_POSTGRES = Boolean(process.env.DATABASE_URL && !IS_TEST);
 
 // Payment deduplication & listener heartbeat tracking
 const processedPaymentHashes = new Set();
@@ -150,10 +155,12 @@ try {
 }
 
 let fbFirestore = null;
-try {
-  const { getFirestore } = require('firebase-admin/firestore');
-  fbFirestore = getFirestore();
-} catch (_) {}
+if (!USE_POSTGRES) {
+  try {
+    const { getFirestore } = require('firebase-admin/firestore');
+    fbFirestore = getFirestore();
+  } catch (_) {}
+}
 
 function normalizeLocalPhone(rawPhone) {
   if (!rawPhone) return '';
@@ -658,13 +665,16 @@ function safeEqual(a, b) {
 
 // Live PostgreSQL Cloud Database connection (if DATABASE_URL is set in Render / cloud)
 let pgPool = null;
-if (process.env.DATABASE_URL) {
+if (USE_POSTGRES) {
   try {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      max: Number(process.env.PG_POOL_MAX || 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
       ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
     });
-    console.log('🐘 PostgreSQL connected. Live cloud database active.');
+    console.log('🐘 PostgreSQL pool configured. Relational Supabase mode active.');
   } catch (err) {
     console.error('PostgreSQL initialization error:', err.message);
   }
@@ -701,7 +711,25 @@ function markBookingConfirmed(b, { method, providerRef, amount, excess, actor = 
   return b;
 }
 
+function emptyDbState() {
+  return {
+    users: [],
+    venues: [],
+    bookings: [],
+    otps: {},
+    walletLedger: [],
+    auditLog: [],
+    reviewQueue: [],
+    partnerRequests: [],
+  };
+}
+
 function loadDb() {
+  // Clean cloud start when connected to PostgreSQL (never hydrate demo seed or local snapshot)
+  if (USE_POSTGRES) {
+    return emptyDbState();
+  }
+
   if (fs.existsSync(DB_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
@@ -744,31 +772,30 @@ function loadDb() {
 }
 
 function saveDb(data) {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    console.error('File DB write error:', err.message);
+  if (!USE_POSTGRES) {
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (err) {
+      console.error('File DB write error:', err.message);
+    }
   }
 
-  // Asynchronous sync to live PostgreSQL database if connected and hydrated
+  // Asynchronous transactional sync to relational PostgreSQL database
   if (pgPool && isHydrated) {
     persistToPostgres(data).catch(e => console.error('Postgres sync error:', e.message));
   }
 }
 
-// Postgres holds a single JSONB snapshot of the whole state. It is loaded at
-// startup (hydratePostgres) and rewritten after every change, so data survives
-// restarts on hosts with an ephemeral disk (e.g. Render free tier).
+// Relational PostgreSQL persistence: hydrated once on startup and updated
+// transactionally across public.* tables after state mutations.
 let pgWriteChain = Promise.resolve();
 function persistToPostgres(data) {
   if (!pgPool || !isHydrated) return Promise.resolve();
-  const snapshot = JSON.stringify(data);
-  // Serialise writes so an older snapshot can never overwrite a newer one.
   pgWriteChain = pgWriteChain
-    .then(() => pgPool.query(
-      `INSERT INTO hagzy_state (id, data, updated_at) VALUES (1, $1::jsonb, now())
-       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
-      [snapshot]))
+    .then(() => persistRelationalState(pgPool, data, {
+      localPaymentIntents,
+      localPaymentEvents,
+    }))
     .catch(e => console.error('Postgres sync error:', e.message));
   return pgWriteChain;
 }
@@ -780,39 +807,22 @@ async function hydratePostgres() {
   }
   try {
     // 1. Run authoritative relational schema migrations on the database
-    try {
-      console.log('🐘 Executing PostgreSQL schema migrations...');
-      await runMigrations({ pool: pgPool });
-      console.log('🐘 Schema migrations up-to-date.');
-    } catch (migErr) {
-      console.warn('🐘 Schema migration notice:', migErr.message);
-    }
+    console.log('🐘 Executing PostgreSQL schema migrations...');
+    await runMigrations({ pool: pgPool });
+    console.log('🐘 Schema migrations up-to-date.');
 
-    // 2. Hydrate in-memory state from PostgreSQL
-    await pgPool.query(`CREATE TABLE IF NOT EXISTS hagzy_state (
-      id INT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())`);
-    const { rows } = await pgPool.query('SELECT data FROM hagzy_state WHERE id = 1');
-    if (rows.length && rows[0].data) {
-      const cloudData = rows[0].data;
-      db.users = Array.isArray(cloudData.users) ? cloudData.users : [];
-      db.venues = Array.isArray(cloudData.venues) && cloudData.venues.length ? cloudData.venues : db.venues;
-      db.bookings = Array.isArray(cloudData.bookings) ? cloudData.bookings : [];
-      db.otps = cloudData.otps || {};
-      db.walletLedger = Array.isArray(cloudData.walletLedger) ? cloudData.walletLedger : (db.walletLedger || []);
-      db.auditLog = Array.isArray(cloudData.auditLog) ? cloudData.auditLog : (db.auditLog || []);
-      db.reviewQueue = Array.isArray(cloudData.reviewQueue) ? cloudData.reviewQueue : (db.reviewQueue || []);
-      db.partnerRequests = Array.isArray(cloudData.partnerRequests) ? cloudData.partnerRequests : (db.partnerRequests || []);
-      try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); } catch (_) {}
-      console.log(`🐘 State restored from PostgreSQL: ${db.users.length} users, ${db.bookings.length} bookings.`);
-    } else {
-      isHydrated = true;
-      await persistToPostgres(db);
-      console.log('🐘 PostgreSQL initialised with current state.');
-    }
-  } catch (err) {
-    console.error('PostgreSQL hydrate error:', err.message);
-  } finally {
+    // 2. Hydrate in-memory state from normalized PostgreSQL tables (leaves empty tables clean at 0 rows)
+    const stats = await hydrateRelationalState(pgPool, db, {
+      localPaymentIntents,
+      localPaymentEvents,
+    });
     isHydrated = true;
+    console.log(
+      `🐘 Relational PostgreSQL hydrated: ${stats.usersCount} users, ${stats.venuesCount} venues (${stats.unitsCount} units), ${stats.bookingsCount} bookings.`,
+    );
+  } catch (err) {
+    // Keep isHydrated = false on failure so no accidental saveDb() can wipe live rows.
+    console.error('PostgreSQL hydrate error (persistence paused until hydrated):', err.message);
   }
 }
 
@@ -3133,13 +3143,19 @@ function checkSlotConflict(excludeBookingId, venueId, itemId, startsAt, duration
 
 app.post('/api/bookings', optionalAuth, async (req, res) => {
   const body = req.body || {};
-  const isAdmin = !!req.admin;
+  let isAdmin = !!req.admin;
   const now = Date.now();
 
   const venue = db.venues.find(v => v.id === body.venueId);
   if (!venue) return res.status(404).json({ error: 'Venue not found' });
   if (isAdmin && !req.isPlatformOwner && !doesPartnerOwnVenue(req.admin, venue)) {
-    return res.status(403).json({ error: 'Forbidden: You can only create walk-in bookings for your own venue' });
+    // Staff-only actions (walk-ins, blocks, status overrides) stay restricted to the venue's own staff.
+    if (body.walkIn || body.blockReason) {
+      return res.status(403).json({ error: 'Forbidden: You can only create walk-in bookings for your own venue' });
+    }
+    // Otherwise an owner/partner booking someone else's venue is just a customer.
+    isAdmin = false;
+    req.user = db.users.find(u => u.id === req.admin.id) || req.admin;
   }
 
   const start = new Date(body.startsAt);
@@ -3807,6 +3823,15 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
     matchedIntent.actual_amount = numAmount;
     matchedIntent.excess_amount = excessAmount;
 
+    const currentEvent = localPaymentEvents.get(eventId);
+    if (currentEvent) {
+      currentEvent.is_claimed = true;
+      currentEvent.matchedIntentId = matchedIntent.intentId || matchedIntent.id;
+      if (matchedIntent.booking_id && !matchedIntent.booking_id.startsWith('wallet_topup_')) {
+        currentEvent.bookingId = matchedIntent.booking_id;
+      }
+    }
+
     if (matchedIntent.booking_id && matchedIntent.booking_id.startsWith('wallet_topup_')) {
       if (matchedIntent.user_id) {
         try {
@@ -4092,8 +4117,9 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     expires_at: expiresAt.toISOString(),
   };
   localPaymentIntents.set(intentId, intentData);
+  saveDb(db);
 
-  // Also persist to Cloud Firestore if initialized
+  // Also persist to Cloud Firestore if initialized (disabled when Postgres is active)
   if (fbFirestore) {
     try {
       await fbFirestore.collection('payment_intents').doc(intentId).set({
@@ -4784,6 +4810,8 @@ app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
     status: 'healthy',
     firebaseAdminReady: !!fbAuth,
     firebaseAdminStatus: fbInitStatus,
+    storageMode: pgPool ? 'postgres' : 'file',
+    postgresHydrated: pgPool ? isHydrated : false,
     time: new Date().toISOString(),
     usersCount: db.users.length,
     venuesCount: db.venues.length,
@@ -4799,11 +4827,11 @@ app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
 
 if (pgPool) {
   hydratePostgres().catch(err => {
-    console.warn('PostgreSQL hydrate notice (running on local state):', err.message);
+    console.warn('PostgreSQL hydrate notice (running on empty/local state):', err.message);
   });
 }
 
-if (fbFirestore && !IS_TEST) {
+if (fbFirestore && !IS_TEST && !pgPool) {
   hydrateVenuesFromFirebase().catch(err => {
     console.warn('Firebase venues hydrate notice:', err.message);
   });
