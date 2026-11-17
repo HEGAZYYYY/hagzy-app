@@ -65,6 +65,55 @@ function normalizeRoute(p) {
   return p.replace(/\/:[a-zA-Z0-9_]+/g, '/:param').replace(/\/(\${[^}]+})/g, '/:param');
 }
 
+// 3. Collect all routes defined in Supabase Edge Function hagzy-api
+const edgeDir = path.join(__dirname, '..', 'supabase', 'functions', 'hagzy-api');
+const edgeFiles = [
+  'index.ts',
+  'routes_auth.ts',
+  'routes_customer_bookings.ts',
+  'routes_admin_partner.ts',
+  'routes_payments_webhooks.ts',
+];
+const edgeRoutes = [];
+const edgeRegex = /(?:app|router)\.(get|post|put|delete|patch|all)\s*\(\s*(\[[^\]]+\]|['"`][^'"`]+['"`])/g;
+for (const file of edgeFiles) {
+  const fullPath = path.join(edgeDir, file);
+  if (!fs.existsSync(fullPath)) continue;
+  const content = fs.readFileSync(fullPath, 'utf8');
+  let edgeMatch;
+  while ((edgeMatch = edgeRegex.exec(content)) !== null) {
+    const method = edgeMatch[1].toUpperCase();
+    const rawTarget = edgeMatch[2];
+    if (rawTarget.startsWith('[')) {
+      const inner = [...rawTarget.matchAll(/['"`]([^'"`]+)['"`]/g)].map(m => m[1]);
+      for (const p of inner) edgeRoutes.push({ method, path: p });
+    } else {
+      edgeRoutes.push({ method, path: rawTarget.slice(1, -1) });
+    }
+  }
+}
+
+const edgeRequired = [
+  ...customCalls,
+  { method: 'GET', path: '/api/admin/users' },
+];
+const edgeMissing = [];
+for (const c of edgeRequired) {
+  const normClient = normalizeRoute(c.path);
+  const exists = edgeRoutes.some(e => {
+    if (e.method !== c.method && e.method !== 'ALL') return false;
+    return normalizeRoute(e.path) === normClient;
+  });
+  if (!exists) edgeMissing.push(c);
+}
+
+console.log('Edge routes defined:', edgeRoutes.length);
+if (edgeMissing.length > 0) {
+  console.error('ERROR: Missing routes in Supabase Edge Function hagzy-api:');
+  for (const m of edgeMissing) console.error(' -', m.method, m.path);
+  process.exit(1);
+}
+
 const missing = [];
 for (const c of customCalls) {
   const normClient = normalizeRoute(c.path);

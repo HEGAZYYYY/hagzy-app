@@ -283,10 +283,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           );
           token = res['token'] as String?;
           isAdmin = res['isAdmin'] == true;
-          final fbCustomToken = res['firebaseCustomToken'] as String?;
-          if (fbCustomToken != null && fbCustomToken.isNotEmpty) {
-            unawaited(SocialAuthService.signInWithCustomToken(fbCustomToken));
-          }
           if (res['customer'] is Map<String, dynamic>) {
             final cust = res['customer'] as Map<String, dynamic>;
             walletBalance = (cust['walletBalance'] as num?)?.toDouble();

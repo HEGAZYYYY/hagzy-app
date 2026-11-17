@@ -17,7 +17,7 @@ String resolveVenueBookingUrl(String venueId) {
       }
     } catch (_) {}
   }
-  return 'https://hagzy-booking.web.app/#/venue/$venueId';
+  return 'https://hagzy-web.onrender.com/#/venue/$venueId';
 }
 
 /// Printable In-App Counter Standee Generator for Venue Merchants

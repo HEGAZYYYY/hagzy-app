@@ -19,20 +19,15 @@ import 'screens/unified_payment_screen.dart';
 import 'theme/hagzy_theme.dart';
 import 'widgets/common_widgets.dart';
 import 'services/social_auth_service.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'services/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 export 'models/models.dart';
 export 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb) {
-    try {
-      await Firebase.initializeApp();
-    } catch (e) {
-      debugPrint('Firebase native init note: $e');
-    }
-  }
+  await initHagzySupabase();
   runApp(const HagzyApp());
 }
 
@@ -161,6 +156,8 @@ class _HagzyHomeState extends State<HagzyHome> {
   Timer? _expiredBookingTimer;
   Timer? _paymentPollingTimer;
   Timer? _liveSyncTimer;
+  StreamSubscription<AuthState>? _supabaseAuthSub;
+  RealtimeChannel? _realtimeChannel;
   List<Venue> _venues = kSeedNaderSalon ? defaultPrototypeVenues() : [];
   List<Booking> _bookings = [];
   List<Booking> _customerBookings = [];
@@ -229,81 +226,110 @@ class _HagzyHomeState extends State<HagzyHome> {
       _savedCustomerEmail = 'demo@hagzy.app';
     }
     _load();
+    _initSupabaseAuthAndRealtime();
+  }
 
-    // Check for real OAuth 2.0 callback credentials in URL query parameters or Firebase redirect result
-    if (kIsWeb) {
-      try {
-        final params = Uri.base.queryParameters;
-        String? token = params['auth_token'];
-        String? name = params['auth_name'];
-        String? email = params['auth_email'];
-        if (token == null || token.isEmpty) {
-          final redirectUser = SocialAuthService.getRedirectUser();
-          if (redirectUser != null) {
-            token = redirectUser['token'] as String?;
-            name = redirectUser['name'] as String?;
-            email = redirectUser['email'] as String?;
-          }
-        }
-        if (token != null && token.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _handleCustomerSignIn(
-              name: name ?? (email?.split('@')[0] ?? 'Hagzy Member'),
-              email: email ?? '',
-              phone: '',
-              token: token,
-            );
-          });
-        }
-      } catch (_) {}
+  void _initSupabaseAuthAndRealtime() {
+    final client = supabaseClientOrNull;
+    if (client == null) return;
 
-      // Listen for asynchronous Google/Apple redirect auth results
-      SocialAuthService.registerRedirectAuthListener((redirectUser) {
-        if (!mounted) return;
-        final token = redirectUser['token'] as String?;
-        final name = redirectUser['name'] as String?;
-        final email = redirectUser['email'] as String?;
-        final phone = redirectUser['phone'] as String?;
-        if (token != null && token.isNotEmpty && !_customerSignedIn) {
-          _handleCustomerSignIn(
-            name: name ?? (email?.split('@')[0] ?? 'Hagzy Member'),
-            email: email ?? '',
-            phone: phone ?? '',
-            token: token,
-          );
-        }
+    final existingSession = client.auth.currentSession;
+    if (existingSession != null && !_customerSignedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_exchangeSupabaseSocialSession(existingSession));
       });
+    }
 
-      // Listen for Firebase account deletion/sign-out in real time
-      SocialAuthService.registerSignOutListener(() {
-        if (mounted && _customerSignedIn) {
-          _handleCustomerSignOut();
-        }
-      });
+    _supabaseAuthSub = client.auth.onAuthStateChange.listen((data) {
+      if (!mounted) return;
+      if (data.event == AuthChangeEvent.signedIn &&
+          data.session != null &&
+          !_customerSignedIn) {
+        unawaited(_exchangeSupabaseSocialSession(data.session!));
+      } else if (data.event == AuthChangeEvent.signedOut && _customerSignedIn) {
+        unawaited(_handleCustomerSignOut());
+      }
+    });
 
-      // Listen for real-time Cloud Firestore venue updates
-      SocialAuthService.registerVenuesListener((fbVenuesJson) {
-        if (!mounted || fbVenuesJson.isEmpty) return;
-        try {
-          final incoming = fbVenuesJson
-              .map((m) => Venue.fromJson(m))
-              .toList();
-          if (incoming.isNotEmpty) {
-            final merged = List<Venue>.of(_venues);
-            for (final fv in incoming) {
-              final idx = merged.indexWhere((v) => v.id == fv.id);
-              if (idx >= 0) {
-                merged[idx] = fv;
-              } else {
-                merged.add(fv);
-              }
-            }
-            setState(() {
-              _venues = merged;
-            });
-          }
-        } catch (_) {}
+    try {
+      _realtimeChannel = client
+          .channel('public:hagzy_realtime')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'venues',
+            callback: (_) => unawaited(_refreshVenuesFromApi()),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'bookings',
+            callback: (_) => unawaited(_pollPendingBookingsLiveSync()),
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Supabase realtime subscription notice: $e');
+    }
+  }
+
+  Future<void> _refreshVenuesFromApi() async {
+    if (!mounted || !_api.isConfigured) return;
+    try {
+      final remoteVenues = await _api.venues();
+      if (!mounted) return;
+      setState(() {
+        _venues = remoteVenues
+            .map((value) => Venue.fromJson(value as Map<String, dynamic>))
+            .toList();
       });
+    } catch (_) {}
+  }
+
+  Future<void> _exchangeSupabaseSocialSession(Session session) async {
+    if (!mounted || !_api.isConfigured) return;
+    final user = session.user;
+    final provider = (user.appMetadata['provider']?.toString() ?? 'google').toLowerCase();
+    final email = (user.email ?? '').trim().toLowerCase();
+    final name = (user.userMetadata?['full_name'] ??
+            user.userMetadata?['name'] ??
+            (email.isNotEmpty ? email.split('@').first : 'Hagzy Member'))
+        .toString()
+        .trim();
+    final avatar = (user.userMetadata?['avatar_url'] ?? '').toString();
+
+    try {
+      final backendRes = await _api.signInWithSocial(
+        provider: provider == 'apple' ? 'apple' : 'google',
+        email: email,
+        name: name,
+        avatar: avatar,
+        providerId: user.id,
+        idToken: session.accessToken,
+      );
+      if (!mounted) return;
+      final token = backendRes['token'] as String? ?? session.accessToken;
+      final cust = backendRes['customer'] is Map<String, dynamic>
+          ? backendRes['customer'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+      final walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+      final isAdmin = backendRes['isAdmin'] == true;
+      await _handleCustomerSignIn(
+        name: (cust['name'] as String?) ?? name,
+        email: (cust['email'] as String?) ?? email,
+        phone: (cust['phone'] as String?) ?? (user.phone ?? ''),
+        token: token,
+        walletBalance: walletBalance,
+        isAdmin: isAdmin,
+      );
+    } catch (_) {
+      if (mounted && email.isNotEmpty && !_customerSignedIn) {
+        await _handleCustomerSignIn(
+          name: name,
+          email: email,
+          phone: user.phone ?? '',
+          token: session.accessToken,
+        );
+      }
     }
   }
 
@@ -489,6 +515,12 @@ class _HagzyHomeState extends State<HagzyHome> {
     _expiredBookingTimer?.cancel();
     _paymentPollingTimer?.cancel();
     _liveSyncTimer?.cancel();
+    _supabaseAuthSub?.cancel();
+    if (_realtimeChannel != null) {
+      try {
+        supabaseClientOrNull?.removeChannel(_realtimeChannel!);
+      } catch (_) {}
+    }
     _api.close();
     _emailController.dispose();
     _passwordController.dispose();
@@ -570,28 +602,31 @@ class _HagzyHomeState extends State<HagzyHome> {
     } catch (_) {}
   }
 
-  Future<void> _syncAllVenuesToFirebase() async {
+  Future<void> _syncAllVenuesToCloud() async {
     final arabic = _language == 'AR';
     try {
-      if (kIsWeb) {
-        for (final v in _venues) {
-          SocialAuthService.saveVenueToFirestore(v.toJson());
-        }
-      }
       if (_api.isConfigured && _adminToken != null) {
         await _api.syncVenuesToCloud(_adminToken!);
+        final remote = await _api.venues(adminToken: _adminToken!);
+        if (mounted) {
+          setState(() {
+            _venues = remote
+                .map((value) => Venue.fromJson(value as Map<String, dynamic>))
+                .toList();
+          });
+        }
       }
       _message(localized(
         arabic,
-        'Synced ${_venues.length} venues to Cloud Firebase!',
-        'تمت مزامنة ${_venues.length} أماكن مع سحابة Firebase بنجاح!',
+        'Synced ${_venues.length} venues with Supabase!',
+        'تمت مزامنة ${_venues.length} أماكن مع Supabase بنجاح!',
       ));
     } catch (e) {
       _message(
         localized(
           arabic,
-          'Synced locally & queued for Cloud Firebase.',
-          'تم الحفظ والمزامنة مع Firebase.',
+          'Saved locally & queued for Supabase.',
+          'تم الحفظ والمزامنة مع Supabase.',
         ),
       );
     }
@@ -1176,9 +1211,6 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _saveAdminVenue(Venue venue) async {
-    if (kIsWeb) {
-      SocialAuthService.saveVenueToFirestore(venue.toJson());
-    }
     if (!_api.isConfigured || _mode == 'adminPreview') return;
     final token = _adminToken;
     if (token == null) return;
@@ -1596,9 +1628,6 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _deleteVenue(Venue venue) async {
     await _runSave(() async {
-      if (kIsWeb) {
-        SocialAuthService.deleteVenueFromFirestore(venue.id);
-      }
       if (_api.isConfigured && _adminToken != null) {
         await _api.deleteVenue(_adminToken!, venue.id);
       }
@@ -2973,21 +3002,6 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       await _commit(_venues, [..._bookings, savedBooking]);
-      if (kIsWeb) {
-        final matchedVenue =
-            _venues.where((v) => v.id == savedBooking.venueId).firstOrNull;
-        SocialAuthService.syncBookingToFirestore(
-          {
-            ...savedBooking.toJson(),
-            if (matchedVenue != null) 'venueName': matchedVenue.name,
-          },
-          {
-            'name': _savedCustomerName,
-            'email': _savedCustomerEmail,
-            'phone': _savedCustomerPhone,
-          },
-        );
-      }
       if (!walkIn) {
         if (dueNow <= 0 || savedBooking.paymentStatus == 'paid') {
           _message(localized(
@@ -4707,21 +4721,6 @@ class _HagzyHomeState extends State<HagzyHome> {
           .map((value) => value.id == booking.id ? confirmedBooking : value)
           .toList();
       await _commit(_venues, updated);
-      if (kIsWeb) {
-        final matchedVenue =
-            _venues.where((v) => v.id == confirmedBooking.venueId).firstOrNull;
-        SocialAuthService.syncBookingToFirestore(
-          {
-            ...confirmedBooking.toJson(),
-            if (matchedVenue != null) 'venueName': matchedVenue.name,
-          },
-          {
-            'name': confirmedBooking.customer,
-            'email': confirmedBooking.email,
-            'phone': confirmedBooking.phone,
-          },
-        );
-      }
       _message('Deposit verified & booking confirmed!');
     });
   }
@@ -4740,25 +4739,6 @@ class _HagzyHomeState extends State<HagzyHome> {
         await _api.cancelBooking(_adminToken!, booking.id);
       }
       await _commit(_venues, updated);
-      if (kIsWeb) {
-        final cancelledBooking = booking.copyWith(
-          cancelled: true,
-          status: 'cancelled',
-        );
-        final matchedVenue =
-            _venues.where((v) => v.id == cancelledBooking.venueId).firstOrNull;
-        SocialAuthService.syncBookingToFirestore(
-          {
-            ...cancelledBooking.toJson(),
-            if (matchedVenue != null) 'venueName': matchedVenue.name,
-          },
-          {
-            'name': cancelledBooking.customer,
-            'email': cancelledBooking.email,
-            'phone': cancelledBooking.phone,
-          },
-        );
-      }
     });
   }
 
@@ -4795,18 +4775,6 @@ class _HagzyHomeState extends State<HagzyHome> {
           'partnerStatus': _savedPartnerStatus,
         }),
       );
-      if (kIsWeb &&
-          _customerSignedIn &&
-          (_savedCustomerName.isNotEmpty ||
-              _savedCustomerEmail.isNotEmpty ||
-              _savedCustomerPhone.isNotEmpty)) {
-        SocialAuthService.syncUserToFirestore({
-          'name': _savedCustomerName,
-          'email': _savedCustomerEmail,
-          'phone': _savedCustomerPhone,
-          'walletBalance': _walletBalance,
-        });
-      }
     } catch (_) {}
   }
 
@@ -5786,7 +5754,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 onRemoveService: _removeService,
                                                 onDelete: _deleteVenue,
                                                 onRemoveItem: _removeItem,
-                                                onSyncFirebase: _syncAllVenuesToFirebase,
+                                                onSyncFirebase: _syncAllVenuesToCloud,
                                               ),
                                             2 => PosTab(
                                                 venues: _venues,
@@ -5896,7 +5864,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onRemoveService: _removeService,
                                             onDelete: _deleteVenue,
                                             onRemoveItem: _removeItem,
-                                            onSyncFirebase: _syncAllVenuesToFirebase,
+                                            onSyncFirebase: _syncAllVenuesToCloud,
                                           ),
                                         2 => AnalyticsTab(
                                             venues: _portalVenues,

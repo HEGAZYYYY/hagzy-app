@@ -1,27 +1,13 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+import 'services/supabase_config.dart';
 
 String resolveDefaultApiUrl() {
   const envUrl = String.fromEnvironment('HAGZY_API_URL');
   if (envUrl.isNotEmpty) return envUrl;
-
-  if (kIsWeb) {
-    try {
-      final host = Uri.base.host.toLowerCase();
-      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
-        if (host.contains('web.app') ||
-            host.contains('firebaseapp.com') ||
-            host.contains('hagzy')) {
-          return 'https://hagzy-api.onrender.com';
-        }
-        return Uri.base.origin;
-      }
-    } catch (_) {}
-  }
-
-  return 'https://hagzy-api.onrender.com';
+  return kDefaultEdgeApiUrl;
 }
 
 class HagzyApi {
@@ -425,11 +411,18 @@ class HagzyApi {
   Future<Map<String, dynamic>> logoutCustomer(String token) async =>
       _send('POST', '/api/auth/customer/logout', token: token);
 
-  /// Permanently deletes the authenticated customer account on the backend & Firebase Auth.
+  /// Permanently deletes the authenticated customer account from backend & Supabase Auth.
   Future<Map<String, dynamic>> deleteCustomerAccount(String token) async =>
       _send('DELETE', '/api/customer/account', token: token);
 
-  /// Bulk syncs all backend venues to Cloud Firestore.
+  /// Fetches linked users and booking summaries for Admin/Partner CRM.
+  Future<List<Map<String, dynamic>>> adminUsers(String token) async {
+    final res = await _send('GET', '/api/admin/users', token: token);
+    final raw = (res['users'] as List<dynamic>?) ?? const [];
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Refreshes backend venue cache/sync state on Supabase.
   Future<Map<String, dynamic>> syncVenuesToCloud(String token) async =>
       _send('POST', '/api/admin/venues/sync-firebase', token: token);
 

@@ -55,7 +55,16 @@ jobs:
         run: flutter test
 
       - name: Build Web
-        run: flutter build web --release --base-href /
+        run: |
+          flutter build web --release --base-href / \
+            --dart-define=HAGZY_API_URL=https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api
+
+      - name: Upload Web Bundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hagzy-Web-Bundle
+          path: build/web
+          retention-days: 14
 
   build-ios:
     name: Build iPhone App (IPA)
@@ -78,7 +87,7 @@ jobs:
       - name: Build iOS Release (Unsigned)
         run: |
           flutter build ios --release --no-codesign \
-            --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
+            --dart-define=HAGZY_API_URL=https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api
 
       - name: Package into IPA
         run: |
@@ -141,12 +150,12 @@ jobs:
       - name: Build Android APK
         run: |
           flutter build apk --release \
-            --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
+            --dart-define=HAGZY_API_URL=https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api
 
       - name: Build Android App Bundle (AAB for Google Play)
         run: |
           flutter build appbundle --release \
-            --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com
+            --dart-define=HAGZY_API_URL=https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
@@ -202,7 +211,7 @@ jobs:
             | :--- | :--- | :--- | :--- |
             | **🍎 iPhone / iPad** | [`Hagzy.ipa`](https://github.com/HEGAZYYYY/hagzy-app/releases/download/${{ github.ref_name }}/Hagzy.ipa) | ~7.8 MB | Install in 1 min with [Sideloadly](https://sideloadly.io/) or [AltStore](https://altstore.io/) |
             | **🤖 Android** | [`Hagzy.apk`](https://github.com/HEGAZYYYY/hagzy-app/releases/download/${{ github.ref_name }}/Hagzy.apk) | ~55 MB | Direct 1-tap download & install |
-            | **🌐 Web App** | [Open Web App](https://hagzy-api.onrender.com) | — | Instant access in any browser |
+            | **🌐 Web App** | [Open Web App](https://hagzy-web.onrender.com) | — | Instant access in any browser |
 
             ### ✨ Key Features
             - 🇪🇬 **Egypt Multi-Vertical**: Padel, Football, Barbershops, and Gaming Lounges across all 27 governorates.

@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'supabase_config.dart';
 
 bool _googleInitialized = false;
 
@@ -19,6 +22,17 @@ Future<Map<String, dynamic>?> webGoogleSignIn() async {
     await _ensureGoogleSignInInitialized();
     final account = await GoogleSignIn.instance.authenticate();
     final idToken = account.authentication.idToken;
+    if (idToken != null && idToken.isNotEmpty) {
+      final client = supabaseClientOrNull;
+      if (client != null) {
+        try {
+          await client.auth.signInWithIdToken(
+            provider: OAuthProvider.google,
+            idToken: idToken,
+          );
+        } catch (_) {}
+      }
+    }
     return {
       'name': account.displayName ?? 'Hagzy Member',
       'email': account.email,
@@ -45,6 +59,18 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
         AppleIDAuthorizationScopes.fullName,
       ],
     );
+    final idToken = credential.identityToken;
+    if (idToken != null && idToken.isNotEmpty) {
+      final client = supabaseClientOrNull;
+      if (client != null) {
+        try {
+          await client.auth.signInWithIdToken(
+            provider: OAuthProvider.apple,
+            idToken: idToken,
+          );
+        } catch (_) {}
+      }
+    }
     final fullName = [credential.givenName, credential.familyName]
         .where((s) => s != null && s.trim().isNotEmpty)
         .join(' ')
@@ -52,7 +78,7 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
     return {
       'name': fullName.isEmpty ? 'Apple Member' : fullName,
       'email': credential.email ?? '',
-      'token': credential.identityToken ?? '',
+      'token': idToken ?? '',
       'providerId': credential.userIdentifier ?? '',
     };
   } catch (e) {
@@ -61,24 +87,11 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
   }
 }
 
-Future<Map<String, dynamic>?> webSendPhoneOtp(String phone) async => null;
-Future<Map<String, dynamic>?> webVerifyPhoneOtp(String code) async => null;
-Map<String, dynamic>? webGetRedirectUser() => null;
-Future<void> webSignInWithCustomToken(String token) async {}
 void webSignOut() {
   try {
     GoogleSignIn.instance.signOut();
   } catch (_) {}
+  try {
+    supabaseClientOrNull?.auth.signOut();
+  } catch (_) {}
 }
-void webRegisterSignOutListener(void Function() onSignOut) {}
-void webRegisterRedirectAuthListener(
-    void Function(Map<String, dynamic>) onRedirectUser) {}
-void webRegisterVenuesListener(
-    void Function(List<Map<String, dynamic>>) onVenues) {}
-void webRegisterUsersListener(
-    void Function(List<Map<String, dynamic>>) onUsers) {}
-void webSaveVenueToFirestore(Map<String, dynamic> venueJson) {}
-void webDeleteVenueFromFirestore(String venueId) {}
-void webSyncUserToFirestore(Map<String, dynamic> userJson) {}
-void webSyncBookingToFirestore(
-    Map<String, dynamic> bookingJson, Map<String, dynamic> userJson) {}

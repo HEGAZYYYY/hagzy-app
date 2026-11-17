@@ -4,29 +4,6 @@ import 'social_auth_service_stub.dart'
 class SocialAuthService {
   static Future<Map<String, dynamic>?> signInWithGoogle() => webGoogleSignIn();
   static Future<Map<String, dynamic>?> signInWithApple() => webAppleSignIn();
-  static Future<Map<String, dynamic>?> sendPhoneOtp(String phone) => webSendPhoneOtp(phone);
-  static Future<Map<String, dynamic>?> verifyPhoneOtp(String code) => webVerifyPhoneOtp(code);
-  static Future<void> signInWithCustomToken(String token) => webSignInWithCustomToken(token);
-  static Map<String, dynamic>? getRedirectUser() => webGetRedirectUser();
+  static void signOut() => webSignOut();
   static void signOutWeb() => webSignOut();
-  static void registerSignOutListener(void Function() onSignOut) =>
-      webRegisterSignOutListener(onSignOut);
-  static void registerRedirectAuthListener(
-          void Function(Map<String, dynamic>) onRedirectUser) =>
-      webRegisterRedirectAuthListener(onRedirectUser);
-  static void registerVenuesListener(
-          void Function(List<Map<String, dynamic>>) onVenues) =>
-      webRegisterVenuesListener(onVenues);
-  static void registerUsersListener(
-          void Function(List<Map<String, dynamic>>) onUsers) =>
-      webRegisterUsersListener(onUsers);
-  static void saveVenueToFirestore(Map<String, dynamic> venueJson) =>
-      webSaveVenueToFirestore(venueJson);
-  static void deleteVenueFromFirestore(String venueId) =>
-      webDeleteVenueFromFirestore(venueId);
-  static void syncUserToFirestore(Map<String, dynamic> userJson) =>
-      webSyncUserToFirestore(userJson);
-  static void syncBookingToFirestore(
-          Map<String, dynamic> bookingJson, Map<String, dynamic> userJson) =>
-      webSyncBookingToFirestore(bookingJson, userJson);
 }

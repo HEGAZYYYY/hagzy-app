@@ -20,7 +20,7 @@ android {
         // Build config fields for Webhook destination & Secret (injected from ENV / properties)
         val webhookUrl = (project.findProperty("PAYMENT_WEBHOOK_URL") as? String)
             ?: System.getenv("PAYMENT_WEBHOOK_URL")
-            ?: "https://paymentgatewaywebhook-acea1-uc.a.run.app"
+            ?: "https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api/api/payments/webhook"
         val webhookSecret = (project.findProperty("PAYMENT_WEBHOOK_SECRET") as? String)
             ?: System.getenv("PAYMENT_WEBHOOK_SECRET")
             ?: ""

@@ -28,10 +28,14 @@ data class PaymentEvent(
         val json = JSONObject()
         json.put("eventId", eventId)
         json.put("paymentMethod", paymentMethod)
-        json.put("senderIdentifier", senderIdentifier)
-        json.put("amount", amount)
+        json.put(
+            "senderIdentifier",
+            if (senderIdentifier == "UNKNOWN_SENDER" || senderIdentifier.isBlank()) JSONObject.NULL else senderIdentifier
+        )
+        json.put("amount", if (amount > 0.0) amount else JSONObject.NULL)
         json.put("providerRef", providerRef ?: JSONObject.NULL)
         json.put("rawText", rawText)
+        json.put("text", rawText)
         json.put("timestamp", timestamp)
         return json.toString()
     }

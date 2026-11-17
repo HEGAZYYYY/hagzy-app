@@ -1,54 +1,13 @@
-databases:
-  - name: hagzy-postgres
-    databaseName: hagzydb
-    user: hagzyuser
-    plan: free
-    region: frankfurt
-
 services:
-  # 1. Hagzy Backend API (Node.js & Express)
-  - type: web
-    name: hagzy-api
-    runtime: node
-    rootDir: server
-    buildCommand: npm install
-    startCommand: node index.js
-    plan: free
-    region: frankfurt
-    autoDeploy: true
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: NODE_ENV
-        value: production
-      - key: JWT_SECRET
-        generateValue: true
-      # Secrets: set these in the Render dashboard (never commit values).
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: ADMIN_PHONE
-        sync: false
-      - key: PAYMENT_WEBHOOK_SECRET
-        sync: false
-      - key: PAYMENT_LISTENER_KEY
-        sync: false
-      - key: CORS_ORIGINS
-        value: https://hagzy-booking.web.app,https://hagzy.app
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: APPLE_CLIENT_ID
-        sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: hagzy-postgres
-          property: connectionString
-
-  # 2. Hagzy Web Client (Flutter Web)
+  # Hagzy Web Client (Flutter Web -> Supabase Auth, Realtime & Edge Functions)
   - type: static
     name: hagzy-web
-    buildCommand: if command -v flutter >/dev/null 2>&1; then flutter pub get && flutter build web --release --dart-define=HAGZY_API_URL=https://hagzy-api.onrender.com; else echo "Using prebuilt Flutter web bundle"; fi
+    buildCommand: |
+      if ! command -v flutter >/dev/null 2>&1; then
+        git clone https://github.com/flutter/flutter.git --depth 1 -b 3.47.7 /tmp/flutter
+        export PATH="/tmp/flutter/bin:$PATH"
+      fi
+      flutter pub get && flutter build web --release --dart-define=HAGZY_API_URL=https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api
     staticPublishPath: build/web
     autoDeploy: true
     routes:

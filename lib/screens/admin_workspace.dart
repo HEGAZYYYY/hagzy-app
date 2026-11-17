@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
-import '../services/social_auth_service.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../core/models/models_v2.dart';
@@ -57,6 +55,7 @@ class AdminManageWorkspace extends StatefulWidget {
     required this.onWalkIn,
     this.onBlockSlot,
     this.onSyncFirebase,
+    this.onLoadUsers,
     required this.onCancel,
     required this.onConfirm,
   });
@@ -75,6 +74,7 @@ class AdminManageWorkspace extends StatefulWidget {
   final void Function(Venue venue, VenueItem item) onWalkIn;
   final void Function(Venue venue, VenueItem item, DateTime start, int duration, String reason)? onBlockSlot;
   final VoidCallback? onSyncFirebase;
+  final Future<List<Map<String, dynamic>>> Function()? onLoadUsers;
   final ValueChanged<Booking> onCancel;
   final ValueChanged<Booking> onConfirm;
 
@@ -199,6 +199,7 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                   key: const ValueKey('admin_users_crm'),
                   venues: widget.venues,
                   bookings: widget.bookings,
+                  onLoadUsers: widget.onLoadUsers,
                   onConfirm: widget.onConfirm,
                   onCancel: widget.onCancel,
                 ),
@@ -708,7 +709,7 @@ class _ManageTabState extends State<ManageTab> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Cloud Firebase Sync Active · ${widget.venues.length} venues online',
+                  'Supabase Cloud Sync Active · ${widget.venues.length} venues online',
                   style: const TextStyle(
                     color: kGreen,
                     fontWeight: FontWeight.w800,
@@ -728,7 +729,7 @@ class _ManageTabState extends State<ManageTab> {
                         Icon(Icons.cloud_sync_rounded, size: 15, color: kGreen),
                         SizedBox(width: 4),
                         Text(
-                          'Sync Firebase',
+                          'Sync Supabase',
                           style: TextStyle(
                             color: kGreen,
                             fontWeight: FontWeight.w900,
@@ -1527,12 +1528,14 @@ class UsersCrmTab extends StatefulWidget {
     super.key,
     required this.venues,
     required this.bookings,
+    this.onLoadUsers,
     required this.onConfirm,
     required this.onCancel,
   });
 
   final List<Venue> venues;
   final List<Booking> bookings;
+  final Future<List<Map<String, dynamic>>> Function()? onLoadUsers;
   final ValueChanged<Booking> onConfirm;
   final ValueChanged<Booking> onCancel;
 
@@ -1562,22 +1565,27 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
   String _searchQuery = '';
   String _filter = 'all'; // 'all' | 'pending' | 'vip'
   final Set<String> _expandedUserIds = {};
-  List<Map<String, dynamic>> _firestoreUsers = [];
+  List<Map<String, dynamic>> _supabaseUsers = [];
 
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      SocialAuthService.registerUsersListener((users) {
-        if (!mounted) return;
-        setState(() {
-          _firestoreUsers = users;
-          if (_expandedUserIds.isEmpty && users.isNotEmpty) {
-            _expandedUserIds.add(users.first['id']?.toString() ?? '');
-          }
-        });
+    _refreshUsers();
+  }
+
+  Future<void> _refreshUsers() async {
+    final loader = widget.onLoadUsers;
+    if (loader == null) return;
+    try {
+      final users = await loader();
+      if (!mounted) return;
+      setState(() {
+        _supabaseUsers = users;
+        if (_expandedUserIds.isEmpty && users.isNotEmpty) {
+          _expandedUserIds.add(users.first['id']?.toString() ?? '');
+        }
       });
-    }
+    } catch (_) {}
   }
 
   static String _buildCleanId(String name, String email, String phone) {
@@ -1607,8 +1615,8 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
   List<_CrmUserEntry> _buildUsers() {
     final byId = <String, _CrmUserEntry>{};
 
-    // 1. Seed from live Cloud Firestore users collection
-    for (final fu in _firestoreUsers) {
+    // 1. Seed from Supabase users CRM view (public.v_user_overview)
+    for (final fu in _supabaseUsers) {
       final id = (fu['id']?.toString() ?? '').trim();
       if (id.isEmpty) continue;
       final name = (fu['name']?.toString() ?? 'Hagzy Member').trim();
@@ -1697,9 +1705,9 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
         IntroCard(
-          title: 'Users & Linked Bookings (Cloud Firestore)',
+          title: 'Users & Linked Bookings (Supabase)',
           subtitle:
-              'Every user in Firebase has their bookings directly inside users/{userId}/bookings. Click any user below to view and manage their reservations.',
+              'Every user in Supabase is linked to their bookings, wallet ledger, and payment intents. Tap any user below to moderate their reservations.',
           icon: Icons.people_alt_rounded,
           action: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

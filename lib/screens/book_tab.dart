@@ -53,12 +53,14 @@ class _BookTabState extends State<BookTab> {
   bool _sortByPrice = false;
   bool _showMapView = false;
   bool _isAutoAssigningGps = false;
-  DateTime _date = () {
+  static DateTime _defaultBookingDate() {
     final now = DateTime.now();
     return now.hour >= 21
         ? DateTime(now.year, now.month, now.day + 1)
         : DateTime(now.year, now.month, now.day);
-  }();
+  }
+
+  DateTime _date = _defaultBookingDate();
   DateTime? _selectedStart;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -195,8 +197,7 @@ class _BookTabState extends State<BookTab> {
         _area = kAllEgyptAreas;
       }
       if (_venueId != value.id) {
-        final now = DateTime.now();
-        _date = DateTime(now.year, now.month, now.day);
+        _date = _defaultBookingDate();
         _suppressCollapseAnimVenueId = _venueId;
       }
       if (_suppressCollapseAnimVenueId == value.id) {

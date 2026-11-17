@@ -1098,7 +1098,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     if (kIsWeb) {
       uri = Uri.base.resolve(path);
     } else {
-      uri = Uri.parse('https://hagzy-api.onrender.com/$path');
+      uri = Uri.parse('${widget.api.baseUrl}/$path');
     }
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);

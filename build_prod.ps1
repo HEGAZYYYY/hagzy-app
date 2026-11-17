@@ -1,8 +1,8 @@
 # Hagzy Production Build Script
-# Usage: .\build_prod.ps1 -ApiUrl "https://api.hagzy.app"
+# Usage: .\build_prod.ps1 -ApiUrl "https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api"
 param(
-    [Parameter(Mandatory=$true)]
-    [string]$ApiUrl
+    [Parameter(Mandatory=$false)]
+    [string]$ApiUrl = "https://qgimngblsrfgzavuxpde.supabase.co/functions/v1/hagzy-api"
 )
 
 Write-Host "Building Hagzy customer web app pointing to $ApiUrl..."
