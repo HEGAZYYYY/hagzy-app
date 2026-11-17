@@ -1,7 +1,8 @@
 services:
   # Hagzy Web Client (Flutter Web -> Supabase Auth, Realtime & Edge Functions)
-  - type: static
+  - type: web
     name: hagzy-web
+    runtime: static
     buildCommand: |
       if ! command -v flutter >/dev/null 2>&1; then
         git clone https://github.com/flutter/flutter.git --depth 1 -b 3.47.7 /tmp/flutter
