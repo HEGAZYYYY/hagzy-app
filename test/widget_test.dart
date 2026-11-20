@@ -329,8 +329,8 @@ void main() {
     expect(find.text('POS timeline'), findsNWidgets(2));
     await tester.tap(find.text('Payment Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Payments & deposits'), findsOneWidget);
-    expect(find.textContaining('never in this app'), findsOneWidget);
+    expect(find.text('Payments, Gateway & Review Queue'), findsOneWidget);
+    expect(find.textContaining('payment oracle'), findsOneWidget);
   });
 
   testWidgets(
@@ -810,7 +810,7 @@ void main() {
   });
 
   testWidgets(
-      'login screen appears on app open and customer can sign in with phone number',
+      'login screen appears on app open and customer can sign in with email',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
@@ -820,7 +820,7 @@ void main() {
     expect(find.byType(CustomerLoginScreen), findsOneWidget);
     expect(find.text('Welcome to Hagzy'), findsOneWidget);
     expect(find.text('Sign in to Hagzy'), findsOneWidget);
-    expect(find.text('Phone Number'), findsOneWidget);
+    expect(find.text('Email Address'), findsOneWidget);
 
     // Switch to Create Account mode on Login Screen
     final createAccountToggle = find.text('Create Account');
@@ -829,13 +829,13 @@ void main() {
     await tester.tap(createAccountToggle);
     await tester.pumpAndSettle();
 
-    // 2. Register with Full Name & Phone Number
+    // 2. Register with Full Name & Email Address
     await tester.enterText(
         find.widgetWithText(TextField, 'Full Name (optional)'),
         'Mohamed Hegazy');
     await tester.enterText(
-        find.widgetWithText(TextField, 'Phone Number'),
-        '01024129393');
+        find.widgetWithText(TextField, 'Email Address'),
+        'mohamed@example.com');
     final createAccountBtn = find.text('Create Account').first;
     await tester.ensureVisible(createAccountBtn);
     await tester.pumpAndSettle();
@@ -844,7 +844,7 @@ void main() {
 
     // Verify OTP verification view is shown
     expect(find.text('Enter Verification Code'), findsOneWidget);
-    expect(find.textContaining('01024129393'), findsWidgets);
+    expect(find.textContaining('mohamed@example.com'), findsWidgets);
 
     // Enter 6-digit OTP and complete verification
     await tester.enterText(find.byType(TextField).last, '123456');
@@ -862,7 +862,7 @@ void main() {
 
     expect(find.text('Sign in to Hagzy'), findsNothing);
     expect(find.text('Mohamed Hegazy'), findsOneWidget);
-    expect(find.text('01024129393'), findsWidgets);
+    expect(find.text('mohamed@example.com'), findsWidgets);
 
     // 3. Sign out from Profile returns to Login Screen
     await tester.scrollUntilVisible(
@@ -882,14 +882,14 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Out'));
     await tester.pumpAndSettle();
 
-    // 4. App is back on Login Screen; log in with existing Phone Number
+    // 4. App is back on Login Screen; log in with existing Email Address
     expect(find.byType(CustomerLoginScreen), findsOneWidget);
-    final phoneField = find.widgetWithText(TextField, 'Phone Number');
-    await tester.ensureVisible(phoneField);
+    final emailField = find.widgetWithText(TextField, 'Email Address');
+    await tester.ensureVisible(emailField);
     await tester.pumpAndSettle();
-    expect(phoneField, findsOneWidget);
+    expect(emailField, findsOneWidget);
 
-    await tester.enterText(phoneField, '01012345678');
+    await tester.enterText(emailField, 'customer@example.com');
     final logInBtn = find.text('Log In');
     await tester.ensureVisible(logInBtn);
     await tester.pumpAndSettle();
@@ -898,22 +898,22 @@ void main() {
 
     // Verify OTP verification view is shown
     expect(find.text('Enter Verification Code'), findsOneWidget);
-    expect(find.textContaining('01012345678'), findsWidgets);
+    expect(find.textContaining('customer@example.com'), findsWidgets);
 
     // Enter 6-digit OTP and complete verification
     await tester.enterText(find.byType(TextField).last, '123456');
     await tester.pumpAndSettle();
-    final verifyPhoneBtn = find.text('Verify & Sign In');
-    await tester.ensureVisible(verifyPhoneBtn);
+    final verifyEmailBtn = find.text('Verify & Sign In');
+    await tester.ensureVisible(verifyEmailBtn);
     await tester.pumpAndSettle();
-    await tester.tap(verifyPhoneBtn);
+    await tester.tap(verifyEmailBtn);
     await tester.pumpAndSettle();
 
     // Navigate to Profile tab to view the signed-in profile card
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     expect(find.text('Customer'), findsOneWidget);
-    expect(find.text('01012345678'), findsWidgets);
+    expect(find.text('customer@example.com'), findsWidgets);
   });
 
   test('subcategories taxonomy and detection for grooming, sports, and entertainment', () {
@@ -1166,14 +1166,14 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('customer can toggle between Log In and Create Account with phone on login screen', (tester) async {
+  testWidgets('customer can toggle between Log In and Create Account with email on login screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
     // Verify Login Screen is shown immediately on app open
     expect(find.byType(CustomerLoginScreen), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Phone Number'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Email Address'), findsOneWidget);
     expect(find.text('Log In'), findsOneWidget);
     expect(find.text('Create Account'), findsOneWidget);
 
@@ -1191,8 +1191,8 @@ void main() {
         find.widgetWithText(TextField, 'Full Name (optional)'),
         'Ahmed Zaki');
     await tester.enterText(
-        find.widgetWithText(TextField, 'Phone Number'),
-        '01099887766');
+        find.widgetWithText(TextField, 'Email Address'),
+        'ahmed@example.com');
     await tester.pumpAndSettle();
 
     // Tap Create Account button
@@ -1214,7 +1214,7 @@ void main() {
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     expect(find.text('Ahmed Zaki'), findsOneWidget);
-    expect(find.text('01099887766'), findsWidgets);
+    expect(find.text('ahmed@example.com'), findsWidgets);
   });
 }
 

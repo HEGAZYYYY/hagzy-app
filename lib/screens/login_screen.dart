@@ -44,7 +44,7 @@ class CustomerLoginScreen extends StatefulWidget {
 
 class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _otpController = TextEditingController();
 
   bool _loading = false;
@@ -57,7 +57,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       setState(() => _errorMessage = null);
     }
   }
-  bool _isPhoneSignUp = false;
+  bool _isEmailSignUp = false;
   bool _isVerifyingOtp = false;
   int _resendCountdown = 60;
   Timer? _countdownTimer;
@@ -66,7 +66,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   void dispose() {
     _countdownTimer?.cancel();
     _nameController.dispose();
-    _phoneController.dispose();
+    _emailController.dispose();
     _otpController.dispose();
     super.dispose();
   }
@@ -90,30 +90,25 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   Future<void> _requestVerificationOtp({bool isResend = false}) async {
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
 
-    if (phone.isEmpty) {
+    if (email.isEmpty) {
       setState(() {
         _errorMessage = localized(
           widget.arabic,
-          'Please enter your phone number.',
-          'يرجى إدخال رقم الموبايل.',
+          'Please enter your email address.',
+          'يرجى إدخال البريد الإلكتروني.',
         );
       });
       return;
     }
 
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    String normalized = digits;
-    if (normalized.startsWith('20') && normalized.length == 12) {
-      normalized = normalized.substring(2);
-    }
-    if (!RegExp(r'^01[0125]\d{8}$').hasMatch(normalized)) {
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       setState(() {
         _errorMessage = localized(
           widget.arabic,
-          'Please enter a valid phone number (e.g. 01012345678).',
-          'يرجى إدخال رقم هاتف صحيح (مثال: 01012345678).',
+          'Please enter a valid email address (e.g. name@example.com).',
+          'يرجى إدخال بريد إلكتروني صحيح (مثال: name@example.com).',
         );
       });
       return;
@@ -134,35 +129,35 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           Map<String, dynamic> otpRes;
           try {
             otpRes = await widget.api.requestVerificationOtp(
-              phone: phone,
+              email: email,
               name: name,
-              isSignUp: _isPhoneSignUp,
+              isSignUp: _isEmailSignUp,
             );
           } catch (firstErr) {
             final errStr = firstErr.toString().toLowerCase();
-            if (!_isPhoneSignUp &&
+            if (!_isEmailSignUp &&
                 (errStr.contains('no account found') ||
                     errStr.contains('not found') ||
                     errStr.contains('404'))) {
               // Automatically transition to Create Account mode so user isn't blocked
               if (mounted) {
-                setState(() => _isPhoneSignUp = true);
+                setState(() => _isEmailSignUp = true);
               }
               otpRes = await widget.api.requestVerificationOtp(
-                phone: phone,
+                email: email,
                 name: name.isNotEmpty ? name : 'Hagzy Member',
                 isSignUp: true,
               );
-            } else if (_isPhoneSignUp &&
+            } else if (_isEmailSignUp &&
                 (errStr.contains('already registered') ||
                     errStr.contains('already exists') ||
                     errStr.contains('409'))) {
               // Automatically transition to Log In mode so existing user isn't blocked
               if (mounted) {
-                setState(() => _isPhoneSignUp = false);
+                setState(() => _isEmailSignUp = false);
               }
               otpRes = await widget.api.requestVerificationOtp(
-                phone: phone,
+                email: email,
                 name: name,
                 isSignUp: false,
               );
@@ -195,8 +190,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
         final msg = localized(
           widget.arabic,
-          'Verification code sent via WhatsApp to $phone',
-          'تم إرسال كود التحقق عبر واتساب إلى $phone',
+          'Verification code sent to $email',
+          'تم إرسال كود التحقق إلى $email',
         );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -214,15 +209,15 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         if (lower.contains('no account found') || lower.contains('not found')) {
           displayErr = localized(
             widget.arabic,
-            'No account found with this phone number. Please click "Create Account" below to register.',
-            'لا يوجد حساب مسجل بهذا الرقم. يرجى الضغط على "إنشاء حساب جديد" بالأسفل للتسجيل.',
+            'No account found with this email address. Please click "Create Account" below to register.',
+            'لا يوجد حساب مسجل بهذا البريد الإلكتروني. يرجى الضغط على "إنشاء حساب جديد" بالأسفل للتسجيل.',
           );
         } else if (lower.contains('already registered') ||
             lower.contains('already exists')) {
           displayErr = localized(
             widget.arabic,
-            'This phone number is already registered. Please click "Log In" to access your account.',
-            'هذا الرقم مسجل بالفعل. يرجى الضغط على "تسجيل الدخول".',
+            'This email address is already registered. Please click "Log In" to access your account.',
+            'هذا البريد الإلكتروني مسجل بالفعل. يرجى الضغط على "تسجيل الدخول".',
           );
         } else if (lower.contains('429') ||
             lower.contains('too many')) {
@@ -259,11 +254,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     });
 
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
 
     String resolvedName = name.isEmpty ? 'Customer' : name;
-    String resolvedEmail = '';
-    String resolvedPhone = phone;
+    String resolvedEmail = email;
+    String resolvedPhone = '';
 
     try {
       final isTest = WidgetsBinding.instance.runtimeType
@@ -277,7 +272,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       if (widget.apiConfigured) {
         try {
           final res = await widget.api.verifyVerificationOtp(
-            phone: phone,
+            email: email,
             code: code,
             name: name,
           );
@@ -742,7 +737,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Icon(
-                                        Icons.chat_bubble_rounded,
+                                        Icons.mark_email_read_outlined,
                                         color: kGreen,
                                         size: 20,
                                       ),
@@ -768,8 +763,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 Text(
                                   localized(
                                     arabic,
-                                    'We sent a 6-digit verification code via WhatsApp to ${_phoneController.text}',
-                                    'أرسلنا كود التحقق المكون من 6 أرقام عبر واتساب إلى ${_phoneController.text}',
+                                    'We sent a 6-digit verification code to ${_emailController.text}',
+                                    'أرسلنا كود التحقق المكون من 6 أرقام إلى ${_emailController.text}',
                                   ),
                                   style: TextStyle(
                                     fontSize: 13,
@@ -1008,8 +1003,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                       child: Text(
                                         localized(
                                           arabic,
-                                          'or continue with mobile number',
-                                          'أو المتابعة برقم الموبايل',
+                                          'or continue with email',
+                                          'أو المتابعة بالبريد الإلكتروني',
                                         ),
                                         style: TextStyle(
                                           fontSize: 12,
@@ -1022,7 +1017,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                if (_isPhoneSignUp) ...[
+                                if (_isEmailSignUp) ...[
                                   TextField(
                                     controller: _nameController,
                                     textDirection: arabic
@@ -1045,23 +1040,23 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   const SizedBox(height: 12),
                                 ],
                                 TextField(
-                                  controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
                                   textInputAction: TextInputAction.done,
                                   onSubmitted: (_) {
                                     if (!_loading) _requestVerificationOtp();
                                   },
                                   textDirection: TextDirection.ltr,
                                   decoration: InputDecoration(
-                                    labelText: localized(
-                                        arabic, 'Phone Number', 'رقم الموبايل'),
-                                    hintText: '010XXXXXXXX / 011XXXXXXXX',
+                                    labelText: localized(arabic,
+                                        'Email Address', 'البريد الإلكتروني'),
+                                    hintText: 'name@example.com',
                                     prefixIcon:
-                                        const Icon(Icons.phone_android_rounded),
+                                        const Icon(Icons.email_outlined),
                                     helperText: localized(
                                       arabic,
-                                      'Enter 11-digit Egyptian mobile number',
-                                      'أدخل رقم موبايل مصري مكون من 11 رقماً',
+                                      'We will send a 6-digit verification code to your email',
+                                      'سنرسل كود تحقق مكون من 6 أرقام إلى بريدك الإلكتروني',
                                     ),
                                     isDense: true,
                                   ),
@@ -1128,10 +1123,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                           : Text(
                                               localized(
                                                 arabic,
-                                                _isPhoneSignUp
+                                                _isEmailSignUp
                                                     ? 'Create Account'
                                                     : 'Log In',
-                                                _isPhoneSignUp
+                                                _isEmailSignUp
                                                     ? 'إنشاء حساب'
                                                     : 'تسجيل الدخول',
                                               ),
@@ -1150,7 +1145,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     Text(
-                                      _isPhoneSignUp
+                                      _isEmailSignUp
                                           ? localized(
                                               arabic,
                                               'Already have an account? ',
@@ -1164,11 +1159,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                     ),
                                     GestureDetector(
                                       onTap: () => setState(() {
-                                        _isPhoneSignUp = !_isPhoneSignUp;
+                                        _isEmailSignUp = !_isEmailSignUp;
                                         _errorMessage = null;
                                       }),
                                       child: Text(
-                                        _isPhoneSignUp
+                                        _isEmailSignUp
                                             ? localized(arabic, 'Log In',
                                                 'تسجيل الدخول')
                                             : localized(

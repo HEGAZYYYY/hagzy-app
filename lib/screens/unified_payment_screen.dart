@@ -925,10 +925,60 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     );
   }
 
+  Widget _buildSenderMatchWarningBanner() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _localized(
+                'Use the EXACT phone number or InstaPay handle you will transfer from. Sending from a different account will delay instant automatic confirmation.',
+                'تأكد من إدخال نفس رقم المحفظة أو اسم إنستاباي الذي ستحوّل منه فعلياً، لأن التحويل من رقم مختلف يؤخر التأكيد التلقائي الفوري.',
+              ),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+                color: kInk,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatPayableAmount(double amount) {
+    final rounded = (amount * 100).round() / 100;
+    if ((rounded - rounded.truncateToDouble()).abs() < 0.005) {
+      return rounded.toInt().toString();
+    }
+    return rounded.toStringAsFixed(2);
+  }
+
+  Future<void> _openWhatsAppSupport({String? intentAmount, String? senderId}) async {
+    final msg = widget.arabic
+        ? 'مرحباً دعم حجزي، أحتاج مساعدة في تأكيد تحويل حجز رقم ${widget.bookingId}${intentAmount != null ? " بمبلغ $intentAmount ج.م" : ""}${senderId != null ? " من حساب $senderId" : ""}.'
+        : 'Hello Hagzy Support, I need help confirming a transfer for booking ${widget.bookingId}${intentAmount != null ? " ($intentAmount EGP)" : ""}${senderId != null ? " from $senderId" : ""}.';
+    final uri = Uri.https('wa.me', '/201015325250', {'text': msg});
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   Widget _buildInstaPayInput(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildSenderMatchWarningBanner(),
         Container(
           padding: const EdgeInsets.all(14),
           margin: const EdgeInsets.only(bottom: 12),
@@ -1066,6 +1116,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildSenderMatchWarningBanner(),
         Container(
           padding: const EdgeInsets.all(14),
           margin: const EdgeInsets.only(bottom: 10),
@@ -1333,7 +1384,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                       style: TextStyle(fontSize: 13, color: kMuted, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      '${intent.expectedAmount.toInt()} ${_localized("EGP", "ج.م")}',
+                      '${_formatPayableAmount(intent.expectedAmount)} ${_localized("EGP", "ج.م")}',
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
@@ -1436,6 +1487,30 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
               fontSize: 12,
               color: kMuted,
               height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _openWhatsAppSupport(
+                intentAmount: _formatPayableAmount(intent.expectedAmount),
+                senderId: intent.expectedSenderIdentifier,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kGreenDark,
+                side: BorderSide(color: kGreenDark.withValues(alpha: 0.4)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.support_agent_rounded, size: 18),
+              label: Text(
+                _localized(
+                  'Sent from another number? Contact WhatsApp Support',
+                  'حوّلت من رقم مختلف أو احتجت مساعدة؟ تواصل معنا واتساب',
+                ),
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],
