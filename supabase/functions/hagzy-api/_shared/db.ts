@@ -156,7 +156,8 @@ export function mapVenueRowToJson(
     pricingMode: row.pricing_mode || 'per_hour',
     rating: Number(row.rating || 0),
     reviewsCount: Number(row.reviews_count || 0),
-    reviews: Number(row.reviews_count || 0),
+    reviews: mappedReviews,
+    reviewsList: mappedReviews,
     isActive: row.is_active !== false,
     isDeleted: Boolean(row.is_deleted),
     images: Array.isArray(row.images) ? row.images : [],
@@ -218,9 +219,15 @@ export function mapBookingRowToJson(row: Record<string, any>): Record<string, an
     confirmed: Boolean(row.confirmed),
     cancelled: Boolean(row.cancelled),
     checkedIn: Boolean(row.checked_in),
+    ...(row.checked_in_at ? { checkedInAt: row.checked_in_at } : {}),
     ...(row.confirmed_at ? { confirmedAt: row.confirmed_at } : {}),
     ...(row.cancelled_at ? { cancelledAt: row.cancelled_at } : {}),
     ...(row.expires_at ? { expiresAt: row.expires_at, holdExpiresAt: row.expires_at } : {}),
+    reminderOffsetMinutes:
+      row.reminder_offset_minutes !== undefined && row.reminder_offset_minutes !== null
+        ? Number(row.reminder_offset_minutes)
+        : 120,
+    ...(row.reminder_sent_at ? { reminderSentAt: row.reminder_sent_at } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

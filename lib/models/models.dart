@@ -723,22 +723,43 @@ class Venue {
         rating: (json['rating'] as num?)?.toDouble() ?? 4.9,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
-        subCategories:
-            (json['subCategories'] as List<dynamic>? ?? []).cast<String>(),
-        staffMembers:
-            (json['staffMembers'] as List<dynamic>? ?? []).cast<String>(),
-        galleryUrls:
-            (json['galleryUrls'] as List<dynamic>? ?? []).cast<String>(),
-        amenities:
-            (json['amenities'] as List<dynamic>? ?? []).cast<String>(),
-        reviews: (json['reviews'] as List<dynamic>? ?? [])
-            .map((r) => VenueReview.fromJson(r as Map<String, dynamic>))
+        subCategories: (json['subCategories'] is List)
+            ? (json['subCategories'] as List)
+                .map((e) => e.toString())
+                .toList()
+            : const <String>[],
+        staffMembers: (json['staffMembers'] is List)
+            ? (json['staffMembers'] as List)
+                .map((e) => e.toString())
+                .toList()
+            : const <String>[],
+        galleryUrls: (json['galleryUrls'] is List)
+            ? (json['galleryUrls'] as List).map((e) => e.toString()).toList()
+            : const <String>[],
+        amenities: (json['amenities'] is List)
+            ? (json['amenities'] as List).map((e) => e.toString()).toList()
+            : const <String>[],
+        reviews: (json['reviews'] is List
+                ? (json['reviews'] as List)
+                : (json['reviewsList'] is List
+                    ? (json['reviewsList'] as List)
+                    : const []))
+            .whereType<Map<String, dynamic>>()
+            .map((r) => VenueReview.fromJson(r))
             .toList(),
-        items: (json['items'] as List<dynamic>? ?? [])
-            .map((item) => VenueItem.fromJson(item as Map<String, dynamic>))
+        items: (json['items'] is List
+                ? (json['items'] as List)
+                : (json['units'] is List
+                    ? (json['units'] as List)
+                    : const []))
+            .whereType<Map<String, dynamic>>()
+            .map((item) => VenueItem.fromJson(item))
             .toList(),
-        services: (json['services'] as List<dynamic>? ?? [])
-            .map((item) => SalonService.fromJson(item as Map<String, dynamic>))
+        services: (json['services'] is List
+                ? (json['services'] as List)
+                : const [])
+            .whereType<Map<String, dynamic>>()
+            .map((item) => SalonService.fromJson(item))
             .toList(),
       );
 }
@@ -768,6 +789,13 @@ class Booking {
     this.discountAmount = 0,
     this.staffMember = '',
     this.blockReason = '',
+    this.checkedIn = false,
+    this.checkedInAt,
+    this.qrSignature = '',
+    this.qrCheckInUrl = '',
+    this.actualPaidAmount,
+    this.reminderOffsetMinutes = 120,
+    this.reminderSentAt,
   });
 
   final String id;
@@ -793,6 +821,13 @@ class Booking {
   final double discountAmount;
   final String staffMember;
   final String blockReason;
+  final bool checkedIn;
+  final DateTime? checkedInAt;
+  final String qrSignature;
+  final String qrCheckInUrl;
+  final double? actualPaidAmount;
+  final int reminderOffsetMinutes;
+  final DateTime? reminderSentAt;
 
   DateTime get endsAt => startsAt.add(Duration(minutes: durationMinutes));
 
@@ -801,7 +836,10 @@ class Booking {
 
   bool get isConfirmed =>
       !cancelled &&
-      (status == 'confirmed' || paymentStatus == 'paid');
+      (status == 'confirmed' ||
+          status == 'checked_in' ||
+          checkedIn ||
+          paymentStatus == 'paid');
 
   bool get isPendingPayment =>
       !isConfirmed &&
@@ -856,6 +894,13 @@ class Booking {
     double? discountAmount,
     String? staffMember,
     String? blockReason,
+    bool? checkedIn,
+    DateTime? checkedInAt,
+    String? qrSignature,
+    String? qrCheckInUrl,
+    double? actualPaidAmount,
+    int? reminderOffsetMinutes,
+    DateTime? reminderSentAt,
   }) =>
       Booking(
         id: id ?? this.id,
@@ -882,6 +927,14 @@ class Booking {
         discountAmount: discountAmount ?? this.discountAmount,
         staffMember: staffMember ?? this.staffMember,
         blockReason: blockReason ?? this.blockReason,
+        checkedIn: checkedIn ?? this.checkedIn,
+        checkedInAt: checkedInAt ?? this.checkedInAt,
+        qrSignature: qrSignature ?? this.qrSignature,
+        qrCheckInUrl: qrCheckInUrl ?? this.qrCheckInUrl,
+        actualPaidAmount: actualPaidAmount ?? this.actualPaidAmount,
+        reminderOffsetMinutes:
+            reminderOffsetMinutes ?? this.reminderOffsetMinutes,
+        reminderSentAt: reminderSentAt ?? this.reminderSentAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -909,36 +962,52 @@ class Booking {
         if (discountAmount > 0) 'discountAmount': discountAmount,
         if (staffMember.isNotEmpty) 'staffMember': staffMember,
         if (blockReason.isNotEmpty) 'blockReason': blockReason,
+        if (checkedIn) 'checkedIn': true,
+        if (checkedInAt != null) 'checkedInAt': checkedInAt!.toIso8601String(),
+        if (qrSignature.isNotEmpty) 'qrSignature': qrSignature,
+        if (qrCheckInUrl.isNotEmpty) 'qrCheckInUrl': qrCheckInUrl,
+        if (actualPaidAmount != null) 'actualPaidAmount': actualPaidAmount,
+        'reminderOffsetMinutes': reminderOffsetMinutes,
+        if (reminderSentAt != null)
+          'reminderSentAt': reminderSentAt!.toIso8601String(),
       };
 
   factory Booking.fromJson(Map<String, dynamic> json) {
-    final isExplicitlyConfirmed =
+    final rawStatus = (json['status'] as String? ?? '').toLowerCase();
+    final isCheckedIn =
+        (json['checkedIn'] as bool? ?? false) || rawStatus == 'checked_in';
+    final isExplicitlyConfirmed = isCheckedIn ||
         (json['confirmed'] as bool? ?? false) ||
-        (json['status'] as String? ?? '').toLowerCase() == 'confirmed' ||
+        rawStatus == 'confirmed' ||
         (json['paymentStatus'] as String? ?? '').toLowerCase() == 'paid';
 
     return Booking(
       id: json['id'] as String,
       venueId: json['venueId'] as String,
-      itemId: json['itemId'] as String,
-      customer: json['customer'] as String,
+      itemId: (json['itemId'] ?? json['unitId'] ?? '') as String,
+      customer: (json['customer'] ?? json['customerName'] ?? '') as String,
       startsAt: DateTime.parse(json['startsAt'] as String),
       durationMinutes: json['durationMinutes'] as int,
       price: (json['price'] as num).toDouble(),
-      serviceNames:
-          (json['serviceNames'] as List<dynamic>? ?? []).cast<String>(),
+      serviceNames: (json['serviceNames'] is List)
+          ? (json['serviceNames'] as List)
+              .map((e) => e.toString())
+              .toList()
+          : const <String>[],
       splitCount: json['splitCount'] as int? ?? 1,
       multiController: json['multiController'] as bool? ?? false,
       cancelled: json['cancelled'] as bool? ?? false,
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String? ?? '',
       dueNow: isExplicitlyConfirmed ? 0.0 : (json['dueNow'] as num?)?.toDouble(),
-      status: isExplicitlyConfirmed
-          ? 'confirmed'
-          : (json['status'] as String? ??
-              ((json['cancelled'] as bool? ?? false)
-                  ? 'cancelled'
-                  : 'pending_payment')),
+      status: isCheckedIn
+          ? 'checked_in'
+          : (isExplicitlyConfirmed
+              ? 'confirmed'
+              : (json['status'] as String? ??
+                  ((json['cancelled'] as bool? ?? false)
+                      ? 'cancelled'
+                      : 'pending_payment'))),
       paymentStatus: isExplicitlyConfirmed
           ? 'paid'
           : (json['paymentStatus'] as String? ?? 'unpaid'),
@@ -957,6 +1026,15 @@ class Booking {
       discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
       staffMember: json['staffMember'] as String? ?? '',
       blockReason: json['blockReason'] as String? ?? '',
+      checkedIn: isCheckedIn,
+      checkedInAt: DateTime.tryParse(json['checkedInAt'] as String? ?? ''),
+      qrSignature: json['qrSignature'] as String? ?? '',
+      qrCheckInUrl: json['qrCheckInUrl'] as String? ?? '',
+      actualPaidAmount: (json['actualPaidAmount'] as num?)?.toDouble(),
+      reminderOffsetMinutes:
+          (json['reminderOffsetMinutes'] as num?)?.toInt() ?? 120,
+      reminderSentAt:
+          DateTime.tryParse(json['reminderSentAt'] as String? ?? ''),
     );
   }
 }
