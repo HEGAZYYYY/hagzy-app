@@ -17,6 +17,8 @@ function buildAllowedOrigins(): string[] {
     'https://hagzy-acea1.web.app',
     'https://hagzy-web.onrender.com',
     'https://hagzy.app',
+    'https://hagzy.shop',
+    'https://www.hagzy.shop',
   ];
 }
 
