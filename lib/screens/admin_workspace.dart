@@ -44,6 +44,20 @@ class AdminManageWorkspace extends StatefulWidget {
     required this.venues,
     required this.bookings,
     this.ownerId,
+    this.isSingularPartner = false,
+    this.partnerRequests = const [],
+    this.onApprovePartnerRequest,
+    this.onRejectPartnerRequest,
+    this.onRefreshPartnerRequests,
+    this.apiConfigured = false,
+    this.localPreview = true,
+    this.onLoadGatewayStatus,
+    this.onLoadReviewQueue,
+    this.onAttachReviewItem,
+    this.adminNotifications = const [],
+    this.onMarkNotificationRead,
+    this.onVerifyBookingQr,
+    this.onCheckInBooking,
     required this.onAddVenue,
     this.onAddVenueModel,
     required this.onEditVenue,
@@ -63,6 +77,22 @@ class AdminManageWorkspace extends StatefulWidget {
   final List<Venue> venues;
   final List<Booking> bookings;
   final String? ownerId;
+  final bool isSingularPartner;
+  final List<Map<String, dynamic>> partnerRequests;
+  final Future<void> Function(String requestId)? onApprovePartnerRequest;
+  final Future<void> Function(String requestId)? onRejectPartnerRequest;
+  final VoidCallback? onRefreshPartnerRequests;
+  final bool apiConfigured;
+  final bool localPreview;
+  final Future<Map<String, dynamic>> Function()? onLoadGatewayStatus;
+  final Future<List<Map<String, dynamic>>> Function()? onLoadReviewQueue;
+  final Future<void> Function(String itemId, String bookingId)?
+      onAttachReviewItem;
+  final List<Map<String, dynamic>> adminNotifications;
+  final Future<void> Function(String notificationId)? onMarkNotificationRead;
+  final Future<Map<String, dynamic>> Function(String bookingId, String? sig)?
+      onVerifyBookingQr;
+  final Future<void> Function(String bookingId, String? sig)? onCheckInBooking;
   final VoidCallback onAddVenue;
   final ValueChanged<Venue>? onAddVenueModel;
   final ValueChanged<Venue> onEditVenue;
@@ -149,6 +179,12 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                 selected: _section == 3,
                 onTap: () => setState(() => _section = 3),
               ),
+              CustomPill(
+                label: 'Gateway & Queue',
+                icon: Icons.bolt_rounded,
+                selected: _section == 4,
+                onTap: () => setState(() => _section = 4),
+              ),
             ],
           ),
         ),
@@ -172,7 +208,13 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                   key: const ValueKey('admin_manage'),
                   venues: widget.venues,
                   ownerId: widget.ownerId,
+                  isSingularPartner: widget.isSingularPartner,
+                  partnerRequests: widget.partnerRequests,
+                  onApprovePartnerRequest: widget.onApprovePartnerRequest,
+                  onRejectPartnerRequest: widget.onRejectPartnerRequest,
+                  onRefreshPartnerRequests: widget.onRefreshPartnerRequests,
                   onAddVenue: widget.onAddVenue,
+                  onAddVenueModel: widget.onAddVenueModel,
                   onEditVenue: widget.onEditVenue,
                   onAddItem: widget.onAddItem,
                   onAddService: widget.onAddService,
@@ -185,6 +227,10 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                   key: const ValueKey('admin_pos'),
                   venues: widget.venues,
                   bookings: widget.bookings,
+                  adminNotifications: widget.adminNotifications,
+                  onMarkNotificationRead: widget.onMarkNotificationRead,
+                  onVerifyBookingQr: widget.onVerifyBookingQr,
+                  onCheckInBooking: widget.onCheckInBooking,
                   onWalkIn: widget.onWalkIn,
                   onBlockSlot: widget.onBlockSlot,
                   onCancel: widget.onCancel,
@@ -194,6 +240,15 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
                   key: const ValueKey('admin_analytics'),
                   venues: widget.venues,
                   bookings: widget.bookings,
+                ),
+              4 => PaymentTab(
+                  key: const ValueKey('admin_payment_gateway'),
+                  apiConfigured: widget.apiConfigured,
+                  localPreview: widget.localPreview,
+                  bookings: widget.bookings,
+                  onLoadGatewayStatus: widget.onLoadGatewayStatus,
+                  onLoadReviewQueue: widget.onLoadReviewQueue,
+                  onAttachReviewItem: widget.onAttachReviewItem,
                 ),
               _ => UsersCrmTab(
                   key: const ValueKey('admin_users_crm'),
@@ -389,10 +444,22 @@ class _ManageTabState extends State<ManageTab> {
           icon: Icons.add_business_outlined,
           action: widget.isSingularPartner
               ? null
-              : FilledButton.icon(
-                  onPressed: widget.onAddVenue,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add venue'),
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: widget.onAddVenue,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add venue', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ],
                 ),
         ),
         if (!widget.isSingularPartner && widget.venues.length > 1) ...[
@@ -438,6 +505,24 @@ class _ManageTabState extends State<ManageTab> {
           ),
           if (!widget.isSingularPartner) ...[
             const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: widget.onAddVenue,
+                    icon: const Icon(Icons.add_business_rounded, size: 18),
+                    label: const Text('Add Your Venue', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -801,6 +886,10 @@ class PosTab extends StatefulWidget {
     super.key,
     required this.venues,
     required this.bookings,
+    this.adminNotifications = const [],
+    this.onMarkNotificationRead,
+    this.onVerifyBookingQr,
+    this.onCheckInBooking,
     required this.onWalkIn,
     this.onBlockSlot,
     required this.onCancel,
@@ -809,6 +898,11 @@ class PosTab extends StatefulWidget {
 
   final List<Venue> venues;
   final List<Booking> bookings;
+  final List<Map<String, dynamic>> adminNotifications;
+  final Future<void> Function(String notificationId)? onMarkNotificationRead;
+  final Future<Map<String, dynamic>> Function(String bookingId, String? sig)?
+      onVerifyBookingQr;
+  final Future<void> Function(String bookingId, String? sig)? onCheckInBooking;
   final void Function(Venue venue, VenueItem item) onWalkIn;
   final void Function(Venue venue, VenueItem item, DateTime start, int duration, String reason)? onBlockSlot;
   final ValueChanged<Booking> onCancel;
@@ -820,6 +914,218 @@ class PosTab extends StatefulWidget {
 
 class _PosTabState extends State<PosTab> {
   String _filter = 'all'; // 'all', 'pending', 'confirmed'
+
+  Future<void> _openQrVerifyDialog() async {
+    final ctrl = TextEditingController();
+    Map<String, dynamic>? loaded;
+    String? errorMsg;
+    var loading = false;
+    var checkedInNow = false;
+    String? lastSig;
+
+    (String bookingId, String? sig) parseInput(String raw) {
+      final clean = raw.trim();
+      final uri = Uri.tryParse(clean);
+      if (uri != null && uri.queryParameters.containsKey('scanBooking')) {
+        return (
+          uri.queryParameters['scanBooking']!.trim(),
+          uri.queryParameters['sig']?.trim(),
+        );
+      }
+      return (clean, null);
+    }
+
+    Future<void> runLookup(StateSetter setDlgState) async {
+      final (bookingId, sig) = parseInput(ctrl.text);
+      if (bookingId.isEmpty) {
+        setDlgState(() => errorMsg = 'Enter a Booking ID or paste QR link.');
+        return;
+      }
+      setDlgState(() {
+        loading = true;
+        errorMsg = null;
+        lastSig = sig;
+      });
+      try {
+        Map<String, dynamic> details;
+        if (widget.onVerifyBookingQr != null) {
+          details = await widget.onVerifyBookingQr!(bookingId, sig);
+        } else {
+          final found =
+              widget.bookings.where((b) => b.id == bookingId).firstOrNull;
+          if (found == null) throw Exception('Booking not found locally.');
+          final paid = found.actualPaidAmount ??
+              (found.isConfirmed ? (found.dueNow ?? 0) : 0.0);
+          details = {
+            'signatureVerified': false,
+            'booking': found.toJson(),
+            'financialSummary': {
+              'totalPrice': found.price,
+              'paidAmount': paid,
+              'remainingDue': (found.price - paid).clamp(0.0, found.price),
+            },
+          };
+        }
+        setDlgState(() {
+          loaded = details;
+          loading = false;
+          final bJson = details['booking'] as Map<String, dynamic>?;
+          checkedInNow = bJson?['checkedIn'] == true ||
+              bJson?['status'] == 'checked_in';
+        });
+      } catch (e) {
+        setDlgState(() {
+          loading = false;
+          errorMsg = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          final bJson = loaded?['booking'] as Map<String, dynamic>?;
+          final fin = loaded?['financialSummary'] as Map<String, dynamic>?;
+          final sigVerified = loaded?['signatureVerified'] == true;
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.qr_code_scanner_rounded, color: kGreen),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Verify / Scan Booking QR',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Paste the scanned QR link from your camera app or enter a Booking ID to verify entry & remaining balance:',
+                    style: TextStyle(fontSize: 12, color: kMuted),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: ctrl,
+                    decoration: InputDecoration(
+                      labelText: 'QR URL or Booking ID',
+                      hintText: 'https://hagzy.shop/partner?scanBooking=...',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.search_rounded),
+                        onPressed: loading ? null : () => runLookup(setDlgState),
+                      ),
+                    ),
+                    onSubmitted: (_) => runLookup(setDlgState),
+                  ),
+                  if (loading) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                  ],
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 10),
+                    Text(errorMsg!,
+                        style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                  if (bJson != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: kPage,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                sigVerified
+                                    ? Icons.verified_rounded
+                                    : Icons.confirmation_number_outlined,
+                                color: sigVerified ? kGreen : const Color(0xFFD97706),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                sigVerified
+                                    ? 'Signed QR Verified ✓'
+                                    : 'Booking Details',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: sigVerified ? kGreen : kInk,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 14),
+                          Text('Guest: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
+                          if ((bJson['phone'] ?? '').toString().isNotEmpty)
+                            Text('Phone: ${bJson['phone']}'),
+                          Text('Venue/Unit: ${bJson['venueName'] ?? bJson['venueId']} · ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
+                          Text('Status: ${checkedInNow ? 'CHECKED IN ✓' : bJson['status']}'),
+                          const SizedBox(height: 6),
+                          if (fin != null)
+                            Text(
+                              'Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800, color: kGreenDark),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+              if (bJson == null)
+                FilledButton(
+                  onPressed: loading ? null : () => runLookup(setDlgState),
+                  child: const Text('Lookup'),
+                ),
+              if (bJson != null && !checkedInNow && widget.onCheckInBooking != null)
+                FilledButton.icon(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final id = (bJson['id'] ?? '').toString();
+                          setDlgState(() => loading = true);
+                          try {
+                            await widget.onCheckInBooking!(id, lastSig);
+                            setDlgState(() {
+                              loading = false;
+                              checkedInNow = true;
+                            });
+                          } catch (e) {
+                            setDlgState(() {
+                              loading = false;
+                              errorMsg = e.toString().replaceFirst('Exception: ', '');
+                            });
+                          }
+                        },
+                  icon: const Icon(Icons.how_to_reg_rounded, size: 18),
+                  label: const Text('Check In Guest'),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+    ctrl.dispose();
+  }
 
   Future<void> _messageCustomer(Booking booking) async {
     final digits = booking.phone.replaceAll(RegExp(r'\D'), '');
@@ -971,19 +1277,87 @@ class _PosTabState extends State<PosTab> {
       return true;
     }).toList();
 
+    final unreadNotifs = widget.adminNotifications
+        .where((n) => n['read'] != true)
+        .toList();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
         IntroCard(
           title: 'POS timeline',
-          subtitle: 'Confirmed bookings and temporary unpaid holds.',
+          subtitle: 'Confirmed bookings, QR check-in, and temporary unpaid holds.',
           icon: Icons.view_timeline_outlined,
-          action: allActive.isEmpty
-              ? null
-              : Text('${allActive.length} active',
-                  style: const TextStyle(
-                      color: kGreen, fontWeight: FontWeight.bold)),
+          action: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: _openQrVerifyDialog,
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
+                label: const Text('Scan QR Pass'),
+              ),
+              if (allActive.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text('${allActive.length} active',
+                    style: const TextStyle(
+                        color: kGreen, fontWeight: FontWeight.bold)),
+              ],
+            ],
+          ),
         ),
+        if (unreadNotifs.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Card(
+            color: const Color(0xFFF0FDF4),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.notifications_active_rounded,
+                          color: kGreen, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'New Booking Alerts (${unreadNotifs.length})',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, color: kGreenDark),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...unreadNotifs.take(4).map((n) {
+                    final nId = (n['id'] ?? '').toString();
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        (n['title'] ?? 'New Alert').toString(),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                      subtitle: Text(
+                        (n['body'] ?? '').toString(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11.5),
+                      ),
+                      trailing: widget.onMarkNotificationRead != null &&
+                              nId.isNotEmpty
+                          ? TextButton(
+                              onPressed: () =>
+                                  widget.onMarkNotificationRead!(nId),
+                              child: const Text('Dismiss'),
+                            )
+                          : null,
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         if (widget.venues.isNotEmpty)
           Card(
@@ -1142,7 +1516,7 @@ class _PosTabState extends State<PosTab> {
                       '${booking.serviceNames.isEmpty ? '' : '\n${booking.serviceNames.join(' + ')}'}'
                       '${booking.splitCount > 1 ? '\n${booking.splitCount}-way · ${formatMoney(booking.price / booking.splitCount)} EGP each' : ''}'
                       '$proofInfo'
-                      '${booking.isPendingPayment ? '\nAwaiting deposit · not confirmed' : '\nConfirmed by venue'}',
+                      '${booking.checkedIn ? '\nChecked In ✓' : (booking.isPendingPayment ? '\nAwaiting deposit · not confirmed' : '\nConfirmed by venue')}',
                     ),
                     isThreeLine: true,
                     trailing: Column(
@@ -1160,7 +1534,9 @@ class _PosTabState extends State<PosTab> {
                       ],
                     ),
                   ),
-                  if (booking.isPendingPayment || booking.phone.isNotEmpty)
+                  if (booking.isPendingPayment ||
+                      booking.phone.isNotEmpty ||
+                      booking.isConfirmed)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                       child: Wrap(
@@ -1176,6 +1552,34 @@ class _PosTabState extends State<PosTab> {
                                 booking.paymentReference.isNotEmpty
                                     ? 'Verify & Confirm Deposit'
                                     : 'Confirm Deposit (${formatMoney(booking.dueNow ?? 0)} EGP)',
+                              ),
+                            ),
+                          if (booking.isConfirmed && !booking.checkedIn && widget.onCheckInBooking != null)
+                            FilledButton.tonalIcon(
+                              onPressed: () => widget.onCheckInBooking!(
+                                booking.id,
+                                booking.qrSignature.isNotEmpty
+                                    ? booking.qrSignature
+                                    : null,
+                              ),
+                              icon: const Icon(Icons.how_to_reg_rounded, size: 16),
+                              label: const Text('Check In'),
+                            ),
+                          if (booking.checkedIn)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE0F2FE),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                'Checked In ✓',
+                                style: TextStyle(
+                                  color: Color(0xFF0369A1),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           if (booking.phone.isNotEmpty)
@@ -1430,97 +1834,339 @@ class _MetricCard extends StatelessWidget {
       );
 }
 
-class PaymentTab extends StatelessWidget {
+class PaymentTab extends StatefulWidget {
   const PaymentTab({
     super.key,
     required this.apiConfigured,
     required this.localPreview,
+    this.bookings = const [],
+    this.onLoadGatewayStatus,
+    this.onLoadReviewQueue,
+    this.onAttachReviewItem,
   });
 
   final bool apiConfigured;
   final bool localPreview;
+  final List<Booking> bookings;
+  final Future<Map<String, dynamic>> Function()? onLoadGatewayStatus;
+  final Future<List<Map<String, dynamic>>> Function()? onLoadReviewQueue;
+  final Future<void> Function(String itemId, String bookingId)?
+      onAttachReviewItem;
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          const IntroCard(
-            title: 'Payments & deposits',
-            subtitle:
-                'Payment credentials belong on the trusted Hagzy server, never in this app.',
-            icon: Icons.lock_outline,
+  State<PaymentTab> createState() => _PaymentTabState();
+}
+
+class _PaymentTabState extends State<PaymentTab> {
+  bool _loading = false;
+  Map<String, dynamic>? _gatewayStatus;
+  List<Map<String, dynamic>> _reviewQueue = const [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.apiConfigured &&
+        !widget.localPreview &&
+        (widget.onLoadGatewayStatus != null ||
+            widget.onLoadReviewQueue != null)) {
+      _refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      Map<String, dynamic>? status;
+      List<Map<String, dynamic>> queue = _reviewQueue;
+      if (widget.onLoadGatewayStatus != null) {
+        status = await widget.onLoadGatewayStatus!();
+      }
+      if (widget.onLoadReviewQueue != null) {
+        queue = await widget.onLoadReviewQueue!();
+      }
+      if (!mounted) return;
+      setState(() {
+        _gatewayStatus = status ?? _gatewayStatus;
+        _reviewQueue = queue;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openAttachDialog(Map<String, dynamic> item) async {
+    if (widget.onAttachReviewItem == null) return;
+    final itemId = (item['id'] ?? '').toString();
+    final pendingBookings = widget.bookings
+        .where((b) => !b.cancelled && !b.isConfirmed)
+        .toList();
+    final idCtrl = TextEditingController(
+      text: pendingBookings.isNotEmpty ? pendingBookings.first.id : '',
+    );
+    var selectedId = idCtrl.text;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: const Text('Attach Transfer to Booking',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Amount: ${item['amount']} EGP · Sender: ${item['sender_identifier'] ?? item['senderIdentifier'] ?? 'unknown'}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              if (pendingBookings.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  initialValue: pendingBookings.any((b) => b.id == selectedId)
+                      ? selectedId
+                      : null,
+                  decoration: const InputDecoration(labelText: 'Select Pending Booking'),
+                  items: pendingBookings
+                      .map((b) => DropdownMenuItem(
+                            value: b.id,
+                            child: Text(
+                              '${b.customer} · ${formatMoney(b.dueNow ?? b.price)} EGP (${b.id.substring(0, b.id.length > 10 ? 10 : b.id.length)})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    setDlgState(() {
+                      selectedId = v ?? '';
+                      idCtrl.text = selectedId;
+                    });
+                  },
+                ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: idCtrl,
+                decoration: const InputDecoration(labelText: 'Or enter Booking ID'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Attach & Confirm'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final targetBookingId = idCtrl.text.trim();
+    idCtrl.dispose();
+    if (confirmed == true && targetBookingId.isNotEmpty && itemId.isNotEmpty) {
+      await widget.onAttachReviewItem!(itemId, targetBookingId);
+      await _refresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isListenerActive = _gatewayStatus?['isListenerActive'] == true;
+    final lastHeartbeatAt = _gatewayStatus?['lastHeartbeatAt']?.toString();
+    final recentLogs = (_gatewayStatus?['recentLogs'] as List<dynamic>?) ?? const [];
+    final unresolved = _reviewQueue
+        .where((i) => (i['status'] ?? '').toString() != 'RESOLVED')
+        .toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: [
+        const IntroCard(
+          title: 'Payments, Gateway & Review Queue',
+          subtitle:
+              'Monitor the central wallet payment oracle and match any unmatched transfers.',
+          icon: Icons.lock_outline,
+        ),
+        const SizedBox(height: 12),
+        if (!widget.apiConfigured || widget.localPreview) const LocalPreviewNotice(),
+        if (widget.apiConfigured && !widget.localPreview) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isListenerActive
+                            ? Icons.sensors_rounded
+                            : Icons.sensors_off_rounded,
+                        color: isListenerActive ? kGreen : const Color(0xFFD97706),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isListenerActive
+                              ? 'Android Gateway Oracle: ACTIVE'
+                              : 'Android Gateway Oracle: Waiting for Heartbeat',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 15),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Refresh gateway & queue',
+                        onPressed: _loading ? null : _refresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                    ],
+                  ),
+                  if (lastHeartbeatAt != null && lastHeartbeatAt.isNotEmpty)
+                    Text('Last Heartbeat: $lastHeartbeatAt',
+                        style: TextStyle(fontSize: 12, color: kMuted)),
+                  if (_error != null) ...[
+                    const SizedBox(height: 6),
+                    Text(_error!,
+                        style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+                  ],
+                  if (recentLogs.isNotEmpty) ...[
+                    const Divider(height: 18),
+                    const Text('Recent Gateway Transfers',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    ...recentLogs.take(5).map((log) {
+                      final m = Map<String, dynamic>.from(log as Map);
+                      final matched = m['matched'] == true;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          '• ${m['amount'] ?? 0} EGP — ${matched ? 'Matched (${m['bookingId'] ?? ''})' : (m['parseStatus'] ?? 'Queued')} at ${m['at'] ?? ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: matched ? kGreenDark : const Color(0xFFB45309),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 12),
-          if (!apiConfigured || localPreview) const LocalPreviewNotice(),
-          if (apiConfigured && !localPreview)
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.cloud_done_outlined, color: kGreen),
-                title: Text('Backend connected'),
-                subtitle: Text(
-                    'Configure payment provider keys as server environment variables before enabling checkout.'),
-              ),
-            ),
-          const SizedBox(height: 12),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Paymob',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      const Icon(Icons.rate_review_outlined,
+                          color: Color(0xFFD97706)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Review Queue (${unresolved.length} open)',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 15),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
-                  Text(
-                      'The API can create a Paymob intention through the backend. Set PAYMOB_SECRET_KEY, PAYMOB_PUBLIC_KEY, and PAYMOB_INTEGRATION_ID on the server. A checkout is not marked paid until a verified provider callback is implemented.',
-                      style: TextStyle(color: kMuted)),
+                  if (unresolved.isEmpty)
+                    Text(
+                      'All incoming InstaPay and Vodafone Cash transfers have matched automatically.',
+                      style: TextStyle(color: kMuted, fontSize: 12.5),
+                    ),
+                  ...unresolved.map((item) {
+                    final sender = item['sender_identifier'] ??
+                        item['senderIdentifier'] ??
+                        'unknown';
+                    final method = item['payment_method'] ??
+                        item['paymentMethod'] ??
+                        'TRANSFER';
+                    final raw =
+                        (item['raw_text'] ?? item['rawText'] ?? '').toString();
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: kPage,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${item['amount']} EGP · $method · ${item['status']}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800, fontSize: 13),
+                                ),
+                              ),
+                              if (widget.onAttachReviewItem != null)
+                                FilledButton.tonal(
+                                  onPressed: () => _openAttachDialog(item),
+                                  child: const Text('Attach'),
+                                ),
+                            ],
+                          ),
+                          Text('Sender: $sender',
+                              style: TextStyle(fontSize: 12, color: kMuted)),
+                          if ((item['reason'] ?? '').toString().isNotEmpty)
+                            Text('${item['reason']}',
+                                style: const TextStyle(
+                                    fontSize: 11.5, color: Color(0xFFB45309))),
+                          if (raw.isNotEmpty)
+                            Text(raw,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: kMuted)),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('InstaPay & Vodafone Cash',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(
-                      'InstaPay and Vodafone Cash transfers require manual instructions and verification. Configure your venue InstaPay address or Vodafone Cash wallet in Manage Venues; customers can submit their transfer reference, and you can verify and confirm their deposit in the POS timeline.',
-                      style: TextStyle(color: kMuted)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Fawry',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(
-                      'Fawry checkout is not connected to the shared backend yet. Do not treat a signed reference or customer screenshot as confirmed payment.',
-                      style: TextStyle(color: kMuted)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-              'Reservations remain unpaid/pending until a trusted provider confirmation or venue owner verification updates their status.',
-              style: TextStyle(color: kMuted, fontSize: 12)),
         ],
-      );
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('InstaPay & Vodafone Cash (Central Wallet Oracle)',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(
+                    'All customer deposits arrive into the central Hagzy wallet and are matched automatically by (Sender + Amount). Any ambiguous or unparsed transfers appear above in the Review Queue for 1-tap resolution.',
+                    style: TextStyle(color: kMuted)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class UsersCrmTab extends StatefulWidget {

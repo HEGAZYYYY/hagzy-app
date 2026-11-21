@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../hagzy_api.dart';
@@ -31,11 +32,14 @@ class MyBookingsTab extends StatefulWidget {
     this.onExplore,
     this.onRefresh,
     this.onScreenOpened,
+    this.onUpdateReminder,
   });
 
   /// Pull-to-refresh handler (re-syncs bookings from the server).
   final Future<void> Function()? onRefresh;
   final Future<void> Function()? onScreenOpened;
+  final Future<void> Function(Booking booking, int offsetMinutes)?
+      onUpdateReminder;
   final List<Venue> venues;
   final List<Booking> bookings;
   final double walletBalance;
@@ -1023,6 +1027,27 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
+                            if (widget.onUpdateReminder != null &&
+                                !booking.cancelled &&
+                                !booking.checkedIn &&
+                                booking.startsAt.isAfter(DateTime.now()))
+                              OutlinedButton.icon(
+                                onPressed: () => _showReminderPicker(booking),
+                                style: OutlinedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
+                                icon: const Icon(
+                                    Icons.notifications_active_outlined,
+                                    size: 16,
+                                    color: kGreen),
+                                label: Text(
+                                  _reminderLabel(
+                                      booking.reminderOffsetMinutes, arabic),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -1039,9 +1064,64 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     );
   }
 
+  String _reminderLabel(int mins, bool arabic) {
+    if (mins <= 0) return localized(arabic, 'Reminder Off', 'التذكير متوقف');
+    if (mins < 60) {
+      return localized(arabic, '$mins min before', 'قبل الموعد بـ $mins د');
+    }
+    if (mins == 1440) {
+      return localized(arabic, '24h before', 'قبل الموعد بـ ٢٤ س');
+    }
+    final hrs = mins ~/ 60;
+    return localized(arabic, '${hrs}h before', 'قبل الموعد بـ $hrs س');
+  }
+
+  Future<void> _showReminderPicker(Booking booking) async {
+    if (widget.onUpdateReminder == null) return;
+    final arabic = widget.arabic;
+    const options = [30, 60, 120, 360, 1440, 0];
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          localized(arabic, 'WhatsApp Reminder Time', 'موعد التذكير عبر واتساب'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options
+              .map((m) => ChoiceChip(
+                    label: Text(_reminderLabel(m, arabic)),
+                    selected: booking.reminderOffsetMinutes == m,
+                    onSelected: (_) => Navigator.pop(ctx, m),
+                  ))
+              .toList(),
+        ),
+      ),
+    );
+    if (picked != null && picked != booking.reminderOffsetMinutes) {
+      await widget.onUpdateReminder!(booking, picked);
+    }
+  }
+
   Future<void> _showQrPassModal(
       Booking booking, Venue? venue, VenueItem? space) async {
     final arabic = widget.arabic;
+    final qrPayload = booking.qrCheckInUrl.isNotEmpty
+        ? booking.qrCheckInUrl
+        : 'https://hagzy.shop/partner?scanBooking=${Uri.encodeComponent(booking.id)}'
+            '${booking.qrSignature.isNotEmpty ? '&sig=${Uri.encodeComponent(booking.qrSignature)}' : ''}';
+    final paidAmount = booking.actualPaidAmount ??
+        (booking.isConfirmed
+            ? (booking.dueNow != null && booking.dueNow! > 0
+                ? booking.dueNow!
+                : (venue != null
+                    ? booking.price * venue.depositPercent / 100
+                    : booking.price * 0.25))
+            : 0.0);
+    final remainingDue = (booking.price - paidAmount).clamp(0.0, booking.price);
+
     await showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -1052,125 +1132,216 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           constraints: const BoxConstraints(maxWidth: 360),
           child: Padding(
             padding: const EdgeInsets.all(22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const HagzyLogoMark(size: 34),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            localized(
-                                arabic, 'HAGZY CHECK-IN PASS', 'بطاقة دخول حجزي'),
-                            style: const TextStyle(
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w900,
-                              color: kGreen,
-                              letterSpacing: 0.8,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const HagzyLogoMark(size: 34),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localized(
+                                  arabic, 'HAGZY CHECK-IN PASS', 'بطاقة دخول حجزي'),
+                              style: const TextStyle(
+                                fontSize: 12.0,
+                                fontWeight: FontWeight.w900,
+                                color: kGreen,
+                                letterSpacing: 0.8,
+                              ),
                             ),
-                          ),
-                          Text(
-                            venue?.name ?? booking.venueId,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: kInk,
+                            Text(
+                              venue?.name ?? booking.venueId,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                color: kInk,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: kBorder, width: 1.5),
+                      boxShadow: HagzyTheme.softShadow,
+                    ),
+                    child: QrImageView(
+                      data: qrPayload,
+                      version: QrVersions.auto,
+                      size: 176,
+                      backgroundColor: Colors.white,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: Color(0xFF0A0F1D),
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: Color(0xFF0A0F1D),
                       ),
                     ),
-                    IconButton(
-                      tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
-                      onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '${space?.name ?? booking.itemId} · ${formatDateTime(booking.startsAt)}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      color: kInk,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'REF: ${booking.id}',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12.0,
+                      color: kMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: booking.checkedIn
+                          ? const Color(0xFFE0F2FE)
+                          : (booking.isConfirmed
+                              ? kSurfaceTint
+                              : const Color(0xFFFFFBEB)),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      booking.checkedIn
+                          ? localized(arabic, 'CHECKED IN ✓', 'تم تسجيل الحضور ✓')
+                          : (booking.isConfirmed
+                              ? localized(arabic, 'CONFIRMED PASS', 'حجز مؤكد')
+                              : localized(arabic, 'HOLD · AWAITING DEPOSIT',
+                                  'حجز مؤقت')),
+                      style: TextStyle(
+                        color: booking.checkedIn
+                            ? const Color(0xFF0369A1)
+                            : (booking.isConfirmed
+                                ? kGreen
+                                : const Color(0xFFB45309)),
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: kPage,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              localized(arabic, 'Deposit Paid', 'العربون المدفوع'),
+                              style: TextStyle(fontSize: 12, color: kMuted),
+                            ),
+                            Text(
+                              '${formatMoney(paidAmount)} EGP',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
+                                  color: kGreen),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              localized(
+                                  arabic, 'Due at Venue', 'المتبقي عند الوصول'),
+                              style: TextStyle(fontSize: 12, color: kMuted),
+                            ),
+                            Text(
+                              '${formatMoney(remainingDue)} EGP',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
+                                  color: kInk),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openMaps(venue);
+                      },
+                      icon: const Icon(Icons.directions_outlined,
+                          size: 15, color: kGreen),
+                      label: Text(
+                        localized(arabic, 'Directions', 'الاتجاهات'),
+                        style: const TextStyle(fontSize: 12.0),
+                      ),
+                    ),
+                  ),
+                  if (widget.onUpdateReminder != null &&
+                      !booking.cancelled &&
+                      !booking.checkedIn) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showReminderPicker(booking);
+                        },
+                        icon: const Icon(Icons.notifications_active_outlined,
+                            size: 15, color: kGreen),
+                        label: Text(
+                          '${localized(arabic, "WhatsApp Reminder:", "تذكير واتساب:")} ${_reminderLabel(booking.reminderOffsetMinutes, arabic)}',
+                          style: const TextStyle(fontSize: 12.0),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: kBorder, width: 1.5),
-                    boxShadow: HagzyTheme.softShadow,
-                  ),
-                  child: CustomPaint(
-                    size: const Size(168, 168),
-                    painter: _QrPassMatrixPainter(seedText: booking.id),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  '${space?.name ?? booking.itemId} · ${formatDateTime(booking.startsAt)}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
-                    color: kInk,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'REF: ${booking.id}',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12.0,
-                    color: kMuted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: booking.isConfirmed
-                        ? kSurfaceTint
-                        : const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    booking.isConfirmed
-                        ? localized(arabic, 'CONFIRMED PASS', 'حجز مؤكد')
-                        : localized(
-                            arabic, 'HOLD · AWAITING DEPOSIT', 'حجز مؤقت'),
-                    style: TextStyle(
-                      color: booking.isConfirmed
-                          ? kGreen
-                          : const Color(0xFFB45309),
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _openMaps(venue);
-                    },
-                    icon: const Icon(Icons.directions_outlined,
-                        size: 15, color: kGreen),
-                    label: Text(
-                      localized(arabic, 'Directions', 'الاتجاهات'),
-                      style: const TextStyle(fontSize: 12.0),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1439,90 +1610,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       ),
     );
   }
-}
-
-class _QrPassMatrixPainter extends CustomPainter {
-  _QrPassMatrixPainter({required this.seedText});
-
-  final String seedText;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const grid = 21;
-    final cell = size.width / grid;
-    final darkPaint = Paint()
-      ..color = kInk
-      ..style = PaintingStyle.fill;
-    final accentPaint = Paint()
-      ..color = kGreen
-      ..style = PaintingStyle.fill;
-
-    bool isFinderPattern(int r, int c) {
-      final topLeft = r < 7 && c < 7;
-      final topRight = r < 7 && c >= grid - 7;
-      final bottomLeft = r >= grid - 7 && c < 7;
-      return topLeft || topRight || bottomLeft;
-    }
-
-    void drawFinder(int startR, int startC) {
-      final outer = RRect.fromRectAndRadius(
-        Rect.fromLTWH(startC * cell, startR * cell, 7 * cell, 7 * cell),
-        Radius.circular(cell * 1.4),
-      );
-      final innerWhite = RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-            (startC + 1) * cell, (startR + 1) * cell, 5 * cell, 5 * cell),
-        Radius.circular(cell * 0.9),
-      );
-      final centerDot = RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-            (startC + 2) * cell, (startR + 2) * cell, 3 * cell, 3 * cell),
-        Radius.circular(cell * 0.7),
-      );
-      canvas.drawRRect(outer, darkPaint);
-      canvas.drawRRect(
-          innerWhite,
-          Paint()
-            ..color = Colors.white
-            ..style = PaintingStyle.fill);
-      canvas.drawRRect(centerDot, accentPaint);
-    }
-
-    drawFinder(0, 0);
-    drawFinder(0, grid - 7);
-    drawFinder(grid - 7, 0);
-
-    var hash = 2166136261;
-    for (final unit in seedText.codeUnits) {
-      hash ^= unit;
-      hash = (hash * 16777619) & 0x7fffffff;
-    }
-
-    for (var r = 0; r < grid; r++) {
-      for (var c = 0; c < grid; c++) {
-        if (isFinderPattern(r, c)) continue;
-        final bit = ((hash ^ (r * 31 + c * 17)) + (r * c)) % 3 == 0;
-        if (bit) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(
-                c * cell + cell * 0.08,
-                r * cell + cell * 0.08,
-                cell * 0.84,
-                cell * 0.84,
-              ),
-              Radius.circular(cell * 0.25),
-            ),
-            darkPaint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrPassMatrixPainter oldDelegate) =>
-      oldDelegate.seedText != seedText;
 }
 
 class _TicketPerforatedDivider extends StatelessWidget {

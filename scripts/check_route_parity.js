@@ -58,7 +58,16 @@ const customCalls = [
   { method: 'POST', path: '/api/admin/venues/sync-firebase' },
   { method: 'POST', path: '/api/customer/wallet/deduct' },
   { method: 'POST', path: '/api/customer/wallet/add' },
-  { method: 'POST', path: '/api/chatbot/message' }
+  { method: 'POST', path: '/api/chatbot/message' },
+  { method: 'PUT', path: '/api/bookings/:id/reminder' },
+  { method: 'GET', path: '/api/admin/notifications' },
+  { method: 'POST', path: '/api/admin/notifications/:id/read' },
+  { method: 'GET', path: '/api/admin/bookings/:id/qr-details' },
+  { method: 'POST', path: '/api/admin/bookings/:id/check-in' },
+  { method: 'POST', path: '/api/internal/run-reminders' },
+  { method: 'GET', path: '/api/admin/payments/review-queue' },
+  { method: 'POST', path: '/api/admin/payments/review-queue/:id/attach' },
+  { method: 'GET', path: '/api/payments/listener/status' }
 ];
 
 function normalizeRoute(p) {

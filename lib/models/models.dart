@@ -186,13 +186,23 @@ class VenueItem {
         'multiRate': multiRate,
       };
 
-  factory VenueItem.fromJson(Map<String, dynamic> json) => VenueItem(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        kind: json['kind'] as String,
-        hourlyRate: (json['hourlyRate'] as num).toDouble(),
-        multiRate: (json['multiRate'] as num?)?.toDouble() ?? 0,
-      );
+  factory VenueItem.fromJson(Map<String, dynamic> json) {
+    final rawRate = json['hourlyRate'] ?? json['pricePerHour'] ?? json['price'];
+    final rate = (rawRate is num)
+        ? rawRate.toDouble()
+        : (double.tryParse(rawRate?.toString() ?? '') ?? 0.0);
+    final rawMulti = json['multiRate'];
+    final multi = (rawMulti is num)
+        ? rawMulti.toDouble()
+        : (double.tryParse(rawMulti?.toString() ?? '') ?? 0.0);
+    return VenueItem(
+      id: (json['id'] ?? generateId()).toString(),
+      name: (json['name'] ?? 'Unit').toString(),
+      kind: (json['kind'] ?? json['type'] ?? json['unitType'] ?? json['category'] ?? 'General').toString(),
+      hourlyRate: rate,
+      multiRate: multi,
+    );
+  }
 }
 
 class SalonService {
@@ -211,12 +221,22 @@ class SalonService {
   Map<String, dynamic> toJson() =>
       {'id': id, 'name': name, 'minutes': minutes, 'price': price};
 
-  factory SalonService.fromJson(Map<String, dynamic> json) => SalonService(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        minutes: (json['minutes'] ?? json['durationMinutes'] ?? 30) as int,
-        price: (json['price'] as num).toDouble(),
-      );
+  factory SalonService.fromJson(Map<String, dynamic> json) {
+    final rawMin = json['minutes'] ?? json['durationMinutes'] ?? 30;
+    final minutes = (rawMin is num)
+        ? rawMin.toInt()
+        : (int.tryParse(rawMin?.toString() ?? '') ?? 30);
+    final rawPrice = json['price'] ?? json['pricePerHour'] ?? 0;
+    final price = (rawPrice is num)
+        ? rawPrice.toDouble()
+        : (double.tryParse(rawPrice?.toString() ?? '') ?? 0.0);
+    return SalonService(
+      id: (json['id'] ?? generateId()).toString(),
+      name: (json['name'] ?? 'Service').toString(),
+      minutes: minutes,
+      price: price,
+    );
+  }
 }
 
 class VenueReview {
@@ -243,12 +263,12 @@ class VenueReview {
       };
 
   factory VenueReview.fromJson(Map<String, dynamic> json) => VenueReview(
-        id: json['id'] as String? ?? generateId(),
-        author: json['author'] as String? ?? 'Guest',
+        id: (json['id'] ?? generateId()).toString(),
+        author: (json['author'] ?? json['authorName'] ?? 'Guest').toString(),
         rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
-        comment: json['comment'] as String? ?? '',
+        comment: (json['comment'] ?? '').toString(),
         createdAt:
-            DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+            DateTime.tryParse(json['createdAt']?.toString() ?? json['date']?.toString() ?? '') ?? DateTime.now(),
       );
 }
 
@@ -704,64 +724,78 @@ class Venue {
         'services': services.map((service) => service.toJson()).toList(),
       };
 
-  factory Venue.fromJson(Map<String, dynamic> json) => Venue(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        location: json['location'] as String? ?? '',
-        type: VenueType.values.byName(json['type'] as String),
-        ownerId: json['ownerId'] as String? ?? '',
-        ownerEmail: json['ownerEmail'] as String? ?? '',
-        ownerPhone: json['ownerPhone'] as String? ?? '',
-        depositPercent: (json['depositPercent'] as num?)?.toDouble() ?? 25,
-        imageUrl: json['imageUrl'] as String?,
-        description: json['description'] as String? ?? '',
-        googleMapsUrl: json['googleMapsUrl'] as String? ?? '',
-        instaPayAddress: json['instaPayAddress'] as String? ?? '',
-        vodafoneCashNumber: json['vodafoneCashNumber'] as String? ?? '',
-        openHour: (json['openHour'] as num?)?.toInt() ?? 10,
-        closeHour: (json['closeHour'] as num?)?.toInt() ?? 22,
-        rating: (json['rating'] as num?)?.toDouble() ?? 4.9,
-        latitude: (json['latitude'] as num?)?.toDouble(),
-        longitude: (json['longitude'] as num?)?.toDouble(),
-        subCategories: (json['subCategories'] is List)
-            ? (json['subCategories'] as List)
-                .map((e) => e.toString())
-                .toList()
-            : const <String>[],
-        staffMembers: (json['staffMembers'] is List)
-            ? (json['staffMembers'] as List)
-                .map((e) => e.toString())
-                .toList()
-            : const <String>[],
-        galleryUrls: (json['galleryUrls'] is List)
-            ? (json['galleryUrls'] as List).map((e) => e.toString()).toList()
-            : const <String>[],
-        amenities: (json['amenities'] is List)
-            ? (json['amenities'] as List).map((e) => e.toString()).toList()
-            : const <String>[],
-        reviews: (json['reviews'] is List
-                ? (json['reviews'] as List)
-                : (json['reviewsList'] is List
-                    ? (json['reviewsList'] as List)
-                    : const []))
-            .whereType<Map<String, dynamic>>()
-            .map((r) => VenueReview.fromJson(r))
-            .toList(),
-        items: (json['items'] is List
-                ? (json['items'] as List)
-                : (json['units'] is List
-                    ? (json['units'] as List)
-                    : const []))
-            .whereType<Map<String, dynamic>>()
-            .map((item) => VenueItem.fromJson(item))
-            .toList(),
-        services: (json['services'] is List
-                ? (json['services'] as List)
-                : const [])
-            .whereType<Map<String, dynamic>>()
-            .map((item) => SalonService.fromJson(item))
-            .toList(),
-      );
+  factory Venue.fromJson(Map<String, dynamic> json) {
+    VenueType resolveType(dynamic raw) {
+      if (raw == null) return VenueType.sports;
+      final str = raw.toString().toLowerCase().trim();
+      if (str == 'salon' || str == 'barber' || str == 'grooming') return VenueType.salon;
+      if (str == 'lounge' || str == 'playstation' || str == 'entertainment' || str == 'gaming' || str == 'billiards') return VenueType.lounge;
+      for (final t in VenueType.values) {
+        if (t.name.toLowerCase() == str) return t;
+      }
+      return VenueType.sports;
+    }
+
+    return Venue(
+      id: (json['id'] ?? generateId()).toString(),
+      name: (json['name'] ?? 'Venue').toString(),
+      location: (json['location'] ?? json['address'] ?? json['city'] ?? '').toString(),
+      type: resolveType(json['type'] ?? json['category']),
+      ownerId: (json['ownerId'] ?? json['owner_id'] ?? '').toString(),
+      ownerEmail: (json['ownerEmail'] ?? json['owner_email'] ?? '').toString(),
+      ownerPhone: (json['ownerPhone'] ?? json['owner_phone'] ?? '').toString(),
+      depositPercent: (json['depositPercent'] as num?)?.toDouble() ??
+          (json['deposit_percent'] as num?)?.toDouble() ?? 25.0,
+      imageUrl: json['imageUrl']?.toString(),
+      description: (json['description'] ?? '').toString(),
+      googleMapsUrl: (json['googleMapsUrl'] ?? '').toString(),
+      instaPayAddress: (json['instaPayAddress'] ?? json['instapayAddress'] ?? '').toString(),
+      vodafoneCashNumber: (json['vodafoneCashNumber'] ?? json['walletNumber'] ?? '').toString(),
+      openHour: (json['openHour'] as num?)?.toInt() ?? 10,
+      closeHour: (json['closeHour'] as num?)?.toInt() ?? 22,
+      rating: (json['rating'] as num?)?.toDouble() ?? 4.9,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      subCategories: (json['subCategories'] is List)
+          ? (json['subCategories'] as List)
+              .map((e) => e.toString())
+              .toList()
+          : const <String>[],
+      staffMembers: (json['staffMembers'] is List)
+          ? (json['staffMembers'] as List)
+              .map((e) => e.toString())
+              .toList()
+          : const <String>[],
+      galleryUrls: (json['galleryUrls'] is List)
+          ? (json['galleryUrls'] as List).map((e) => e.toString()).toList()
+          : const <String>[],
+      amenities: (json['amenities'] is List)
+          ? (json['amenities'] as List).map((e) => e.toString()).toList()
+          : const <String>[],
+      reviews: (json['reviews'] is List
+              ? (json['reviews'] as List)
+              : (json['reviewsList'] is List
+                  ? (json['reviewsList'] as List)
+                  : const []))
+          .whereType<Map>()
+          .map((r) => VenueReview.fromJson(Map<String, dynamic>.from(r)))
+          .toList(),
+      items: (json['items'] is List
+              ? (json['items'] as List)
+              : (json['units'] is List
+                  ? (json['units'] as List)
+                  : const []))
+          .whereType<Map>()
+          .map((item) => VenueItem.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
+      services: (json['services'] is List
+              ? (json['services'] as List)
+              : const [])
+          .whereType<Map>()
+          .map((item) => SalonService.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
+    );
+  }
 }
 
 class Booking {
@@ -973,68 +1007,85 @@ class Booking {
       };
 
   factory Booking.fromJson(Map<String, dynamic> json) {
-    final rawStatus = (json['status'] as String? ?? '').toLowerCase();
+    final rawStatus = (json['status']?.toString() ?? '').toLowerCase();
     final isCheckedIn =
         (json['checkedIn'] as bool? ?? false) || rawStatus == 'checked_in';
     final isExplicitlyConfirmed = isCheckedIn ||
         (json['confirmed'] as bool? ?? false) ||
         rawStatus == 'confirmed' ||
-        (json['paymentStatus'] as String? ?? '').toLowerCase() == 'paid';
+        (json['paymentStatus']?.toString() ?? '').toLowerCase() == 'paid';
+
+    DateTime parseDate(dynamic raw) {
+      if (raw == null) return DateTime.now();
+      if (raw is DateTime) return raw;
+      return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+    }
+
+    final rawDur = json['durationMinutes'] ?? json['duration_minutes'] ?? 60;
+    final dur = (rawDur is num)
+        ? rawDur.toInt()
+        : (int.tryParse(rawDur.toString()) ?? 60);
+
+    final rawPrice = json['price'] ?? json['totalPrice'] ?? json['total_price'] ?? 0;
+    final price = (rawPrice is num)
+        ? rawPrice.toDouble()
+        : (double.tryParse(rawPrice.toString()) ?? 0.0);
 
     return Booking(
-      id: json['id'] as String,
-      venueId: json['venueId'] as String,
-      itemId: (json['itemId'] ?? json['unitId'] ?? '') as String,
-      customer: (json['customer'] ?? json['customerName'] ?? '') as String,
-      startsAt: DateTime.parse(json['startsAt'] as String),
-      durationMinutes: json['durationMinutes'] as int,
-      price: (json['price'] as num).toDouble(),
+      id: (json['id'] ?? generateId()).toString(),
+      venueId: (json['venueId'] ?? json['venue_id'] ?? '').toString(),
+      itemId: (json['itemId'] ?? json['unitId'] ?? json['unit_id'] ?? '').toString(),
+      customer: (json['customer'] ?? json['customerName'] ?? json['customer_name'] ?? 'Customer').toString(),
+      startsAt: parseDate(json['startsAt'] ?? json['booking_date']),
+      durationMinutes: dur,
+      price: price,
       serviceNames: (json['serviceNames'] is List)
           ? (json['serviceNames'] as List)
               .map((e) => e.toString())
               .toList()
           : const <String>[],
-      splitCount: json['splitCount'] as int? ?? 1,
-      multiController: json['multiController'] as bool? ?? false,
-      cancelled: json['cancelled'] as bool? ?? false,
-      phone: json['phone'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      dueNow: isExplicitlyConfirmed ? 0.0 : (json['dueNow'] as num?)?.toDouble(),
+      splitCount: (json['splitCount'] as num?)?.toInt() ?? 1,
+      multiController: json['multiController'] == true ||
+          json['multiController'] == 1 ||
+          json['multiController']?.toString() == 'true',
+      cancelled: json['cancelled'] == true ||
+          json['cancelled'] == 1 ||
+          json['cancelled']?.toString() == 'true' ||
+          rawStatus == 'cancelled',
+      phone: (json['phone'] ?? json['customerPhone'] ?? json['customer_phone'] ?? '').toString(),
+      email: (json['email'] ?? json['customerEmail'] ?? json['customer_email'] ?? '').toString(),
+      dueNow: isExplicitlyConfirmed ? 0.0 : ((json['dueNow'] ?? json['due_now']) as num?)?.toDouble(),
       status: isCheckedIn
           ? 'checked_in'
           : (isExplicitlyConfirmed
               ? 'confirmed'
-              : (json['status'] as String? ??
-                  ((json['cancelled'] as bool? ?? false)
-                      ? 'cancelled'
-                      : 'pending_payment'))),
+              : (rawStatus.isNotEmpty ? rawStatus : 'pending_payment')),
       paymentStatus: isExplicitlyConfirmed
           ? 'paid'
-          : (json['paymentStatus'] as String? ?? 'unpaid'),
+          : (json['paymentStatus']?.toString() ?? (isExplicitlyConfirmed ? 'paid' : 'unpaid')),
       holdExpiresAt: isExplicitlyConfirmed
           ? null
-          : (DateTime.tryParse(
-                json['holdExpiresAt'] as String? ?? '',
-              ) ??
-              ((json['status'] as String? ?? 'pending_payment') ==
-                      'pending_payment'
-                  ? DateTime.now()
-                  : null)),
-      paymentMethod: json['paymentMethod'] as String? ?? '',
-      paymentReference: json['paymentReference'] as String? ?? '',
-      promoCode: json['promoCode'] as String? ?? '',
-      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
-      staffMember: json['staffMember'] as String? ?? '',
-      blockReason: json['blockReason'] as String? ?? '',
+          : (json['holdExpiresAt'] != null || json['expires_at'] != null
+              ? parseDate(json['holdExpiresAt'] ?? json['expires_at'])
+              : (rawStatus == 'pending_payment' ? DateTime.now() : null)),
+      paymentMethod: (json['paymentMethod'] ?? json['payment_method'] ?? '').toString(),
+      paymentReference: (json['paymentReference'] ?? json['payment_reference'] ?? '').toString(),
+      promoCode: (json['promoCode'] ?? json['promo_code'] ?? '').toString(),
+      discountAmount: ((json['discountAmount'] ?? json['discount_amount']) as num?)?.toDouble() ?? 0.0,
+      staffMember: (json['staffMember'] ?? json['staff_member'] ?? '').toString(),
+      blockReason: (json['blockReason'] ?? json['block_reason'] ?? '').toString(),
       checkedIn: isCheckedIn,
-      checkedInAt: DateTime.tryParse(json['checkedInAt'] as String? ?? ''),
-      qrSignature: json['qrSignature'] as String? ?? '',
-      qrCheckInUrl: json['qrCheckInUrl'] as String? ?? '',
-      actualPaidAmount: (json['actualPaidAmount'] as num?)?.toDouble(),
+      checkedInAt: json['checkedInAt'] != null || json['checked_in_at'] != null
+          ? parseDate(json['checkedInAt'] ?? json['checked_in_at'])
+          : null,
+      qrSignature: (json['qrSignature'] ?? json['qr_signature'] ?? '').toString(),
+      qrCheckInUrl: (json['qrCheckInUrl'] ?? json['qr_check_in_url'] ?? '').toString(),
+      actualPaidAmount: ((json['actualPaidAmount'] ?? json['actual_paid_amount']) as num?)?.toDouble(),
       reminderOffsetMinutes:
-          (json['reminderOffsetMinutes'] as num?)?.toInt() ?? 120,
-      reminderSentAt:
-          DateTime.tryParse(json['reminderSentAt'] as String? ?? ''),
+          ((json['reminderOffsetMinutes'] ?? json['reminder_offset_minutes']) as num?)?.toInt() ?? 120,
+      reminderSentAt: json['reminderSentAt'] != null || json['reminder_sent_at'] != null
+          ? parseDate(json['reminderSentAt'] ?? json['reminder_sent_at'])
+          : null,
     );
   }
 }

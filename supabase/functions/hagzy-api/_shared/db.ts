@@ -121,8 +121,11 @@ export function mapVenueRowToJson(
       name: u.name,
       ...(u.name_en ? { nameEn: u.name_en } : {}),
       type: u.unit_type || 'unit',
+      kind: u.unit_type || 'unit',
       ...(u.capacity != null ? { capacity: Number(u.capacity) } : {}),
-      ...(u.price_per_hour != null ? { pricePerHour: Number(u.price_per_hour), hourlyRate: Number(u.price_per_hour), price: Number(u.price_per_hour) } : {}),
+      pricePerHour: Number(u.price_per_hour || 0),
+      hourlyRate: Number(u.price_per_hour || 0),
+      price: Number(u.price_per_hour || 0),
       isActive: u.is_active !== false,
     });
   }

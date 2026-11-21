@@ -234,7 +234,7 @@ ${code}
 إذا لم تكن قد طلبت هذا الرمز، يمكنك تجاهل هذه الرسالة بأمان.
 
 Hagzy · حجزي
-https://hagzy-booking.web.app`;
+https://hagzy.shop`;
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -256,7 +256,7 @@ https://hagzy-booking.web.app`;
                     <table role="presentation" border="0" cellspacing="0" cellpadding="0">
                       <tr>
                         <td style="vertical-align: middle; padding-left: 10px;">
-                          <img src="https://hagzy-booking.web.app/favicon.png" width="30" height="30" alt="Hagzy" style="border-radius: 7px; display: block; border: 0;" />
+                          <img src="https://hagzy.shop/favicon.png" width="30" height="30" alt="Hagzy" style="border-radius: 7px; display: block; border: 0;" />
                         </td>
                         <td style="vertical-align: middle;">
                           <span style="font-size: 18px; font-weight: 700; color: #111827; letter-spacing: -0.2px;">Hagzy</span>

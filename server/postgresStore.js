@@ -260,9 +260,11 @@ function mapRowToUnit(row) {
   base.id = row.id;
   base.name = row.name;
   if (row.name_en) base.nameEn = row.name_en;
-  if (row.unit_type) base.type = row.unit_type;
+  base.type = row.unit_type || 'unit';
+  base.kind = row.unit_type || 'unit';
   if (row.capacity != null) base.capacity = Number(row.capacity);
-  if (row.price_per_hour != null) base.pricePerHour = Number(row.price_per_hour);
+  base.pricePerHour = Number(row.price_per_hour || 0);
+  base.hourlyRate = Number(row.price_per_hour || 0);
   base.isActive = row.is_active !== false;
   return base;
 }
@@ -274,6 +276,7 @@ const BOOKING_KNOWN_KEYS = new Set([
   'price', 'totalPrice', 'depositAmount', 'dueNow', 'actualPaidAmount', 'excessAmount',
   'paymentMethod', 'paymentReference', 'confirmed', 'cancelled', 'checkedIn',
   'checkedInAt', 'confirmedAt', 'cancelledAt', 'expiresAt', 'holdExpiresAt',
+  'reminderOffsetMinutes', 'reminderSentAt',
   'createdAt', 'updatedAt',
 ]);
 
@@ -329,6 +332,14 @@ function mapBookingToRow(b, { validUserIds, validVenueIds, validUnitPairs }) {
     confirmed_at: toIsoOrNull(b.confirmedAt),
     cancelled_at: toIsoOrNull(b.cancelledAt),
     expires_at: toIsoOrNull(b.holdExpiresAt || b.expiresAt),
+    reminder_offset_minutes:
+      b.reminderOffsetMinutes !== undefined &&
+      b.reminderOffsetMinutes !== null &&
+      b.reminderOffsetMinutes !== '' &&
+      Number.isFinite(Number(b.reminderOffsetMinutes))
+        ? Math.max(0, Math.min(10080, Math.round(Number(b.reminderOffsetMinutes))))
+        : 120,
+    reminder_sent_at: toIsoOrNull(b.reminderSentAt),
     extra,
     created_at: toIsoOrNow(b.createdAt),
     updated_at: toIsoOrNow(b.updatedAt || b.createdAt),
@@ -397,6 +408,13 @@ function mapRowToBooking(row) {
     base.expiresAt = expIso;
     if (hasHoldExpiresAt) base.holdExpiresAt = expIso;
   }
+  base.reminderOffsetMinutes =
+    row.reminder_offset_minutes !== undefined &&
+    row.reminder_offset_minutes !== null &&
+    Number.isFinite(Number(row.reminder_offset_minutes))
+      ? Math.max(0, Math.round(Number(row.reminder_offset_minutes)))
+      : 120;
+  if (row.reminder_sent_at) base.reminderSentAt = fromIsoOrUndefined(row.reminder_sent_at);
   base.createdAt = fromIsoOrUndefined(row.created_at);
   if (row.updated_at) base.updatedAt = fromIsoOrUndefined(row.updated_at);
   return base;
@@ -967,14 +985,16 @@ async function persistToPostgres(pool, db, { localPaymentIntents, localPaymentEv
            ends_at, duration_minutes, status, total_price, deposit_amount, due_now,
            actual_paid_amount, excess_amount, payment_method, payment_reference,
            confirmed, cancelled, checked_in, checked_in_at, confirmed_at,
-           cancelled_at, expires_at, extra, created_at, updated_at
+           cancelled_at, expires_at, reminder_offset_minutes, reminder_sent_at,
+           extra, created_at, updated_at
          )
          SELECT id, customer_id, venue_id, unit_id, unit_name, venue_name,
                 customer_name, customer_phone, customer_email, booking_date, starts_at,
                 ends_at, duration_minutes, status, total_price, deposit_amount, due_now,
                 actual_paid_amount, excess_amount, payment_method, payment_reference,
                 confirmed, cancelled, checked_in, checked_in_at, confirmed_at,
-                cancelled_at, expires_at, extra, created_at, updated_at
+                cancelled_at, expires_at, reminder_offset_minutes, reminder_sent_at,
+                extra, created_at, updated_at
          FROM jsonb_to_recordset($1::jsonb) AS t(
            id TEXT, customer_id TEXT, venue_id TEXT, unit_id TEXT, unit_name TEXT,
            venue_name TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT,
@@ -984,8 +1004,9 @@ async function persistToPostgres(pool, db, { localPaymentIntents, localPaymentEv
            excess_amount NUMERIC, payment_method TEXT, payment_reference TEXT,
            confirmed BOOLEAN, cancelled BOOLEAN, checked_in BOOLEAN,
            checked_in_at TIMESTAMPTZ, confirmed_at TIMESTAMPTZ,
-           cancelled_at TIMESTAMPTZ, expires_at TIMESTAMPTZ, extra JSONB,
-           created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ
+           cancelled_at TIMESTAMPTZ, expires_at TIMESTAMPTZ,
+           reminder_offset_minutes INTEGER, reminder_sent_at TIMESTAMPTZ,
+           extra JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ
          )
          ON CONFLICT (id) DO UPDATE SET
            customer_id = EXCLUDED.customer_id,
@@ -1015,6 +1036,8 @@ async function persistToPostgres(pool, db, { localPaymentIntents, localPaymentEv
            confirmed_at = EXCLUDED.confirmed_at,
            cancelled_at = EXCLUDED.cancelled_at,
            expires_at = EXCLUDED.expires_at,
+           reminder_offset_minutes = EXCLUDED.reminder_offset_minutes,
+           reminder_sent_at = EXCLUDED.reminder_sent_at,
            extra = EXCLUDED.extra`,
         [JSON.stringify(snap.bookings)],
       );

@@ -1,5 +1,6 @@
 import { Hono } from '@hono/hono';
 import {
+  attachBookingQrMeta,
   claimCustomerBookings,
   doesPartnerOwnVenue,
   isUserAdmin,
@@ -14,6 +15,7 @@ import {
   mapBookingRowToJson,
   normalizeLocalPhone,
 } from './_shared/db.ts';
+import { notifyVenueOwner } from './_shared/notifications.ts';
 import { normalizeSenderId } from './_shared/payments.ts';
 import { calculateServerPricing, PricingError } from './_shared/pricing.ts';
 import { BOOKING_STATUS, canTransition } from './_shared/state_machine.ts';
@@ -408,6 +410,14 @@ export function registerCustomerAndBookingRoutes(app: Hono) {
     const unitMatches = (venue.units || venue.items || venue.spaces || []).some(
       (u: any) => String(u.id) === String(body.itemId),
     );
+    const rawReminderOffset = Number(body.reminderOffsetMinutes);
+    const reminderOffsetMinutes =
+      body.reminderOffsetMinutes !== undefined &&
+      body.reminderOffsetMinutes !== null &&
+      body.reminderOffsetMinutes !== '' &&
+      Number.isFinite(rawReminderOffset)
+        ? Math.max(0, Math.min(10080, Math.round(rawReminderOffset)))
+        : 120;
 
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_book_slot_atomic', {
       p_payload: {
@@ -430,6 +440,7 @@ export function registerCustomerAndBookingRoutes(app: Hono) {
         paymentMethod: String(body.paymentMethod || ''),
         confirmed,
         expiresAt: holdExpiresAt || '',
+        reminderOffsetMinutes,
         chargeWallet,
         actor: claims?.email || ownerRow?.email || 'customer',
         extra: {
@@ -459,9 +470,17 @@ export function registerCustomerAndBookingRoutes(app: Hono) {
     }
 
     const { data: bRow } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+    if (bRow && !body.blockReason) {
+      await notifyVenueOwner(supabase, {
+        venue,
+        booking: bRow,
+        eventType: bRow.confirmed ? 'booking_confirmed' : 'booking_created',
+      });
+    }
+
     return c.json({
       success: true,
-      booking: mapBookingRowToJson(bRow!),
+      booking: await attachBookingQrMeta(mapBookingRowToJson(bRow!)),
       ...(rpcRes.walletBalance != null ? { walletBalance: Number(rpcRes.walletBalance) } : {}),
     });
   });
@@ -476,14 +495,48 @@ export function registerCustomerAndBookingRoutes(app: Hono) {
     const userEmail = auth.userRow.email_verified ? String(auth.userRow.email || '').trim().toLowerCase() : '';
     const { data: rows } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
 
-    const mine = (rows || []).filter(b => {
+    const matched = (rows || []).filter(b => {
       if (b.customer_id === auth.userRow.id) return true;
       if (userPhone && normalizeLocalPhone(b.customer_phone) === userPhone) return true;
       if (userEmail && String(b.customer_email || '').trim().toLowerCase() === userEmail) return true;
       return false;
-    }).map(mapBookingRowToJson);
+    });
+    const mine = await Promise.all(matched.map(b => attachBookingQrMeta(mapBookingRowToJson(b))));
 
     return c.json({ success: true, bookings: mine });
+  });
+
+  // Update per-booking WhatsApp reminder timing
+  app.put('/api/bookings/:id/reminder', async c => {
+    const auth = await requireCustomer(c);
+    if ('error' in auth) return auth.error;
+    const { data: bRow } = await supabase.from('bookings').select('*').eq('id', c.req.param('id')).maybeSingle();
+    if (!bRow) return c.json({ error: 'Booking not found' }, 404);
+
+    const isOwner =
+      bRow.customer_id === auth.userRow.id ||
+      (auth.userRow.phone_verified && normalizeLocalPhone(auth.userRow.phone) === normalizeLocalPhone(bRow.customer_phone)) ||
+      (auth.userRow.email_verified && String(auth.userRow.email || '').toLowerCase() === String(bRow.customer_email || '').toLowerCase());
+    if (!isOwner) return c.json({ error: 'Forbidden' }, 403);
+
+    const body = await c.req.json().catch(() => ({}));
+    const rawOffset = Number(body.reminderOffsetMinutes);
+    if (!Number.isFinite(rawOffset) || rawOffset < 0 || rawOffset > 10080) {
+      return c.json({ error: 'reminderOffsetMinutes must be between 0 and 10080' }, 400);
+    }
+    const clamped = Math.round(rawOffset);
+    const { data: updated } = await supabase
+      .from('bookings')
+      .update({ reminder_offset_minutes: clamped, reminder_sent_at: null })
+      .eq('id', bRow.id)
+      .select('*')
+      .single();
+
+    return c.json({
+      success: true,
+      reminderOffsetMinutes: clamped,
+      booking: await attachBookingQrMeta(mapBookingRowToJson(updated!)),
+    });
   });
 
   // Customer booking cancel + >= 6h wallet refund
@@ -548,7 +601,15 @@ export function registerCustomerAndBookingRoutes(app: Hono) {
     }
 
     const { data: updated } = await supabase.from('bookings').select('*').eq('id', bRow.id).single();
-    return c.json({ success: true, message: 'Booking cancelled successfully.', booking: mapBookingRowToJson(updated!) });
+    if (updated) {
+      const venueObj = await loadFullVenueWithUnits(supabase, updated.venue_id);
+      await notifyVenueOwner(supabase, { venue: venueObj, booking: updated, eventType: 'booking_cancelled' });
+    }
+    return c.json({
+      success: true,
+      message: 'Booking cancelled successfully.',
+      booking: await attachBookingQrMeta(mapBookingRowToJson(updated!)),
+    });
   });
 
   // Public booking status poll

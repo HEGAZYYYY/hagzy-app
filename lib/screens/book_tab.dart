@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../theme/hagzy_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/map_explorer.dart';
+import '../widgets/smart_image.dart';
 
 class BookTab extends StatefulWidget {
   const BookTab({
@@ -3473,12 +3474,11 @@ class CustomerHero extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.network(
-                _image,
+              child: HagzySmartImage(
+                imageUrl: _image,
                 fit: BoxFit.cover,
                 cacheWidth: 640,
-                alignment: Alignment.center,
-                errorBuilder: (context, error, stackTrace) => Align(
+                errorWidget: Align(
                   alignment:
                       arabic ? Alignment.centerLeft : Alignment.centerRight,
                   child: Icon(content.$2,
@@ -3801,8 +3801,8 @@ class VenueBrowseCard extends StatelessWidget {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: Image.network(
-                          _image,
+                        child: HagzySmartImage(
+                          imageUrl: _image,
                           fit: BoxFit.cover,
                           cacheWidth: 640,
                           loadingBuilder: (context, child, loadingProgress) {
@@ -3813,8 +3813,7 @@ class VenueBrowseCard extends StatelessWidget {
                               borderRadius: 0,
                             );
                           },
-                          errorBuilder: (context, error, stackTrace) =>
-                              const SizedBox.shrink(),
+                          errorWidget: const SizedBox.shrink(),
                         ),
                       ),
                       Positioned.fill(
@@ -4503,12 +4502,12 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                               const SizedBox(width: 10),
                           itemBuilder: (context, idx) => ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Image.network(
-                              venue.galleryUrls[idx],
+                            child: HagzySmartImage(
+                              imageUrl: venue.galleryUrls[idx],
                               width: 210,
                               height: 128,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorWidget: Container(
                                 width: 210,
                                 height: 128,
                                 color: kPage,

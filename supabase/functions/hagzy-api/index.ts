@@ -5,6 +5,7 @@ import { registerAdminAndPartnerRoutes } from './routes_admin_partner.ts';
 import { registerAuthRoutes } from './routes_auth.ts';
 import { registerCustomerAndBookingRoutes } from './routes_customer_bookings.ts';
 import { registerPaymentAndWebhookRoutes } from './routes_payments_webhooks.ts';
+import { registerAiRoutes } from './routes_ai.ts';
 
 function buildAllowedOrigins(): string[] {
   const configured = getEnv('CORS_ORIGINS')
@@ -29,6 +30,7 @@ function createRoutes(): Hono {
   registerCustomerAndBookingRoutes(router);
   registerAdminAndPartnerRoutes(router);
   registerPaymentAndWebhookRoutes(router);
+  registerAiRoutes(router);
 
   const handleHealth = async (c: any) => {
     const supabase = getSupabaseAdmin();

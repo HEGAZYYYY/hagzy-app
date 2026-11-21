@@ -74,7 +74,7 @@ class PaymentIntentData {
       intentId: json['intentId'] ?? json['intent_id'] ?? '',
       status: status,
       expectedAmount: ((json['expectedAmount'] ?? json['expected_amount'] ?? 0) as num).toDouble(),
-      expectedSenderIdentifier: (json['expectedSenderIdentifier'] ?? json['expected_sender_identifier'] ?? '') as String,
+      expectedSenderIdentifier: (json['expectedSenderIdentifier'] ?? json['expected_sender_identifier'] ?? '').toString(),
       expiresAt: expires,
       verifiedAt: verified,
       matchedEventId: json['matchedEventId'] ?? json['matched_event_id'],

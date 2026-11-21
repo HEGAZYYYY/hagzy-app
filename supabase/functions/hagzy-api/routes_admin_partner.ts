@@ -1,8 +1,10 @@
 import { Hono } from '@hono/hono';
 import {
+  attachBookingQrMeta,
   doesPartnerOwnVenue,
   isUserAdmin,
   resolveUserFromToken,
+  verifyBookingQrSig,
 } from './_shared/auth.ts';
 import {
   getSupabaseAdmin,
@@ -11,7 +13,7 @@ import {
   mapBookingRowToJson,
   normalizeLocalPhone,
 } from './_shared/db.ts';
-import { sendSmsOrWhatsApp } from './_shared/notifications.ts';
+import { notifyVenueOwner, sendSmsOrWhatsApp } from './_shared/notifications.ts';
 import { BOOKING_STATUS, canTransition } from './_shared/state_machine.ts';
 
 async function requireAdmin(c: any) {
@@ -444,11 +446,15 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
     const auth = await requireAdmin(c);
     if ('error' in auth) return auth.error;
     const { data: rows } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
-    if (auth.isOwner) return c.json({ success: true, bookings: (rows || []).map(mapBookingRowToJson) });
+    if (auth.isOwner) {
+      const bookings = await Promise.all((rows || []).map(r => attachBookingQrMeta(mapBookingRowToJson(r))));
+      return c.json({ success: true, bookings });
+    }
 
     const venues = await loadAllVenuesWithUnits(supabase);
     const ownedIds = new Set(venues.filter(v => doesPartnerOwnVenue(auth.claims, v)).map(v => v.id));
-    const scoped = (rows || []).filter(b => ownedIds.has(b.venue_id)).map(mapBookingRowToJson);
+    const scopedRows = (rows || []).filter(b => ownedIds.has(b.venue_id));
+    const scoped = await Promise.all(scopedRows.map(r => attachBookingQrMeta(mapBookingRowToJson(r))));
     return c.json({ success: true, bookings: scoped });
   });
 
@@ -477,11 +483,11 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
     for (const b of bookings) {
       const p = Number(b.total_price || 0);
       const dep = Number(b.deposit_amount || b.due_now || 0);
-      if (b.status === 'confirmed' || b.status === 'completed') {
+      if (b.status === 'confirmed' || b.status === 'checked_in' || b.status === 'completed') {
         totalRevenueEgp += p;
         totalDepositsEgp += dep;
         totalBalanceDueEgp += Math.max(0, p - dep);
-        if (b.status === 'confirmed') confirmedCount++;
+        if (b.status === 'confirmed' || b.status === 'checked_in') confirmedCount++;
         if (b.status === 'completed') completedCount++;
       } else if (b.status === 'cancelled') {
         cancelledCount++; lostRevenueEgp += p;
@@ -564,7 +570,178 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
     }
 
     const { data: updated } = await supabase.from('bookings').select('*').eq('id', bRow.id).single();
-    return c.json({ success: true, booking: mapBookingRowToJson(updated!) });
+    if (updated) {
+      const venueObj = await loadFullVenueWithUnits(supabase, updated.venue_id);
+      await notifyVenueOwner(supabase, { venue: venueObj, booking: updated, eventType: 'booking_confirmed' });
+    }
+    return c.json({ success: true, booking: await attachBookingQrMeta(mapBookingRowToJson(updated!)) });
+  });
+
+  // Partner / Admin Notifications & QR Check-In
+  app.get('/api/admin/notifications', async c => {
+    const auth = await requireAdmin(c);
+    if ('error' in auth) return auth.error;
+    const unreadOnly = c.req.query('unreadOnly') === 'true';
+    const { data: rows } = await supabase
+      .from('partner_notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    let list = rows || [];
+    if (!auth.isOwner) {
+      const venues = await loadAllVenuesWithUnits(supabase);
+      const ownedIds = new Set(venues.filter(v => doesPartnerOwnVenue(auth.claims, v)).map(v => v.id));
+      list = list.filter(n => n.venue_id && ownedIds.has(n.venue_id));
+    }
+    const unreadCount = list.filter(n => !n.read).length;
+    if (unreadOnly) list = list.filter(n => !n.read);
+
+    return c.json({
+      success: true,
+      unreadCount,
+      notifications: list.map(n => ({
+        id: n.id,
+        ownerId: n.owner_id,
+        venueId: n.venue_id,
+        bookingId: n.booking_id,
+        eventType: n.event_type,
+        title: n.title,
+        body: n.body,
+        whatsappSent: Boolean(n.whatsapp_sent),
+        read: Boolean(n.read),
+        createdAt: n.created_at,
+        ...(n.read_at ? { readAt: n.read_at } : {}),
+      })),
+    });
+  });
+
+  app.post('/api/admin/notifications/:id/read', async c => {
+    const auth = await requireAdmin(c);
+    if ('error' in auth) return auth.error;
+    const notifId = c.req.param('id');
+    const { data: n } = await supabase.from('partner_notifications').select('*').eq('id', notifId).maybeSingle();
+    if (!n) return c.json({ error: 'Notification not found' }, 404);
+    if (!auth.isOwner && n.venue_id) {
+      const venue = await loadFullVenueWithUnits(supabase, n.venue_id);
+      if (!venue || !doesPartnerOwnVenue(auth.claims, venue)) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
+    }
+    await supabase
+      .from('partner_notifications')
+      .update({ read: true, read_at: new Date().toISOString() })
+      .eq('id', notifId);
+    return c.json({ success: true });
+  });
+
+  app.get('/api/admin/bookings/:id/qr-details', async c => {
+    const auth = await requireAdmin(c);
+    if ('error' in auth) return auth.error;
+    const bookingId = c.req.param('id');
+    const { data: bRow } = await supabase.from('bookings').select('*').eq('id', bookingId).maybeSingle();
+    if (!bRow) return c.json({ error: 'Booking not found' }, 404);
+
+    const venue = await loadFullVenueWithUnits(supabase, bRow.venue_id);
+    if (!auth.isOwner && (!venue || !doesPartnerOwnVenue(auth.claims, venue))) {
+      return c.json({ error: 'Forbidden: You do not own this venue' }, 403);
+    }
+
+    const sig = c.req.query('sig') || '';
+    let signatureVerified = false;
+    if (sig) {
+      signatureVerified = await verifyBookingQrSig(bRow.id, bRow.venue_id, sig);
+      if (!signatureVerified) {
+        return c.json({ error: 'Invalid or tampered QR check-in signature' }, 403);
+      }
+    }
+
+    const totalPrice = Number(bRow.total_price || 0);
+    const depositAmount = Number(bRow.deposit_amount || 0);
+    const paidAmount = Number(
+      bRow.actual_paid_amount || (bRow.confirmed ? depositAmount : 0),
+    );
+    const remainingDue = Math.max(0, Number((totalPrice - paidAmount).toFixed(2)));
+    const enriched = await attachBookingQrMeta(mapBookingRowToJson(bRow));
+
+    return c.json({
+      success: true,
+      signatureVerified,
+      venue: venue ? { id: venue.id, name: venue.name, area: venue.area, city: venue.city } : null,
+      booking: enriched,
+      financialSummary: {
+        totalPrice,
+        depositAmount,
+        paidAmount,
+        remainingDue,
+      },
+    });
+  });
+
+  app.post('/api/admin/bookings/:id/check-in', async c => {
+    const auth = await requireAdmin(c);
+    if ('error' in auth) return auth.error;
+    const bookingId = c.req.param('id');
+    const { data: bRow } = await supabase.from('bookings').select('*').eq('id', bookingId).maybeSingle();
+    if (!bRow) return c.json({ error: 'Booking not found' }, 404);
+
+    const venue = await loadFullVenueWithUnits(supabase, bRow.venue_id);
+    if (!auth.isOwner && (!venue || !doesPartnerOwnVenue(auth.claims, venue))) {
+      return c.json({ error: 'Forbidden: You do not own this venue' }, 403);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const sig = String(body.sig || c.req.query('sig') || '').trim();
+    if (sig) {
+      const okSig = await verifyBookingQrSig(bRow.id, bRow.venue_id, sig);
+      if (!okSig) return c.json({ error: 'Invalid or tampered QR check-in signature' }, 403);
+    }
+
+    if (bRow.checked_in || bRow.status === BOOKING_STATUS.CHECKED_IN) {
+      return c.json({
+        success: true,
+        alreadyCheckedIn: true,
+        booking: await attachBookingQrMeta(mapBookingRowToJson(bRow)),
+      });
+    }
+    if (bRow.cancelled || bRow.status === BOOKING_STATUS.CANCELLED || bRow.status === BOOKING_STATUS.EXPIRED) {
+      return c.json({ error: `Cannot check in a ${bRow.status} booking.` }, 409);
+    }
+    if (!bRow.confirmed && bRow.status !== BOOKING_STATUS.CONFIRMED) {
+      return c.json({ error: 'Booking deposit has not been confirmed yet.' }, 409);
+    }
+    if (!canTransition(bRow.status, BOOKING_STATUS.CHECKED_IN)) {
+      return c.json({ error: `Cannot check in booking from status '${bRow.status}'` }, 409);
+    }
+
+    const nowIso = new Date().toISOString();
+    const { data: updated } = await supabase
+      .from('bookings')
+      .update({
+        status: BOOKING_STATUS.CHECKED_IN,
+        checked_in: true,
+        checked_in_at: nowIso,
+      })
+      .eq('id', bRow.id)
+      .select('*')
+      .single();
+
+    await supabase.from('audit_log').insert({
+      id: `aud_${Date.now()}_${crypto.randomUUID().slice(0, 5)}`,
+      booking_id: bRow.id,
+      venue_id: bRow.venue_id,
+      user_id: bRow.customer_id,
+      action: 'booking_checked_in',
+      from_status: bRow.status,
+      to_status: BOOKING_STATUS.CHECKED_IN,
+      actor: String(auth.claims.email || 'admin'),
+      reason: sig ? 'QR code scanned & verified at venue' : 'Manual partner check-in',
+    });
+
+    return c.json({
+      success: true,
+      booking: await attachBookingQrMeta(mapBookingRowToJson(updated!)),
+    });
   });
 
   app.delete('/api/admin/bookings/:id', async c => {
@@ -635,7 +812,30 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
       .from('payment_review_queue')
       .select('*')
       .order('received_at', { ascending: false });
-    return c.json({ success: true, count: (items || []).length, items: items || [] });
+
+    let filtered = items || [];
+    if (!auth.isOwner) {
+      const venues = await loadAllVenuesWithUnits(supabase);
+      const ownedIds = new Set(venues.filter(v => doesPartnerOwnVenue(auth.claims, v)).map(v => v.id));
+      const linkedIds = Array.from(
+        new Set(filtered.map(i => i.booking_id || i.attached_to?.bookingId).filter(Boolean)),
+      );
+      const venueByBooking = new Map<string, string>();
+      if (linkedIds.length > 0) {
+        const { data: linkedBookings } = await supabase
+          .from('bookings')
+          .select('id, venue_id')
+          .in('id', linkedIds);
+        for (const b of linkedBookings || []) venueByBooking.set(b.id, b.venue_id);
+      }
+      filtered = filtered.filter(item => {
+        const bId = item.booking_id || item.attached_to?.bookingId;
+        const vId = bId ? venueByBooking.get(bId) : null;
+        return Boolean(vId && ownedIds.has(vId));
+      });
+    }
+
+    return c.json({ success: true, count: filtered.length, items: filtered });
   });
 
   app.post('/api/admin/payments/review-queue/:id/attach', async c => {
@@ -651,7 +851,13 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
     if (bookingId) {
       const { data: bRow } = await supabase.from('bookings').select('*').eq('id', bookingId).maybeSingle();
       if (!bRow) return c.json({ error: 'Booking not found' }, 404);
-      await supabase.from('bookings').update({
+      if (!auth.isOwner) {
+        const venue = await loadFullVenueWithUnits(supabase, bRow.venue_id);
+        if (!venue || !doesPartnerOwnVenue(auth.claims, venue)) {
+          return c.json({ error: 'Forbidden: You do not own the venue for this booking' }, 403);
+        }
+      }
+      const { data: updatedBooking } = await supabase.from('bookings').update({
         status: 'confirmed',
         confirmed: true,
         due_now: 0,
@@ -659,7 +865,14 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
         payment_method: item.payment_method,
         payment_reference: item.provider_ref || '',
         confirmed_at: new Date().toISOString(),
-      }).eq('id', bRow.id);
+      }).eq('id', bRow.id).select('*').single();
+
+      if (updatedBooking) {
+        const venueObj = await loadFullVenueWithUnits(supabase, updatedBooking.venue_id);
+        await notifyVenueOwner(supabase, { venue: venueObj, booking: updatedBooking, eventType: 'booking_confirmed' });
+      }
+    } else if (!auth.isOwner) {
+      return c.json({ error: 'Forbidden: Only platform admins can credit customer wallets directly' }, 403);
     }
 
     if (userId) {

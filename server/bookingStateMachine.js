@@ -4,6 +4,7 @@
 const BOOKING_STATUS = {
   PENDING_PAYMENT: 'pending_payment',
   CONFIRMED: 'confirmed',
+  CHECKED_IN: 'checked_in',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
   EXPIRED: 'expired',
@@ -17,8 +18,13 @@ const ALLOWED_TRANSITIONS = {
     BOOKING_STATUS.CANCELLED,
   ],
   [BOOKING_STATUS.CONFIRMED]: [
+    BOOKING_STATUS.CHECKED_IN,
     BOOKING_STATUS.COMPLETED,
     BOOKING_STATUS.CANCELLED,
+    BOOKING_STATUS.NO_SHOW,
+  ],
+  [BOOKING_STATUS.CHECKED_IN]: [
+    BOOKING_STATUS.COMPLETED,
     BOOKING_STATUS.NO_SHOW,
   ],
   [BOOKING_STATUS.EXPIRED]: [],
@@ -81,6 +87,12 @@ function transitionBookingStatus(booking, nextStatus, { actor = 'system', reason
     booking.paymentStatus = 'paid';
     booking.holdExpiresAt = null;
     booking.dueNow = 0;
+  } else if (target === BOOKING_STATUS.CHECKED_IN) {
+    booking.confirmed = true;
+    booking.checkedIn = true;
+    booking.checkedInAt = new Date().toISOString();
+    booking.isPendingPayment = false;
+    booking.holdExpiresAt = null;
   } else if (target === BOOKING_STATUS.CANCELLED) {
     booking.cancelled = true;
     booking.isPendingPayment = false;

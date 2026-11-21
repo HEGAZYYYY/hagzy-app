@@ -140,7 +140,12 @@ function calculateServerPricing({
 
   // 4. Deposit & Due Now calculations
   const depositPercent = Math.max(0, Math.min(100, Number(venue.depositPercent !== undefined ? venue.depositPercent : 30)));
-  const requiredDeposit = Math.round((finalPrice * (depositPercent / 100)) * 100) / 100;
+  const calculatedDeposit = Math.round((finalPrice * (depositPercent / 100)) * 100) / 100;
+  // Egyptian telecom & mobile wallet networks reject transfers under 5 EGP.
+  // Clamp deposit to at least 5 EGP, or full price if finalPrice is under 5 EGP.
+  const requiredDeposit = depositPercent > 0
+    ? Math.min(finalPrice, Math.max(5, calculatedDeposit))
+    : 0;
 
   const validSplit = Math.max(1, Math.min(50, Math.floor(Number(splitCount) || 1)));
   let dueNow = requiredDeposit;

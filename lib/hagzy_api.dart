@@ -33,17 +33,17 @@ class HagzyApi {
   Future<List<dynamic>> venues({String? adminToken}) async {
     final path = adminToken == null ? '/api/venues' : '/api/admin/venues';
     final result = await _send('GET', path, token: adminToken);
-    return result['venues'] as List<dynamic>;
+    return (result['venues'] as List<dynamic>?) ?? const [];
   }
 
   Future<List<dynamic>> bookings(String token) async {
     final result = await _send('GET', '/api/admin/bookings', token: token);
-    return result['bookings'] as List<dynamic>;
+    return (result['bookings'] as List<dynamic>?) ?? const [];
   }
 
   Future<void> saveVenue(String token, Map<String, dynamic> venue) async {
     await _send('PUT',
-        '/api/admin/venues/${Uri.encodeComponent(venue['id'] as String)}',
+        '/api/admin/venues/${Uri.encodeComponent((venue['id'] ?? '').toString())}',
         token: token, body: venue);
   }
 
@@ -59,7 +59,9 @@ class HagzyApi {
     final result =
         await _send('POST', '/api/bookings', token: adminToken, body: booking);
     return {
-      ...(result['booking'] as Map<String, dynamic>),
+      ...(result['booking'] is Map
+          ? Map<String, dynamic>.from(result['booking'] as Map)
+          : const <String, dynamic>{}),
       // Present only for wallet payments: the server-side balance after payment.
       if (result['walletBalance'] != null)
         'walletBalance': result['walletBalance'],
@@ -81,7 +83,9 @@ class HagzyApi {
       '/api/admin/bookings/${Uri.encodeComponent(bookingId)}/confirm',
       token: token,
     );
-    return result['booking'] as Map<String, dynamic>;
+    return result['booking'] is Map
+        ? Map<String, dynamic>.from(result['booking'] as Map)
+        : const <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> submitPaymentProof(
@@ -124,7 +128,9 @@ class HagzyApi {
       final latest = await bookingStatus(bookingId);
       return latest;
     } catch (_) {
-      return result['booking'] as Map<String, dynamic>;
+      return result['booking'] is Map
+          ? Map<String, dynamic>.from(result['booking'] as Map)
+          : const <String, dynamic>{};
     }
   }
 
@@ -181,7 +187,7 @@ class HagzyApi {
         },
       },
     );
-    return result['checkoutUrl'] as String;
+    return (result['checkoutUrl'] ?? '').toString();
   }
 
   /// Requests a 6-digit OTP code for customer phone or email verification.
@@ -530,7 +536,9 @@ class HagzyApi {
   Future<Map<String, dynamic>> bookingStatus(String bookingId) async {
     final result =
         await _send('GET', '/api/bookings/${Uri.encodeComponent(bookingId)}');
-    return result['booking'] as Map<String, dynamic>;
+    return result['booking'] is Map
+        ? Map<String, dynamic>.from(result['booking'] as Map)
+        : const <String, dynamic>{};
   }
 
   /// Looks up active bookings by customer phone number (requires verified customer OTP token).
@@ -544,8 +552,128 @@ class HagzyApi {
       '/api/bookings?phone=$encodedPhone',
       token: customerToken,
     );
-    return result['bookings'] as List<dynamic>;
+    return (result['bookings'] as List<dynamic>?) ?? const [];
   }
+
+  /// Fetches the live Android gateway listener heartbeat status and recent transfer feed.
+  Future<Map<String, dynamic>> getGatewayStatus() async =>
+      _send('GET', '/api/payments/listener/status');
+
+  /// Lists unmatched or flagged payment events in the review queue (admin/partner).
+  Future<List<Map<String, dynamic>>> getPaymentReviewQueue(
+    String adminToken,
+  ) async {
+    final res = await _send(
+      'GET',
+      '/api/admin/payments/review-queue',
+      token: adminToken,
+    );
+    final raw = (res['items'] as List<dynamic>?) ?? const [];
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Attaches a review-queue payment event to a booking or customer wallet.
+  Future<Map<String, dynamic>> attachReviewQueueItem(
+    String adminToken,
+    String itemId, {
+    String? bookingId,
+    String? userId,
+  }) async =>
+      _send(
+        'POST',
+        '/api/admin/payments/review-queue/${Uri.encodeComponent(itemId)}/attach',
+        token: adminToken,
+        body: {
+          if (bookingId != null && bookingId.isNotEmpty) 'bookingId': bookingId,
+          if (userId != null && userId.isNotEmpty) 'userId': userId,
+        },
+      );
+
+  /// Fetches persistent in-app notifications for the partner/admin dashboard.
+  Future<Map<String, dynamic>> getAdminNotifications(
+    String adminToken, {
+    bool unreadOnly = false,
+  }) async {
+    final query = unreadOnly ? '?unreadOnly=true' : '';
+    return _send('GET', '/api/admin/notifications$query', token: adminToken);
+  }
+
+  /// Marks a partner/admin notification as read.
+  Future<Map<String, dynamic>> markAdminNotificationRead(
+    String adminToken,
+    String notificationId,
+  ) async =>
+      _send(
+        'POST',
+        '/api/admin/notifications/${Uri.encodeComponent(notificationId)}/read',
+        token: adminToken,
+      );
+
+  /// Verifies a scanned booking QR pass and returns guest + financial details.
+  Future<Map<String, dynamic>> getBookingQrDetails(
+    String adminToken,
+    String bookingId, {
+    String? sig,
+  }) async {
+    final query = (sig != null && sig.trim().isNotEmpty)
+        ? '?sig=${Uri.encodeQueryComponent(sig.trim())}'
+        : '';
+    return _send(
+      'GET',
+      '/api/admin/bookings/${Uri.encodeComponent(bookingId)}/qr-details$query',
+      token: adminToken,
+    );
+  }
+
+  /// Marks a confirmed booking as checked in at the venue.
+  Future<Map<String, dynamic>> checkInBooking(
+    String adminToken,
+    String bookingId, {
+    String? sig,
+  }) async =>
+      _send(
+        'POST',
+        '/api/admin/bookings/${Uri.encodeComponent(bookingId)}/check-in',
+        token: adminToken,
+        body: {
+          if (sig != null && sig.trim().isNotEmpty) 'sig': sig.trim(),
+        },
+      );
+
+  /// Updates the customer's chosen WhatsApp reminder timing for a booking.
+  Future<Map<String, dynamic>> updateBookingReminder({
+    required String bookingId,
+    required int reminderOffsetMinutes,
+    required String customerToken,
+  }) async =>
+      _send(
+        'PUT',
+        '/api/bookings/${Uri.encodeComponent(bookingId)}/reminder',
+        token: customerToken,
+        body: {'reminderOffsetMinutes': reminderOffsetMinutes},
+      );
+
+  /// Generates a full venue configuration using Gemini 1.5 Flash (or heuristic fallback)
+  Future<Map<String, dynamic>> generateVenueWithAi({
+    String? prompt,
+    String? imageBase64,
+    String? mimeType,
+    String? categoryHint,
+    bool? isArabic,
+    String? token,
+  }) async =>
+      _send(
+        'POST',
+        '/api/ai/venue-generator',
+        token: token,
+        body: {
+          if (prompt != null) 'prompt': prompt,
+          if (imageBase64 != null) 'imageBase64': imageBase64,
+          if (mimeType != null) 'mimeType': mimeType,
+          if (categoryHint != null) 'categoryHint': categoryHint,
+          if (isArabic != null) 'isArabic': isArabic,
+        },
+      );
 
   Future<Map<String, dynamic>> _send(
     String method,
@@ -573,11 +701,14 @@ class HagzyApi {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       var message = 'Hagzy API returned HTTP ${response.statusCode}.';
       try {
-        final error = jsonDecode(response.body) as Map<String, dynamic>;
-        if (error['error'] is String) message = error['error'] as String;
-      } on FormatException {
-        if (response.body.isNotEmpty) message = '$message ${response.body}';
-      } on TypeError {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) {
+          final errVal = decoded['error'] ?? decoded['message'] ?? decoded['msg'];
+          if (errVal != null && errVal.toString().isNotEmpty) {
+            message = errVal.toString();
+          }
+        }
+      } catch (_) {
         if (response.body.isNotEmpty) message = '$message ${response.body}';
       }
       if (response.statusCode == 429) {
@@ -591,10 +722,10 @@ class HagzyApi {
       return <String, dynamic>{};
     }
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) {
+    if (decoded is! Map) {
       throw const FormatException(
           'The Hagzy API returned an unexpected response.');
     }
-    return decoded;
+    return Map<String, dynamic>.from(decoded);
   }
 }

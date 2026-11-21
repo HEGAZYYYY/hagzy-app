@@ -1,14 +1,26 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { hmacSha256Hex, safeEqual, sha256Hex } from './auth.ts';
-import { getEnv, normalizeLocalPhone } from './db.ts';
-import { sendSmsOrWhatsApp } from './notifications.ts';
+import { getEnv, loadFullVenueWithUnits, normalizeLocalPhone } from './db.ts';
+import { notifyVenueOwner, sendSmsOrWhatsApp } from './notifications.ts';
 
 const EVENT_EXPIRY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function convertEasternArabicNumerals(str: unknown): string {
   if (!str || typeof str !== 'string') return '';
   const eastern = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return str.replace(/[٠-٩]/g, d => String(eastern.indexOf(d))).replace(/٫/g, '.');
+  const extended = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  let out = str
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(/[٠-٩]/g, d => String(eastern.indexOf(d)))
+    .replace(/[۰-۹]/g, d => String(extended.indexOf(d)))
+    .replace(/٫/g, '.')
+    .replace(/٬/g, '');
+  let prev = '';
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(/(\d),(\d{3})(?!\d)/g, '$1$2');
+  }
+  return out;
 }
 
 export function normalizeSenderId(method: string, raw: unknown): string {
@@ -40,17 +52,25 @@ export function generateUniquePayableAmount(
   baseAmount: number,
   receiverWallet: string,
   activeIntents: Record<string, any>[],
+  senderIdentifier = '',
 ): number {
   const numBase = Number(Number(baseAmount).toFixed(2));
-  const activeForWallet = activeIntents.filter(
-    i => i.status === 'AWAITING_TRANSFER' && (!receiverWallet || i.receiver_wallet === receiverWallet),
-  );
-  const collision = activeForWallet.some(i => Math.abs(Number(i.expected_amount) - numBase) < 0.005);
+  const cleanSender = senderIdentifier ? String(senderIdentifier).trim().toLowerCase() : '';
+  const activeForScope = activeIntents.filter(i => {
+    if (i.status !== 'AWAITING_TRANSFER') return false;
+    if (receiverWallet && i.receiver_wallet && i.receiver_wallet !== receiverWallet) return false;
+    if (cleanSender) {
+      const intentSender = String(i.expected_sender_identifier || '').trim().toLowerCase();
+      if (intentSender && intentSender !== cleanSender) return false;
+    }
+    return true;
+  });
+  const collision = activeForScope.some(i => Math.abs(Number(i.expected_amount) - numBase) < 0.005);
   if (!collision) return numBase;
 
   const roundedBase = Math.floor(numBase);
   const taken = new Set(
-    activeForWallet
+    activeForScope
       .filter(i => Math.floor(Number(i.expected_amount)) === roundedBase)
       .map(i => Math.round((Number(i.expected_amount) - Math.floor(Number(i.expected_amount))) * 100)),
   );
@@ -92,6 +112,10 @@ export function parseIncomingTransferText(rawText: string, metadata: Record<stri
 
   if (amount === null) {
     const regexes = [
+      /(?:فودافون كاش|vf[\s-]*cash|أرسلت|ارسلت|وصلتك|حول لك|تم تحويل|تم إيداع|تم ايداع|مبلغ|بمبلغ|بقيمة|قيمة|استلام|استلمت|تحويل|إيداع|ايداع)[:\s-]+(?:مبلغ\s+)?([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|ج م|egp|le)/i,
+      /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)[:\s]+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
+      /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)[:\s]+([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le)?/i,
+      /([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le|جنيه|جنيها|ج\.م|جم)\s+(?:received|recieved|from|من|successfully)/i,
       /(?:مبلغ|بمبلغ|بقيمة|قيمة|استلام|استلمت|تحويل|إيداع|ايداع)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|ج م|egp|le)/i,
       /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)\s+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
       /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le)?/i,
@@ -139,7 +163,7 @@ export function parseIncomingTransferText(rawText: string, metadata: Record<stri
     }
   }
 
-  const refMatch = fullText.match(/(?:رقم العملية|مرجع|المرجع|ref(?:erence)?[:\s]+)([0-9a-zA-Z]+)/i);
+  const refMatch = fullText.match(/(?:رقم العملية|مرجع|المرجع|ref(?:erence)?[:\s_-]+)([0-9a-zA-Z_-]+)/i);
   if (refMatch?.[1]) providerRef = refMatch[1];
 
   return {
@@ -274,20 +298,35 @@ export async function finalizePaymentVerification(
   }
 
   // 4. Fetch open AWAITING_TRANSFER intents
-  const { data: openIntents } = await supabase
+  let { data: openIntents } = await supabase
     .from('payment_intents')
     .select('*')
     .eq('status', 'AWAITING_TRANSFER')
     .eq('payment_method', method)
     .eq('expected_sender_identifier', normalizedSender);
 
+  // Cross-method fallback: customer picked InstaPay on screen but transferred to Vodafone Cash wallet (or vice-versa)
+  if (!openIntents || openIntents.length === 0) {
+    const { data: crossIntents } = await supabase
+      .from('payment_intents')
+      .select('*')
+      .eq('status', 'AWAITING_TRANSFER')
+      .eq('expected_sender_identifier', normalizedSender);
+    openIntents = crossIntents;
+  }
+
   const candidates = (openIntents || []).filter(i =>
     !receiverWallet || !i.receiver_wallet || i.receiver_wallet === receiverWallet,
   );
-  const matching = candidates.filter(i => {
+  const exactMatches = candidates.filter(i => {
     const expected = Number(i.expected_amount || 0);
-    return Math.abs(numAmount - expected) < 0.005 || numAmount >= expected;
+    return Math.abs(numAmount - expected) <= 0.005;
   });
+  const overMatches = candidates.filter(i => {
+    const expected = Number(i.expected_amount || 0);
+    return numAmount > expected + 0.005;
+  });
+  const matching = exactMatches.length > 0 ? exactMatches : overMatches;
 
   if (matching.length > 1) {
     const revId = `rev_${Date.now()}_${crypto.randomUUID().slice(0, 6)}`;
@@ -436,6 +475,14 @@ export async function finalizePaymentVerification(
             message: `✅ تم استلام التحويل وتأكيد حجزك في حجزي بنجاح! رقم الحجز: ${b.id}.`,
           });
         }
+
+        const venueObj = b.venue_id ? await loadFullVenueWithUnits(supabase, b.venue_id) : null;
+        await notifyVenueOwner(supabase, {
+          venue: venueObj,
+          booking: { ...b, status: 'confirmed', confirmed: true, actual_paid_amount: numAmount },
+          eventType: 'booking_confirmed',
+        });
+
         return { success: true, matched: true, bookingId: b.id, amount: numAmount, excessAmount };
       }
     }

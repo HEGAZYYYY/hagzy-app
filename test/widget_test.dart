@@ -103,6 +103,10 @@ void main() {
     expect(find.text('Your self-service builder'), findsOneWidget);
     await tester.tap(find.text('Add venue'));
     await tester.pumpAndSettle();
+    if (find.text('Switch to Manual Form').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Switch to Manual Form'));
+      await tester.pumpAndSettle();
+    }
 
     await tester.enterText(find.byType(TextFormField).first, 'Nile Padel');
     await tester.enterText(find.byType(TextFormField).at(1), 'New Cairo');
@@ -112,6 +116,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Nile Padel'), findsOneWidget);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add court / table'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Court 1');
@@ -381,7 +387,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Add New Venue'));
     await tester.pumpAndSettle();
-    expect(find.text('Add a venue'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) =>
+          w is Text &&
+          (w.data == 'Hagzy AI Venue Studio' || w.data == 'Add a venue')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Arabic switches branding, layout, and governorate selection',

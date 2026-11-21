@@ -62,6 +62,38 @@ export function getJwtSecret(): string {
   return `hagzy_derived_${serviceKey}`;
 }
 
+export async function computeBookingQrSig(bookingId: string, venueId: string): Promise<string> {
+  const hex = await hmacSha256Hex(getJwtSecret(), `qr_checkin:${bookingId}:${venueId}`);
+  return hex.slice(0, 24);
+}
+
+export function buildBookingQrCheckInUrl(bookingId: string, sig: string): string {
+  return `https://hagzy.shop/partner?scanBooking=${encodeURIComponent(bookingId)}&sig=${encodeURIComponent(sig)}`;
+}
+
+export async function verifyBookingQrSig(
+  bookingId: string,
+  venueId: string,
+  sig: string,
+): Promise<boolean> {
+  if (!sig || !bookingId || !venueId) return false;
+  const expected = await computeBookingQrSig(bookingId, venueId);
+  return safeEqual(sig.trim(), expected);
+}
+
+export async function attachBookingQrMeta<T extends Record<string, any>>(
+  booking: T,
+): Promise<T & { qrSignature: string; qrCheckInUrl: string }> {
+  const bookingId = String(booking.id || '');
+  const venueId = String(booking.venueId || booking.venue_id || '');
+  const sig = await computeBookingQrSig(bookingId, venueId);
+  return {
+    ...booking,
+    qrSignature: sig,
+    qrCheckInUrl: buildBookingQrCheckInUrl(bookingId, sig),
+  };
+}
+
 export async function signJwt(
   payload: Record<string, unknown>,
   expiresInSeconds = 30 * 24 * 3600,

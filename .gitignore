@@ -71,3 +71,8 @@ server/data/*.json
 
 # Scratch & temporary test scripts
 scratch/
+server/preview_email.html
+server/preview_email.png
+
+# Supabase CLI cache
+supabase/.temp/

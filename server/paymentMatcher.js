@@ -20,12 +20,18 @@ class PaymentMatchingError extends Error {
  * Generates a unique payable amount with a piaster fraction (e.g. 150.37 EGP)
  * to guarantee no collision among open intents on the same receiver wallet.
  */
-function generateUniquePayableAmount(baseAmount, receiverWallet, activeIntents = []) {
+function generateUniquePayableAmount(baseAmount, receiverWallet, activeIntents = [], senderIdentifier = '') {
   const numBase = Number(Number(baseAmount).toFixed(2));
-  const activeForWallet = activeIntents.filter(i =>
-    i.status === 'AWAITING_TRANSFER' &&
-    (!receiverWallet || i.receiver_wallet === receiverWallet)
-  );
+  const cleanSender = senderIdentifier ? String(senderIdentifier).trim().toLowerCase() : '';
+  const activeForWallet = activeIntents.filter(i => {
+    if (i.status !== 'AWAITING_TRANSFER') return false;
+    if (receiverWallet && i.receiver_wallet && i.receiver_wallet !== receiverWallet) return false;
+    if (cleanSender) {
+      const intentSender = String(i.expected_sender_identifier || '').trim().toLowerCase();
+      if (intentSender && intentSender !== cleanSender) return false;
+    }
+    return true;
+  });
 
   const hasExactCollision = activeForWallet.some(i =>
     Math.abs(Number(i.expected_amount) - numBase) < 0.005
@@ -157,7 +163,7 @@ function matchPaymentEvent({
   }
 
   // 4. Amount matching (Exact match preferred, overpayment allowed, underpayment strictly rejected)
-  const candidateIntents = activeIntents.filter(intent => {
+  let candidateIntents = activeIntents.filter(intent => {
     if (intent.status !== 'AWAITING_TRANSFER') return false;
     if (intent.payment_method !== paymentMethod) return false;
     if (intent.expected_sender_identifier !== senderIdentifier) return false;
@@ -166,6 +172,16 @@ function matchPaymentEvent({
     // Underpayment is strictly rejected
     return numAmount >= Number(intent.expected_amount);
   });
+
+  // Cross-method fallback: customer chose InstaPay in app but transferred to Vodafone Cash wallet (or vice versa)
+  if (candidateIntents.length === 0) {
+    candidateIntents = activeIntents.filter(intent => {
+      if (intent.status !== 'AWAITING_TRANSFER') return false;
+      if (intent.expected_sender_identifier !== senderIdentifier) return false;
+      if (receiverWallet && intent.receiver_wallet && intent.receiver_wallet !== receiverWallet) return false;
+      return numAmount >= Number(intent.expected_amount);
+    });
+  }
 
   // Prefer exact match if one exists
   const exactMatches = candidateIntents.filter(i =>

@@ -1,5 +1,54 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { computeBookingQrSig, buildBookingQrCheckInUrl } from './auth.ts';
 import { getEnv, normalizeLocalPhone } from './db.ts';
+
+function formatReminderLabelArabic(mins: number): string {
+  if (mins <= 0) return 'متوقف';
+  if (mins < 60) return `قبل الموعد بـ ${mins} دقيقة`;
+  if (mins === 60) return 'قبل الموعد بساعة واحدة';
+  if (mins === 120) return 'قبل الموعد بساعتين';
+  if (mins === 1440) return 'قبل الموعد بـ 24 ساعة';
+  const hrs = Math.round(mins / 60);
+  return `قبل الموعد بـ ${hrs} ساعات`;
+}
+
+function formatReminderLabelEnglish(mins: number): string {
+  if (mins <= 0) return 'Disabled';
+  if (mins < 60) return `${mins} minutes before`;
+  if (mins === 1440) return '24 hours before';
+  const hrs = Math.round(mins / 60);
+  return `${hrs} hour${hrs === 1 ? '' : 's'} before`;
+}
+
+function parseRequestedReminderMinutes(text: string): number | null {
+  const lower = text.toLowerCase().trim();
+  if (/^(?:تذكير\s*(?:ايقاف|إيقاف|لا)|الغاء التذكير|إلغاء التذكير|remind\s*off)$/i.test(lower)) {
+    return 0;
+  }
+  const arMatch = lower.match(/(?:تذكير|ذكرني)\s+(\d+)\s*(دقيق(?:ة|ه)|د|ساع(?:ة|ه)|س|ساعات|يوم)?/i);
+  if (arMatch) {
+    const val = Number(arMatch[1]);
+    const unit = arMatch[2] || '';
+    if (unit.startsWith('د')) return val;
+    if (unit.startsWith('ي')) return val * 1440;
+    if (val === 30) return 30;
+    if (val === 24) return 1440;
+    if ([1, 2, 6, 12].includes(val)) return val * 60;
+    return val;
+  }
+  const enMatch = lower.match(/remind\s+(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)?/i);
+  if (enMatch) {
+    const val = Number(enMatch[1]);
+    const unit = (enMatch[2] || '').toLowerCase();
+    if (unit.startsWith('m')) return val;
+    if (unit.startsWith('d')) return val * 1440;
+    if (unit.startsWith('h')) return val * 60;
+    if (val === 30) return 30;
+    if (val === 24) return 1440;
+    return [1, 2, 6, 12].includes(val) ? val * 60 : val;
+  }
+  return null;
+}
 
 export async function processChatbotMessage(
   supabase: SupabaseClient,
@@ -19,8 +68,9 @@ export async function processChatbotMessage(
   const cleanMsg = String(message || '').trim();
   const lower = cleanMsg.toLowerCase();
   const cleanPhone = senderPhone.replace(/\D/g, '');
+  const nowIso = new Date().toISOString();
 
-  let matchedBooking: Record<string, any> | null = null;
+  let activeBookings: Record<string, any>[] = [];
   if (bookingId) {
     const { data } = await supabase
       .from('bookings')
@@ -28,42 +78,64 @@ export async function processChatbotMessage(
       .eq('id', bookingId)
       .eq('cancelled', false)
       .maybeSingle();
-    matchedBooking = data;
+    if (data) activeBookings = [data];
   }
 
-  if (!matchedBooking && cleanPhone) {
+  if (activeBookings.length === 0 && cleanPhone) {
     const norm = normalizeLocalPhone(cleanPhone);
     const { data: candidates } = await supabase
       .from('bookings')
       .select('*')
       .eq('cancelled', false)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    matchedBooking = (candidates || []).find(b => {
+      .not('status', 'in', '("cancelled","expired","no_show","completed")')
+      .order('starts_at', { ascending: true })
+      .limit(100);
+    const matching = (candidates || []).filter(b => {
       const bp = normalizeLocalPhone(b.customer_phone);
       return bp && (bp === norm || cleanPhone.endsWith(bp));
-    }) || null;
+    });
+    const upcoming = matching.filter(b => !b.ends_at || b.ends_at >= nowIso || b.starts_at >= nowIso);
+    activeBookings = (upcoming.length > 0 ? upcoming : matching).slice(0, 5);
   }
 
   const idMatch = cleanMsg.match(/(?:bk_[a-zA-Z0-9_]+|\b17\d{14,}\b)/i);
-  if (idMatch && !matchedBooking) {
+  if (idMatch && activeBookings.length === 0) {
     const { data } = await supabase
       .from('bookings')
       .select('*')
       .eq('id', idMatch[0])
       .eq('cancelled', false)
       .maybeSingle();
-    matchedBooking = data;
+    if (data) activeBookings = [data];
   }
 
-  let venue: Record<string, any> | null = null;
-  if (matchedBooking) {
-    const { data } = await supabase
+  const matchedBooking = activeBookings[0] || null;
+  const venueIds = Array.from(new Set(activeBookings.map(b => b.venue_id).filter(Boolean)));
+  const venueMap = new Map<string, Record<string, any>>();
+  if (venueIds.length > 0) {
+    const { data: venues } = await supabase
       .from('venues')
       .select('id, name, extra')
-      .eq('id', matchedBooking.venue_id)
-      .maybeSingle();
-    venue = data;
+      .in('id', venueIds);
+    for (const v of venues || []) venueMap.set(v.id, v);
+  }
+  const venue = matchedBooking ? venueMap.get(matchedBooking.venue_id) || null : null;
+
+  const requestedReminder = parseRequestedReminderMinutes(cleanMsg);
+  if (requestedReminder !== null) {
+    if (!matchedBooking) {
+      return arabic
+        ? 'لم يتم العثور على حجز نشط مرتبط برقمك لتعديل وقت التذكير.'
+        : 'No active booking found for your phone number to update reminder timing.';
+    }
+    const clamped = Math.max(0, Math.min(10080, Math.round(requestedReminder)));
+    await supabase
+      .from('bookings')
+      .update({ reminder_offset_minutes: clamped, reminder_sent_at: null })
+      .eq('id', matchedBooking.id);
+    return arabic
+      ? `⏰ تم تحديث موعد التذكير لحجزك #${matchedBooking.id} إلى: *${formatReminderLabelArabic(clamped)}*.`
+      : `⏰ WhatsApp reminder updated for booking #${matchedBooking.id}: *${formatReminderLabelEnglish(clamped)}*.`;
   }
 
   const isLikelyRefNumber =
@@ -90,14 +162,33 @@ export async function processChatbotMessage(
       : `💳 Deposit Payment Options:\n1. FawryPay: 78890\n2. InstaPay: ${insta}\n3. Vodafone Cash: ${vf}\n\n💡 Reply with your transaction reference number after transferring.`;
   }
 
-  if (lower.includes('status') || lower.includes('booking') || lower.includes('حجز') || lower.includes('حالة') || idMatch) {
-    if (matchedBooking) {
-      const isConfirmed = matchedBooking.status === 'confirmed';
-      const venueName = venue?.name || matchedBooking.venue_name || matchedBooking.venue_id;
-      const price = matchedBooking.total_price || matchedBooking.due_now || 0;
-      return arabic
-        ? `📌 تفاصيل حجزك في حجزي:\n• المكان: ${venueName}\n• الموعد: ${matchedBooking.starts_at}\n• الحالة: ${isConfirmed ? 'مؤكد رسمياً ✓' : 'حجز مؤقت (بانتظار العربون) ⏳'}\n• المبلغ: ${price} جنيه\n• رقم الحجز: ${matchedBooking.id}`
-        : `📌 Your Hagzy Reservation:\n• Venue: ${venueName}\n• Start: ${matchedBooking.starts_at}\n• Status: ${isConfirmed ? 'Confirmed ✓' : 'Pending Deposit ⏳'}\n• Price: ${price} EGP\n• ID: ${matchedBooking.id}`;
+  if (lower.includes('status') || lower.includes('booking') || lower.includes('حجز') || lower.includes('حجزي') || lower.includes('حالة') || idMatch) {
+    if (activeBookings.length > 0) {
+      const blocks: string[] = [];
+      for (let i = 0; i < activeBookings.length; i++) {
+        const b = activeBookings[i];
+        const v = venueMap.get(b.venue_id);
+        const venueName = v?.name || b.venue_name || b.venue_id;
+        const unitLabel = b.unit_name ? ` — ${b.unit_name}` : '';
+        const isConfirmed = Boolean(b.confirmed) || b.status === 'confirmed' || b.status === 'checked_in';
+        const total = Number(b.total_price || b.due_now || 0);
+        const paid = Number(b.actual_paid_amount || (isConfirmed ? b.deposit_amount || 0 : 0));
+        const remaining = Math.max(0, Number((total - paid).toFixed(2)));
+        const remOffset = b.reminder_offset_minutes !== undefined && b.reminder_offset_minutes !== null
+          ? Number(b.reminder_offset_minutes)
+          : 120;
+        const sig = await computeBookingQrSig(b.id, b.venue_id);
+        const qrUrl = buildBookingQrCheckInUrl(b.id, sig);
+        blocks.push(
+          arabic
+            ? `*${i + 1}. ${venueName}${unitLabel}*\n• الموعد: ${b.starts_at}\n• الحالة: ${isConfirmed ? 'مؤكد ✓' : 'بانتظار العربون ⏳'}\n• العربون المدفوع: ${paid} ج.م | المتبقي بالمكان: ${remaining} ج.م\n• التذكير: ${formatReminderLabelArabic(remOffset)}\n• كود الدخول QR للمكان: ${qrUrl}\n• رقم الحجز: ${b.id}`
+            : `*${i + 1}. ${venueName}${unitLabel}*\n• Start: ${b.starts_at}\n• Status: ${isConfirmed ? 'Confirmed ✓' : 'Pending Deposit ⏳'}\n• Deposit Paid: ${paid} EGP | Due at Venue: ${remaining} EGP\n• Reminder: ${formatReminderLabelEnglish(remOffset)}\n• Venue Check-In QR: ${qrUrl}\n• Booking ID: ${b.id}`,
+        );
+      }
+      const footer = arabic
+        ? '\n\n⏰ لتغيير وقت التذكير أرسل مثلاً: "تذكير 30" (دقيقة) أو "تذكير 1" / "تذكير 2" / "تذكير 6" / "تذكير 24" (ساعة) أو "تذكير ايقاف".'
+        : '\n\n⏰ To change reminder timing reply e.g. "remind 30m", "remind 1h", "remind 2h", "remind 6h", "remind 24h", or "remind off".';
+      return `${arabic ? '📌 *حجوزاتك النشطة في حجزي:*\n\n' : '📌 *Your Active Hagzy Bookings:*\n\n'}${blocks.join('\n\n')}${footer}`;
     }
     return arabic
       ? 'لم نتمكن من العثور على حجز نشط مرتبط برقمك حالياً. أرسل رقم الحجز إن وجد.'
@@ -111,6 +202,6 @@ export async function processChatbotMessage(
   }
 
   return arabic
-    ? 'أهلاً بك في خدمة عملاء حجزي! أرسل "حجزي" لمعرفة تفاصيل حجزك، أو "دفع" لطرق الدفع، أو "إلغاء".'
-    : 'Welcome to Hagzy Assistant! Reply "status" for booking details, "pay" for deposit options, or "cancel".';
+    ? 'أهلاً بك في خدمة عملاء حجزي! أرسل "حجزي" لمعرفة تفاصيل حجوزاتك وQR الدخول، أو "تذكير 2" لضبط التنبيه، أو "دفع" لطرق الدفع.'
+    : 'Welcome to Hagzy Assistant! Reply "status" for your bookings & QR pass, "remind 2h" to set reminder timing, "pay" for deposit options, or "cancel".';
 }

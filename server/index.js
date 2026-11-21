@@ -104,6 +104,7 @@ async function comparePassword(plain, stored) {
   }
 }
 const nodemailer = require('nodemailer');
+const { getOtpEmailTemplate } = require('./emailTemplates');
 
 // Firebase Admin SDK Initialization
 let fbAuth = null;
@@ -711,6 +712,89 @@ function markBookingConfirmed(b, { method, providerRef, amount, excess, actor = 
   return b;
 }
 
+function computeBookingQrSig(bookingId, venueId) {
+  return crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`qr_checkin:${bookingId}:${venueId}`)
+    .digest('hex')
+    .slice(0, 24);
+}
+
+function buildBookingQrCheckInUrl(bookingId, sig) {
+  return `https://hagzy.shop/partner?scanBooking=${encodeURIComponent(bookingId)}&sig=${encodeURIComponent(sig)}`;
+}
+
+function verifyBookingQrSig(bookingId, venueId, sig) {
+  if (!sig || !bookingId || !venueId) return false;
+  const expected = computeBookingQrSig(bookingId, venueId);
+  const a = Buffer.from(String(sig).trim(), 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function attachBookingQrMeta(booking) {
+  if (!booking || !booking.id || !booking.venueId) return booking;
+  const sig = computeBookingQrSig(booking.id, booking.venueId);
+  return {
+    ...booking,
+    qrSignature: sig,
+    qrCheckInUrl: buildBookingQrCheckInUrl(booking.id, sig),
+  };
+}
+
+function notifyVenueOwner({ venue, booking, eventType, extraReason = '' }) {
+  if (!booking) return null;
+  if (!Array.isArray(db.partnerNotifications)) db.partnerNotifications = [];
+  const venueId = String(venue?.id || booking.venueId || '');
+  const venueName = String(venue?.name || booking.venueName || venueId);
+  const unitName = String(booking.unitName || '');
+  const customerName = String(booking.customer || booking.customerName || 'Guest');
+  const customerPhone = String(booking.phone || booking.customerPhone || '');
+  const totalPrice = Number(booking.price || booking.totalPrice || 0);
+  const paidSoFar = Number(booking.actualPaidAmount || (booking.confirmed ? booking.depositAmount || 0 : 0));
+  const remainingDue = Math.max(0, Number((totalPrice - paidSoFar).toFixed(2)));
+
+  const titles = {
+    booking_created: `حجز جديد في ${venueName}${unitName ? ` — ${unitName}` : ''}`,
+    booking_confirmed: `تم تأكيد حجز ${customerName} في ${venueName}`,
+    booking_cancelled: `تم إلغاء حجز ${customerName} في ${venueName}`,
+    booking_checked_in: `تم تسجيل وصول ${customerName} في ${venueName}`,
+  };
+  const title = titles[eventType] || `تحديث حجز في ${venueName}`;
+  const bodyLines = [
+    `🏟️ المكان: ${venueName}${unitName ? ` (${unitName})` : ''}`,
+    `👤 العميل: ${customerName}${customerPhone ? ` · ${customerPhone}` : ''}`,
+    `📅 الموعد: ${booking.startsAt || ''}`,
+    `💰 المدفوع: ${paidSoFar} ج.م | المتبقي عند الوصول: ${remainingDue} ج.م`,
+    `🆔 رقم الحجز: ${booking.id}`,
+  ];
+  if (extraReason) bodyLines.push(`ℹ️ ${extraReason}`);
+  const body = bodyLines.join('\n');
+
+  const ownerPhone = String(venue?.ownerPhone || venue?.phone || '').trim();
+  let whatsappSent = false;
+  if (ownerPhone && !IS_TEST) {
+    whatsappSent = true;
+    sendSmsOrWhatsApp({ phone: ownerPhone, message: `🔔 *${title}*\n\n${body}`, otp: '' }).catch(() => {});
+  }
+
+  const notif = {
+    id: `pn_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    ownerId: venue?.ownerId || null,
+    venueId,
+    bookingId: booking.id,
+    eventType,
+    title,
+    body,
+    whatsappSent,
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
+  db.partnerNotifications.unshift(notif);
+  if (db.partnerNotifications.length > 500) db.partnerNotifications.length = 500;
+  return notif;
+}
+
 function emptyDbState() {
   return {
     users: [],
@@ -721,6 +805,7 @@ function emptyDbState() {
     auditLog: [],
     reviewQueue: [],
     partnerRequests: [],
+    partnerNotifications: [],
   };
 }
 
@@ -744,6 +829,7 @@ function loadDb() {
       if (!data.auditLog || !Array.isArray(data.auditLog)) data.auditLog = [];
       if (!data.reviewQueue || !Array.isArray(data.reviewQueue)) data.reviewQueue = [];
       if (!data.partnerRequests || !Array.isArray(data.partnerRequests)) data.partnerRequests = [];
+      if (!data.partnerNotifications || !Array.isArray(data.partnerNotifications)) data.partnerNotifications = [];
       return data;
     } catch (_) {}
   }
@@ -768,6 +854,7 @@ function loadDb() {
     auditLog: [],
     reviewQueue: [],
     partnerRequests: [],
+    partnerNotifications: [],
   };
 }
 
@@ -900,7 +987,7 @@ app.use(helmet({
 
 const allowedCorsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim().toLowerCase())
-  : (IS_PROD ? ['https://hagzy-booking.web.app', 'https://hagzy.app', 'https://hagzy-api.onrender.com'] : ['*']);
+  : (IS_PROD ? ['https://hagzy.shop', 'https://www.hagzy.shop', 'https://hagzy-booking.web.app', 'https://hagzy-acea1.web.app', 'https://hagzy.app', 'https://hagzy-api.onrender.com'] : ['*']);
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -1129,17 +1216,7 @@ async function sendRealEmail({ email, code }) {
   console.log(`Code: ${code}`);
   console.log(`========================================\n`);
 
-  const subject = `رمز التحقق الخاص بك في منصة حجزي: ${code}`;
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 20px auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 18px; background: #ffffff;">
-      <h2 style="color: #059669; margin: 0 0 10px;">حجزي · Hagzy</h2>
-      <p style="color: #334155; font-size: 15px; margin: 0 0 18px;">رمز التحقق لتسجيل الدخول إلى حسابك هو:</p>
-      <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 16px; text-align: center; font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #166534; font-family: monospace;">
-        ${code}
-      </div>
-      <p style="color: #64748b; font-size: 12px; margin: 18px 0 0;">صلاحية هذا الرمز 5 دقائق فقط. لا تشارك هذا الرمز مع أي شخص.</p>
-    </div>
-  `;
+  const { subject, html, text } = getOtpEmailTemplate({ code, email });
 
   // 1. Resend API
   if (process.env.RESEND_API_KEY) {
@@ -1154,7 +1231,8 @@ async function sendRealEmail({ email, code }) {
           from: process.env.EMAIL_FROM || 'Hagzy <onboarding@resend.dev>',
           to: [email],
           subject,
-          html
+          html,
+          text
         })
       });
       if (res.ok) {
@@ -1182,7 +1260,8 @@ async function sendRealEmail({ email, code }) {
         from: process.env.SMTP_USER,
         to: email,
         subject,
-        html
+        html,
+        text
       });
       console.log(`✅ [LIVE EMAIL SENT via SMTP] to: ${email}`);
       return { sent: true, provider: 'smtp' };
@@ -3025,14 +3104,16 @@ app.post('/api/venues/:id/reviews', optionalAuth, async (req, res) => {
 // Admin Bookings List (Scoped to partner venues unless platform owner)
 app.get('/api/admin/bookings', authenticateAdmin, (req, res) => {
   if (req.isPlatformOwner) {
-    return res.json({ success: true, bookings: db.bookings });
+    return res.json({ success: true, bookings: (db.bookings || []).map(attachBookingQrMeta) });
   }
   const partnerVenueIds = new Set(
     (db.venues || [])
       .filter(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v))
       .map(v => v.id)
   );
-  const scopedBookings = (db.bookings || []).filter(b => partnerVenueIds.has(b.venueId));
+  const scopedBookings = (db.bookings || [])
+    .filter(b => partnerVenueIds.has(b.venueId))
+    .map(attachBookingQrMeta);
   return res.json({ success: true, bookings: scopedBookings });
 });
 
@@ -3078,11 +3159,11 @@ app.get('/api/admin/analytics', authenticateAdmin, (req, res) => {
     const p = Number(b.price) || 0;
     const dep = Number(b.depositAmount) || 0;
     const due = Number(b.dueNow) || 0;
-    if (b.status === 'confirmed' || b.status === 'completed') {
+    if (b.status === 'confirmed' || b.status === 'checked_in' || b.status === 'completed') {
       totalRevenueEgp += p;
       totalDepositsEgp += (dep || due);
       totalBalanceDueEgp += Math.max(0, p - (dep || due));
-      if (b.status === 'confirmed') confirmedCount++;
+      if (b.status === 'confirmed' || b.status === 'checked_in') confirmedCount++;
       if (b.status === 'completed') completedCount++;
     } else if (b.status === 'cancelled') {
       cancelledCount++;
@@ -3215,7 +3296,21 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
   booking.discountAmount = calculatedPricing.discountAmount;
   booking.promoCode = calculatedPricing.promoCode;
   booking.services = calculatedPricing.services;
+  booking.depositAmount = Number(
+    body.depositAmount ?? calculatedPricing.requiredDeposit ?? calculatedPricing.depositAmount ?? 0
+  );
+  booking.dueNow = Number(
+    body.dueNow ?? (booking.depositAmount > 0 ? booking.depositAmount : (calculatedPricing.dueNow ?? finalPrice))
+  );
   booking.startsAt = start.toISOString();
+  const rawRemOffset = Number(body.reminderOffsetMinutes);
+  booking.reminderOffsetMinutes =
+    body.reminderOffsetMinutes !== undefined &&
+    body.reminderOffsetMinutes !== null &&
+    body.reminderOffsetMinutes !== '' &&
+    Number.isFinite(rawRemOffset)
+      ? Math.max(0, Math.min(10080, Math.round(rawRemOffset)))
+      : 120;
 
   if (!booking.id || !/^[\w-]{1,64}$/.test(String(booking.id)) || db.bookings.some(b => b.id === booking.id)) {
     booking.id = 'bk_' + crypto.randomUUID();
@@ -3303,6 +3398,13 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     }
   }
   db.bookings.push(booking);
+  if (!booking.blockReason) {
+    notifyVenueOwner({
+      venue,
+      booking,
+      eventType: booking.confirmed ? 'booking_confirmed' : 'booking_created',
+    });
+  }
   saveDb(db);
   syncBookingToFirebase(booking, owner);
 
@@ -3320,7 +3422,7 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
   const walletUser = req.user && db.users.find(u => u.id === req.user.id);
   return res.json({
     success: true,
-    booking,
+    booking: attachBookingQrMeta(booking),
     ...(booking.paymentMethod === 'wallet' && walletUser ? { walletBalance: walletUser.walletBalance } : {})
   });
 });
@@ -3345,9 +3447,35 @@ app.get('/api/bookings', authenticateCustomer, (req, res) => {
     if (b.status === 'confirmed' || b.confirmed) {
       markBookingConfirmed(b);
     }
-    return b;
+    return attachBookingQrMeta(b);
   });
   return res.json({ success: true, bookings: mine });
+});
+
+app.put('/api/bookings/:id/reminder', authenticateCustomer, (req, res) => {
+  const booking = db.bookings.find(b => b.id === req.params.id);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const isOwner = (booking.ownerId === user.id) || (booking.customerId === user.id) ||
+    (user.phoneVerified && user.phone && booking.phone && user.phone.replace(/\D/g, '') === String(booking.phone).replace(/\D/g, '')) ||
+    (user.emailVerified && user.email && booking.email && user.email.toLowerCase() === String(booking.email).toLowerCase());
+  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+
+  const rawOffset = Number(req.body?.reminderOffsetMinutes);
+  if (!Number.isFinite(rawOffset) || rawOffset < 0 || rawOffset > 10080) {
+    return res.status(400).json({ error: 'reminderOffsetMinutes must be between 0 and 10080' });
+  }
+  const clamped = Math.round(rawOffset);
+  booking.reminderOffsetMinutes = clamped;
+  booking.reminderSentAt = null;
+  saveDb(db);
+  return res.json({
+    success: true,
+    reminderOffsetMinutes: clamped,
+    booking: attachBookingQrMeta(booking),
+  });
 });
 
 // Customer Booking Cancellation
@@ -3407,10 +3535,12 @@ app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
     }
   }
 
+  const venueObj = (db.venues || []).find(v => v.id === booking.venueId);
+  notifyVenueOwner({ venue: venueObj, booking, eventType: 'booking_cancelled' });
   saveDb(db);
   syncBookingToFirebase(booking, user);
 
-  return res.json({ success: true, message: 'Booking cancelled successfully.', booking });
+  return res.json({ success: true, message: 'Booking cancelled successfully.', booking: attachBookingQrMeta(booking) });
 });
 
 // Public status poll: no contact details are returned.
@@ -3452,6 +3582,8 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
     return res.status(err.statusCode || 409).json({ error: err.message });
   }
 
+  const venueObj = (db.venues || []).find(v => v.id === booking.venueId);
+  notifyVenueOwner({ venue: venueObj, booking, eventType: 'booking_confirmed' });
   saveDb(db);
   syncBookingToFirebase(booking);
 
@@ -3463,7 +3595,100 @@ app.post('/api/admin/bookings/:id/confirm', authenticateAdmin, (req, res) => {
     });
   }
 
-  return res.json({ success: true, booking });
+  return res.json({ success: true, booking: attachBookingQrMeta(booking) });
+});
+
+app.get('/api/admin/notifications', authenticateAdmin, (req, res) => {
+  const unreadOnly = req.query.unreadOnly === 'true';
+  let list = Array.isArray(db.partnerNotifications) ? [...db.partnerNotifications] : [];
+  if (!req.isPlatformOwner) {
+    const ownedIds = new Set(
+      (db.venues || [])
+        .filter(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v))
+        .map(v => v.id),
+    );
+    list = list.filter(n => n.venueId && ownedIds.has(n.venueId));
+  }
+  const unreadCount = list.filter(n => !n.read).length;
+  if (unreadOnly) list = list.filter(n => !n.read);
+  return res.json({ success: true, unreadCount, notifications: list.slice(0, 100) });
+});
+
+app.post('/api/admin/notifications/:id/read', authenticateAdmin, (req, res) => {
+  const n = (db.partnerNotifications || []).find(item => item.id === req.params.id);
+  if (!n) return res.status(404).json({ error: 'Notification not found' });
+  if (!req.isPlatformOwner && n.venueId) {
+    const venue = (db.venues || []).find(v => v.id === n.venueId);
+    if (!venue || !doesPartnerOwnVenue(req.admin, venue)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+  n.read = true;
+  n.readAt = new Date().toISOString();
+  saveDb(db);
+  return res.json({ success: true });
+});
+
+app.get('/api/admin/bookings/:id/qr-details', authenticateAdmin, (req, res) => {
+  const booking = (db.bookings || []).find(b => b.id === req.params.id);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const venue = (db.venues || []).find(v => v.id === booking.venueId);
+  if (!req.isPlatformOwner && (!venue || !doesPartnerOwnVenue(req.admin, venue))) {
+    return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
+  }
+  const sig = String(req.query.sig || '').trim();
+  let signatureVerified = false;
+  if (sig) {
+    signatureVerified = verifyBookingQrSig(booking.id, booking.venueId, sig);
+    if (!signatureVerified) {
+      return res.status(403).json({ error: 'Invalid or tampered QR check-in signature' });
+    }
+  }
+  const totalPrice = Number(booking.price || booking.totalPrice || 0);
+  const depositAmount = Number(booking.depositAmount || 0);
+  const paidAmount = Number(booking.actualPaidAmount || (booking.confirmed ? depositAmount : 0));
+  const remainingDue = Math.max(0, Number((totalPrice - paidAmount).toFixed(2)));
+  return res.json({
+    success: true,
+    signatureVerified,
+    venue: venue ? { id: venue.id, name: venue.name, area: venue.area, city: venue.city } : null,
+    booking: attachBookingQrMeta(booking),
+    financialSummary: { totalPrice, depositAmount, paidAmount, remainingDue },
+  });
+});
+
+app.post('/api/admin/bookings/:id/check-in', authenticateAdmin, (req, res) => {
+  const booking = (db.bookings || []).find(b => b.id === req.params.id);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const venue = (db.venues || []).find(v => v.id === booking.venueId);
+  if (!req.isPlatformOwner && (!venue || !doesPartnerOwnVenue(req.admin, venue))) {
+    return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
+  }
+  const sig = String(req.body?.sig || req.query.sig || '').trim();
+  if (sig && !verifyBookingQrSig(booking.id, booking.venueId, sig)) {
+    return res.status(403).json({ error: 'Invalid or tampered QR check-in signature' });
+  }
+  if (booking.checkedIn || booking.status === BOOKING_STATUS.CHECKED_IN) {
+    return res.json({ success: true, alreadyCheckedIn: true, booking: attachBookingQrMeta(booking) });
+  }
+  if (booking.cancelled || booking.status === BOOKING_STATUS.CANCELLED || booking.status === BOOKING_STATUS.EXPIRED) {
+    return res.status(409).json({ error: `Cannot check in a ${booking.status} booking.` });
+  }
+  if (!booking.confirmed && booking.status !== BOOKING_STATUS.CONFIRMED) {
+    return res.status(409).json({ error: 'Booking deposit has not been confirmed yet.' });
+  }
+  try {
+    transitionBookingStatus(booking, BOOKING_STATUS.CHECKED_IN, {
+      actor: req.admin?.email || 'admin',
+      reason: sig ? 'QR code scanned & verified at venue' : 'Manual partner check-in',
+      auditLog: db.auditLog,
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 409).json({ error: err.message });
+  }
+  saveDb(db);
+  syncBookingToFirebase(booking);
+  return res.json({ success: true, booking: attachBookingQrMeta(booking) });
 });
 
 // Cancel Booking
@@ -3623,9 +3848,19 @@ const localPaymentEvents = new Map();
 function convertEasternArabicNumerals(str) {
   if (!str || typeof str !== 'string') return '';
   const easternDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
-  return str
+  const extendedDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+  let out = str
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
     .replace(/[٠-٩]/g, d => easternDigits.indexOf(d))
-    .replace(/٫/g, '.');
+    .replace(/[۰-۹]/g, d => extendedDigits.indexOf(d))
+    .replace(/٫/g, '.')
+    .replace(/٬/g, '');
+  let prev = '';
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(/(\d),(\d{3})(?!\d)/g, '$1$2');
+  }
+  return out;
 }
 
 function normalizeSenderId(method, raw) {
@@ -3683,6 +3918,10 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   // 2. Parse Amount
   if (amount === null) {
     const amountRegexes = [
+      /(?:فودافون كاش|vf[\s-]*cash|أرسلت|ارسلت|وصلتك|حول لك|تم تحويل|تم إيداع|تم ايداع|مبلغ|بمبلغ|بقيمة|قيمة|استلام|استلمت|تحويل|إيداع|ايداع)[:\s-]+(?:مبلغ\s+)?([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|ج م|egp|le)/i,
+      /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)[:\s]+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
+      /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)[:\s]+([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le)?/i,
+      /([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le|جنيه|جنيها|ج\.م|جم)\s+(?:received|recieved|from|من|successfully)/i,
       /(?:مبلغ|بمبلغ|بقيمة|قيمة|استلام|استلمت|تحويل|إيداع|ايداع)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|جم|ج م|egp|le)/i,
       /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)\s+(?:egp|le)?\s*([0-9]+(?:\.[0-9]+)?)/i,
       /(?:received|recieved|you have received|you have recieved|you received|you recieved|transfer of)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:egp|le)?/i,
@@ -3758,7 +3997,7 @@ function parseIncomingTransferText(rawText, metadata = {}) {
   }
 
   // 4. Provider Reference Number
-  const refMatch = fullText.match(/(?:رقم العملية|مرجع|المرجع|ref(?:erence)?[:\s]+)([0-9a-zA-Z]+)/i);
+  const refMatch = fullText.match(/(?:رقم العملية|مرجع|المرجع|ref(?:erence)?[:\s_-]+)([0-9a-zA-Z_-]+)/i);
   if (refMatch && refMatch[1]) {
     providerRef = refMatch[1];
   }
@@ -3893,6 +4132,11 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
           actor: 'payment_oracle',
           reason: 'Automated exact payment match'
         });
+        notifyVenueOwner({
+          venue: (db.venues || []).find(v => v.id === b.venueId),
+          booking: b,
+          eventType: 'booking_confirmed',
+        });
         saveDb(db);
         syncBookingToFirebase(b);
         return { success: true, matched: true, bookingId: b.id, amount: numAmount, excessAmount };
@@ -3959,6 +4203,11 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
           excess: excessAmount,
           actor: 'payment_listener',
           reason: `Automated match via incoming ${method} transfer notification`
+        });
+        notifyVenueOwner({
+          venue: (db.venues || []).find(v => v.id === b.venueId),
+          booking: b,
+          eventType: 'booking_confirmed',
         });
         saveDb(db);
         syncBookingToFirebase(b);
@@ -4030,79 +4279,112 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     authoritativeAmount = 5.0;
   }
 
-  // Look up venue receiver wallet if available
-  let receiverWallet = null;
+  // Look up central/venue receiver wallet
+  let receiverWallet = method === 'INSTAPAY'
+    ? (process.env.INSTAPAY_HANDLE || 'hagzy@instapay')
+    : (process.env.ADMIN_PHONE || '01015325250');
   if (localBooking) {
     const venue = db.venues ? db.venues.find(v => v.id === localBooking.venueId) : null;
-    if (venue && venue.receiverWallet) receiverWallet = venue.receiverWallet;
+    if (venue) {
+      if (venue.receiverWallet) receiverWallet = venue.receiverWallet;
+      else if (method === 'MOBILE_WALLET' && venue.vodafoneCashNumber) receiverWallet = venue.vodafoneCashNumber;
+      else if (method === 'INSTAPAY' && venue.instaPayAddress) receiverWallet = venue.instaPayAddress;
+    }
   }
 
-  // Generate unique payable amount with piaster suffix to guarantee zero collisions
+  // Generate unique payable amount scoped by (receiverWallet, sender)
   const payableAmount = generateUniquePayableAmount(
     authoritativeAmount,
     receiverWallet,
-    Array.from(localPaymentIntents.values())
+    Array.from(localPaymentIntents.values()),
+    normalizedSender
   );
 
-  const intentId = `intent_${bookingId}_${method.toLowerCase()}`;
+  const intentId = `intent_${bookingId}_${method.toLowerCase()}_${Date.now().toString(36)}_${crypto.randomBytes(2).toString('hex')}`;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
 
-  // In-memory retroactive match if payment notification arrived within last 15m
+  // In-memory retroactive match if payment notification arrived within last 15m (exact amount preferred)
+  const eligibleRetro = [];
   for (const [evtId, evt] of localPaymentEvents.entries()) {
     if (!evt.is_claimed &&
         evt.payment_method === method &&
         evt.sender_identifier === normalizedSender &&
-        Number(evt.amount) >= payableAmount &&
+        Number(evt.amount) >= payableAmount - 0.005 &&
         (now.getTime() - new Date(evt.received_at).getTime()) <= 15 * 60 * 1000) {
-      const receivedAmt = Number(evt.amount);
-      const excess = Math.max(0, receivedAmt - payableAmount);
-
-      evt.is_claimed = true;
-      evt.claimed_by_intent_id = intentId;
-      evt.claimed_at = now.toISOString();
-
-      const verifiedIntent = {
-        intentId,
-        booking_id: bookingId,
-        user_id: req.user?.id || 'guest',
-        payment_method: method,
-        receiver_wallet: receiverWallet,
-        expected_sender_identifier: normalizedSender,
-        expected_amount: payableAmount,
-        actual_amount: receivedAmt,
-        excess_amount: excess,
-        status: 'VERIFIED',
-        expires_at: expiresAt.toISOString(),
-        verified_at: now.toISOString(),
-        matched_event_id: evtId,
-      };
-      localPaymentIntents.set(intentId, verifiedIntent);
-
-      if (localBooking) {
-        markBookingConfirmed(localBooking, { method, amount: receivedAmt, excess });
-        saveDb(db);
-        syncBookingToFirebase(localBooking);
-      } else if (bookingId.startsWith('wallet_topup_') && req.user) {
-        const u = db.users ? db.users.find(usr => usr.id === req.user.id) : null;
-        if (u) {
-          try {
-            recordLedgerEntry(db.walletLedger, {
-              userId: u.id,
-              amount: receivedAmt,
-              type: LEDGER_ENTRY_TYPE.TOPUP,
-              referenceId: intentId,
-              description: `Wallet top-up via ${method}`,
-              actor: 'payment_oracle'
-            });
-            u.walletBalance = calculateWalletBalance(u.id, db.walletLedger);
-            saveDb(db);
-          } catch (_) {}
-        }
-      }
-
-      return res.json(verifiedIntent);
+      eligibleRetro.push([evtId, evt]);
     }
+  }
+  const exactRetro = eligibleRetro.find(([, e]) => Math.abs(Number(e.amount) - payableAmount) <= 0.005);
+  const chosenRetro = exactRetro || eligibleRetro.find(([, e]) => Number(e.amount) > payableAmount + 0.005);
+
+  if (chosenRetro) {
+    const [evtId, evt] = chosenRetro;
+    const receivedAmt = Number(evt.amount);
+    const excess = Math.max(0, Number((receivedAmt - payableAmount).toFixed(2)));
+
+    evt.is_claimed = true;
+    evt.claimed_by_intent_id = intentId;
+    evt.claimed_at = now.toISOString();
+
+    const verifiedIntent = {
+      intentId,
+      booking_id: bookingId,
+      user_id: req.user?.id || 'guest',
+      payment_method: method,
+      receiver_wallet: receiverWallet,
+      expected_sender_identifier: normalizedSender,
+      expected_amount: payableAmount,
+      actual_amount: receivedAmt,
+      excess_amount: excess,
+      status: 'VERIFIED',
+      expires_at: expiresAt.toISOString(),
+      verified_at: now.toISOString(),
+      matched_event_id: evtId,
+    };
+    localPaymentIntents.set(intentId, verifiedIntent);
+
+    // Resolve any matching stale UNMATCHED entry in reviewQueue
+    for (const qItem of db.reviewQueue || []) {
+      if (qItem.status === 'UNMATCHED' &&
+          qItem.paymentMethod === method &&
+          qItem.senderIdentifier === normalizedSender &&
+          ((evt.provider_ref && qItem.providerRef === evt.provider_ref) ||
+           Math.abs(Number(qItem.amount || 0) - receivedAmt) <= 0.005)) {
+        qItem.status = 'RESOLVED';
+        qItem.resolvedBy = 'payment_oracle_retroactive';
+        qItem.resolvedAt = now.toISOString();
+        qItem.attachedTo = { bookingId, intentId };
+      }
+    }
+
+    if (localBooking) {
+      markBookingConfirmed(localBooking, { method, amount: receivedAmt, excess });
+      const venueObj = (db.venues || []).find(v => v.id === localBooking.venueId);
+      notifyVenueOwner({ venue: venueObj, booking: localBooking, eventType: 'booking_confirmed' });
+      saveDb(db);
+      syncBookingToFirebase(localBooking);
+    } else if (bookingId.startsWith('wallet_topup_') && req.user) {
+      const u = db.users ? db.users.find(usr => usr.id === req.user.id) : null;
+      if (u) {
+        try {
+          recordLedgerEntry(db.walletLedger, {
+            userId: u.id,
+            amount: receivedAmt,
+            type: LEDGER_ENTRY_TYPE.TOPUP,
+            referenceId: intentId,
+            description: `Wallet top-up via ${method}`,
+            actor: 'payment_oracle'
+          });
+          u.walletBalance = calculateWalletBalance(u.id, db.walletLedger);
+          saveDb(db);
+        } catch (_) {}
+      }
+    } else {
+      saveDb(db);
+    }
+
+    return res.json(verifiedIntent);
   }
 
   const intentData = {
@@ -4212,10 +4494,23 @@ app.post('/api/payments/webhook', async (req, res) => {
 // ADMIN PAYMENT REVIEW QUEUE
 // ==========================================
 app.get('/api/admin/payments/review-queue', authenticateAdmin, (req, res) => {
+  let items = db.reviewQueue || [];
+  if (!req.isPlatformOwner) {
+    const ownedIds = new Set(
+      (db.venues || [])
+        .filter(v => !v.isDeleted && doesPartnerOwnVenue(req.admin, v))
+        .map(v => v.id),
+    );
+    items = items.filter(item => {
+      const bId = item.bookingId || item.attachedTo?.bookingId;
+      const b = bId ? (db.bookings || []).find(bk => bk.id === bId) : null;
+      return Boolean(b && ownedIds.has(b.venueId));
+    });
+  }
   return res.json({
     success: true,
-    count: (db.reviewQueue || []).length,
-    items: db.reviewQueue || [],
+    count: items.length,
+    items,
   });
 });
 
@@ -4232,6 +4527,10 @@ app.post('/api/admin/payments/review-queue/:id/attach', authenticateAdmin, (req,
   if (bookingId) {
     const booking = db.bookings.find(b => b.id === bookingId);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    const venue = (db.venues || []).find(v => v.id === booking.venueId);
+    if (!req.isPlatformOwner && (!venue || !doesPartnerOwnVenue(req.admin, venue))) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
+    }
     markBookingConfirmed(booking, {
       method: item.paymentMethod,
       providerRef: item.providerRef,
@@ -4239,7 +4538,10 @@ app.post('/api/admin/payments/review-queue/:id/attach', authenticateAdmin, (req,
       actor: req.admin ? req.admin.email : 'admin',
       reason: 'Manual match from review queue',
     });
+    notifyVenueOwner({ venue, booking, eventType: 'booking_confirmed' });
     syncBookingToFirebase(booking);
+  } else if (!req.isPlatformOwner) {
+    return res.status(403).json({ error: 'Forbidden: Only platform admins can credit wallets' });
   }
 
   if (userId) {
@@ -4422,6 +4724,49 @@ async function handlePaymentListenerRequest(req, res) {
 
   const parsed = parseIncomingTransferText(rawText, { ...req.query, ...payload });
   if (!parsed || !parsed.amount || !parsed.senderIdentifier) {
+    const looksFinancial = Boolean(
+      parsed?.amount ||
+      /egp|جنيه|جنيها|ج\.م|جم|instapay|انستاباي|vodafone|vf-cash|vf cash|فودافون|استلام|استلمت|تحويل|إيداع|ايداع|received|recieved/i.test(rawText || ''),
+    );
+    if (looksFinancial && !isHtml) {
+      const revId = `rev_parse_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      const revItem = {
+        id: revId,
+        paymentMethod: parsed?.paymentMethod || 'INSTAPAY',
+        senderIdentifier: parsed?.senderIdentifier || 'unknown',
+        amount: Number(parsed?.amount || 0),
+        providerRef: parsed?.providerRef || '',
+        rawText: redactRawPaymentText(rawText),
+        status: 'PARSE_REVIEW',
+        reason: !parsed?.amount
+          ? 'Financial notification received without a parseable amount — routed for manual review'
+          : 'Financial notification received without a sender phone or handle — routed for manual review',
+        receivedAt: new Date().toISOString(),
+      };
+      if (!Array.isArray(db.reviewQueue)) db.reviewQueue = [];
+      db.reviewQueue.push(revItem);
+      saveDb(db);
+      recentListenerLogs.unshift({
+        at: new Date().toISOString(),
+        method: req.method,
+        status: 200,
+        matched: false,
+        requiresReview: true,
+        parseStatus: 'PARSE_REVIEW',
+        rawTextPreview: String(rawText || '').slice(0, 200),
+      });
+      if (recentListenerLogs.length > 20) recentListenerLogs.pop();
+      return res.json({
+        success: true,
+        matched: false,
+        requiresReview: true,
+        status: 'PARSE_REVIEW',
+        eventId: revId,
+        parsed,
+        message: 'Unparsed financial notification saved to review queue.',
+      });
+    }
+
     recentListenerLogs.unshift({
       at: new Date().toISOString(),
       method: req.method,
@@ -4539,100 +4884,105 @@ app.get(['/api/payments/listener', '/api/payments/android-listener'], async (req
 app.post(['/api/payments/listener', '/api/payments/android-listener'], handlePaymentListenerRequest);
 
 // ==========================================
-// ADMIN PAYMENT REVIEW QUEUE
-// ==========================================
-app.get('/api/admin/payments/review-queue', authenticateAdmin, (req, res) => {
-  return res.json({
-    success: true,
-    count: (db.reviewQueue || []).length,
-    items: db.reviewQueue || [],
-  });
-});
-
-app.post('/api/admin/payments/review-queue/:id/attach', authenticateAdmin, (req, res) => {
-  const item = (db.reviewQueue || []).find(q => q.id === req.params.id);
-  if (!item) return res.status(404).json({ error: 'Review queue item not found' });
-  if (item.status === 'RESOLVED') return res.status(409).json({ error: 'Item already resolved' });
-
-  const { bookingId, userId } = req.body || {};
-  if (!bookingId && !userId) {
-    return res.status(400).json({ error: 'bookingId or userId is required to attach payment' });
-  }
-
-  if (bookingId) {
-    const booking = db.bookings.find(b => b.id === bookingId);
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
-    markBookingConfirmed(booking, {
-      method: item.paymentMethod,
-      providerRef: item.providerRef,
-      amount: item.amount,
-      actor: req.admin ? req.admin.email : 'admin',
-      reason: 'Manual match from review queue',
-    });
-    syncBookingToFirebase(booking);
-  }
-
-  if (userId) {
-    const user = db.users.find(u => u.id === userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    recordLedgerEntry(db.walletLedger, {
-      userId: user.id,
-      amount: item.amount,
-      type: LEDGER_ENTRY_TYPE.ADMIN_ADJUSTMENT,
-      referenceId: item.id,
-      description: `Manual credit from review queue (${item.paymentMethod})`,
-      actor: req.admin ? req.admin.email : 'admin',
-    });
-    user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
-    syncUserToFirebase(user);
-  }
-
-  item.status = 'RESOLVED';
-  item.resolvedBy = req.admin ? req.admin.email : 'admin';
-  item.resolvedAt = new Date().toISOString();
-  item.attachedTo = { bookingId, userId };
-
-  saveDb(db);
-  return res.json({ success: true, item });
-});
-
-// ==========================================
 // HAGZY WHATSAPP & IN-APP CHATBOT ENGINE
 // ==========================================
+function formatReminderLabelNode(mins, arabic = true) {
+  if (mins <= 0) return arabic ? 'متوقف' : 'Disabled';
+  if (mins < 60) return arabic ? `قبل الموعد بـ ${mins} دقيقة` : `${mins} minutes before`;
+  if (mins === 60) return arabic ? 'قبل الموعد بساعة واحدة' : '1 hour before';
+  if (mins === 120) return arabic ? 'قبل الموعد بساعتين' : '2 hours before';
+  if (mins === 1440) return arabic ? 'قبل الموعد بـ 24 ساعة' : '24 hours before';
+  const hrs = Math.round(mins / 60);
+  return arabic ? `قبل الموعد بـ ${hrs} ساعات` : `${hrs} hours before`;
+}
+
+function parseRequestedReminderMinutesNode(text) {
+  const lower = String(text || '').toLowerCase().trim();
+  if (/^(?:تذكير\s*(?:ايقاف|إيقاف|لا)|الغاء التذكير|إلغاء التذكير|remind\s*off)$/i.test(lower)) {
+    return 0;
+  }
+  const arMatch = lower.match(/(?:تذكير|ذكرني)\s+(\d+)\s*(دقيق(?:ة|ه)|د|ساع(?:ة|ه)|س|ساعات|يوم)?/i);
+  if (arMatch) {
+    const val = Number(arMatch[1]);
+    const unit = arMatch[2] || '';
+    if (unit.startsWith('د')) return val;
+    if (unit.startsWith('ي')) return val * 1440;
+    if (val === 30) return 30;
+    if (val === 24) return 1440;
+    if ([1, 2, 6, 12].includes(val)) return val * 60;
+    return val;
+  }
+  const enMatch = lower.match(/remind\s+(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)?/i);
+  if (enMatch) {
+    const val = Number(enMatch[1]);
+    const unit = (enMatch[2] || '').toLowerCase();
+    if (unit.startsWith('m')) return val;
+    if (unit.startsWith('d')) return val * 1440;
+    if (unit.startsWith('h')) return val * 60;
+    if (val === 30) return 30;
+    if (val === 24) return 1440;
+    return [1, 2, 6, 12].includes(val) ? val * 60 : val;
+  }
+  return null;
+}
+
 async function processChatbotMessage({ message = '', senderPhone = '', bookingId = '', language = 'AR' }) {
   const arabic = language !== 'EN';
   const cleanMsg = String(message || '').trim();
   const lower = cleanMsg.toLowerCase();
   const cleanPhone = senderPhone.replace(/\D/g, '');
+  const nowIso = new Date().toISOString();
 
-  // 1. Find matching booking by ID or phone number
-  let matchedBooking = null;
+  // 1. Find active bookings by ID or phone number
+  let activeBookings = [];
   if (bookingId) {
-    matchedBooking = db.bookings.find(b => b.id === bookingId && !b.cancelled);
+    const b = db.bookings.find(x => x.id === bookingId && !x.cancelled);
+    if (b) activeBookings = [b];
   }
-  if (!matchedBooking && cleanPhone) {
-    matchedBooking = db.bookings
-      .filter(b => !b.cancelled)
-      .find(b => {
-        const bp = String(b.phone || '').replace(/\D/g, '');
+  if (activeBookings.length === 0 && cleanPhone) {
+    const matching = db.bookings
+      .filter(b => !b.cancelled && !['cancelled', 'expired', 'no_show', 'completed'].includes(String(b.status || '').toLowerCase()))
+      .filter(b => {
+        const bp = String(b.phone || b.customerPhone || '').replace(/\D/g, '');
         return bp && (bp === cleanPhone || cleanPhone.endsWith(bp) || bp.endsWith(cleanPhone));
-      });
+      })
+      .sort((a, b) => String(a.startsAt || '').localeCompare(String(b.startsAt || '')));
+    const upcoming = matching.filter(b => !b.startsAt || b.startsAt >= nowIso);
+    activeBookings = (upcoming.length > 0 ? upcoming : matching).slice(0, 5);
   }
 
-  // Also check if user typed an exact booking ID (e.g. 1793... or bk_...)
   const idMatch = cleanMsg.match(/(?:bk_[a-zA-Z0-9_]+|\b17\d{14,}\b)/i);
-  if (idMatch && !matchedBooking) {
+  if (idMatch && activeBookings.length === 0) {
     const extractedId = idMatch[0];
-    matchedBooking = db.bookings.find(b => b.id === extractedId && !b.cancelled);
+    const b = db.bookings.find(x => x.id === extractedId && !x.cancelled);
+    if (b) activeBookings = [b];
   }
 
+  const matchedBooking = activeBookings[0] || null;
   let venue = null;
   if (matchedBooking) {
     venue = db.venues.find(v => v.id === matchedBooking.venueId);
   }
 
+  // Reminder update command via WhatsApp
+  const reqReminder = parseRequestedReminderMinutesNode(cleanMsg);
+  if (reqReminder !== null) {
+    if (!matchedBooking) {
+      return arabic
+        ? 'لم يتم العثور على حجز نشط مرتبط برقمك لتعديل وقت التذكير.'
+        : 'No active booking found for your phone number to update reminder timing.';
+    }
+    const clamped = Math.max(0, Math.min(10080, Math.round(reqReminder)));
+    matchedBooking.reminderOffsetMinutes = clamped;
+    matchedBooking.reminderSentAt = null;
+    saveDb(db);
+    return arabic
+      ? `⏰ تم تحديث موعد التذكير لحجزك #${matchedBooking.id} إلى: *${formatReminderLabelNode(clamped, true)}*.`
+      : `⏰ WhatsApp reminder updated for booking #${matchedBooking.id}: *${formatReminderLabelNode(clamped, false)}*.`;
+  }
+
   // 2. Reference Number Submission (e.g. 6-24 digits or "ref 123456")
-  const isLikelyRefNumber = /^(?:ref\s*[:=]?\s*)?[0-9]{6,24}$/i.test(cleanMsg) || 
+  const isLikelyRefNumber = /^(?:ref\s*[:=]?\s*)?[0-9]{6,24}$/i.test(cleanMsg) ||
                             /(?:رقم العملية|المرجعي|كود التحويل)\s*[:=]?\s*([0-9]{6,24})/i.test(cleanMsg);
   if (isLikelyRefNumber && matchedBooking) {
     const rawRef = cleanMsg.replace(/\D/g, '');
@@ -4648,7 +4998,7 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
     }
   }
 
-  // 3. Deposit / Payment methods ("دفع", "عربون", "انستاباي", "فودافون كاش", "فوري", "pay", "deposit")
+  // 3. Deposit / Payment methods
   if (lower.includes('pay') || lower.includes('deposit') || lower.includes('دفع') || lower.includes('عربون') || lower.includes('انستاباي') || lower.includes('فودافون')) {
     const insta = venue?.instaPayAddress || 'hagzy@instapay';
     const vf = venue?.vodafoneCashNumber || process.env.ADMIN_PHONE || '01041570557';
@@ -4667,32 +5017,35 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
         `💡 After payment, simply reply with your transaction reference number here to verify your booking!`;
   }
 
-  // 4. Booking status ("حجز", "حجزي", "حالة", "تأكيد", "status", "booking")
+  // 4. Booking status (all upcoming bookings + QR check-in pass + reminder timing)
   if (lower.includes('status') || lower.includes('booking') || lower.includes('حجز') || lower.includes('حالة') || idMatch) {
-    if (matchedBooking) {
-      const isConfirmed = matchedBooking.status === 'confirmed';
-      const venueName = venue?.name || matchedBooking.venueId;
-      const startsAt = matchedBooking.startsAt || matchedBooking.date || 'اليوم';
-      const price = matchedBooking.price || matchedBooking.dueNow || 0;
-      return arabic
-        ? `📌 تفاصيل حجزك في حجزي:\n\n` +
-          `• المكان: ${venueName}\n` +
-          `• الموعد: ${startsAt}\n` +
-          `• الحالة: ${isConfirmed ? 'مؤكد رسمياً ✓' : 'حجز مؤقت (بانتظار العربون) ⏳'}\n` +
-          `• المبلغ: ${price} جنيه\n` +
-          `• رقم الحجز: ${matchedBooking.id}\n\n` +
-          `🎫 يمكنك إدارة حجزك وتذكرتك من الرابط: https://hagzy-booking.web.app`
-        : `📌 Your Hagzy Reservation Details:\n\n` +
-          `• Venue: ${venueName}\n` +
-          `• Date & Time: ${startsAt}\n` +
-          `• Status: ${isConfirmed ? 'Confirmed ✓' : 'Temporary Hold (Pending Deposit) ⏳'}\n` +
-          `• Amount: ${price} EGP\n` +
-          `• Booking ID: ${matchedBooking.id}\n\n` +
-          `🎫 Manage your booking: https://hagzy-booking.web.app`;
+    if (activeBookings.length > 0) {
+      const blocks = activeBookings.map((b, i) => {
+        const v = db.venues.find(vx => vx.id === b.venueId);
+        const isConfirmed = Boolean(b.confirmed) || b.status === 'confirmed' || b.status === 'checked_in';
+        const venueName = v?.name || b.venueName || b.venueId;
+        const unitLabel = b.unitName ? ` — ${b.unitName}` : '';
+        const startsAt = b.startsAt || b.date || 'اليوم';
+        const total = Number(b.price || b.totalPrice || b.dueNow || 0);
+        const paid = Number(b.actualPaidAmount || (isConfirmed ? b.depositAmount || 0 : 0));
+        const remaining = Math.max(0, Number((total - paid).toFixed(2)));
+        const remOffset = b.reminderOffsetMinutes !== undefined && b.reminderOffsetMinutes !== null
+          ? Number(b.reminderOffsetMinutes)
+          : 120;
+        const sig = computeBookingQrSig(b.id, b.venueId);
+        const qrUrl = buildBookingQrCheckInUrl(b.id, sig);
+        return arabic
+          ? `*${i + 1}. ${venueName}${unitLabel}*\n• الموعد: ${startsAt}\n• الحالة: ${isConfirmed ? 'مؤكد ✓' : 'بانتظار العربون ⏳'}\n• المدفوع: ${paid} ج.م | المتبقي بالمكان: ${remaining} ج.م\n• التذكير: ${formatReminderLabelNode(remOffset, true)}\n• كود الدخول QR: ${qrUrl}\n• رقم الحجز: ${b.id}`
+          : `*${i + 1}. ${venueName}${unitLabel}*\n• Start: ${startsAt}\n• Status: ${isConfirmed ? 'Confirmed ✓' : 'Pending Deposit ⏳'}\n• Paid: ${paid} EGP | Due at Venue: ${remaining} EGP\n• Reminder: ${formatReminderLabelNode(remOffset, false)}\n• Check-In QR: ${qrUrl}\n• ID: ${b.id}`;
+      });
+      const footer = arabic
+        ? '\n\n⏰ لتغيير وقت التذكير أرسل مثلاً: "تذكير 30" (دقيقة) أو "تذكير 2" (ساعة) أو "تذكير ايقاف".'
+        : '\n\n⏰ To change reminder timing reply e.g. "remind 30m", "remind 2h", or "remind off".';
+      return `${arabic ? '📌 *حجوزاتك النشطة في حجزي:*\n\n' : '📌 *Your Active Hagzy Bookings:*\n\n'}${blocks.join('\n\n')}${footer}`;
     } else {
       return arabic
-        ? `لم نتمكن من العثور على حجز نشط مرتبط برقمك حالياً.\n\nإذا كان لديك رقم حجز محدد، أرسل الرقم فقط (مثال: 1793...).\nأو يمكنك تصفح الملاعب والأنشطة وحجز موعدك فوراً:\n👉 https://hagzy-booking.web.app`
-        : `No active reservation was found for your phone number.\n\nIf you have a Booking ID, please reply with it directly.\nOr explore and book venues now at:\n👉 https://hagzy-booking.web.app`;
+        ? `لم نتمكن من العثور على حجز نشط مرتبط برقمك حالياً.\n\nإذا كان لديك رقم حجز محدد، أرسل الرقم فقط (مثال: 1793...).\nأو يمكنك تصفح الملاعب والأنشطة وحجز موعدك فوراً:\n👉 https://hagzy.shop`
+        : `No active reservation was found for your phone number.\n\nIf you have a Booking ID, please reply with it directly.\nOr explore and book venues now at:\n👉 https://hagzy.shop`;
     }
   }
 
@@ -4702,16 +5055,16 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
       return arabic
         ? `⚠️ بخصوص إلغاء الحجز رقم (${matchedBooking.id}) في ${venue?.name || matchedBooking.venueId}:\n\n` +
           `يمكنك إلغاء الحجز واسترداد العربون لمحفظتك قبل الموعد بـ 6 ساعات مباشرة من التطبيق:\n` +
-          `👉 https://hagzy-booking.web.app\n` +
+          `👉 https://hagzy.shop\n` +
           `أو أرسل "خدمة العملاء" للمساعدة الفورية.`
         : `⚠️ To cancel booking (${matchedBooking.id}) at ${venue?.name || matchedBooking.venueId}:\n\n` +
           `You can cancel directly on the app up to 6 hours before your slot to receive a wallet refund:\n` +
-          `👉 https://hagzy-booking.web.app\n` +
+          `👉 https://hagzy.shop\n` +
           `Or reply "support" for customer assistance.`;
     }
     return arabic
-      ? `لإلغاء أي حجز، يرجى الدخول إلى صفحة "حجوزاتي" عبر الرابط https://hagzy-booking.web.app واختيار "إلغاء الحجز".`
-      : `To cancel a booking, please open your Reservations page at https://hagzy-booking.web.app and tap Cancel.`;
+      ? `لإلغاء أي حجز، يرجى الدخول إلى صفحة "حجوزاتي" عبر الرابط https://hagzy.shop واختيار "إلغاء الحجز".`
+      : `To cancel a booking, please open your Reservations page at https://hagzy.shop and tap Cancel.`;
   }
 
   // 6. Live Agent / Human Support ("خدمة العملاء", "موظف", "support", "human")
@@ -4729,14 +5082,14 @@ async function processChatbotMessage({ message = '', senderPhone = '', bookingId
       `2️⃣ لدفع العربون وطرق التحويل، أرسل: "دفع" أو "عربون".\n` +
       `3️⃣ لإلغاء حجز، أرسل: "إلغاء".\n` +
       `4️⃣ للتحدث مع خدمة العملاء، أرسل: "خدمة العملاء".\n\n` +
-      `👉 لتصفح وحجز الملاعب: https://hagzy-booking.web.app`
+      `👉 لتصفح وحجز الملاعب: https://hagzy.shop`
     : `Welcome to Hagzy Assistant! 🏆👋\n\n` +
       `How can we help you today?\n` +
       `1️⃣ Check booking status: Reply "status" or your Booking ID.\n` +
       `2️⃣ Deposit payment options: Reply "pay" or "deposit".\n` +
       `3️⃣ Cancel a reservation: Reply "cancel".\n` +
       `4️⃣ Talk to human support: Reply "support".\n\n` +
-      `👉 Book venues: https://hagzy-booking.web.app`;
+      `👉 Book venues: https://hagzy.shop`;
 }
 
 // UltraMsg Inbound WhatsApp Webhook
@@ -4804,6 +5157,330 @@ app.post('/api/chatbot/message', async (req, res) => {
   return res.json({ success: true, reply });
 });
 
+app.post('/api/internal/run-reminders', async (req, res) => {
+  const secret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET || '';
+  const authHeader = String(req.headers.authorization || '');
+  const keyHeader = String(req.headers['x-listener-key'] || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '')).trim();
+  let authorized = Boolean(secret && keyHeader && secret.length === keyHeader.length && crypto.timingSafeEqual(Buffer.from(keyHeader), Buffer.from(secret)));
+  if (!authorized && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+      authorized = Boolean(decoded && (decoded.role === 'owner' || decoded.isAdmin));
+    } catch (_) {}
+  }
+  if (!authorized) return res.status(401).json({ error: 'Unauthorized reminder runner' });
+
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const results = [];
+  let sentCount = 0;
+
+  for (const b of db.bookings || []) {
+    if (!b.confirmed || b.cancelled || b.checkedIn || b.reminderSentAt) continue;
+    const offsetMins = b.reminderOffsetMinutes !== undefined && b.reminderOffsetMinutes !== null
+      ? Number(b.reminderOffsetMinutes)
+      : 120;
+    if (!Number.isFinite(offsetMins) || offsetMins <= 0) continue;
+    const startsAtMs = new Date(b.startsAt).getTime();
+    if (Number.isNaN(startsAtMs) || startsAtMs <= nowMs) continue;
+    if (nowMs < startsAtMs - offsetMins * 60 * 1000) continue;
+
+    const phone = b.phone || b.customerPhone;
+    if (!phone) {
+      results.push({ bookingId: b.id, skipped: true, reason: 'no_phone' });
+      continue;
+    }
+
+    const v = (db.venues || []).find(vx => vx.id === b.venueId);
+    const venueName = v?.name || b.venueName || b.venueId;
+    const unitLine = b.unitName ? ` (${b.unitName})` : '';
+    const total = Number(b.price || b.totalPrice || 0);
+    const paid = Number(b.actualPaidAmount || b.depositAmount || 0);
+    const remaining = Math.max(0, Number((total - paid).toFixed(2)));
+    const qrUrl = buildBookingQrCheckInUrl(b.id, computeBookingQrSig(b.id, b.venueId));
+    const msg = [
+      `⏰ *تذكير بموعد حجزك في حجزي*`,
+      `🏟️ المكان: ${venueName}${unitLine}`,
+      `📅 الموعد: ${b.startsAt}`,
+      `💰 المتبقي للدفع بالمكان: ${remaining} ج.م`,
+      `🎫 رابط كود الدخول QR: ${qrUrl}`,
+      `🆔 رقم الحجز: ${b.id}`,
+    ].join('\n');
+
+    const sendRes = await sendSmsOrWhatsApp({ phone, message: msg, otp: '' }).catch(() => ({ sent: false }));
+    if (sendRes && sendRes.sent) {
+      b.reminderSentAt = nowIso;
+      sentCount++;
+    } else if (req.body?.forceMarkSent) {
+      b.reminderSentAt = nowIso;
+      sentCount++;
+    }
+    results.push({ bookingId: b.id, sent: Boolean(sendRes?.sent || req.body?.forceMarkSent) });
+  }
+
+  saveDb(db);
+  return res.json({ success: true, checkedAt: nowIso, sentCount, results });
+});
+
+// AI Venue Generator (Gemini 1.5 Flash + Egyptian Market Template Fallback)
+function buildFallbackVenueFromTemplateNode(prompt = '', categoryHint = 'padel', isArabic = false) {
+  const lower = (prompt + ' ' + categoryHint).toLowerCase();
+  let type = 'sports';
+  let category = 'padel';
+
+  if (/صالون|حلاقة|حلاق|كوافير|تجميل|شعر|salon|barber|grooming|hair/i.test(lower)) {
+    type = 'salon';
+    category = 'salon';
+  } else if (/playstation|بلايستيشن|ps5|ps4|جيمنج|gaming/i.test(lower)) {
+    type = 'lounge';
+    category = 'playstation';
+  } else if (/بلياردو|billiards|pool|snooker/i.test(lower)) {
+    type = 'lounge';
+    category = 'billiards';
+  } else if (/كرة|كورة|football|خماسي|ملعب كرة/i.test(lower)) {
+    type = 'sports';
+    category = 'football';
+  } else if (/تنس|tennis/i.test(lower)) {
+    type = 'sports';
+    category = 'tennis';
+  }
+
+  const phoneMatch = prompt.match(/01[0125][0-9]{8}/);
+  const phone = phoneMatch ? phoneMatch[0] : '';
+  const ipaMatch = prompt.match(/([a-zA-Z0-9._-]+@instapay)/i);
+  const instaPay = ipaMatch ? ipaMatch[1] : '';
+  const depMatch = prompt.match(/(?:عربون|deposit)[:\s]+([0-9]{1,3})%?/i) || prompt.match(/([0-9]{1,3})%\s*(?:عربون|deposit)/i);
+  const depositPercent = depMatch ? Math.max(0, Math.min(100, Number(depMatch[1]))) : 25;
+  const priceMatch = prompt.match(/(?:الساعة|ساعة|price|rate|بـ|ب|بقيمة)[:\s]*([0-9]+(?:\.[0-9]+)?)\s*(?:جنيه|جنيها|ج\.م|egp|le)?/i);
+  const extractedPrice = priceMatch ? Number(priceMatch[1]) : 0;
+
+  let city = isArabic ? 'القاهرة الجديدة' : 'New Cairo';
+  if (/تجمع|التجمع/i.test(lower)) city = isArabic ? 'التجمع الخامس' : 'New Cairo';
+  else if (/معادي|المعادي|maadi/i.test(lower)) city = isArabic ? 'المعادي' : 'Maadi';
+  else if (/زايد|الشيخ زايد|zayed/i.test(lower)) city = isArabic ? 'الشيخ زايد' : 'Sheikh Zayed';
+  else if (/أكتوبر|اكتوبر|october/i.test(lower)) city = isArabic ? 'السادس من أكتوبر' : '6th of October';
+  else if (/نصر|مدينة نصر|nasr city/i.test(lower)) city = isArabic ? 'مدينة نصر' : 'Nasr City';
+  else if (/إسكندرية|اسكندرية|alex/i.test(lower)) city = isArabic ? 'الإسكندرية' : 'Alexandria';
+  else if (/طنطا|tanta/i.test(lower)) city = isArabic ? 'طنطا' : 'Tanta';
+  else if (/كفر الشيخ|kafr el sheikh/i.test(lower)) city = isArabic ? 'كفر الشيخ' : 'Kafr El Sheikh';
+  else if (/المنصورة|منصورة|mansoura/i.test(lower)) city = isArabic ? 'المنصورة' : 'Mansoura';
+
+  let name = '';
+  const nameMatch = prompt.match(/(?:اسمه|اسم المكان|اسم النادي|venue|name)[:\s]+([^\n,،.]+)/i);
+  if (nameMatch && nameMatch[1].trim()) {
+    name = nameMatch[1].trim();
+  } else {
+    const cleanWords = prompt.split(/[\s,،.]+/).filter(w => w.length > 2 && !/ملعب|نادي|صالون|حجز|الساعة|عربون|جنيه|01[0125]/.test(w));
+    name = cleanWords.slice(0, 3).join(' ') || (category === 'padel' ? 'Nile Padel Club' : category === 'salon' ? 'Elite Lounge & Salon' : 'Arena Hub');
+  }
+
+  let spaces = [];
+  let services = [];
+  let amenities = [];
+  let description = '';
+
+  if (category === 'padel') {
+    const rate = extractedPrice > 0 ? extractedPrice : 400;
+    spaces = [
+      { name: 'Court 1 (Panoramic)', kind: 'Padel', hourlyRate: rate },
+      { name: 'Court 2 (Standard)', kind: 'Padel', hourlyRate: rate },
+    ];
+    services = [
+      { name: isArabic ? 'تأجير مضرب بادل احترافي' : 'Pro Padel Racket Rental', price: 50 },
+      { name: isArabic ? 'حصة تدريب فردية (ساعة)' : 'Private Coaching Session (1 hr)', price: 250 },
+      { name: isArabic ? 'كرات جديدة (علبة)' : 'Fresh Ball Can (3 balls)', price: 180 },
+    ];
+    amenities = ['Parking', 'Showers', 'Night Floodlights', 'Wi-Fi', 'Café & Shaded Seating'];
+    description = isArabic
+      ? 'ملاعب بادل احترافية مجهزة بأعلى مواصفات الإضاءة والأرضيات الزجاجية مع خدمات تدريب وتأجير معدات.'
+      : 'Top-tier panoramic padel courts with professional lighting, equipment rental, and certified coaching.';
+  } else if (category === 'football') {
+    const rate = extractedPrice > 0 ? extractedPrice : 350;
+    spaces = [
+      { name: 'Pitch A (5-a-side)', kind: 'Football 5x5', hourlyRate: rate },
+      { name: 'Pitch B (5-a-side)', kind: 'Football 5x5', hourlyRate: rate },
+    ];
+    services = [
+      { name: isArabic ? 'تأجير أطقم تيشرتات مميزة' : 'Team Bibs & Ball Rental', price: 40 },
+      { name: isArabic ? 'حكم مباراة معتمد' : 'Certified Match Referee', price: 150 },
+    ];
+    amenities = ['Parking', 'Locker Rooms', 'Showers', 'Bleachers', 'Night Floodlights'];
+    description = isArabic
+      ? 'ملاعب كرة قدم خماسية بنجيل صناعي معتمد وترتان ممتاز وإضاءة مسائية متطورة.'
+      : 'FIFA-grade turf 5-a-side football pitches with floodlights and locker facilities.';
+  } else if (category === 'salon') {
+    const rate = extractedPrice > 0 ? extractedPrice : 150;
+    spaces = [
+      { name: 'VIP Chair 1', kind: 'Master Barber', hourlyRate: rate },
+      { name: 'Stylist Chair 2', kind: 'Stylist Chair', hourlyRate: Math.round(rate * 0.8) },
+    ];
+    services = [
+      { name: isArabic ? 'قص شعر وتصفيف VIP' : 'Haircut & VIP Styling', price: 120 },
+      { name: isArabic ? 'تشذيب لحية بالبخار وفوطة ساخنة' : 'Hot Towel Beard Trim & Shave', price: 90 },
+      { name: isArabic ? 'جلسة تنظيف بشرة وماسك أسود' : 'Deep Facial Cleansing & Mask', price: 180 },
+    ];
+    amenities = ['AC', 'Wi-Fi', 'Beverages & Espresso', 'Complimentary Parking', 'VIP Room'];
+    description = isArabic
+      ? 'صالون متكامل يقدم خدمات الحلاقة والعناية بالبشرة بأيدي خبراء متخصصين وأجواء راقية.'
+      : 'Modern premium grooming lounge offering bespoke haircuts, beard styling, and skincare treatments.';
+  } else if (category === 'playstation') {
+    const rate = extractedPrice > 0 ? extractedPrice : 70;
+    spaces = [
+      { name: 'VIP Room 1 (PS5 & 65" 4K)', kind: 'PS5 VIP Room', hourlyRate: rate },
+      { name: 'Standard Station 2 (PS5)', kind: 'PS5 Standard', hourlyRate: Math.max(40, Math.round(rate * 0.75)) },
+    ];
+    services = [
+      { name: isArabic ? 'دراع إضافي تحكم' : 'Extra Controller', price: 25 },
+      { name: isArabic ? 'مشروب طاقة / قهوة' : 'Energy Drink / Specialty Coffee', price: 35 },
+    ];
+    amenities = ['AC', 'Ultra 4K OLED Screens', 'Surround Sound', 'High-Speed Wi-Fi', 'Snack Bar'];
+    description = isArabic
+      ? 'غرف بلايستيشن VIP مجهزة بأحدث أجهزة PS5 وشاشات 4K مع تكيف مركزي وأفضل ألعاب الجيل الجديد.'
+      : 'Exclusive PS5 gaming lounge featuring private 4K VIP suites and the latest competitive titles.';
+  } else {
+    const rate = extractedPrice > 0 ? extractedPrice : 200;
+    spaces = [{ name: 'Space 1', kind: category, hourlyRate: rate }];
+    services = [{ name: isArabic ? 'خدمة مخصصة' : 'Standard Service Addon', price: 50 }];
+    amenities = ['AC', 'Wi-Fi', 'Parking'];
+    description = isArabic ? 'مساحة راقية مجهزة بالكامل لتلبية كافة احتياجاتك.' : 'Fully equipped venue space.';
+  }
+
+  const address = isArabic ? `${city}، مصر` : `${city}, Egypt`;
+
+  return {
+    name,
+    type,
+    category,
+    city,
+    address,
+    location: address,
+    description,
+    openHour: 10,
+    closeHour: 24,
+    depositPercent,
+    instaPayAddress: instaPay,
+    vodafoneCashNumber: phone,
+    amenities,
+    spaces,
+    items: spaces,
+    services,
+  };
+}
+
+app.post('/api/ai/venue-generator', async (req, res) => {
+  const body = req.body || {};
+  const prompt = String(body.prompt || '').trim();
+  const imageBase64 = String(body.imageBase64 || '').trim();
+  const mimeType = String(body.mimeType || 'image/jpeg').trim();
+  const categoryHint = String(body.categoryHint || '').trim();
+  const isArabic = Boolean(body.isArabic || /[\u0600-\u06FF]/.test(prompt));
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (geminiApiKey) {
+    try {
+      const systemInstruction = `You are Hagzy AI, an expert venue operations generator for the Egyptian booking market (sports, padel, football, salons, grooming, playstation, billiards, entertainment).
+Given the user's text description or photo of a price sheet / board / flyer:
+1. Extract or determine:
+   - name: Venue business name.
+   - type: Must be "sports", "salon", or "lounge".
+   - category: e.g. "padel", "football", "salon", "playstation", "billiards".
+   - city: Egyptian city (New Cairo, Maadi, Sheikh Zayed, Nasr City, Alexandria, Tanta, Mansoura, etc.).
+   - address: Detailed area or street in Egypt.
+   - description: 1-2 sentence compelling marketing description (in ${isArabic ? 'Arabic' : 'English'}).
+   - openHour: Integer 0-23 (default 10).
+   - closeHour: Integer 0-23 (default 24).
+   - depositPercent: Integer 0-100 (default 25).
+   - instaPayAddress: Extract if handle like name@instapay is mentioned, otherwise "".
+   - vodafoneCashNumber: Extract Egyptian 010/011/012/015 11-digit mobile wallet if mentioned, otherwise "".
+   - amenities: String array of key amenities (e.g. Parking, AC, Wi-Fi, Showers, Floodlights, Café).
+   - spaces: Array of bookable units/spaces, each with: { "name": string, "kind": string, "hourlyRate": number (in EGP) }.
+   - services: Array of add-on services or menu items with: { "name": string, "price": number (in EGP) }.
+Output MUST be strict JSON matching this structure without Markdown backticks.`;
+
+      const contents = [];
+      const parts = [];
+      if (imageBase64) {
+        parts.push({
+          inlineData: {
+            mimeType: mimeType || 'image/jpeg',
+            data: imageBase64.replace(/^data:[^;]+;base64,/, ''),
+          },
+        });
+      }
+      parts.push({
+        text: `${prompt || 'Extract and create a complete Egyptian venue setup from this input.'} Category hint: ${categoryHint || 'auto'}.`,
+      });
+      contents.push({ parts });
+
+      const candidateModels = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest'];
+      let geminiData = null;
+
+      for (const model of candidateModels) {
+        try {
+          const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(7000),
+              body: JSON.stringify({
+                contents,
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                  temperature: 0.2,
+                },
+              }),
+            }
+          );
+          if (resp.ok) {
+            geminiData = await resp.json();
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (geminiData) {
+        const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          const parsed = JSON.parse(rawText);
+          parsed.depositPercent = Math.max(0, Math.min(100, Number(parsed.depositPercent || 25)));
+          parsed.spaces = Array.isArray(parsed.spaces) && parsed.spaces.length > 0
+            ? parsed.spaces.map(s => ({
+                name: String(s.name || 'Space 1').trim(),
+                kind: String(s.kind || parsed.category || 'Standard').trim(),
+                hourlyRate: Math.max(10, Number(s.hourlyRate || 200)),
+              }))
+            : [{ name: 'Space 1', kind: parsed.category || 'Standard', hourlyRate: 200 }];
+          parsed.services = Array.isArray(parsed.services)
+            ? parsed.services.map(sv => ({
+                name: String(sv.name || 'Add-on').trim(),
+                price: Math.max(5, Number(sv.price || 50)),
+              }))
+            : [];
+          parsed.amenities = Array.isArray(parsed.amenities) ? parsed.amenities.map(String) : [];
+          parsed.items = parsed.spaces;
+
+          return res.json({
+            success: true,
+            source: 'gemini-3.5-flash-lite',
+            venue: parsed,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[AI_VENUE_GENERATOR] Node Gemini call failed, falling back to templates:', err.message);
+    }
+  }
+
+  const fallbackVenue = buildFallbackVenueFromTemplateNode(prompt, categoryHint, isArabic);
+  return res.json({
+    success: true,
+    source: 'egyptian-market-heuristics-fallback',
+    venue: fallbackVenue,
+  });
+});
+
 // Health check: handles /health, /api/health, /healthz, and /ping
 app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
   return res.status(200).json({
@@ -4837,8 +5514,12 @@ if (fbFirestore && !IS_TEST && !pgPool) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Hagzy server is live on port ${PORT} (bound to 0.0.0.0)`);
-  console.log(`📡 Venues loaded: ${db.venues.length} · 👥 Users: ${db.users.length}\n`);
-});
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 Hagzy server is live on port ${PORT} (bound to 0.0.0.0)`);
+    console.log(`📡 Venues loaded: ${db.venues.length} · 👥 Users: ${db.users.length}\n`);
+  });
+}
+
+module.exports = { app, buildFallbackVenueFromTemplateNode };
 

@@ -16,17 +16,23 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hagzy.paymentgateway.GatewayApplication
-import com.hagzy.paymentgateway.R
+import com.hagzy.paymentgateway.data.local.GatewayConfig
 import com.hagzy.paymentgateway.data.model.PaymentEvent
 import com.hagzy.paymentgateway.data.model.SyncStatus
 import com.hagzy.paymentgateway.databinding.ActivityMainBinding
 import com.hagzy.paymentgateway.databinding.ItemEventLogBinding
-import com.hagzy.paymentgateway.receiver.WalletSmsReceiver
+import com.hagzy.paymentgateway.network.PaymentEventPipeline
+import com.hagzy.paymentgateway.network.WebhookDispatcher
 import com.hagzy.paymentgateway.service.GatewayKeepAliveService
-import com.hagzy.paymentgateway.service.InstaPayNotificationListenerService
+import com.hagzy.paymentgateway.util.PaymentTextParser
+import com.hagzy.paymentgateway.worker.PaymentRetryWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,7 +40,9 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var gatewayConfig: GatewayConfig
     private val adapter = EventLogAdapter()
+    private val heartbeatDateFormat = SimpleDateFormat("HH:mm:ss dd/MM", Locale.US)
 
     private val requestSmsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -52,12 +60,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        gatewayConfig = GatewayConfig(this)
 
         setSupportActionBar(binding.toolbar)
 
+        setupConfigInputs()
         setupRecyclerView()
         setupListeners()
         observeDatabase()
+        updateHeartbeatDisplay()
 
         // Ensure keep-alive service is running
         GatewayKeepAliveService.start(this)
@@ -66,6 +77,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updatePermissionButtons()
+        updateHeartbeatDisplay()
+    }
+
+    private fun setupConfigInputs() {
+        binding.etWebhookUrl.setText(gatewayConfig.webhookUrl)
+        binding.etWebhookSecret.setText(gatewayConfig.webhookSecret)
     }
 
     private fun setupRecyclerView() {
@@ -78,6 +95,46 @@ class MainActivity : AppCompatActivity() {
             GatewayKeepAliveService.stop(this)
             GatewayKeepAliveService.start(this)
             Toast.makeText(this, "Gateway Keep-Alive Service Restarted", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.btnSaveConfig.setOnClickListener {
+            val rawUrl = binding.etWebhookUrl.text?.toString().orEmpty().trim()
+            val rawSecret = binding.etWebhookSecret.text?.toString().orEmpty().trim()
+
+            if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+                binding.etWebhookUrl.error = "Enter a valid http:// or https:// URL"
+                return@setOnClickListener
+            }
+
+            gatewayConfig.webhookUrl = rawUrl
+            gatewayConfig.webhookSecret = rawSecret
+            binding.etWebhookUrl.error = null
+            binding.btnSaveConfig.isEnabled = false
+            binding.tvHeartbeatStatus.text = "Heartbeat: Pinging server..."
+
+            lifecycleScope.launch {
+                val result = WebhookDispatcher.sendHeartbeat()
+                binding.btnSaveConfig.isEnabled = true
+                updateHeartbeatDisplay()
+                if (result.isSuccess) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Saved & server heartbeat OK!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Saved, ping failed: ${result.exceptionOrNull()?.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+
+        binding.btnRetryPending.setOnClickListener {
+            PaymentRetryWorker.schedule(this)
+            Toast.makeText(this, "Queued retry for pending/failed events", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnGrantSms.setOnClickListener {
@@ -103,6 +160,13 @@ class MainActivity : AppCompatActivity() {
         binding.btnSimulateVodafone.setOnClickListener {
             simulateVodafoneCashSms()
         }
+    }
+
+    private fun updateHeartbeatDisplay() {
+        val status = gatewayConfig.lastHeartbeatStatus
+        val lastAt = gatewayConfig.lastHeartbeatAt
+        val timeText = if (lastAt > 0L) " • ${heartbeatDateFormat.format(Date(lastAt))}" else ""
+        binding.tvHeartbeatStatus.text = "Heartbeat: $status$timeText"
     }
 
     private fun observeDatabase() {
@@ -162,18 +226,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun simulateInstaPayReceipt() {
-        val fakeNotification = "You have received 150.00 EGP from abdelhamed1978@instapay"
-        val service = InstaPayNotificationListenerService()
-        // Inject application context for database lookup
-        service.parseInstaPayContent(fakeNotification, System.currentTimeMillis())
-        Toast.makeText(this, "Simulated InstaPay receipt triggered!", Toast.LENGTH_SHORT).show()
+        val fakeNotification = "You have recieved 150.00 EGP from mohamedra4adhegazy@instapay"
+        val event = PaymentTextParser.parseInstaPayNotification(
+            rawText = fakeNotification,
+            timestamp = System.currentTimeMillis(),
+            isOfficialInstaPayApp = true
+        )
+        if (event == null) {
+            Toast.makeText(this, "Simulator failed to parse InstaPay sample", Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            val recorded = withContext(Dispatchers.IO) {
+                PaymentEventPipeline.recordAndDispatch(applicationContext, event)
+            }
+            val msg = if (recorded) {
+                "Simulated InstaPay receipt triggered!"
+            } else {
+                "Duplicate simulated InstaPay event (already queued in last 10s)"
+            }
+            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun simulateVodafoneCashSms() {
-        val fakeSms = "تم استلام مبلغ 200 جنيه من 01012345678 رقم العملية VF984128"
-        val receiver = WalletSmsReceiver()
-        receiver.parseWalletSms(this, fakeSms, System.currentTimeMillis())
-        Toast.makeText(this, "Simulated Vodafone Cash SMS triggered!", Toast.LENGTH_SHORT).show()
+        val fakeRef = "VF${System.currentTimeMillis() % 1_000_000}"
+        val fakeSms = "تم استلام مبلغ 100.00 جنيه من 01063330948؛\n" +
+            "المسجل بإسم OMAR ISMAEL ABDELHAF\n" +
+            "على رقم محفظتك 01041570557 بتاريخ 20:16 26-11-13.\n" +
+            "رصيدك الحالي: 7.10 جنيه\n" +
+            "رقم العملية: $fakeRef"
+        val event = PaymentTextParser.parseWalletSms(fakeSms, System.currentTimeMillis())
+        if (event == null) {
+            Toast.makeText(this, "Simulator failed to parse VF-Cash sample", Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                PaymentEventPipeline.recordAndDispatch(applicationContext, event)
+            }
+            Toast.makeText(this@MainActivity, "Simulated Vodafone Cash SMS triggered!", Toast.LENGTH_SHORT).show()
+        }
     }
 }
 
@@ -207,12 +300,25 @@ class EventLogAdapter : RecyclerView.Adapter<EventLogAdapter.ViewHolder>() {
 
         fun bind(event: PaymentEvent) {
             binding.tvMethodBadge.text = event.paymentMethod
-            binding.tvAmount.text = "${"%.2f".format(event.amount)} EGP"
+            binding.tvAmount.text = if (event.amount > 0.0) {
+                "${"%.2f".format(Locale.US, event.amount)} EGP"
+            } else {
+                "Needs Server Parse"
+            }
             binding.tvSender.text = "From: ${event.senderIdentifier}"
 
-            val refText = if (event.providerRef != null) "Ref: ${event.providerRef}" else "Event: ${event.eventId.take(12)}..."
+            val refText = if (event.providerRef != null) {
+                "Ref: ${event.providerRef}"
+            } else {
+                "Event: ${event.eventId.take(12)}..."
+            }
             val timeText = dateFormat.format(Date(event.timestamp))
-            binding.tvRefAndDate.text = "$refText • $timeText"
+            val errorSuffix = if (event.syncStatus == SyncStatus.FAILED && !event.errorMessage.isNullOrBlank()) {
+                " • ${event.errorMessage}"
+            } else {
+                ""
+            }
+            binding.tvRefAndDate.text = "$refText • $timeText$errorSuffix"
 
             binding.tvSyncStatus.text = event.syncStatus.name
             when (event.syncStatus) {
