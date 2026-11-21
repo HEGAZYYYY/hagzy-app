@@ -354,11 +354,16 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
       pricing_mode: merged.pricingMode || 'per_hour',
       is_active: merged.isActive !== false,
       is_deleted: false,
-      images: Array.isArray(merged.images) ? merged.images : [],
+      images: Array.isArray(merged.images) && merged.images.length > 0
+        ? merged.images
+        : (merged.imageUrl ? [merged.imageUrl] : []),
       amenities: Array.isArray(merged.amenities) ? merged.amenities : [],
       rules: Array.isArray(merged.rules) ? merged.rules : [],
       services: Array.isArray(merged.services) ? merged.services : [],
-      extra,
+      extra: {
+        ...extra,
+        ...(merged.imageUrl ? { imageUrl: merged.imageUrl } : {}),
+      },
     });
 
     // Sync bookable_units for this venue
@@ -373,17 +378,21 @@ export function registerAdminAndPartnerRoutes(app: Hono) {
         if (seenIds.has(unitId)) return;
         seenIds.add(unitId);
         const priceVal = u.pricePerHour ?? u.hourlyRate ?? u.price;
+        const uExtra = (u.extra && typeof u.extra === 'object') ? { ...u.extra } : {};
+        if (u.imageUrl) uExtra.imageUrl = u.imageUrl;
+        if (u.description) uExtra.description = u.description;
         unitRows.push({
           id: unitId,
           venue_id: venueId,
           name: String(u.name || unitId),
           name_en: String(u.nameEn || ''),
-          unit_type: String(u.unitType || u.type || 'unit'),
+          unit_type: String(u.unitType || u.kind || u.type || 'unit'),
           capacity: u.capacity != null && Number.isFinite(Number(u.capacity)) ? Math.round(Number(u.capacity)) : null,
           price_per_hour: priceVal != null && Number.isFinite(Number(priceVal)) ? Number(priceVal) : null,
           is_active: u.isActive !== false,
           source_key: sourceKey,
           sort_order: idx,
+          extra: uExtra,
         });
       });
     }

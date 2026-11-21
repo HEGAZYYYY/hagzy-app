@@ -140,6 +140,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
         kind: i.kind,
         hourlyRate: i.hourlyRate,
         peakRate: i.multiRate > 0 ? i.multiRate : i.hourlyRate * 1.25,
+        description: i.description,
+        imageUrl: i.imageUrl,
       )).toList();
 
       _services = v.services.map((s) => _EditableService(
@@ -168,9 +170,33 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     _services.clear();
     if (type == VenueType.salon) {
       _items.addAll([
-        _EditableItem(id: 'chair_1', name: 'Master Barber Chair 1', kind: 'Master Station', hourlyRate: 150, peakRate: 200),
-        _EditableItem(id: 'chair_2', name: 'Styling Chair 2', kind: 'Standard', hourlyRate: 120, peakRate: 150),
-        _EditableItem(id: 'chair_vip', name: 'VIP Private Grooming Suite', kind: 'VIP Suite', hourlyRate: 250, peakRate: 300),
+        _EditableItem(
+          id: 'chair_1',
+          name: 'Master Barber Chair 1',
+          kind: 'Master Station',
+          hourlyRate: 150,
+          peakRate: 200,
+          description: 'Hydraulic barber chair with hot towel station.',
+          imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'chair_2',
+          name: 'Styling Chair 2',
+          kind: 'Standard',
+          hourlyRate: 120,
+          peakRate: 150,
+          description: 'Ergonomic styling station with mirror lighting.',
+          imageUrl: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'chair_vip',
+          name: 'VIP Private Grooming Suite',
+          kind: 'VIP Suite',
+          hourlyRate: 250,
+          peakRate: 300,
+          description: 'Private enclosed suite with recliner & beverage bar.',
+          imageUrl: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=800&q=80',
+        ),
       ]);
       _services.addAll([
         _EditableService(id: 'svc_hair', name: 'Haircut & Styling', price: 100, minutes: 30),
@@ -179,14 +205,54 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       ]);
     } else if (type == VenueType.lounge) {
       _items.addAll([
-        _EditableItem(id: 'ps_room_1', name: 'PS5 Room 1 (65" 4K OLED)', kind: 'VIP Lounge', hourlyRate: 80, peakRate: 100),
-        _EditableItem(id: 'ps_room_2', name: 'PS5 Room 2 (Standard)', kind: 'Standard Room', hourlyRate: 60, peakRate: 80),
-        _EditableItem(id: 'billiard_1', name: 'Tournament Billiards Table', kind: 'Billiards', hourlyRate: 70, peakRate: 90),
+        _EditableItem(
+          id: 'ps_room_1',
+          name: 'PS5 Room 1 (65" 4K OLED)',
+          kind: 'VIP Lounge',
+          hourlyRate: 80,
+          peakRate: 100,
+          description: 'Private soundproof room, 65" LG OLED, 4 DualSense controllers.',
+          imageUrl: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'ps_room_2',
+          name: 'PS5 Room 2 (Standard)',
+          kind: 'Standard Room',
+          hourlyRate: 60,
+          peakRate: 80,
+          description: 'Cozy gaming setup with 55" 4K HDR TV and leather seating.',
+          imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'billiard_1',
+          name: 'Tournament Billiards Table',
+          kind: 'Billiards',
+          hourlyRate: 70,
+          peakRate: 90,
+          description: '9-foot tournament slate pool table with premium cues.',
+          imageUrl: 'https://images.unsplash.com/photo-1588731234159-8b9963143fca?auto=format&fit=crop&w=800&q=80',
+        ),
       ]);
     } else {
       _items.addAll([
-        _EditableItem(id: 'court_1', name: 'Court 1 (Panoramic Glass)', kind: 'Panoramic', hourlyRate: 400, peakRate: 500),
-        _EditableItem(id: 'court_2', name: 'Court 2 (Standard)', kind: 'Standard', hourlyRate: 350, peakRate: 450),
+        _EditableItem(
+          id: 'court_1',
+          name: 'Court 1 (Panoramic Glass)',
+          kind: 'Panoramic',
+          hourlyRate: 400,
+          peakRate: 500,
+          description: 'Panoramic glass court with LED floodlights and blue Mondo turf.',
+          imageUrl: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'court_2',
+          name: 'Court 2 (Standard)',
+          kind: 'Standard',
+          hourlyRate: 350,
+          peakRate: 450,
+          description: 'Standard outdoor court with high-visibility lighting.',
+          imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80',
+        ),
       ]);
       _services.addAll([
         _EditableService(id: 'svc_racket', name: 'Pro Racket Rental', price: 50, minutes: 60),
@@ -256,6 +322,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       kind: i.kind.trim(),
       hourlyRate: i.hourlyRate,
       multiRate: i.peakRate,
+      description: i.description.trim(),
+      imageUrl: i.imageUrl?.trim().isNotEmpty == true ? i.imageUrl!.trim() : null,
     )).toList();
 
     final services = _services.map((s) => SalonService(
@@ -511,18 +579,38 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: kSurfaceTint,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              _selectedType == VenueType.salon ? Icons.chair_rounded : Icons.sports_tennis_rounded,
-                              color: kGreen,
-                              size: 18,
-                            ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                                ? HagzySmartImage(
+                                    imageUrl: item.imageUrl!,
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorWidget: Container(
+                                      width: 44,
+                                      height: 44,
+                                      color: kSurfaceTint,
+                                      child: Icon(
+                                        _selectedType == VenueType.salon ? Icons.chair_rounded : Icons.sports_tennis_rounded,
+                                        color: kGreen,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: kSurfaceTint,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      _selectedType == VenueType.salon ? Icons.chair_rounded : Icons.sports_tennis_rounded,
+                                      color: kGreen,
+                                      size: 20,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -533,7 +621,16 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                   item.name,
                                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                                 ),
-                                const SizedBox(height: 2),
+                                if (item.description.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                                const SizedBox(height: 3),
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 4,
@@ -934,84 +1031,196 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     final kindCtrl = TextEditingController(text: isSalon ? 'Standard Station' : 'Standard');
     final rateCtrl = TextEditingController(text: isSalon ? '150' : '350');
     final peakCtrl = TextEditingController(text: isSalon ? '200' : '450');
+    final descCtrl = TextEditingController();
+    final imageCtrl = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          isSalon
-              ? (isAr ? 'إضافة كرسي حلاقة جديد' : 'Add New Salon Chair')
-              : (isAr ? 'إضافة غرفة أو ملعب جديد' : 'Add New Room or Court'),
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: isSalon ? 'اسم الكرسي / المحطة *' : 'اسم الغرفة / الملعب *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> pickUnitImage() async {
+            try {
+              final dataUrl = await ImageUploadService.pickImage();
+              if (dataUrl != null && dataUrl.isNotEmpty) {
+                setDialogState(() {
+                  imageCtrl.text = dataUrl;
+                });
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to load image: $e')),
+                );
+              }
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              isSalon
+                  ? (isAr ? 'إضافة كرسي حلاقة جديد' : 'Add New Salon Chair')
+                  : (isAr ? 'إضافة غرفة أو ملعب جديد' : 'Add New Room or Court'),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: isSalon ? 'اسم الكرسي / المحطة *' : 'اسم الغرفة / الملعب *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: kindCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'النوع / الفئة (Standard, VIP, Panoramic...)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: rateCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: peakCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: descCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'وصف الغرفة أو التجهيزات (اختياري)' : 'Description & Features (Optional)',
+                        hintText: isSalon
+                            ? 'e.g. VIP reclining chair, hot towel service'
+                            : 'e.g. 4K OLED, 2 wireless controllers, sound system',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: pickUnitImage,
+                            icon: const Icon(Icons.file_upload_outlined, size: 18),
+                            label: Text(
+                              isSalon
+                                  ? (isAr ? 'رفع صورة الكرسي (ملف)' : 'Upload Chair Picture')
+                                  : (isAr ? 'رفع صورة الغرفة / الملعب (ملف)' : 'Upload Room Picture'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                            ),
+                          ),
+                        ),
+                        if (imageCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton.outlined(
+                            tooltip: isAr ? 'مسح الصورة' : 'Clear Image',
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            onPressed: () => setDialogState(() => imageCtrl.clear()),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: imageCtrl,
+                      onChanged: (_) => setDialogState(() {}),
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'أو رابط صورة الوحدة (URL)' : 'Or Unit Picture URL',
+                        hintText: 'https://images.unsplash.com/...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.link_rounded, size: 18),
+                      ),
+                    ),
+                    if (imageCtrl.text.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: HagzySmartImage(
+                            imageUrl: imageCtrl.text.trim(),
+                            fit: BoxFit.cover,
+                            errorWidget: Center(
+                              child: Text(
+                                isAr ? 'تعذر معاينة الصورة' : 'Could not preview image',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: kindCtrl,
-                decoration: InputDecoration(
-                  labelText: 'النوع / الفئة (Standard, VIP, Panoramic...)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(isAr ? 'إلغاء' : 'Cancel'),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: rateCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'السعر العادي للساعة (جنيه)' : 'Regular Hourly Rate (EGP)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: peakCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'سعر وقت الذروة / المساء (جنيه)' : 'Peak / Evening Rate (EGP)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  helperText: isAr ? 'تغير السعر حسب وقت الحجز' : 'Time-based dynamic rate',
-                ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: kGreen),
+                onPressed: () {
+                  final n = nameCtrl.text.trim();
+                  if (n.isEmpty) return;
+                  final r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
+                  final p = double.tryParse(peakCtrl.text.trim()) ?? r;
+
+                  setState(() {
+                    _items.add(_EditableItem(
+                      id: 'unit_${DateTime.now().microsecondsSinceEpoch}',
+                      name: n,
+                      kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : 'Standard',
+                      hourlyRate: r,
+                      peakRate: p,
+                      description: descCtrl.text.trim(),
+                      imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
+                    ));
+                  });
+                  Navigator.pop(ctx);
+                },
+                child: Text(isAr ? 'إضافة' : 'Add'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(isAr ? 'إلغاء' : 'Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kGreen),
-            onPressed: () {
-              final n = nameCtrl.text.trim();
-              if (n.isEmpty) return;
-              final r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
-              final p = double.tryParse(peakCtrl.text.trim()) ?? r;
-
-              setState(() {
-                _items.add(_EditableItem(
-                  id: 'unit_${DateTime.now().microsecondsSinceEpoch}',
-                  name: n,
-                  kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : 'Standard',
-                  hourlyRate: r,
-                  peakRate: p,
-                ));
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text(isAr ? 'إضافة' : 'Add'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -1022,81 +1231,192 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     final kindCtrl = TextEditingController(text: item.kind);
     final rateCtrl = TextEditingController(text: item.hourlyRate.toStringAsFixed(0));
     final peakCtrl = TextEditingController(text: item.peakRate.toStringAsFixed(0));
+    final descCtrl = TextEditingController(text: item.description);
+    final imageCtrl = TextEditingController(text: item.imageUrl ?? '');
+    final isSalon = _selectedType == VenueType.salon;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          isAr ? 'تعديل تفاصيل الوحدة والأسعار' : 'Edit Room / Chair & Rates',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'الاسم *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> pickUnitImage() async {
+            try {
+              final dataUrl = await ImageUploadService.pickImage();
+              if (dataUrl != null && dataUrl.isNotEmpty) {
+                setDialogState(() {
+                  imageCtrl.text = dataUrl;
+                });
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to load image: $e')),
+                );
+              }
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              isAr ? 'تعديل تفاصيل الوحدة والأسعار' : 'Edit Room / Chair & Rates',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'الاسم *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: kindCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'الفئة / النوع',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: rateCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: peakCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: descCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'وصف الغرفة أو التجهيزات (اختياري)' : 'Description & Features (Optional)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: pickUnitImage,
+                            icon: const Icon(Icons.file_upload_outlined, size: 18),
+                            label: Text(
+                              isSalon
+                                  ? (isAr ? 'رفع صورة الكرسي (ملف)' : 'Upload Chair Picture')
+                                  : (isAr ? 'رفع صورة الغرفة / الملعب (ملف)' : 'Upload Room Picture'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                            ),
+                          ),
+                        ),
+                        if (imageCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton.outlined(
+                            tooltip: isAr ? 'مسح الصورة' : 'Clear Image',
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            onPressed: () => setDialogState(() => imageCtrl.clear()),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: imageCtrl,
+                      onChanged: (_) => setDialogState(() {}),
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'أو رابط صورة الوحدة (URL)' : 'Or Unit Picture URL',
+                        hintText: 'https://images.unsplash.com/...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.link_rounded, size: 18),
+                      ),
+                    ),
+                    if (imageCtrl.text.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: HagzySmartImage(
+                            imageUrl: imageCtrl.text.trim(),
+                            fit: BoxFit.cover,
+                            errorWidget: Center(
+                              child: Text(
+                                isAr ? 'تعذر معاينة الصورة' : 'Could not preview image',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: kindCtrl,
-                decoration: InputDecoration(
-                  labelText: 'الفئة / النوع',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(isAr ? 'إلغاء' : 'Cancel'),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: rateCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'السعر العادي للساعة (جنيه)' : 'Regular Hourly Rate (EGP)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: peakCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'سعر وقت الذروة / المساء (جنيه)' : 'Peak / Evening Rate (EGP)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: kGreen),
+                onPressed: () {
+                  final n = nameCtrl.text.trim();
+                  if (n.isEmpty) return;
+                  final r = double.tryParse(rateCtrl.text.trim()) ?? item.hourlyRate;
+                  final p = double.tryParse(peakCtrl.text.trim()) ?? r;
+
+                  setState(() {
+                    _items[idx] = _EditableItem(
+                      id: item.id,
+                      name: n,
+                      kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : item.kind,
+                      hourlyRate: r,
+                      peakRate: p,
+                      description: descCtrl.text.trim(),
+                      imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
+                    );
+                  });
+                  Navigator.pop(ctx);
+                },
+                child: Text(isAr ? 'حفظ' : 'Save'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(isAr ? 'إلغاء' : 'Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kGreen),
-            onPressed: () {
-              final n = nameCtrl.text.trim();
-              if (n.isEmpty) return;
-              final r = double.tryParse(rateCtrl.text.trim()) ?? item.hourlyRate;
-              final p = double.tryParse(peakCtrl.text.trim()) ?? r;
-
-              setState(() {
-                _items[idx] = _EditableItem(
-                  id: item.id,
-                  name: n,
-                  kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : item.kind,
-                  hourlyRate: r,
-                  peakRate: p,
-                );
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text(isAr ? 'حفظ' : 'Save'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -1183,6 +1503,8 @@ class _EditableItem {
   String kind;
   double hourlyRate;
   double peakRate;
+  String description;
+  String? imageUrl;
 
   _EditableItem({
     required this.id,
@@ -1190,6 +1512,8 @@ class _EditableItem {
     required this.kind,
     required this.hourlyRate,
     required this.peakRate,
+    this.description = '',
+    this.imageUrl,
   });
 }
 

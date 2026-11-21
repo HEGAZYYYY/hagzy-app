@@ -170,6 +170,8 @@ class VenueItem {
     required this.kind,
     required this.hourlyRate,
     this.multiRate = 0,
+    this.description = '',
+    this.imageUrl,
   });
 
   final String id;
@@ -177,6 +179,8 @@ class VenueItem {
   final String kind;
   final double hourlyRate;
   final double multiRate;
+  final String description;
+  final String? imageUrl;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -184,6 +188,8 @@ class VenueItem {
         'kind': kind,
         'hourlyRate': hourlyRate,
         'multiRate': multiRate,
+        if (description.isNotEmpty) 'description': description,
+        if (imageUrl != null && imageUrl!.isNotEmpty) 'imageUrl': imageUrl,
       };
 
   factory VenueItem.fromJson(Map<String, dynamic> json) {
@@ -201,6 +207,8 @@ class VenueItem {
       kind: (json['kind'] ?? json['type'] ?? json['unitType'] ?? json['category'] ?? 'General').toString(),
       hourlyRate: rate,
       multiRate: multi,
+      description: (json['description'] ?? '').toString(),
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
     );
   }
 }
@@ -704,6 +712,9 @@ class Venue {
         'ownerPhone': ownerPhone,
         'depositPercent': depositPercent,
         if (imageUrl != null && imageUrl!.isNotEmpty) 'imageUrl': imageUrl,
+        'images': galleryUrls.isNotEmpty
+            ? galleryUrls
+            : (imageUrl != null && imageUrl!.isNotEmpty ? [imageUrl] : const []),
         if (description.isNotEmpty) 'description': description,
         if (googleMapsUrl.isNotEmpty) 'googleMapsUrl': googleMapsUrl,
         if (instaPayAddress.isNotEmpty) 'instaPayAddress': instaPayAddress,
@@ -746,7 +757,13 @@ class Venue {
       ownerPhone: (json['ownerPhone'] ?? json['owner_phone'] ?? '').toString(),
       depositPercent: (json['depositPercent'] as num?)?.toDouble() ??
           (json['deposit_percent'] as num?)?.toDouble() ?? 25.0,
-      imageUrl: json['imageUrl']?.toString(),
+      imageUrl: (json['imageUrl'] ??
+              json['image_url'] ??
+              json['image'] ??
+              ((json['images'] is List && (json['images'] as List).isNotEmpty)
+                  ? (json['images'] as List).first
+                  : null))
+          ?.toString(),
       description: (json['description'] ?? '').toString(),
       googleMapsUrl: (json['googleMapsUrl'] ?? '').toString(),
       instaPayAddress: (json['instaPayAddress'] ?? json['instapayAddress'] ?? '').toString(),
@@ -766,9 +783,11 @@ class Venue {
               .map((e) => e.toString())
               .toList()
           : const <String>[],
-      galleryUrls: (json['galleryUrls'] is List)
+      galleryUrls: (json['galleryUrls'] is List && (json['galleryUrls'] as List).isNotEmpty)
           ? (json['galleryUrls'] as List).map((e) => e.toString()).toList()
-          : const <String>[],
+          : ((json['images'] is List)
+              ? (json['images'] as List).map((e) => e.toString()).toList()
+              : const <String>[]),
       amenities: (json['amenities'] is List)
           ? (json['amenities'] as List).map((e) => e.toString()).toList()
           : const <String>[],

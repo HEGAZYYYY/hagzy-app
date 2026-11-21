@@ -155,4 +155,76 @@ void main() {
     expect(created!.imageUrl, isNotNull);
     expect(created!.imageUrl, contains('unsplash.com'));
   });
+
+  testWidgets('SmoothVenueEditorDialog allows adding room with image and description', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    Venue? created;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SmoothVenueEditorDialog(
+            initialType: VenueType.sports,
+            populateDefaults: false,
+            onSaved: (v) => created = v,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Enter venue name
+    await tester.enterText(find.byType(TextFormField).first, 'Modern Padel Academy');
+    await tester.pumpAndSettle();
+
+    // Tap Add Room button
+    final addRoomBtn = find.text('+ Add Room');
+    expect(addRoomBtn, findsOneWidget);
+    await tester.ensureVisible(addRoomBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(addRoomBtn);
+    await tester.pumpAndSettle();
+
+    // Dialog should show room inputs including description and unit picture
+    expect(find.text('Add New Room or Court'), findsOneWidget);
+    expect(find.text('Upload Room Picture'), findsOneWidget);
+
+    // Enter room description
+    final descField = find.widgetWithText(TextFormField, 'Description & Features (Optional)');
+    expect(descField, findsOneWidget);
+    await tester.enterText(descField, 'Panoramic glass court with LED floodlights');
+    await tester.pumpAndSettle();
+
+    // Enter room image URL
+    final imgField = find.widgetWithText(TextFormField, 'Or Unit Picture URL');
+    expect(imgField, findsOneWidget);
+    await tester.enterText(imgField, 'https://example.com/padel_room1.jpg');
+    await tester.pumpAndSettle();
+
+    // Tap Add in dialog
+    final confirmAddBtn = find.widgetWithText(FilledButton, 'Add');
+    await tester.tap(confirmAddBtn);
+    await tester.pumpAndSettle();
+
+    // Room item should be displayed in list
+    expect(find.text('Panoramic glass court with LED floodlights'), findsOneWidget);
+
+    // Save venue
+    final saveBtn = find.text('Add venue');
+    await tester.ensureVisible(saveBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(saveBtn);
+    await tester.pumpAndSettle();
+
+    expect(created, isNotNull);
+    expect(created!.items.length, 1);
+    expect(created!.items.first.description, 'Panoramic glass court with LED floodlights');
+    expect(created!.items.first.imageUrl, 'https://example.com/padel_room1.jpg');
+  });
 }

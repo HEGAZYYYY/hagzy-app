@@ -2635,7 +2635,8 @@ app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
     'name', 'nameAr', 'type', 'category', 'categories', 'city', 'address', 'addressAr',
     'phone', 'ownerPhone', 'ownerEmail', 'instapayHandle', 'vodafoneCashNumber',
     'depositPercent', 'pricingMode', 'units', 'items', 'spaces', 'services', 'amenities', 'rules',
-    'latitude', 'longitude', 'lat', 'lng', 'rating', 'reviews', 'image', 'images',
+    'latitude', 'longitude', 'lat', 'lng', 'rating', 'reviews', 'image', 'images', 'imageUrl',
+    'galleryUrls', 'description', 'googleMapsUrl', 'instaPayAddress',
     'openingTime', 'closingTime', 'isActive', 'currency'
   ];
 
@@ -2644,6 +2645,12 @@ app.put('/api/admin/venues/:id', authenticateAdmin, async (req, res) => {
     if (venueData[field] !== undefined) {
       sanitized[field] = venueData[field];
     }
+  }
+  if (sanitized.imageUrl && (!sanitized.images || !sanitized.images.length)) {
+    sanitized.images = [sanitized.imageUrl];
+  }
+  if (!sanitized.imageUrl && Array.isArray(sanitized.images) && sanitized.images.length > 0) {
+    sanitized.imageUrl = sanitized.images[0];
   }
   if (req.isPlatformOwner) {
     if (typeof sanitized.ownerEmail === 'string') {

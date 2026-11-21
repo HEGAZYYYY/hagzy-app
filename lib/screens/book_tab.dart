@@ -2271,6 +2271,80 @@ class _BookTabState extends State<BookTab> {
                                         );
                                       }).toList(),
                                     ),
+                                  if (item != null && ((item.imageUrl != null && item.imageUrl!.isNotEmpty) || item.description.isNotEmpty)) ...[
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      clipBehavior: Clip.antiAlias,
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: kBorder),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: const Radius.circular(13),
+                                                bottomLeft: const Radius.circular(13),
+                                                topRight: Radius.circular(widget.arabic ? 13 : 0),
+                                                bottomRight: Radius.circular(widget.arabic ? 13 : 0),
+                                              ),
+                                              child: HagzySmartImage(
+                                                imageUrl: item.imageUrl!,
+                                                width: 100,
+                                                height: 75,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          item.name,
+                                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                      ),
+                                                      if (item.kind.isNotEmpty)
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: kSurfaceTint,
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: Text(
+                                                            item.kind,
+                                                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: kGreen),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  if (item.description.isNotEmpty) ...[
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      item.description,
+                                                      style: TextStyle(fontSize: 12, color: kMuted, height: 1.3),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -4563,6 +4637,99 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                         ),
                       ],
                     ),
+                    if (venue.items.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        localized(
+                          arabic,
+                          venue.type == VenueType.salon
+                              ? 'Chairs & Stations (${venue.items.length})'
+                              : 'Rooms & Courts (${venue.items.length})',
+                          venue.type == VenueType.salon
+                              ? 'الكراسي والمحطات (${venue.items.length})'
+                              : 'الغرف والملاعب (${venue.items.length})',
+                        ),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      ...venue.items.map(
+                        (it) => Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: kPage,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: (it.imageUrl != null && it.imageUrl!.isNotEmpty)
+                                    ? HagzySmartImage(
+                                        imageUrl: it.imageUrl!,
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorWidget: Container(
+                                          width: 48,
+                                          height: 48,
+                                          color: kSurfaceTint,
+                                          child: Icon(venue.type.icon,
+                                              color: kGreen, size: 20),
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 48,
+                                        height: 48,
+                                        color: kSurfaceTint,
+                                        child: Icon(venue.type.icon,
+                                            color: kGreen, size: 20),
+                                      ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            it.name,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13),
+                                          ),
+                                        ),
+                                        Text(
+                                          '${formatMoney(it.hourlyRate)} ${localized(arabic, 'EGP', 'ج.م')}',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              color: kGreen,
+                                              fontSize: 12.5),
+                                        ),
+                                      ],
+                                    ),
+                                    if (it.description.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        it.description,
+                                        style: TextStyle(
+                                            color: kMuted, fontSize: 11.5),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [

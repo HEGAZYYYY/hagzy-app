@@ -115,6 +115,8 @@ export function mapVenueRowToJson(
     const uExtra = (u.extra && typeof u.extra === 'object') ? u.extra : {};
     const key = ['units', 'items', 'spaces'].includes(u.source_key) ? u.source_key : 'units';
     if (!grouped[key]) grouped[key] = [];
+    const uDesc = u.description || uExtra.description || '';
+    const uImg = u.image_url || u.imageUrl || uExtra.imageUrl || null;
     grouped[key].push({
       ...uExtra,
       id: u.id,
@@ -127,6 +129,8 @@ export function mapVenueRowToJson(
       hourlyRate: Number(u.price_per_hour || 0),
       price: Number(u.price_per_hour || 0),
       isActive: u.is_active !== false,
+      description: uDesc,
+      ...(uImg ? { imageUrl: uImg } : {}),
     });
   }
 
@@ -138,6 +142,8 @@ export function mapVenueRowToJson(
     date: r.review_date || String(r.created_at || '').split('T')[0],
     verifiedBooking: r.verified_booking !== false,
   }));
+
+  const venueImg = extra.imageUrl || (Array.isArray(row.images) && row.images.length > 0 ? row.images[0] : null);
 
   const out: Record<string, any> = {
     ...extra,
@@ -151,6 +157,7 @@ export function mapVenueRowToJson(
     address: row.address || '',
     description: row.description || '',
     phone: row.phone || '',
+    ...(venueImg ? { imageUrl: venueImg } : {}),
     ...(row.owner_id || rawOwnerId ? { ownerId: row.owner_id || rawOwnerId } : {}),
     ...(row.owner_email ? { ownerEmail: row.owner_email } : {}),
     ...(row.owner_phone ? { ownerPhone: row.owner_phone } : {}),
@@ -163,11 +170,14 @@ export function mapVenueRowToJson(
     reviewsList: mappedReviews,
     isActive: row.is_active !== false,
     isDeleted: Boolean(row.is_deleted),
-    images: Array.isArray(row.images) ? row.images : [],
+    images: Array.isArray(row.images) && row.images.length > 0
+      ? row.images
+      : (venueImg ? [venueImg] : []),
     amenities: Array.isArray(row.amenities) ? row.amenities : [],
     rules: Array.isArray(row.rules) ? row.rules : [],
     services: Array.isArray(row.services) ? row.services : [],
     ...grouped,
+    ...(grouped.units && !grouped.items ? { items: grouped.units } : {}),
     ...(mappedReviews.length > 0 ? { reviewsList: mappedReviews } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
