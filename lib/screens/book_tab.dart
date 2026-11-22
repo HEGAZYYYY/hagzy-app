@@ -70,6 +70,7 @@ class _BookTabState extends State<BookTab> {
   DateTime? _selectedStart;
   int _headcount = 2;
   int? _escapeTierIndex;
+  int _sportsDurationMinutes = 60;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _bookingSectionKey = GlobalKey();
@@ -2449,6 +2450,7 @@ class _BookTabState extends State<BookTab> {
                                                 setState(() {
                                                   _itemId = null;
                                                   _escapeTierIndex = null;
+      _sportsDurationMinutes = 60;
                                                   _selectedStart = null;
                                                 });
                                               },
@@ -2718,7 +2720,217 @@ class _BookTabState extends State<BookTab> {
                                   );
                                 }
 
-                                // STANDARD VENUE FLOW (Sports, Salons, Cafes, Lounges):
+
+                                final isSports = venue.type == VenueType.sports;
+
+                                if (isSports) {
+                                  // SPORTS & PADEL COURTS: Court Pills + Match Duration Selection Phase
+                                  const sportsDurations = [
+                                    (60, '60 Minutes (1 Hour)', '٦٠ دقيقة (ساعة واحدة)', 'Quick Match / Warmup', 'ماتش سريع / تسخين'),
+                                    (90, '90 Minutes (1.5 Hours)', '٩٠ دقيقة (ساعة ونصف)', 'Standard Padel Match', 'ماتش بادل قياسي'),
+                                    (120, '120 Minutes (2 Hours)', '١٢٠ دقيقة (ساعتان)', 'Full Game / Rematch', 'ماتش كامل / ريماتش'),
+                                    (180, '180 Minutes (3 Hours)', '١٨٠ دقيقة (٣ ساعات)', 'Training / Tournament', 'تدريب مكثف / بطولة'),
+                                  ];
+
+                                  return Padding(
+                                    key: _spaceStepKey,
+                                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                localized(widget.arabic, 'Choose Your Space', 'اختر المساحة'),
+                                                style: TextStyle(
+                                                  fontSize: 15.5,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: kInk,
+                                                  letterSpacing: -0.2,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: venue.items.map((val) {
+                                            final sel = val.id == item?.id;
+                                            return CustomPill(
+                                              icon: sel ? Icons.check_circle_rounded : venue.type.icon,
+                                              selected: sel,
+                                              label: '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}',
+                                              onTap: () => _selectSpace(val.id),
+                                            );
+                                          }).toList(),
+                                        ),
+                                        if (item != null) ...[
+                                          const SizedBox(height: 16),
+                                          // Duration Selection Phase
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(7),
+                                                decoration: BoxDecoration(
+                                                  color: kGreen.withValues(alpha: 0.14),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.timer_outlined, color: kGreen, size: 20),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      localized(widget.arabic, 'Select Match Duration', 'اختر مدة اللعب'),
+                                                      style: TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      localized(widget.arabic, 'How long is your match or training session?', 'كم مدة الماتش أو التمرين؟'),
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          ...sportsDurations.map((dur) {
+                                            final minutes = dur.$1;
+                                            final isSelected = _sportsDurationMinutes == minutes;
+                                            final durTotal = item.hourlyRate * minutes / 60;
+                                            return Container(
+                                              margin: const EdgeInsets.only(bottom: 8),
+                                              decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? (isDark ? kGreen.withValues(alpha: 0.22) : const Color(0xFFECFDF5))
+                                                    : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: isSelected
+                                                      ? kGreen
+                                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                                  width: isSelected ? 2 : 1.2,
+                                                ),
+                                                boxShadow: isSelected
+                                                    ? [
+                                                        BoxShadow(
+                                                          color: kGreen.withValues(alpha: 0.2),
+                                                          blurRadius: 8,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ]
+                                                    : null,
+                                              ),
+                                              child: InkWell(
+                                                borderRadius: BorderRadius.circular(14),
+                                                onTap: () {
+                                                  setState(() {
+                                                    _sportsDurationMinutes = minutes;
+                                                  });
+                                                },
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        isSelected
+                                                            ? Icons.radio_button_checked_rounded
+                                                            : Icons.radio_button_off_rounded,
+                                                        color: isSelected ? kGreen : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                                                        size: 20,
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              localized(widget.arabic, dur.$2, dur.$3),
+                                                              style: TextStyle(
+                                                                fontSize: 15,
+                                                                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                                                                color: isSelected
+                                                                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                                                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(height: 2),
+                                                            Text(
+                                                              localized(widget.arabic, dur.$4, dur.$5),
+                                                              style: TextStyle(
+                                                                fontSize: 11.5,
+                                                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                                fontWeight: FontWeight.w600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        '${formatMoney(durTotal)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: isSelected ? kGreen : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }),
+                                          const SizedBox(height: 10),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  localized(widget.arabic, 'Total for $_sportsDurationMinutes min:', 'إجمالي المدة ($_sportsDurationMinutes دقيقة):'),
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '${formatMoney(item.hourlyRate * _sportsDurationMinutes / 60)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: kGreen,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }
+                                // STANDARD VENUE FLOW (Salons, Cafes, Lounges):
                                 return Padding(
                                   key: _spaceStepKey,
                                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
@@ -3077,14 +3289,13 @@ class _BookTabState extends State<BookTab> {
                                             venue: venue,
                                             item: item,
                                             arabic: widget.arabic,
-                                            estimatedMinutes: estimatedMinutes,
+                                            estimatedMinutes: venue.type == VenueType.sports ? _sportsDurationMinutes : estimatedMinutes,
                                             selectedStart: _selectedStart,
                                             headcount: _headcount,
                                             onHeadcountChanged: (h) => setState(() => _headcount = h),
                                             onReserve: _selectedStart == null
                                                 ? null
-                                                : () => widget.onBook(venue,
-                                                    item, _selectedStart!, _headcount),
+                                                : () => widget.onBook(venue, item, _selectedStart!, _headcount, venue.type == VenueType.sports ? _sportsDurationMinutes : estimatedMinutes),
                                           ),
                                         ),
                                       ],

@@ -1965,6 +1965,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     bool walkIn = false,
     DateTime? initialStart,
     int? initialHeadcount,
+    int? initialDurationMinutes,
   }) async {
     final arabic = _language == 'AR';
     final isTest = WidgetsBinding.instance.runtimeType
@@ -2039,7 +2040,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     var date = initialStart ?? DateTime.now();
     var time = TimeOfDay.fromDateTime(initialStart ??
         DateTime.now().add(walkIn ? Duration.zero : const Duration(hours: 1)));
-    var durationMinutes = venue.type == VenueType.salon ? 30 : 60;
+    var durationMinutes = initialDurationMinutes ?? (venue.type == VenueType.salon ? 30 : 60);
     var split = 1;
     var multi = false;
     var selectedPromo = '';
@@ -6085,12 +6086,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             arabic: arabic,
                                             initialVenueId: _targetVenueId,
                                             currentArea: _currentArea,
-                                            onBook: (venue, item, startsAt, [h]) =>
+                                            onBook: (venue, item, startsAt, [h, d]) =>
                                                 _createBooking(
                                               venue: venue,
                                               item: item,
                                               initialStart: startsAt,
                                               initialHeadcount: h,
+                                                   initialDurationMinutes: d,
                                             ),
                                             onAddReview: _addReview,
                                             onAreaChanged: (area) {
@@ -6176,7 +6178,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 bookings: _bookings,
                                                 arabic: arabic,
                                                 initialVenueId: _targetVenueId,
-                                                onBook: (venue, item, startsAt, [h]) =>
+                                                onBook: (venue, item, startsAt, [h, d]) =>
                                                     _createBooking(
                                                   venue: venue,
                                                   item: item,
