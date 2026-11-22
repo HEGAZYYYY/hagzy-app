@@ -3653,74 +3653,7 @@ class ReservationQuote extends StatelessWidget {
                   )
                 : const SizedBox.shrink(),
           ),
-          if (isPerPerson) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: kGreen.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kGreen.withValues(alpha: 0.22)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          localized(arabic, 'Number of Players (Shilla)', 'عدد أفراد الشلة / اللاعبين'),
-                          style: TextStyle(
-                            color: kInk,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${formatMoney(perPersonRate)} ${localized(arabic, 'EGP / player', 'جنيه / فرد')}',
-                          style: const TextStyle(
-                            color: kGreen,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      IconButton.filledTonal(
-                        visualDensity: VisualDensity.compact,
-                        onPressed: headcount > (item.minCapacity ?? 1)
-                            ? () => onHeadcountChanged?.call(headcount - 1)
-                            : null,
-                        icon: const Icon(Icons.remove, size: 16),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(
-                          '$headcount',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            color: kInk,
-                          ),
-                        ),
-                      ),
-                      IconButton.filledTonal(
-                        visualDensity: VisualDensity.compact,
-                        onPressed: headcount < (item.maxCapacity ?? 20)
-                            ? () => onHeadcountChanged?.call(headcount + 1)
-                            : null,
-                        icon: const Icon(Icons.add, size: 16),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+          
           Row(
             children: [
               Expanded(
@@ -3728,7 +3661,7 @@ class ReservationQuote extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      localized(arabic, 'Total Estimate', 'الإجمالي التقريبي'),
+                      localized(arabic, 'Total', 'الإجمالي'),
                       style: TextStyle(
                           color: kMuted,
                           fontSize: 12.0,

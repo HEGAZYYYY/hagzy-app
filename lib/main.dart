@@ -2399,37 +2399,28 @@ class _HagzyHomeState extends State<HagzyHome> {
                             }),
                           )),
                     ],
-                    if (venue.type != VenueType.salon ||
-                        selectedServices.isEmpty) ...[
-                      const SizedBox(height: 14),
-                      Text(
-                        localized(arabic, 'Duration', 'المدة'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: kMuted,
+                    if (isPerPerson) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: kGreen.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: kGreen.withValues(alpha: 0.25)),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: (venue.type == VenueType.salon
-                                ? [15, 30, 45, 60, 90]
-                                : [60, 90, 120, 180, 240])
-                            .map((minutes) {
-                          final label = minutes < 60
-                              ? '${minutes}m'
-                              : minutes % 60 == 0
-                                  ? '${minutes ~/ 60}h'
-                                  : '${minutes ~/ 60}h 30m';
-                          return CustomPill(
-                            label: label,
-                            selected: durationMinutes == minutes,
-                            onTap: () => setDialogState(
-                                () => durationMinutes = minutes),
-                          );
-                        }).toList(),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '$headcount ${localized(arabic, "Players", "أفراد")}',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kInk),
+                            ),
+                            Text(
+                              '${item.priceForHeadcount(headcount).toStringAsFixed(0)} ${localized(arabic, "EGP / person", "ج.م / فرد")}',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kGreen),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                     if (venue.type == VenueType.lounge &&
@@ -2445,122 +2436,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         onChanged: (value) =>
                             setDialogState(() => multi = value),
                       ),
-                    if (isPerPerson) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: kPage,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: kBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  localized(arabic, 'Number of Players (Shilla)', 'عدد أفراد الشلة / اللاعبين'),
-                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kInk),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: kGreen.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '${item.priceForHeadcount(headcount).toStringAsFixed(0)} ${localized(arabic, "EGP/person", "ج.م / فرد")}',
-                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kGreen),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                IconButton.filledTonal(
-                                  onPressed: headcount > minCap
-                                      ? () => setDialogState(() => headcount--)
-                                      : null,
-                                  icon: const Icon(Icons.remove, size: 18),
-                                ),
-                                const SizedBox(width: 14),
-                                Text(
-                                  '$headcount ${localized(arabic, "Players", "أفراد")}',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kInk),
-                                ),
-                                const SizedBox(width: 14),
-                                IconButton.filledTonal(
-                                  onPressed: headcount < maxCap
-                                      ? () => setDialogState(() => headcount++)
-                                      : null,
-                                  icon: const Icon(Icons.add, size: 18),
-                                ),
-                              ],
-                            ),
-                            if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Builder(
-                                builder: (context) {
-                                  final sortedEntries = item.pricingTiers!.entries
-                                      .map((e) => MapEntry(int.tryParse(e.key) ?? 999, (e.value as num).toDouble()))
-                                      .toList()
-                                    ..sort((a, b) => a.key.compareTo(b.key));
-                                  int? activeCap;
-                                  for (final entry in sortedEntries) {
-                                    if (headcount <= entry.key) {
-                                      activeCap = entry.key;
-                                      break;
-                                    }
-                                  }
-                                  if (activeCap == null && sortedEntries.isNotEmpty) {
-                                    activeCap = sortedEntries.last.key;
-                                  }
-                                  var prevCap = minCap - 1;
-                                  return Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: sortedEntries.map((e) {
-                                      final cap = e.key;
-                                      final price = e.value;
-                                      final from = prevCap + 1;
-                                      final isActive = cap == activeCap;
-                                      String label;
-                                      if (from == cap) {
-                                        label = arabic ? '$cap أفراد: ${price.toStringAsFixed(0)} ج.م' : '$cap p: ${price.toStringAsFixed(0)} EGP';
-                                      } else if (cap >= maxCap) {
-                                        label = arabic ? 'أكتر من $prevCap ($from-$cap): ${price.toStringAsFixed(0)} ج.م' : '$from+ ($from-$cap): ${price.toStringAsFixed(0)} EGP';
-                                      } else {
-                                        label = arabic ? '$from-$cap أفراد: ${price.toStringAsFixed(0)} ج.م' : '$from-$cap p: ${price.toStringAsFixed(0)} EGP';
-                                      }
-                                      prevCap = cap;
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: isActive ? kGreen.withValues(alpha: 0.16) : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: isActive ? kGreen : kBorder, width: isActive ? 1.5 : 1),
-                                        ),
-                                        child: Text(
-                                          label,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                                            color: isActive ? kGreen : kMuted,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  );
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ] else if (venue.type == VenueType.sports) ...[
+                    if (venue.type == VenueType.sports) ...[
                       const SizedBox(height: 14),
                       Text(
                         localized(arabic, 'Split Pitch Payment',
@@ -2908,8 +2784,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    localized(arabic, 'Total Amount',
-                                        'المبلغ الإجمالي'),
+                                    localized(arabic, 'Total', 'الإجمالي'),
                                     style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: kMuted),
