@@ -2309,7 +2309,11 @@ class _BookTabState extends State<BookTab> {
                                                       Expanded(
                                                         child: Text(
                                                           item.name,
-                                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.w800,
+                                                            fontSize: 13.5,
+                                                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                                          ),
                                                           maxLines: 1,
                                                           overflow: TextOverflow.ellipsis,
                                                         ),
@@ -2318,12 +2322,16 @@ class _BookTabState extends State<BookTab> {
                                                         Container(
                                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                           decoration: BoxDecoration(
-                                                            color: kSurfaceTint,
+                                                            color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
                                                             borderRadius: BorderRadius.circular(6),
                                                           ),
                                                           child: Text(
                                                             item.kind,
-                                                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: kGreen),
+                                                            style: TextStyle(
+                                                              fontSize: 10.5,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: isDark ? kGreenLight : kGreenDark,
+                                                            ),
                                                           ),
                                                         ),
                                                     ],
@@ -2332,7 +2340,11 @@ class _BookTabState extends State<BookTab> {
                                                     const SizedBox(height: 4),
                                                     Text(
                                                       item.description,
-                                                      style: TextStyle(fontSize: 12, color: kMuted, height: 1.3),
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                                        height: 1.3,
+                                                      ),
                                                       maxLines: 2,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -4649,8 +4661,10 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                               ? 'الكراسي والمحطات (${venue.items.length})'
                               : 'الغرف والملاعب (${venue.items.length})',
                         ),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 14),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
                       ),
                       const SizedBox(height: 8),
                       ...venue.items.map(
@@ -4658,7 +4672,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: kPage,
+                            color: isDark ? const Color(0xFF162822) : kPage,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: kBorder),
                           ),
@@ -4675,17 +4689,17 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                                         errorWidget: Container(
                                           width: 48,
                                           height: 48,
-                                          color: kSurfaceTint,
+                                          color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
                                           child: Icon(venue.type.icon,
-                                              color: kGreen, size: 20),
+                                              color: isDark ? kGreenLight : kGreenDark, size: 20),
                                         ),
                                       )
                                     : Container(
                                         width: 48,
                                         height: 48,
-                                        color: kSurfaceTint,
+                                        color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
                                         child: Icon(venue.type.icon,
-                                            color: kGreen, size: 20),
+                                            color: isDark ? kGreenLight : kGreenDark, size: 20),
                                       ),
                               ),
                               const SizedBox(width: 10),
@@ -4698,16 +4712,17 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                                         Expanded(
                                           child: Text(
                                             it.name,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontWeight: FontWeight.w700,
-                                                fontSize: 13),
+                                                fontSize: 13,
+                                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
                                           ),
                                         ),
                                         Text(
                                           '${formatMoney(it.hourlyRate)} ${localized(arabic, 'EGP', 'ج.م')}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                               fontWeight: FontWeight.w800,
-                                              color: kGreen,
+                                              color: isDark ? kGreenLight : kGreenDark,
                                               fontSize: 12.5),
                                         ),
                                       ],
@@ -4717,7 +4732,7 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                                       Text(
                                         it.description,
                                         style: TextStyle(
-                                            color: kMuted, fontSize: 11.5),
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), fontSize: 11.5),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),

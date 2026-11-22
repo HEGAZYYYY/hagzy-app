@@ -206,6 +206,8 @@ class HagzyTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: kPage,
+        labelStyle: TextStyle(color: kMuted),
+        hintStyle: TextStyle(color: kMuted),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         border: OutlineInputBorder(
@@ -219,6 +221,59 @@ class HagzyTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: kGreen, width: 1.5),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: kPanel,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          color: kInk,
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+        ),
+        contentTextStyle: TextStyle(
+          color: kInk,
+          fontSize: 14,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: kBorder),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: kPage,
+        disabledColor: const Color(0xFFE2E8F0),
+        selectedColor: kSurfaceTint,
+        secondarySelectedColor: kSurfaceTint,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        labelStyle: TextStyle(
+          color: kInk,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: kGreenDark,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+        side: BorderSide(color: kBorder),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return kGreenDark;
+            }
+            return kInk;
+          }),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return kSurfaceTint;
+            }
+            return kPanel;
+          }),
+          side: WidgetStateProperty.all(BorderSide(color: kBorder)),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -264,6 +319,19 @@ class HagzyTheme {
             color: Colors.white, fontWeight: FontWeight.w600, height: 1.35),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(color: kGreenDark),
+      popupMenuTheme: PopupMenuThemeData(
+        color: kPanel,
+        surfaceTintColor: Colors.transparent,
+        textStyle: TextStyle(color: kInk, fontSize: 13.5, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: kBorder),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        textColor: kInk,
+        iconColor: kInk,
+      ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: kInk,
@@ -306,9 +374,54 @@ class HagzyTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: darkPanel,
         surfaceTintColor: Colors.transparent,
+        titleTextStyle: const TextStyle(
+          color: darkText,
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+        ),
+        contentTextStyle: const TextStyle(
+          color: Color(0xFFE2E8F0),
+          fontSize: 14,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: const BorderSide(color: darkBorder),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: darkInput,
+        disabledColor: const Color(0xFF1F352D),
+        selectedColor: const Color(0xFF1E3A2F),
+        secondarySelectedColor: const Color(0xFF1E3A2F),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        labelStyle: const TextStyle(
+          color: darkText,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: kGreenLight,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+        side: const BorderSide(color: darkBorder),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return kGreenLight;
+            }
+            return darkText;
+          }),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF1E3A2F);
+            }
+            return darkPanel;
+          }),
+          side: WidgetStateProperty.all(const BorderSide(color: darkBorder)),
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
@@ -422,6 +535,19 @@ class HagzyTheme {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(color: kGreenLight),
+      popupMenuTheme: const PopupMenuThemeData(
+        color: darkPanel,
+        surfaceTintColor: Colors.transparent,
+        textStyle: TextStyle(color: darkText, fontSize: 13.5, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          side: BorderSide(color: darkBorder),
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        textColor: darkText,
+        iconColor: darkText,
+      ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: darkText,

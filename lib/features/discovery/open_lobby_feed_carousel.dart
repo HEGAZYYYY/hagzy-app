@@ -249,7 +249,7 @@ class _LobbyCard extends StatelessWidget {
                 onPressed: onTap,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isChallenger ? Colors.amber : theme.colorScheme.primary,
-                  foregroundColor: Colors.black,
+                  foregroundColor: isChallenger ? Colors.black : theme.colorScheme.onPrimary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

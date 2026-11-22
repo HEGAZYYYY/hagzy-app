@@ -361,28 +361,38 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
   Widget build(BuildContext context) {
     final isAr = widget.isArabic;
     final isEditing = widget.initialVenue != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
+    final cardBg = isDark ? const Color(0xFF162822) : Colors.white;
+    final surfaceBg = isDark ? const Color(0xFF162822) : Colors.grey.shade50;
+    final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade200;
+    final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: borderColor),
+      ),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680, maxHeight: 760),
         child: Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: dialogBg,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: dialogBg,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.black87),
+              icon: Icon(Icons.close_rounded, color: textColor),
               onPressed: () => Navigator.of(context).pop(),
             ),
             title: Text(
               isEditing
                   ? (isAr ? 'تعديل وتحديث المكان' : 'Renovate / Edit Venue')
                   : (isAr ? 'إضافة مكان جديد' : 'Add a venue'),
-              style: const TextStyle(
-                color: Colors.black87,
+              style: TextStyle(
+                color: textColor,
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
               ),
@@ -397,6 +407,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                 _buildSectionHeader(
                   icon: Icons.storefront_rounded,
                   title: isAr ? 'البيانات الأساسية ونوع المكان' : 'Basic Info & Category',
+                  textColor: textColor,
                 ),
                 const SizedBox(height: 10),
                 SegmentedButton<VenueType>(
@@ -459,7 +470,15 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   runSpacing: 4,
                   children: _egyptianCities.map((city) {
                     return ActionChip(
-                      label: Text(city, style: const TextStyle(fontSize: 11.5)),
+                      backgroundColor: isDark ? const Color(0xFF162822) : null,
+                      side: BorderSide(color: isDark ? const Color(0xFF1F352D) : Colors.grey.shade300),
+                      label: Text(
+                        city,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                        ),
+                      ),
                       onPressed: () {
                         setState(() {
                           _addressController.text = '$city, Egypt';
@@ -501,7 +520,16 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   runSpacing: 4,
                   children: [15, 20, 25, 30, 50].map((percent) {
                     return ActionChip(
-                      label: Text('$percent%'),
+                      backgroundColor: isDark ? const Color(0xFF162822) : null,
+                      side: BorderSide(color: isDark ? const Color(0xFF1F352D) : Colors.grey.shade300),
+                      label: Text(
+                        '$percent%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                        ),
+                      ),
                       onPressed: () {
                         setState(() {
                           _depositPercentController.text = percent.toString();
@@ -512,7 +540,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                 ),
 
                 const SizedBox(height: 24),
-                const Divider(),
+                Divider(color: borderColor),
                 const SizedBox(height: 12),
 
                 // SECTION 2: Rooms, Courts & Salon Chairs with Time-Based Pricing
@@ -525,6 +553,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         title: _selectedType == VenueType.salon
                             ? (isAr ? 'كراسي الحلاقة ومحطات الخدمة' : 'Salon Chairs & Stations')
                             : (isAr ? 'الغرف، الملاعب والوحدات' : 'Rooms, Courts & Units'),
+                        textColor: textColor,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -545,23 +574,23 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   isAr
                       ? 'حدد سعر الساعة العادي وسعر وقت الذروة / المساء لكل وحدة على حدة.'
                       : 'Set regular and peak time-based hourly rates for each room, court, or chair.',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5),
+                  style: TextStyle(color: mutedColor, fontSize: 12.5),
                 ),
                 const SizedBox(height: 12),
                 if (_items.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: surfaceBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: borderColor),
                     ),
                     child: Center(
                       child: Text(
                         _selectedType == VenueType.salon
                             ? (isAr ? 'لم تتم إضافة أي كراسي' : 'No chairs added yet')
                             : (isAr ? 'لم تتم إضافة أي غرف' : 'No rooms added yet'),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(fontWeight: FontWeight.w600, color: mutedColor),
                       ),
                     ),
                   )
@@ -573,9 +602,9 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(color: borderColor),
                       ),
                       child: Row(
                         children: [
@@ -590,10 +619,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                     errorWidget: Container(
                                       width: 44,
                                       height: 44,
-                                      color: kSurfaceTint,
+                                      color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
                                       child: Icon(
                                         _selectedType == VenueType.salon ? Icons.chair_rounded : Icons.sports_tennis_rounded,
-                                        color: kGreen,
+                                        color: isDark ? kGreenLight : kGreen,
                                         size: 20,
                                       ),
                                     ),
@@ -602,12 +631,12 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: kSurfaceTint,
+                                      color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Icon(
                                       _selectedType == VenueType.salon ? Icons.chair_rounded : Icons.sports_tennis_rounded,
-                                      color: kGreen,
+                                      color: isDark ? kGreenLight : kGreen,
                                       size: 20,
                                     ),
                                   ),
@@ -619,7 +648,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                               children: [
                                 Text(
                                   item.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: textColor),
                                 ),
                                 if (item.description.isNotEmpty) ...[
                                   const SizedBox(height: 2),
@@ -627,7 +656,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                     item.description,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                    style: TextStyle(fontSize: 11.5, color: mutedColor),
                                   ),
                                 ],
                                 const SizedBox(height: 3),
@@ -639,26 +668,30 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
+                                        color: isDark ? const Color(0xFF1F352D) : Colors.grey.shade100,
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
                                         item.kind,
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDark ? const Color(0xFFCBD5E1) : Colors.grey.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                     Text(
                                       '${item.hourlyRate.toStringAsFixed(0)} EGP/hr',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.w800,
-                                        color: kGreen,
+                                        color: isDark ? kGreenLight : kGreen,
                                         fontSize: 13,
                                       ),
                                     ),
                                     if (item.peakRate > 0 && item.peakRate != item.hourlyRate)
                                       Text(
                                         '• Peak: ${item.peakRate.toStringAsFixed(0)} EGP',
-                                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                        style: TextStyle(fontSize: 11.5, color: mutedColor),
                                       ),
                                   ],
                                 ),
@@ -666,7 +699,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            icon: Icon(Icons.edit_outlined, size: 18, color: textColor),
                             onPressed: () => _showEditItemDialog(item, idx, isAr),
                           ),
                           IconButton(
@@ -680,7 +713,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
 
                 // SECTION 3: Services (for Salon or Sports)
                 const SizedBox(height: 20),
-                const Divider(),
+                Divider(color: borderColor),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -691,6 +724,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         title: _selectedType == VenueType.salon
                             ? (isAr ? 'خدمات الصالون وباقاته' : 'Salon Services & Packages')
                             : (isAr ? 'الخدمات الإضافية والتأجير' : 'Add-ons & Equipment Rental'),
+                        textColor: textColor,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -705,7 +739,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                 if (_services.isEmpty)
                   Text(
                     isAr ? 'لا توجد خدمات إضافية.' : 'No additional services configured.',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12.5),
+                    style: TextStyle(color: mutedColor, fontSize: 12.5),
                   )
                 else
                   ..._services.asMap().entries.map((entry) {
@@ -715,9 +749,9 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       margin: const EdgeInsets.only(bottom: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: surfaceBg,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(color: borderColor),
                       ),
                       child: Row(
                         children: [
@@ -726,7 +760,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                           Expanded(
                             child: Text(
                               '${svc.name} (${svc.minutes} min)',
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: textColor),
                             ),
                           ),
                           Text(
@@ -738,7 +772,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
-                            icon: const Icon(Icons.close_rounded, size: 16, color: Colors.grey),
+                            icon: Icon(Icons.close_rounded, size: 16, color: mutedColor),
                             onPressed: () => setState(() => _services.removeAt(idx)),
                           ),
                         ],
@@ -748,11 +782,12 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
 
                 // SECTION 4: Photos & Amenities
                 const SizedBox(height: 20),
-                const Divider(),
+                Divider(color: borderColor),
                 const SizedBox(height: 12),
                 _buildSectionHeader(
                   icon: Icons.add_photo_alternate_rounded,
                   title: isAr ? 'صور المكان والمميزات' : 'Pictures & Amenities',
+                  textColor: textColor,
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -798,9 +833,18 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   runSpacing: 4,
                   children: _photoPresets.map((preset) {
                     return ChoiceChip(
-                      label: Text(preset['label']!, style: const TextStyle(fontSize: 11.5)),
+                      backgroundColor: isDark ? const Color(0xFF162822) : null,
+                      selectedColor: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
+                      side: BorderSide(color: isDark ? const Color(0xFF1F352D) : Colors.grey.shade300),
+                      label: Text(
+                        preset['label']!,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       selected: _imageUrlController.text.trim() == preset['url'],
-                      selectedColor: kSurfaceTint,
                       onSelected: (_) {
                         setState(() {
                           _imageUrlController.text = preset['url']!;
@@ -817,8 +861,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       height: 160,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        border: Border.all(color: Colors.grey.shade300),
+                        color: surfaceBg,
+                        border: Border.all(color: borderColor),
                       ),
                       child: HagzySmartImage(
                         imageUrl: _imageUrlController.text.trim(),
@@ -826,7 +870,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         errorWidget: Center(
                           child: Text(
                             isAr ? 'تعذر معاينة الصورة' : 'Could not preview image',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: TextStyle(fontSize: 12, color: mutedColor),
                           ),
                         ),
                       ),
@@ -836,7 +880,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                 const SizedBox(height: 14),
                 Text(
                   isAr ? 'تجهيزات ومميزات المكان:' : 'Available Amenities:',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textColor),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -845,9 +889,18 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   children: _allAmenities.map((amenity) {
                     final selected = _selectedAmenities.contains(amenity);
                     return FilterChip(
-                      label: Text(amenity, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: isDark ? const Color(0xFF162822) : null,
+                      selectedColor: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
+                      side: BorderSide(color: isDark ? const Color(0xFF1F352D) : Colors.grey.shade300),
+                      label: Text(
+                        amenity,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
                       selected: selected,
-                      selectedColor: kSurfaceTint,
                       checkmarkColor: kGreen,
                       onSelected: (val) {
                         setState(() {
@@ -864,11 +917,12 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
 
                 // SECTION 5: Payouts & Working Hours
                 const SizedBox(height: 20),
-                const Divider(),
+                Divider(color: borderColor),
                 const SizedBox(height: 12),
                 _buildSectionHeader(
                   icon: Icons.account_balance_wallet_rounded,
                   title: isAr ? 'طرق الدفع ومواعيد العمل' : 'Payout Accounts & Hours',
+                  textColor: textColor,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
@@ -917,6 +971,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     Expanded(
                       child: DropdownButtonFormField<int>(
                         initialValue: _openHour,
+                        dropdownColor: isDark ? const Color(0xFF162822) : Colors.white,
+                        style: TextStyle(color: textColor, fontSize: 13.5),
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: isAr ? 'ساعة الفتح' : 'Opening Time',
@@ -931,7 +987,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                   : h == 12
                                       ? '12:00 PM'
                                       : '${h - 12}:00 PM';
-                          return DropdownMenuItem(value: h, child: Text(display, overflow: TextOverflow.ellipsis));
+                          return DropdownMenuItem(
+                            value: h,
+                            child: Text(display, style: TextStyle(color: textColor), overflow: TextOverflow.ellipsis),
+                          );
                         }).toList(),
                         onChanged: (val) => setState(() => _openHour = val ?? 10),
                       ),
@@ -940,6 +999,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     Expanded(
                       child: DropdownButtonFormField<int>(
                         initialValue: _closeHour,
+                        dropdownColor: isDark ? const Color(0xFF162822) : Colors.white,
+                        style: TextStyle(color: textColor, fontSize: 13.5),
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: isAr ? 'ساعة الإغلاق' : 'Closing Time',
@@ -954,7 +1015,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                   : h == 12
                                       ? '12:00 PM'
                                       : '${h - 12}:00 PM';
-                          return DropdownMenuItem(value: h, child: Text(display, overflow: TextOverflow.ellipsis));
+                          return DropdownMenuItem(
+                            value: h,
+                            child: Text(display, style: TextStyle(color: textColor), overflow: TextOverflow.ellipsis),
+                          );
                         }).toList(),
                         onChanged: (val) => setState(() => _closeHour = val ?? 24),
                       ),
@@ -968,8 +1032,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           bottomNavigationBar: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+              color: dialogBg,
+              border: Border(top: BorderSide(color: borderColor)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -978,7 +1042,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(
                     isAr ? 'إلغاء' : 'Cancel',
-                    style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
                   ),
                 ),
                 FilledButton.icon(
@@ -1005,7 +1069,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     );
   }
 
-  Widget _buildSectionHeader({required IconData icon, required String title}) {
+  Widget _buildSectionHeader({required IconData icon, required String title, Color? textColor}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1015,7 +1079,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           child: Text(
             title,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: textColor ?? kInk),
           ),
         ),
       ],
@@ -1038,6 +1102,13 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+          final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
+          final surfaceBg = isDark ? const Color(0xFF162822) : Colors.grey.shade100;
+          final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade300;
+          final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+          final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
           Future<void> pickUnitImage() async {
             try {
               final dataUrl = await ImageUploadService.pickImage();
@@ -1056,12 +1127,16 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: dialogBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: borderColor),
+            ),
             title: Text(
               isSalon
                   ? (isAr ? 'إضافة كرسي حلاقة جديد' : 'Add New Salon Chair')
                   : (isAr ? 'إضافة غرفة أو ملعب جديد' : 'Add New Room or Court'),
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
             ),
             content: SingleChildScrollView(
               child: SizedBox(
@@ -1170,8 +1245,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         child: Container(
                           height: 120,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            border: Border.all(color: Colors.grey.shade300),
+                            color: surfaceBg,
+                            border: Border.all(color: borderColor),
                           ),
                           child: HagzySmartImage(
                             imageUrl: imageCtrl.text.trim(),
@@ -1179,7 +1254,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                             errorWidget: Center(
                               child: Text(
                                 isAr ? 'تعذر معاينة الصورة' : 'Could not preview image',
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                style: TextStyle(fontSize: 11, color: mutedColor),
                               ),
                             ),
                           ),
@@ -1193,7 +1268,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text(isAr ? 'إلغاء' : 'Cancel'),
+                child: Text(
+                  isAr ? 'إلغاء' : 'Cancel',
+                  style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
+                ),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: kGreen),
@@ -1239,6 +1317,13 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+          final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
+          final surfaceBg = isDark ? const Color(0xFF162822) : Colors.grey.shade100;
+          final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade300;
+          final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+          final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
           Future<void> pickUnitImage() async {
             try {
               final dataUrl = await ImageUploadService.pickImage();
@@ -1257,10 +1342,14 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: dialogBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: borderColor),
+            ),
             title: Text(
               isAr ? 'تعديل تفاصيل الوحدة والأسعار' : 'Edit Room / Chair & Rates',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
             ),
             content: SingleChildScrollView(
               child: SizedBox(
@@ -1366,8 +1455,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         child: Container(
                           height: 120,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            border: Border.all(color: Colors.grey.shade300),
+                            color: surfaceBg,
+                            border: Border.all(color: borderColor),
                           ),
                           child: HagzySmartImage(
                             imageUrl: imageCtrl.text.trim(),
@@ -1375,7 +1464,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                             errorWidget: Center(
                               child: Text(
                                 isAr ? 'تعذر معاينة الصورة' : 'Could not preview image',
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                style: TextStyle(fontSize: 11, color: mutedColor),
                               ),
                             ),
                           ),
@@ -1389,7 +1478,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text(isAr ? 'إلغاء' : 'Cancel'),
+                child: Text(
+                  isAr ? 'إلغاء' : 'Cancel',
+                  style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
+                ),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: kGreen),
@@ -1426,13 +1518,23 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController(text: '100');
     final minCtrl = TextEditingController(text: '30');
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade300;
+    final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: dialogBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: borderColor),
+        ),
         title: Text(
           isAr ? 'إضافة خدمة أو باقة' : 'Add Service / Add-on',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -1469,7 +1571,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(isAr ? 'إلغاء' : 'Cancel'),
+            child: Text(
+              isAr ? 'إلغاء' : 'Cancel',
+              style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: kGreen),

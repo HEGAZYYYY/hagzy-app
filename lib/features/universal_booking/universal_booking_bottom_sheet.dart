@@ -282,7 +282,7 @@ class _UniversalBookingBottomSheetState
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                      color: isSel ? Colors.black : null,
+                      color: isSel ? Colors.white : null,
                     ),
                   ),
                   selected: isSel,
@@ -349,8 +349,10 @@ class _UniversalBookingBottomSheetState
               ),
               child: Text(
                 '${pricing.rateAppliedEgp.toStringAsFixed(0)} ${isAr ? "ج.م / فرد" : "EGP/ea"}',
-                style: const TextStyle(
-                  color: Colors.greenAccent,
+                style: TextStyle(
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.greenAccent
+                      : const Color(0xFF047857),
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -418,7 +420,11 @@ class _UniversalBookingBottomSheetState
                     style: TextStyle(
                       fontSize: 12.0,
                       fontWeight: isCurrentTier ? FontWeight.bold : FontWeight.normal,
-                      color: isCurrentTier ? theme.colorScheme.primary : null,
+                      color: isCurrentTier
+                          ? (theme.brightness == Brightness.dark
+                              ? const Color(0xFF6EE7B7)
+                              : const Color(0xFF047857))
+                          : null,
                     ),
                   ),
                 );
