@@ -670,15 +670,19 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                   item.name,
                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: textColor),
                                 ),
-                                if (item.description.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    item.description,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 11.5, color: mutedColor),
-                                  ),
-                                ],
+                                 if (item.description.isNotEmpty) ...[
+                                   const SizedBox(height: 4),
+                                   Text(
+                                     item.description,
+                                     maxLines: 5,
+                                     overflow: TextOverflow.ellipsis,
+                                     style: TextStyle(
+                                       fontSize: 13,
+                                       height: 1.45,
+                                       color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                                     ),
+                                   ),
+                                 ],
                                 const SizedBox(height: 3),
                                 Wrap(
                                   spacing: 8,

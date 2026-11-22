@@ -2305,92 +2305,14 @@ class _BookTabState extends State<BookTab> {
                                         );
                                       }).toList(),
                                     ),
-                                  if (item != null && ((item.imageUrl != null && item.imageUrl!.isNotEmpty) || item.description.isNotEmpty)) ...[
-                                    const SizedBox(height: 12),
-                                    Container(
-                                      clipBehavior: Clip.antiAlias,
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: kBorder),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.only(
-                                                topLeft: const Radius.circular(13),
-                                                bottomLeft: const Radius.circular(13),
-                                                topRight: Radius.circular(widget.arabic ? 13 : 0),
-                                                bottomRight: Radius.circular(widget.arabic ? 13 : 0),
-                                              ),
-                                              child: HagzySmartImage(
-                                                imageUrl: item.imageUrl!,
-                                                width: 100,
-                                                height: 75,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          Expanded(
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: Text(
-                                                          item.name,
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.w800,
-                                                            fontSize: 13.5,
-                                                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                      ),
-                                                      if (item.kind.isNotEmpty)
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Text(
-                                                            item.kind,
-                                                            style: TextStyle(
-                                                              fontSize: 10.5,
-                                                              fontWeight: FontWeight.w700,
-                                                              color: isDark ? kGreenLight : kGreenDark,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  if (item.description.isNotEmpty) ...[
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      item.description,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                                                        height: 1.3,
-                                                      ),
-                                                      maxLines: 2,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                   if (item != null && ((item.imageUrl != null && item.imageUrl!.isNotEmpty) || item.description.isNotEmpty)) ...[
+                                     _RoomDetailCard(
+                                       item: item,
+                                       isDark: isDark,
+                                       arabic: widget.arabic,
+                                       isEscapeRoom: venue.subCategories.contains('escape_rooms'),
+                                     ),
+                                   ],
                                 ],
                               ),
                             ),
@@ -4766,16 +4688,18 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                                         ),
                                       ],
                                     ),
-                                    if (it.description.isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        it.description,
-                                        style: TextStyle(
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), fontSize: 11.5),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                     if (it.description.isNotEmpty) ...[
+                                       const SizedBox(height: 4),
+                                       Text(
+                                         it.description,
+                                         style: TextStyle(
+                                             color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                                             fontSize: 13.5,
+                                             height: 1.45),
+                                         maxLines: 4,
+                                         overflow: TextOverflow.ellipsis,
+                                       ),
+                                     ],
                                   ],
                                 ),
                               ),
@@ -5407,3 +5331,180 @@ class _BookingStepPill extends StatelessWidget {
 }
 
 
+class _RoomDetailCard extends StatefulWidget {
+  final VenueItem item;
+  final bool isDark;
+  final bool arabic;
+  final bool isEscapeRoom;
+
+  const _RoomDetailCard({
+    required this.item,
+    required this.isDark,
+    required this.arabic,
+    this.isEscapeRoom = false,
+  });
+
+  @override
+  State<_RoomDetailCard> createState() => _RoomDetailCardState();
+}
+
+class _RoomDetailCardState extends State<_RoomDetailCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final isDark = widget.isDark;
+    final arabic = widget.arabic;
+    final hasImage = item.imageUrl != null && item.imageUrl!.isNotEmpty;
+    final isLongBio = item.description.length > 120;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasImage)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              child: HagzySmartImage(
+                imageUrl: item.imageUrl!,
+                height: 150,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16.5,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    if (item.kind.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E3A2F) : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          item.kind,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? kGreenLight : kGreenDark,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (item.description.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 200),
+                    alignment: Alignment.topCenter,
+                    child: Text(
+                      item.description,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                        height: 1.55,
+                      ),
+                      maxLines: _isExpanded ? null : 4,
+                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isLongBio) ...[
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () => setState(() => _isExpanded = !_isExpanded),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _isExpanded
+                                  ? (arabic ? 'عرض أقل ▲' : 'Show less ▲')
+                                  : (arabic ? 'اقرأ القصة والتفاصيل كاملة ▼' : 'Read full story & details ▼'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? kGreenLight : kGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+                if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: item.pricingTiers!.entries.map((e) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Text(
+                          arabic
+                              ? '≤ ${e.key} أفراد: ${e.value} جنيه للفرد'
+                              : '≤ ${e.key} players: ${e.value} EGP / person',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? kGreenLight : kGreenDark,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
