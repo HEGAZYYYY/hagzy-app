@@ -765,12 +765,16 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                               const Icon(Icons.near_me_rounded,
                                   size: 13, color: kGreen),
                               const SizedBox(width: 4),
-                              Text(
-                                '${_getDistanceToVenue(activeVenue).toStringAsFixed(1)} ${localized(arabic, 'km away', 'كم عنك')} · ${activeVenue.location}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: kGreen,
+                              Expanded(
+                                child: Text(
+                                  '${_getDistanceToVenue(activeVenue).toStringAsFixed(1)} ${localized(arabic, 'km away', 'كم عنك')} · ${activeVenue.location}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: kGreen,
+                                  ),
                                 ),
                               ),
                             ],

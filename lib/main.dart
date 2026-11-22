@@ -311,9 +311,9 @@ class _HagzyHomeState extends State<HagzyHome> {
       final remoteVenues = await _api.venues();
       if (!mounted) return;
       setState(() {
-        _venues = remoteVenues
+        _venues = upsertNaderSalon(remoteVenues
             .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-            .toList();
+            .toList());
         _isOffline = false;
         _apiError = null;
       });
@@ -472,6 +472,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       _venues = await _loadSeedVenues(_venues);
+      _venues = upsertNaderSalon(_venues);
       if (mounted) setState(() {});
       await prefs.setString(
         kStorageKey,
@@ -5566,7 +5567,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       final parsed = remoteVenues
           .map((value) => Venue.fromJson(value as Map<String, dynamic>))
           .toList();
-      final seeded = await _loadSeedVenues(parsed);
+      final seeded = upsertNaderSalon(await _loadSeedVenues(parsed));
       setState(() {
         _venues = seeded;
         _isOffline = false;

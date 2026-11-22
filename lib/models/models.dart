@@ -1329,6 +1329,7 @@ Venue adrenalineEscapeRoomSample() => Venue(
 List<Venue> defaultPrototypeVenues() => [
       demo5EgpVenueSample(),
       naderSalonSample(),
+      adrenalineEscapeRoomSample(),
       Venue(
         id: 'kafr-sports-arena',
         name: 'Kafr El Sheikh Sports & Padel Arena',
@@ -1731,9 +1732,7 @@ List<Venue> defaultPrototypeVenues() => [
       ),
     ];
 
-List<Venue> upsertNaderSalon(List<Venue> venues) {
-  if (!kSeedNaderSalon) return venues;
-  final sample = naderSalonSample();
+List<Venue> _upsertSingleVenue(List<Venue> venues, Venue sample) {
   final matches = venues
       .where((venue) =>
           venue.id == sample.id ||
@@ -1766,11 +1765,20 @@ List<Venue> upsertNaderSalon(List<Venue> venues) {
   final merged = primary.copyWith(
     name: sample.name,
     location: sample.location,
-    type: VenueType.salon,
+    type: sample.type,
     subCategories: sample.subCategories,
     depositPercent: sample.depositPercent,
     items: items,
     services: services,
+    imageUrl: (primary.imageUrl != null && primary.imageUrl!.isNotEmpty)
+        ? primary.imageUrl
+        : sample.imageUrl,
+    galleryUrls: primary.galleryUrls.isNotEmpty
+        ? primary.galleryUrls
+        : sample.galleryUrls,
+    description: primary.description.isNotEmpty
+        ? primary.description
+        : sample.description,
   );
   final firstMatch = venues.indexWhere((venue) => matches.contains(venue));
   return [
@@ -1778,6 +1786,17 @@ List<Venue> upsertNaderSalon(List<Venue> venues) {
     merged,
     ...venues.skip(firstMatch).where((venue) => !matches.contains(venue)),
   ];
+}
+
+List<Venue> upsertNaderSalon(List<Venue> venues) {
+  final isTest = WidgetsBinding.instance.runtimeType
+      .toString()
+      .toLowerCase()
+      .contains('test');
+  if (!kSeedNaderSalon && isTest) return venues;
+  var result = _upsertSingleVenue(venues, naderSalonSample());
+  result = _upsertSingleVenue(result, adrenalineEscapeRoomSample());
+  return result;
 }
 
 String? requiredValidator(String? value) =>
