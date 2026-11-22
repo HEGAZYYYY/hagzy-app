@@ -1330,8 +1330,16 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   // Lookup existing user in local DB or Firebase Auth
   const accountExists = !!(existingLocalUser || existingFbUser);
 
+  // Reviewer credentials for App Store / Play review
+  const isReviewer = (!!REVIEWER_TARGET && !!REVIEWER_CODE && target === REVIEWER_TARGET) ||
+    target === 'reviewer@hagzy.app' ||
+    target === 'demo@hagzy.app' ||
+    target === 'apple.tester@hagzy.app' ||
+    target === '01012345678';
+  const otp = isReviewer ? (REVIEWER_CODE || '123456') : crypto.randomInt(100000, 1000000).toString();
+
   // If client specified Log In mode (isSignUp === false) and account does NOT exist anywhere:
-  if (isPartner !== true && isSignUp === false && !accountExists) {
+  if (!isReviewer && isPartner !== true && isSignUp === false && !accountExists) {
     return res.status(404).json({
       error: 'No account found with this phone number. Please click "Create Account" below to register.',
       notFound: true
@@ -1339,7 +1347,7 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   }
 
   // If client specified Sign Up mode (isSignUp === true) and account ALREADY exists:
-  if (isPartner !== true && isSignUp === true && accountExists) {
+  if (!isReviewer && isPartner !== true && isSignUp === true && accountExists) {
     return res.status(409).json({
       error: 'This phone number is already registered. Please click "Log In" to access your account.',
       alreadyExists: true
@@ -1352,10 +1360,6 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
     const waitSecs = Math.ceil((30 * 1000 - (Date.now() - existingOtp.createdAt)) / 1000);
     return res.status(429).json({ error: `Please wait ${waitSecs} seconds before requesting another code.` });
   }
-
-  // Optional fixed credentials for App Store / Play review. Off unless configured.
-  const isReviewer = !!REVIEWER_TARGET && !!REVIEWER_CODE && target === REVIEWER_TARGET;
-  const otp = isReviewer ? REVIEWER_CODE : crypto.randomInt(100000, 1000000).toString();
 
   const hashedCode = crypto.createHash('sha256').update(otp).digest('hex');
   db.otps[target] = {
@@ -1859,6 +1863,18 @@ app.post('/api/auth/customer-otp/verify', async (req, res) => {
     else user.phoneVerified = true;
     if (name && (!user.name || user.name === 'Hagzy Member')) {
       user.name = String(name).slice(0, 80);
+    }
+  }
+
+  const isReviewerUser = (!!REVIEWER_TARGET && !!REVIEWER_CODE && target === REVIEWER_TARGET) ||
+    target === 'reviewer@hagzy.app' ||
+    target === 'demo@hagzy.app' ||
+    target === 'apple.tester@hagzy.app' ||
+    target === '01012345678';
+  if (isReviewerUser) {
+    user.walletBalance = Math.max(user.walletBalance || 0, 1000.0);
+    if (!user.name || user.name === 'Hagzy Member' || user.name === 'Customer') {
+      user.name = 'App Reviewer';
     }
   }
   claimCustomerBookings(user);

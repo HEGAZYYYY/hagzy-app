@@ -2986,6 +2986,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                           ? selectedBarber
                           : '',
                       reminderOffsetMinutes: reminderOffsetMinutes,
+                      createdAt: DateTime.now(),
+                      confirmedAt: (walkIn || isWalletPaid) ? DateTime.now() : null,
                     ),
                   );
                 },
@@ -4767,6 +4769,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         status: 'confirmed',
         paymentStatus: 'paid',
         clearHoldExpiresAt: true,
+        confirmedAt: DateTime.now(),
       );
       if (_api.isConfigured && _adminToken != null) {
         final remote = await _api.confirmBooking(_adminToken!, booking.id);

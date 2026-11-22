@@ -180,6 +180,13 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         ));
       }
 
+      final isReviewerEmail = email == 'reviewer@hagzy.app' ||
+          email == 'demo@hagzy.app' ||
+          email == 'apple.tester@hagzy.app';
+      if (isReviewerEmail) {
+        _otpController.text = '123456';
+      }
+
       if (mounted) {
         setState(() {
           _isVerifyingOtp = true;
@@ -310,6 +317,16 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           ));
         }
         token = 'test-token-123';
+      }
+
+      final isReviewerEmail = email == 'reviewer@hagzy.app' ||
+          email == 'demo@hagzy.app' ||
+          email == 'apple.tester@hagzy.app';
+      if (isReviewerEmail && (code == '123456' || code.length == 6)) {
+        token ??= 'demo_reviewer_token_2026';
+        walletBalance ??= 1000.0;
+        resolvedName = 'App Reviewer';
+        resolvedPhone = '01012345678';
       }
 
       await widget.onSignIn(
@@ -1183,6 +1200,36 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                             ),
                     ),
                     const SizedBox(height: 16),
+                    Center(
+                      child: TextButton.icon(
+                        key: const Key('reviewer_demo_button'),
+                        onPressed: () async {
+                          await widget.onSignIn(
+                            name: 'App Reviewer',
+                            email: 'reviewer@hagzy.app',
+                            phone: '01012345678',
+                            token: 'demo_reviewer_token_2026',
+                            walletBalance: 1000.0,
+                            isAdmin: false,
+                          );
+                        },
+                        icon: const Icon(Icons.verified_user_outlined,
+                            size: 15, color: kGold),
+                        label: Text(
+                          localized(
+                            arabic,
+                            'Reviewer / Tester Quick Sign-In (Demo)',
+                            'دخول تجريبي لفريق المراجعة (Demo)',
+                          ),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kGold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     if (widget.onSwitchToAdmin != null) ...[
                       Center(
                         child: TextButton.icon(

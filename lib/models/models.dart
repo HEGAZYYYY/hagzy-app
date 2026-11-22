@@ -850,6 +850,8 @@ class Booking {
     this.actualPaidAmount,
     this.reminderOffsetMinutes = 120,
     this.reminderSentAt,
+    this.createdAt,
+    this.confirmedAt,
   });
 
   final String id;
@@ -882,6 +884,8 @@ class Booking {
   final double? actualPaidAmount;
   final int reminderOffsetMinutes;
   final DateTime? reminderSentAt;
+  final DateTime? createdAt;
+  final DateTime? confirmedAt;
 
   DateTime get endsAt => startsAt.add(Duration(minutes: durationMinutes));
 
@@ -955,6 +959,8 @@ class Booking {
     double? actualPaidAmount,
     int? reminderOffsetMinutes,
     DateTime? reminderSentAt,
+    DateTime? createdAt,
+    DateTime? confirmedAt,
   }) =>
       Booking(
         id: id ?? this.id,
@@ -989,6 +995,8 @@ class Booking {
         reminderOffsetMinutes:
             reminderOffsetMinutes ?? this.reminderOffsetMinutes,
         reminderSentAt: reminderSentAt ?? this.reminderSentAt,
+        createdAt: createdAt ?? this.createdAt,
+        confirmedAt: confirmedAt ?? this.confirmedAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -1024,6 +1032,8 @@ class Booking {
         'reminderOffsetMinutes': reminderOffsetMinutes,
         if (reminderSentAt != null)
           'reminderSentAt': reminderSentAt!.toIso8601String(),
+        if (createdAt != null) 'createdAt': iso8601WithOffset(createdAt!),
+        if (confirmedAt != null) 'confirmedAt': iso8601WithOffset(confirmedAt!),
       };
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -1108,6 +1118,12 @@ class Booking {
           ((json['reminderOffsetMinutes'] ?? json['reminder_offset_minutes']) as num?)?.toInt() ?? 120,
       reminderSentAt: json['reminderSentAt'] != null || json['reminder_sent_at'] != null
           ? parseDate(json['reminderSentAt'] ?? json['reminder_sent_at'])
+          : null,
+      createdAt: json['createdAt'] != null || json['created_at'] != null
+          ? parseDate(json['createdAt'] ?? json['created_at'])
+          : null,
+      confirmedAt: json['confirmedAt'] != null || json['confirmed_at'] != null
+          ? parseDate(json['confirmedAt'] ?? json['confirmed_at'])
           : null,
     );
   }

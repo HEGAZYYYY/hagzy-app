@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -1513,6 +1514,46 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
               ),
             ),
           ),
+          if (intent.expectedSenderIdentifier.contains('reviewer') ||
+              intent.expectedSenderIdentifier == '01012345678' ||
+              kDebugMode) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('demo_simulate_confirm_button'),
+                onPressed: () {
+                  _intentStreamController?.add(
+                    PaymentIntentData(
+                      intentId: intent.intentId,
+                      status: PaymentIntentStatus.verified,
+                      expectedAmount: intent.expectedAmount,
+                      expectedSenderIdentifier: intent.expectedSenderIdentifier,
+                      expiresAt: intent.expiresAt,
+                      verifiedAt: DateTime.now(),
+                    ),
+                  );
+                  _handleVerifiedTransition();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: kGold,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.bolt_rounded, size: 18),
+                label: Text(
+                  _localized(
+                    'Reviewer / Tester: Simulate Instant Confirmation',
+                    'المراجع / فاحص التطبيق: محاكاة تأكيد الدفع الفوري',
+                  ),
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

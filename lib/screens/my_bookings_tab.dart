@@ -571,8 +571,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             totalPriceEgp: booking.price,
             depositRequiredEgp: booking.dueNow ?? (booking.price * 0.1),
             status: booking.isConfirmed ? BookingStatus.confirmed : BookingStatus.pendingDeposit,
-            confirmedAt: booking.isConfirmed ? DateTime.now().subtract(const Duration(minutes: 2)) : null,
-            createdAt: DateTime.now().subtract(const Duration(minutes: 3)),
+            confirmedAt: booking.confirmedAt,
+            createdAt: booking.createdAt ?? booking.startsAt,
           );
 
           return Column(
