@@ -287,6 +287,7 @@ class ManageTab extends StatefulWidget {
     required this.onDelete,
     required this.onRemoveItem,
     this.onSyncFirebase,
+    this.onExploreCustomerApp,
   });
 
   final List<Venue> venues;
@@ -305,6 +306,7 @@ class ManageTab extends StatefulWidget {
   final ValueChanged<Venue> onDelete;
   final void Function(Venue venue, VenueItem item) onRemoveItem;
   final VoidCallback? onSyncFirebase;
+  final VoidCallback? onExploreCustomerApp;
 
   @override
   State<ManageTab> createState() => _ManageTabState();
@@ -446,22 +448,16 @@ class _ManageTabState extends State<ManageTab> {
           icon: Icons.add_business_outlined,
           action: widget.isSingularPartner
               ? null
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: kGreenDark,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: widget.onAddVenue,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add venue', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-                  ],
+              : FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kGreenDark,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: widget.onAddVenue,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add venue', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
         ),
         if (!widget.isSingularPartner && widget.venues.length > 1) ...[
@@ -551,6 +547,21 @@ class _ManageTabState extends State<ManageTab> {
                 label: const Text('Step-by-Step Venue Setup'),
               ),
             ),
+            if (widget.onExploreCustomerApp != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: widget.onExploreCustomerApp,
+                  icon: const Icon(Icons.explore_rounded, size: 18),
+                  label: const Text('Browse Places as Customer (تصفح كعميل)', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
           ],
         ],
         ...filteredVenues.map((venue) => Card(

@@ -185,7 +185,14 @@ class _HagzyHomeState extends State<HagzyHome> {
   Timer? _liveSyncTimer;
   StreamSubscription<AuthState>? _supabaseAuthSub;
   RealtimeChannel? _realtimeChannel;
-  List<Venue> _venues = kSeedNaderSalon ? defaultPrototypeVenues() : [];
+  static bool get _isTestRuntime => WidgetsBinding.instance.runtimeType
+      .toString()
+      .toLowerCase()
+      .contains('test');
+
+  List<Venue> _venues = (!_isTestRuntime || kSeedNaderSalon)
+      ? defaultPrototypeVenues()
+      : [];
   List<Booking> _bookings = [];
   List<Booking> _customerBookings = [];
   String _savedCustomerId = '';
@@ -310,10 +317,9 @@ class _HagzyHomeState extends State<HagzyHome> {
     try {
       final remoteVenues = await _api.venues();
       if (!mounted) return;
+      final seeded = await _mergeWithSeedVenues(remoteVenues);
       setState(() {
-        _venues = upsertNaderSalon(remoteVenues
-            .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-            .toList());
+        _venues = seeded;
         _isOffline = false;
         _apiError = null;
       });
@@ -380,11 +386,20 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
   }
 
+  Future<List<Venue>> _mergeWithSeedVenues(List<dynamic> rawVenues) async {
+    final parsed = rawVenues
+        .whereType<Map>()
+        .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
+        .toList();
+    if (_isTestRuntime && !kSeedNaderSalon) {
+      return parsed;
+    }
+    final seeded = await _loadSeedVenues(parsed);
+    return upsertNaderSalon(seeded);
+  }
+
   Future<List<Venue>> _loadSeedVenues(List<Venue> venues) async {
-    final isTest = WidgetsBinding.instance.runtimeType
-        .toString()
-        .toLowerCase()
-        .contains('test');
+    final isTest = _isTestRuntime;
     if (isTest && !kSeedNaderSalon) return venues;
     try {
       final raw = await rootBundle.loadString('assets/venues_seed.json');
@@ -403,9 +418,13 @@ class _HagzyHomeState extends State<HagzyHome> {
           result.add(venue);
         }
       }
+      if (result.isEmpty) {
+        return upsertNaderSalon(defaultPrototypeVenues());
+      }
       return result;
     } catch (_) {
-      return kSeedNaderSalon ? upsertNaderSalon(venues) : venues;
+      if (isTest && !kSeedNaderSalon) return venues;
+      return upsertNaderSalon(venues.isNotEmpty ? venues : defaultPrototypeVenues());
     }
   }
 
@@ -459,9 +478,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (_api.isConfigured && !isTest) {
         try {
           final remoteVenues = await _api.venues();
-          _venues = remoteVenues
-              .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-              .toList();
+          _venues = await _mergeWithSeedVenues(remoteVenues);
           _isOffline = false;
           _apiError = null;
         } catch (error) {
@@ -506,9 +523,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           try {
             final scopedVenues = await _api.venues(adminToken: _customerToken!);
             final scopedBookings = await _api.bookings(_customerToken!);
-            _venues = scopedVenues
-                .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-                .toList();
+            _venues = await _mergeWithSeedVenues(scopedVenues);
             _bookings = scopedBookings
                 .map((value) => Booking.fromJson(value as Map<String, dynamic>))
                 .toList();
@@ -628,13 +643,17 @@ class _HagzyHomeState extends State<HagzyHome> {
     final arabic = _language == 'AR';
     try {
       if (_api.isConfigured && _adminToken != null) {
+        for (final v in _venues) {
+          try {
+            await _api.saveVenue(_adminToken!, v.toJson());
+          } catch (_) {}
+        }
         await _api.syncVenuesToCloud(_adminToken!);
         final remote = await _api.venues(adminToken: _adminToken!);
         if (mounted) {
+          final seeded = await _mergeWithSeedVenues(remote);
           setState(() {
-            _venues = remote
-                .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-                .toList();
+            _venues = seeded;
           });
         }
       }
@@ -1107,15 +1126,13 @@ class _HagzyHomeState extends State<HagzyHome> {
         );
         final venues = await _api.venues(adminToken: portalToken);
         final bookings = await _api.bookings(portalToken);
+        final seeded = await _mergeWithSeedVenues(venues);
         if (!mounted) return;
         setState(() {
           _working = false;
           _mode = 'admin';
           _tab = 0;
-          _venues = venues
-              .whereType<Map>()
-              .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-              .toList();
+          _venues = seeded;
           _bookings = bookings
               .whereType<Map>()
               .map((b) => Booking.fromJson(Map<String, dynamic>.from(b)))
@@ -1200,15 +1217,13 @@ class _HagzyHomeState extends State<HagzyHome> {
         } catch (_) {}
       }
 
+      final seeded = await _mergeWithSeedVenues(venues);
       if (!mounted) return;
       setState(() {
         _working = false;
         _mode = 'admin';
         _tab = 0;
-        _venues = venues
-            .whereType<Map>()
-            .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-            .toList();
+        _venues = seeded;
         _bookings = bookings
             .whereType<Map>()
             .map((b) => Booking.fromJson(Map<String, dynamic>.from(b)))
@@ -1266,10 +1281,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             bookings = await _api.bookings(token);
           }
         } catch (_) {}
-        _venues = venues
-            .whereType<Map>()
-            .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-            .toList();
+        _venues = await _mergeWithSeedVenues(venues);
         _bookings = bookings
             .whereType<Map>()
             .map((b) => Booking.fromJson(Map<String, dynamic>.from(b)))
@@ -1297,10 +1309,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         } else {
           try {
             final publicVenues = await _api.venues();
-            _venues = publicVenues
-                .whereType<Map>()
-                .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-                .toList();
+            _venues = await _mergeWithSeedVenues(publicVenues);
           } catch (_) {}
         }
       }
@@ -1438,15 +1447,13 @@ class _HagzyHomeState extends State<HagzyHome> {
         } catch (_) {}
       }
 
+      final seeded = await _mergeWithSeedVenues(venues);
       if (!mounted) return;
       setState(() {
         _working = false;
         _mode = 'admin';
         _tab = 0;
-        _venues = venues
-            .whereType<Map>()
-            .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-            .toList();
+        _venues = seeded;
         _bookings = bookings
             .whereType<Map>()
             .map((b) => Booking.fromJson(Map<String, dynamic>.from(b)))
@@ -1549,14 +1556,12 @@ class _HagzyHomeState extends State<HagzyHome> {
           } catch (_) {}
         }
 
+        final seeded = await _mergeWithSeedVenues(venues);
         if (!mounted) return;
         setState(() {
           _mode = 'admin';
           _tab = 0;
-          _venues = venues
-              .whereType<Map>()
-              .map((value) => Venue.fromJson(Map<String, dynamic>.from(value)))
-              .toList();
+          _venues = seeded;
           _bookings = bookings
               .whereType<Map>()
               .map((value) => Booking.fromJson(Map<String, dynamic>.from(value)))
@@ -4897,10 +4902,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       try {
         final venues = await _api.venues(adminToken: token);
         final bookings = await _api.bookings(token);
-        _venues = venues
-            .whereType<Map>()
-            .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-            .toList();
+        _venues = await _mergeWithSeedVenues(venues);
         _bookings = bookings
             .whereType<Map>()
             .map((b) => Booking.fromJson(Map<String, dynamic>.from(b)))
@@ -4908,10 +4910,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       } catch (_) {
         try {
           final venues = await _api.venues();
-          _venues = venues
-              .whereType<Map>()
-              .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
-              .toList();
+          _venues = await _mergeWithSeedVenues(venues);
         } catch (_) {}
       }
     }
@@ -5273,14 +5272,13 @@ class _HagzyHomeState extends State<HagzyHome> {
           try {
             final scopedVenues = await _api.venues(adminToken: _customerToken!);
             final scopedBookings = await _api.bookings(_customerToken!);
+            final seeded = await _mergeWithSeedVenues(scopedVenues);
             if (mounted) {
               setState(() {
                 _adminToken = _customerToken;
                 _mode = 'admin';
                 _tab = 0;
-                _venues = scopedVenues
-                    .map((v) => Venue.fromJson(v as Map<String, dynamic>))
-                    .toList();
+                _venues = seeded;
                 _bookings = scopedBookings
                     .map((b) => Booking.fromJson(b as Map<String, dynamic>))
                     .toList();
@@ -5564,10 +5562,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     try {
       final remoteVenues = await _api.venues();
       if (!mounted) return;
-      final parsed = remoteVenues
-          .map((value) => Venue.fromJson(value as Map<String, dynamic>))
-          .toList();
-      final seeded = upsertNaderSalon(await _loadSeedVenues(parsed));
+      final seeded = await _mergeWithSeedVenues(remoteVenues);
       setState(() {
         _venues = seeded;
         _isOffline = false;
@@ -6006,9 +6001,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ],
                       if (!isCustomer) ...[
                         const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: localized(arabic, 'Switch to Customer App',
-                              'الانتقال لتطبيق العملاء'),
+                        FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kSurfaceTint,
+                            foregroundColor: kGreen,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                          ),
                           onPressed: () {
                             setState(() {
                               _partnerSwitchedToCustomerApp = true;
@@ -6016,7 +6015,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                               _tab = 0;
                             });
                           },
-                          icon: const Icon(Icons.explore_rounded),
+                          icon: const Icon(Icons.explore_rounded, size: 16),
+                          label: Text(
+                            localized(arabic, 'Customer App', 'تطبيق العملاء'),
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
                         ),
                         const SizedBox(width: 2),
                         IconButton(
@@ -6225,6 +6228,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 onDelete: _deleteVenue,
                                                 onRemoveItem: _removeItem,
                                                 onSyncFirebase: _syncAllVenuesToCloud,
+                                                onExploreCustomerApp: () => setState(() {
+                                                  _partnerSwitchedToCustomerApp = true;
+                                                  _mode = 'customer';
+                                                  _tab = 0;
+                                                }),
                                               ),
                                             2 => PosTab(
                                                 venues: _venues,
