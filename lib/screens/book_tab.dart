@@ -2302,20 +2302,42 @@ class _BookTabState extends State<BookTab> {
                                               ? Icons.check_circle_rounded
                                               : venue.type.icon,
                                           selected: sel,
-                                          label:
-                                              '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/30m', '/٣٠ د') : (venue.subCategories.contains('escape_rooms') ? localized(widget.arabic, '/person', '/فرد') : localized(widget.arabic, '/h', '/س'))}',
+                                          label: () {
+                                            final isTiered = val.pricingMode == 'per_person_tiered' ||
+                                                (val.pricingTiers != null && val.pricingTiers!.isNotEmpty) ||
+                                                venue.subCategories.contains('escape_rooms');
+                                            if (isTiered) {
+                                              final rate = sel ? val.priceForHeadcount(_headcount) : (val.pricingTiers != null && val.pricingTiers!.isNotEmpty ? val.pricingTiers!.values.map((v) => (v as num).toDouble()).reduce((a, b) => a < b ? a : b) : val.hourlyRate);
+                                              return sel
+                                                  ? '${val.name} · ${formatMoney(rate)} ${localized(widget.arabic, 'EGP/p', 'ج.م/فرد')}'
+                                                  : '${val.name} · ${localized(widget.arabic, 'from', 'من')} ${formatMoney(rate)} ${localized(widget.arabic, 'EGP/p', 'ج.م/فرد')}';
+                                            } else if (venue.type == VenueType.salon) {
+                                              return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/30m', 'ج.م/٣٠ د')}';
+                                            }
+                                            return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}';
+                                          }(),
                                           onTap: () => _selectSpace(val.id),
                                         );
                                       }).toList(),
                                     ),
                                    if (item != null && ((item.imageUrl != null && item.imageUrl!.isNotEmpty) || item.description.isNotEmpty)) ...[
-                                     _RoomDetailCard(
-                                       item: item,
-                                       isDark: isDark,
-                                       arabic: widget.arabic,
-                                       isEscapeRoom: venue.subCategories.contains('escape_rooms'),
-                                     ),
-                                   ],
+                                      _RoomDetailCard(
+                                        item: item,
+                                        isDark: isDark,
+                                        arabic: widget.arabic,
+                                        isEscapeRoom: venue.subCategories.contains('escape_rooms'),
+                                      ),
+                                    ],
+                                    if (item != null && (item.pricingMode == 'per_person_tiered' || (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) || venue.subCategories.contains('escape_rooms'))) ...[
+                                      _HeadcountPricingStep(
+                                        item: item,
+                                        venue: venue,
+                                        headcount: _headcount,
+                                        arabic: widget.arabic,
+                                        isDark: isDark,
+                                        onChanged: (h) => setState(() => _headcount = h),
+                                      ),
+                                    ],
                                 ],
                               ),
                             ),
@@ -5553,38 +5575,345 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
                     ),
                   ],
                 ],
-                if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: item.pricingTiers!.entries.map((e) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Text(
-                          arabic
-                              ? '≤ ${e.key} أفراد: ${e.value} جنيه للفرد'
-                              : '≤ ${e.key} players: ${e.value} EGP / person',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? kGreenLight : kGreenDark,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
+
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _HeadcountPricingStep extends StatelessWidget {
+  const _HeadcountPricingStep({
+    required this.item,
+    required this.venue,
+    required this.headcount,
+    required this.arabic,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  final VenueItem item;
+  final Venue venue;
+  final int headcount;
+  final bool arabic;
+  final bool isDark;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final minCap = item.minCapacity ?? 2;
+    final maxCap = item.maxCapacity ?? 15;
+    final currentRate = item.priceForHeadcount(headcount);
+    final total = currentRate * headcount;
+    final rawDeposit = total * venue.depositPercent / 100;
+    final deposit = (rawDeposit > 0 && rawDeposit < 5.0) ? 5.0 : rawDeposit;
+
+    final sortedEntries = (item.pricingTiers ?? const {}).entries
+        .map((e) => MapEntry(int.tryParse(e.key) ?? 999, (e.value as num).toDouble()))
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    int? activeCap;
+    for (final entry in sortedEntries) {
+      if (headcount <= entry.key) {
+        activeCap = entry.key;
+        break;
+      }
+    }
+    if (activeCap == null && sortedEntries.isNotEmpty) {
+      activeCap = sortedEntries.last.key;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? kGreenLight.withValues(alpha: 0.3) : kGreen.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: kGreen.withValues(alpha: isDark ? 0.15 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? kGreen.withValues(alpha: 0.25) : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: kGreen.withValues(alpha: 0.3)),
+                ),
+                child: const Icon(Icons.group_rounded, color: kGreen, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      localized(arabic, '1. Choose Number of Players', '١. اختر عدد أفراد الشلة / اللاعبين'),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      localized(arabic, 'Price updates live based on your group size', 'السعر بيتحدد تلقائياً حسب عدد الأفراد اللي هتختارهم'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate((maxCap - minCap + 1).clamp(1, 30), (index) {
+                final count = minCap + index;
+                final isSelected = count == headcount;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: InkWell(
+                    onTap: () => onChanged(count),
+                    borderRadius: BorderRadius.circular(12),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? kGreen
+                            : (isDark ? const Color(0xFF334155) : Colors.white),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? kGreen
+                              : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: kGreen.withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                            ),
+                          ),
+                          Text(
+                            localized(arabic, 'players', 'أفراد'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected
+                                  ? Colors.white.withValues(alpha: 0.9)
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      localized(arabic, 'Rate per Player:', 'سعر الفرد:'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    Text(
+                      '${formatMoney(currentRate)} ${localized(arabic, 'EGP / player', 'جنيه / فرد')}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: kGreen,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      localized(arabic, 'Total ($headcount players):', 'إجمالي الحجز ($headcount أفراد):'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    Text(
+                      '${formatMoney(total)} ${localized(arabic, 'EGP', 'ج.م')}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      localized(arabic, 'Deposit Due Now (${venue.depositPercent}%):', 'العربون المطلوب الآن (${venue.depositPercent}%):'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    Text(
+                      '${formatMoney(deposit)} ${localized(arabic, 'EGP', 'ج.م')}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (sortedEntries.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              localized(arabic, 'Group Pricing Brackets:', 'شرائح أسعار المجموعات:'),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: () {
+                var prevCap = minCap - 1;
+                final widgets = <Widget>[];
+                for (final e in sortedEntries) {
+                  final cap = e.key;
+                  final price = e.value;
+                  final from = prevCap + 1;
+                  final isActive = cap == activeCap;
+                  String label;
+                  if (from == cap) {
+                    label = arabic ? '$cap أفراد: ${price.toStringAsFixed(0)} ج.م/فرد' : '$cap players: ${price.toStringAsFixed(0)} EGP/p';
+                  } else if (cap >= maxCap) {
+                    label = arabic ? 'أكتر من $prevCap أفراد ($from - $cap): ${price.toStringAsFixed(0)} ج.م/فرد' : '$from+ players ($from - $cap): ${price.toStringAsFixed(0)} EGP/p';
+                  } else {
+                    label = arabic ? '$from أو $cap أفراد: ${price.toStringAsFixed(0)} ج.م/فرد' : '$from - $cap players: ${price.toStringAsFixed(0)} EGP/p';
+                  }
+                  prevCap = cap;
+                  widgets.add(
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? (isDark ? kGreen.withValues(alpha: 0.28) : const Color(0xFFD1FAE5))
+                            : (isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isActive ? kGreen : (isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0)),
+                          width: isActive ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isActive) ...[
+                            const Icon(Icons.check_circle, size: 14, color: kGreen),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+                              color: isActive
+                                  ? (isDark ? kGreenLight : kGreenDark)
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                          ),
+                          if (isActive) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              arabic ? '(المطبق)' : '(Active)',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: kGreen,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return widgets;
+              }(),
+            ),
+          ],
         ],
       ),
     );

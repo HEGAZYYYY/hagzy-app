@@ -2502,28 +2502,59 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ),
                             if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
                               const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: item.pricingTiers!.entries.map((e) {
-                                  final cap = int.tryParse(e.key) ?? 1;
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: headcount <= cap ? kGreen.withValues(alpha: 0.14) : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: headcount <= cap ? kGreen : kBorder),
-                                    ),
-                                    child: Text(
-                                      '≤$cap ${localized(arabic, "p", "فرد")}: ${e.value} ${localized(arabic, "EGP", "ج.م")}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: headcount <= cap ? FontWeight.w800 : FontWeight.w600,
-                                        color: headcount <= cap ? kGreen : kMuted,
-                                      ),
-                                    ),
+                              Builder(
+                                builder: (context) {
+                                  final sortedEntries = item.pricingTiers!.entries
+                                      .map((e) => MapEntry(int.tryParse(e.key) ?? 999, (e.value as num).toDouble()))
+                                      .toList()
+                                    ..sort((a, b) => a.key.compareTo(b.key));
+                                  int? activeCap;
+                                  for (final entry in sortedEntries) {
+                                    if (headcount <= entry.key) {
+                                      activeCap = entry.key;
+                                      break;
+                                    }
+                                  }
+                                  if (activeCap == null && sortedEntries.isNotEmpty) {
+                                    activeCap = sortedEntries.last.key;
+                                  }
+                                  var prevCap = minCap - 1;
+                                  return Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: sortedEntries.map((e) {
+                                      final cap = e.key;
+                                      final price = e.value;
+                                      final from = prevCap + 1;
+                                      final isActive = cap == activeCap;
+                                      String label;
+                                      if (from == cap) {
+                                        label = arabic ? '$cap أفراد: ${price.toStringAsFixed(0)} ج.م' : '$cap p: ${price.toStringAsFixed(0)} EGP';
+                                      } else if (cap >= maxCap) {
+                                        label = arabic ? 'أكتر من $prevCap ($from-$cap): ${price.toStringAsFixed(0)} ج.م' : '$from+ ($from-$cap): ${price.toStringAsFixed(0)} EGP';
+                                      } else {
+                                        label = arabic ? '$from-$cap أفراد: ${price.toStringAsFixed(0)} ج.م' : '$from-$cap p: ${price.toStringAsFixed(0)} EGP';
+                                      }
+                                      prevCap = cap;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: isActive ? kGreen.withValues(alpha: 0.16) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: isActive ? kGreen : kBorder, width: isActive ? 1.5 : 1),
+                                        ),
+                                        child: Text(
+                                          label,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                                            color: isActive ? kGreen : kMuted,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                                   );
-                                }).toList(),
+                                },
                               ),
                             ],
                           ],
