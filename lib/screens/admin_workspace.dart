@@ -74,9 +74,15 @@ class AdminManageWorkspace extends StatefulWidget {
     this.onLoadUsers,
     required this.onCancel,
     required this.onConfirm,
+    this.archivedVenues = const [],
+    this.onRestoreVenue,
+    this.onPermanentDeleteVenue,
   });
 
   final List<Venue> venues;
+  final List<Venue> archivedVenues;
+  final ValueChanged<Venue>? onRestoreVenue;
+  final ValueChanged<Venue>? onPermanentDeleteVenue;
   final List<Booking> bookings;
   final String? ownerId;
   final bool isSingularPartner;
@@ -209,6 +215,9 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
               0 => ManageTab(
                   key: const ValueKey('admin_manage'),
                   venues: widget.venues,
+                  archivedVenues: widget.archivedVenues,
+                  onRestoreVenue: widget.onRestoreVenue,
+                  onPermanentDeleteVenue: widget.onPermanentDeleteVenue,
                   ownerId: widget.ownerId,
                   isSingularPartner: widget.isSingularPartner,
                   partnerRequests: widget.partnerRequests,
@@ -272,6 +281,9 @@ class ManageTab extends StatefulWidget {
   const ManageTab({
     super.key,
     required this.venues,
+    this.archivedVenues = const [],
+    this.onRestoreVenue,
+    this.onPermanentDeleteVenue,
     this.ownerId,
     this.isSingularPartner = false,
     this.partnerRequests = const [],
@@ -291,6 +303,9 @@ class ManageTab extends StatefulWidget {
   });
 
   final List<Venue> venues;
+  final List<Venue> archivedVenues;
+  final ValueChanged<Venue>? onRestoreVenue;
+  final ValueChanged<Venue>? onPermanentDeleteVenue;
   final String? ownerId;
   final bool isSingularPartner;
   final List<Map<String, dynamic>> partnerRequests;
@@ -314,12 +329,17 @@ class ManageTab extends StatefulWidget {
 
 class _ManageTabState extends State<ManageTab> {
   VenueType? _filterType;
+  bool _showArchived = false;
 
   @override
   Widget build(BuildContext context) {
-    final filteredVenues = _filterType == null
+    final activeList = _filterType == null
         ? widget.venues
         : widget.venues.where((v) => v.type == _filterType).toList();
+    final archivedList = _filterType == null
+        ? widget.archivedVenues
+        : widget.archivedVenues.where((v) => v.type == _filterType).toList();
+    final filteredVenues = _showArchived ? archivedList : activeList;
     final pendingRequests = widget.partnerRequests
         .where((r) => (r['status'] ?? 'pending') == 'pending')
         .toList();
@@ -438,42 +458,128 @@ class _ManageTabState extends State<ManageTab> {
             ),
           ),
         ],
-        IntroCard(
-          title: widget.isSingularPartner
-              ? 'My Venue Dashboard'
-              : 'Your self-service builder',
-          subtitle: widget.isSingularPartner
-              ? 'Manage your venue details, bookable spaces, services, and pricing.'
-              : 'Add a venue after contacting its owner, then list bookable spaces and services.',
-          icon: Icons.add_business_outlined,
-          action: widget.isSingularPartner
-              ? null
-              : FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: kGreenDark,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: kPanel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _showArchived = false),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: !_showArchived ? kGreen.withValues(alpha: 0.15) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: !_showArchived ? kGreen : Colors.transparent,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.storefront_rounded, size: 16, color: !_showArchived ? kGreen : kMuted),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Active Places (${widget.venues.length})',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12.5,
+                            color: !_showArchived ? kGreen : kMuted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onPressed: widget.onAddVenue,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add venue', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _showArchived = true),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _showArchived ? Colors.amber.withValues(alpha: 0.15) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _showArchived ? Colors.amber.shade700 : Colors.transparent,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 16, color: _showArchived ? Colors.amber.shade700 : kMuted),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Trash / Archived (${widget.archivedVenues.length})',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12.5,
+                            color: _showArchived ? Colors.amber.shade700 : kMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        if (!widget.isSingularPartner && widget.venues.length > 1) ...[
+        if (_showArchived)
+          const IntroCard(
+            title: 'Trash / Archived Venues',
+            subtitle: 'Venues in trash are completely hidden from customer search and booking tabs. You can restore them anytime or permanently delete them.',
+            icon: Icons.delete_sweep_outlined,
+          )
+        else
+          IntroCard(
+            title: widget.isSingularPartner
+                ? 'My Venue Dashboard'
+                : 'Your self-service builder',
+            subtitle: widget.isSingularPartner
+                ? 'Manage your venue details, bookable spaces, services, and pricing.'
+                : 'Add a venue after contacting its owner, then list bookable spaces and services.',
+            icon: Icons.add_business_outlined,
+            action: widget.isSingularPartner
+                ? null
+                : FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: kGreenDark,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: widget.onAddVenue,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add venue', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+          ),
+        if (!widget.isSingularPartner && (_showArchived ? widget.archivedVenues.length : widget.venues.length) > 1) ...[
           const SizedBox(height: 10),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 CustomPill(
-                  label: 'All (${widget.venues.length})',
+                  label: 'All (${_showArchived ? widget.archivedVenues.length : widget.venues.length})',
                   selected: _filterType == null,
                   onTap: () => setState(() => _filterType = null),
                 ),
                 const SizedBox(width: 6),
                 ...VenueType.values.map((t) {
-                  final count = widget.venues.where((v) => v.type == t).length;
+                  final src = _showArchived ? widget.archivedVenues : widget.venues;
+                  final count = src.where((v) => v.type == t).length;
                   if (count == 0) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsetsDirectional.only(end: 6),
@@ -493,15 +599,17 @@ class _ManageTabState extends State<ManageTab> {
         const SizedBox(height: 14),
         if (filteredVenues.isEmpty) ...[
           EmptyCard(
-            icon: Icons.add_business_outlined,
-            title: widget.isSingularPartner
-                ? 'No venue assigned yet'
-                : 'Build your first venue',
-            body: widget.isSingularPartner
-                ? 'Your approved venue will appear here automatically. Contact platform support if you need assistance.'
-                : 'Choose a venue type, add spaces or chairs, then set prices.',
+            icon: _showArchived ? Icons.delete_sweep_outlined : Icons.add_business_outlined,
+            title: _showArchived
+                ? 'Trash is empty'
+                : (widget.isSingularPartner ? 'No venue assigned yet' : 'Build your first venue'),
+            body: _showArchived
+                ? 'No venues currently in trash. When you delete a venue, it is moved here safely so you can restore it anytime.'
+                : (widget.isSingularPartner
+                    ? 'Your approved venue will appear here automatically. Contact platform support if you need assistance.'
+                    : 'Choose a venue type, add spaces or chairs, then set prices.'),
           ),
-          if (!widget.isSingularPartner) ...[
+          if (!_showArchived && !widget.isSingularPartner) ...[
             const SizedBox(height: 10),
             Row(
               children: [
@@ -585,6 +693,32 @@ class _ManageTabState extends State<ManageTab> {
                                       fontSize: 17)),
                               Text(venue.type.label,
                                   style: TextStyle(color: kMuted)),
+                              if (_showArchived) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.amber.shade700.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.archive_outlined, size: 12, color: Colors.amber.shade800),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'In Trash · Hidden from Customers',
+                                        style: TextStyle(
+                                          color: Colors.amber.shade800,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               if (!widget.isSingularPartner &&
                                   (venue.ownerEmail.isNotEmpty ||
                                       venue.ownerPhone.isNotEmpty))
@@ -601,38 +735,102 @@ class _ManageTabState extends State<ManageTab> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Print Table QR Standee',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (ctx) => QrStandeeGenerator(
-                                  venue: HagzyVenue(
-                                    id: venue.id,
-                                    ownerId: venue.ownerPhone.isNotEmpty ? venue.ownerPhone : 'owner',
-                                    name: venue.name,
-                                    city: venue.location,
-                                    categories: [venue.type.name],
-                                    createdAt: DateTime.now(),
+                        if (_showArchived) ...[
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: kGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: () => widget.onRestoreVenue?.call(venue),
+                            icon: const Icon(Icons.restore_from_trash_rounded, size: 15),
+                            label: const Text('Restore', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                          ),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            tooltip: 'Delete Forever',
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Delete Permanently?'),
+                                  content: Text('Are you sure you want to permanently delete "${venue.name}"?\n\nThis cannot be undone and will purge all data.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        widget.onPermanentDeleteVenue?.call(venue);
+                                      },
+                                      child: const Text('Delete Forever'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.delete_forever_rounded, color: Colors.red),
+                          ),
+                        ] else ...[
+                          IconButton(
+                            tooltip: 'Print Table QR Standee',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (ctx) => QrStandeeGenerator(
+                                    venue: HagzyVenue(
+                                      id: venue.id,
+                                      ownerId: venue.ownerPhone.isNotEmpty ? venue.ownerPhone : 'owner',
+                                      name: venue.name,
+                                      city: venue.location,
+                                      categories: [venue.type.name],
+                                      createdAt: DateTime.now(),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.qr_code_rounded, color: Colors.amber),
-                        ),
-                        IconButton(
-                          tooltip: 'Edit venue',
-                          onPressed: () => widget.onEditVenue(venue),
-                          icon: const Icon(Icons.edit_outlined, color: kGreen),
-                        ),
-                        IconButton(
-                          tooltip: 'Delete venue',
-                          onPressed: () => widget.onDelete(venue),
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.red),
-                        ),
+                              );
+                            },
+                            icon: const Icon(Icons.qr_code_rounded, color: Colors.amber),
+                          ),
+                          IconButton(
+                            tooltip: 'Edit venue',
+                            onPressed: () => widget.onEditVenue(venue),
+                            icon: const Icon(Icons.edit_outlined, color: kGreen),
+                          ),
+                          IconButton(
+                            tooltip: 'Move to Trash',
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Move Venue to Trash?'),
+                                  content: Text('Are you sure you want to move "${venue.name}" to Trash?\n\nIt will be hidden from customer search and booking tabs immediately. You can restore it anytime from the Trash tab.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.amber.shade800),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        widget.onDelete(venue);
+                                      },
+                                      child: const Text('Move to Trash'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.red),
+                          ),
+                        ],
                       ],
                     ),
                     if (venue.location.isNotEmpty)

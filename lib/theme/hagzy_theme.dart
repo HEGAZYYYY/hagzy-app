@@ -30,6 +30,8 @@ Color get kMuted => kDarkMode.value ? const Color(0xFF94A3B8) : const Color(0xFF
 Color get kBorder => kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFFE2E8F0);
 
 const kStorageKey = 'hagzy_app_data_v1';
+const kArchivedVenuesStorageKey = 'hagzy_archived_venues_v1';
+const kDeletedVenueIdsStorageKey = 'hagzy_deleted_venue_ids_v1';
 const kFavoriteStorageKey = 'hagzy_favorite_venues_v1';
 const kLanguageStorageKey = 'hagzy_language_v1';
 const kDarkModeStorageKey = 'hagzy_dark_mode_v1';

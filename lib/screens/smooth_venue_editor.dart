@@ -113,8 +113,11 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     'Kafr El Sheikh',
   ];
 
-  bool get isSalon => _selectedType == VenueType.salon;
+  String _selectedSubcategory = 'escape_rooms';
+
+  bool get isSalon => _selectedType == VenueType.salon || _selectedSubcategory == 'barbers';
   bool get isEscapeRoom =>
+      _selectedSubcategory == 'escape_rooms' ||
       widget.initialVenue?.subCategories.contains('escape_rooms') == true ||
       _selectedAmenities.any((a) => a.contains('إسكيب') || a.toLowerCase().contains('escape')) ||
       widget.initialVenue?.name.toLowerCase().contains('escape') == true ||
@@ -124,6 +127,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           i.name.contains('دار الأيتام') ||
           i.name.contains('آكلي لحوم البشر') ||
           i.name.contains('اللعنة'));
+  bool get isSportsVenue =>
+      _selectedSubcategory == 'padel' ||
+      _selectedSubcategory == 'soccer' ||
+      _selectedType == VenueType.sports;
 
   @override
   void initState() {
@@ -132,6 +139,22 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
 
     if (v != null) {
       _selectedType = v.type;
+      if (v.subCategories.contains('escape_rooms') || v.name.toLowerCase().contains('escape')) {
+        _selectedSubcategory = 'escape_rooms';
+      } else if (v.subCategories.contains('padel')) {
+        _selectedSubcategory = 'padel';
+      } else if (v.subCategories.contains('soccer')) {
+        _selectedSubcategory = 'soccer';
+      } else if (v.subCategories.contains('barbers') || v.type == VenueType.salon) {
+        _selectedSubcategory = 'barbers';
+      } else if (v.subCategories.contains('playstation') || v.type == VenueType.lounge) {
+        _selectedSubcategory = 'playstation';
+      } else if (v.type == VenueType.sports) {
+        _selectedSubcategory = 'padel';
+      } else {
+        _selectedSubcategory = 'escape_rooms';
+      }
+
       _nameController.text = v.name;
       _addressController.text = v.location;
       _ownerPhoneController.text = v.ownerPhone;
@@ -155,7 +178,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
         description: i.description,
         imageUrl: i.imageUrl,
         pricingMode: i.pricingMode,
-        pricingTiers: i.pricingTiers,
+        pricingTiers: i.pricingTiers != null ? Map<String, dynamic>.from(i.pricingTiers!) : null,
+        customDurations: i.customDurations != null ? Map<String, double>.from(i.customDurations!) : null,
         minCapacity: i.minCapacity,
         maxCapacity: i.maxCapacity,
       )).toList();
@@ -168,6 +192,14 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       )).toList();
     } else {
       _selectedType = widget.initialType;
+      if (_selectedType == VenueType.sports) {
+        _selectedSubcategory = 'padel';
+      } else if (_selectedType == VenueType.salon) {
+        _selectedSubcategory = 'barbers';
+      } else {
+        _selectedSubcategory = 'escape_rooms';
+      }
+
       _nameController.text = '';
       _addressController.text = 'New Cairo';
       _ownerPhoneController.text = '01015325250';
@@ -176,22 +208,102 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       _closeHour = 24;
       _selectedAmenities.addAll(['Wi-Fi', 'Air Conditioning', 'Parking']);
       if (widget.populateDefaults) {
-        _populateDefaultItemsForType(_selectedType);
+        _populateDefaultItemsForSubcategory(_selectedSubcategory);
       }
     }
   }
 
-  void _populateDefaultItemsForType(VenueType type) {
+
+
+  void _populateDefaultItemsForSubcategory(String subcat) {
     _items.clear();
     _services.clear();
-    if (type == VenueType.salon) {
+    if (subcat == 'escape_rooms') {
+      _items.addAll([
+        _EditableItem(
+          id: 'room_orphans',
+          name: 'Orphans - دار الأيتام',
+          kind: 'Escape Room',
+          hourlyRate: 100,
+          peakRate: 100,
+          minCapacity: 2,
+          maxCapacity: 15,
+          pricingMode: 'per_person_tiered',
+          pricingTiers: {'3': 150.0, '5': 120.0, '15': 100.0},
+          description: 'دار الأيتام المهجورة التي أغلقت عام 1974 بعد حوادث اختفاء غامضة. هل ستتمكن أنت وأصدقاؤك من الخروج خلال 60 دقيقة؟',
+          imageUrl: 'https://images.unsplash.com/photo-1509248961158-e54f6934749c?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'room_curse',
+          name: 'The Curse - اللعنة',
+          kind: 'Escape Room',
+          hourlyRate: 100,
+          peakRate: 100,
+          minCapacity: 2,
+          maxCapacity: 15,
+          pricingMode: 'per_person_tiered',
+          pricingTiers: {'3': 150.0, '5': 120.0, '15': 100.0},
+          description: 'مغامرة تحبس الأنفاس داخل مقبرة فرعونية ملعونة. حل الألغاز المعقدة لكسر التعويذة قبل فوات الأوان.',
+          imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+        ),
+      ]);
+    } else if (subcat == 'padel') {
+      _items.addAll([
+        _EditableItem(
+          id: 'court_padel_1',
+          name: 'Court 1 (Panoramic Glass)',
+          kind: 'Panoramic Padel',
+          hourlyRate: 400,
+          peakRate: 400,
+          minCapacity: 4,
+          maxCapacity: 8,
+          customDurations: {'60': 400.0, '90': 550.0, '120': 700.0, '180': 1000.0},
+          description: 'ملعب بادل زجاجي بانورامي مع نجيلة Mondo زرقاء وإضاءة ليد للمباريات الليلية.',
+          imageUrl: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=800&q=80',
+        ),
+        _EditableItem(
+          id: 'court_padel_2',
+          name: 'Court 2 (Standard)',
+          kind: 'Standard Padel',
+          hourlyRate: 350,
+          peakRate: 350,
+          minCapacity: 4,
+          maxCapacity: 8,
+          customDurations: {'60': 350.0, '90': 480.0, '120': 600.0, '180': 850.0},
+          description: 'ملعب بادل قياسي مفتوح مع إضاءة عالية الكفاءة.',
+          imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80',
+        ),
+      ]);
+      _services.addAll([
+        _EditableService(id: 'svc_racket', name: 'Pro Racket Rental', price: 50, minutes: 60),
+        _EditableService(id: 'svc_balls', name: 'New Ball Canister (3 balls)', price: 180, minutes: 60),
+      ]);
+    } else if (subcat == 'soccer') {
+      _items.addAll([
+        _EditableItem(
+          id: 'pitch_1',
+          name: 'Pitch A (5-a-side AstroTurf)',
+          kind: 'Football Pitch',
+          hourlyRate: 300,
+          peakRate: 300,
+          minCapacity: 10,
+          maxCapacity: 14,
+          customDurations: {'60': 300.0, '90': 450.0, '120': 550.0},
+          description: 'ملعب خماسي نجيل صناعي تركي من الجيل الثالث مع إضاءة كاشفة ممتازة.',
+          imageUrl: 'https://images.unsplash.com/photo-1529900241451-b06cb88331be?auto=format&fit=crop&w=800&q=80',
+        ),
+      ]);
+      _services.addAll([
+        _EditableService(id: 'svc_bibs', name: 'Bibs & Pro Ball Set', price: 40, minutes: 60),
+      ]);
+    } else if (subcat == 'barbers') {
       _items.addAll([
         _EditableItem(
           id: 'chair_1',
           name: 'Master Barber Chair 1',
           kind: 'Master Station',
           hourlyRate: 150,
-          peakRate: 200,
+          peakRate: 150,
           description: 'Hydraulic barber chair with hot towel station.',
           imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
         ),
@@ -200,7 +312,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           name: 'Styling Chair 2',
           kind: 'Standard',
           hourlyRate: 120,
-          peakRate: 150,
+          peakRate: 120,
           description: 'Ergonomic styling station with mirror lighting.',
           imageUrl: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80',
         ),
@@ -209,7 +321,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           name: 'VIP Private Grooming Suite',
           kind: 'VIP Suite',
           hourlyRate: 250,
-          peakRate: 300,
+          peakRate: 250,
           description: 'Private enclosed suite with recliner & beverage bar.',
           imageUrl: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=800&q=80',
         ),
@@ -219,7 +331,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
         _EditableService(id: 'svc_beard', name: 'Hot Towel Beard Grooming', price: 70, minutes: 20),
         _EditableService(id: 'svc_vip', name: 'VIP Total Grooming Package', price: 250, minutes: 60),
       ]);
-    } else if (type == VenueType.lounge) {
+    } else {
       _items.addAll([
         _EditableItem(
           id: 'ps_room_1',
@@ -239,40 +351,6 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
           description: 'Cozy gaming setup with 55" 4K HDR TV and leather seating.',
           imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80',
         ),
-        _EditableItem(
-          id: 'billiard_1',
-          name: 'Tournament Billiards Table',
-          kind: 'Billiards',
-          hourlyRate: 70,
-          peakRate: 90,
-          description: '9-foot tournament slate pool table with premium cues.',
-          imageUrl: 'https://images.unsplash.com/photo-1588731234159-8b9963143fca?auto=format&fit=crop&w=800&q=80',
-        ),
-      ]);
-    } else {
-      _items.addAll([
-        _EditableItem(
-          id: 'court_1',
-          name: 'Court 1 (Panoramic Glass)',
-          kind: 'Panoramic',
-          hourlyRate: 400,
-          peakRate: 500,
-          description: 'Panoramic glass court with LED floodlights and blue Mondo turf.',
-          imageUrl: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=800&q=80',
-        ),
-        _EditableItem(
-          id: 'court_2',
-          name: 'Court 2 (Standard)',
-          kind: 'Standard',
-          hourlyRate: 350,
-          peakRate: 450,
-          description: 'Standard outdoor court with high-visibility lighting.',
-          imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80',
-        ),
-      ]);
-      _services.addAll([
-        _EditableService(id: 'svc_racket', name: 'Pro Racket Rental', price: 50, minutes: 60),
-        _EditableService(id: 'svc_balls', name: 'New Ball Canister (3 balls)', price: 180, minutes: 60),
       ]);
     }
   }
@@ -342,6 +420,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       imageUrl: i.imageUrl?.trim().isNotEmpty == true ? i.imageUrl!.trim() : null,
       pricingMode: i.pricingMode,
       pricingTiers: i.pricingTiers,
+      customDurations: i.customDurations,
       minCapacity: i.minCapacity,
       maxCapacity: i.maxCapacity,
     )).toList();
@@ -358,6 +437,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       name: name,
       location: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : 'Cairo, Egypt',
       type: _selectedType,
+      subCategories: [_selectedSubcategory],
       depositPercent: dep.clamp(0.0, 100.0),
       imageUrl: _imageUrlController.text.trim().isNotEmpty ? _imageUrlController.text.trim() : null,
       description: _descriptionController.text.trim(),
@@ -430,33 +510,48 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   textColor: textColor,
                 ),
                 const SizedBox(height: 10),
-                SegmentedButton<VenueType>(
-                  segments: [
-                    ButtonSegment(
-                      value: VenueType.sports,
-                      label: Text(isAr ? 'ملاعب ورياضة' : 'Sports & Courts'),
-                      icon: const Icon(Icons.sports_tennis_rounded, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: VenueType.salon,
-                      label: Text(isAr ? 'صالون ورعاية' : 'Salon & Barber'),
-                      icon: const Icon(Icons.content_cut_rounded, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: VenueType.lounge,
-                      label: Text(isAr ? 'صالة ألعاب ولونج' : 'Gaming & Lounge'),
-                      icon: const Icon(Icons.sports_esports_rounded, size: 18),
-                    ),
-                  ],
-                  selected: {_selectedType},
-                  onSelectionChanged: (val) {
-                    setState(() {
-                      _selectedType = val.first;
-                      if (widget.initialVenue == null) {
-                        _populateDefaultItemsForType(_selectedType);
-                      }
-                    });
-                  },
+                Text(
+                  isAr ? 'اختر تصنيف ونشاط المكان:' : 'Select venue activity & category:',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: textColor),
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      (key: 'escape_rooms', labelEn: '👻 Escape Rooms', labelAr: '👻 غرف هروب ورعب', type: VenueType.lounge),
+                      (key: 'padel', labelEn: '🎾 Padel Courts', labelAr: '🎾 ملاعب بادل', type: VenueType.sports),
+                      (key: 'soccer', labelEn: '⚽ Soccer Pitches', labelAr: '⚽ ملاعب كورة', type: VenueType.sports),
+                      (key: 'playstation', labelEn: '🎮 PS5 & Lounge', labelAr: '🎮 ألعاب ولونج', type: VenueType.lounge),
+                      (key: 'barbers', labelEn: '💈 Barbershop', labelAr: '💈 صالون حلاقة', type: VenueType.salon),
+                    ].map((cat) {
+                      final isSel = _selectedSubcategory == cat.key;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          selected: isSel,
+                          label: Text(isAr ? cat.labelAr : cat.labelEn),
+                          selectedColor: kGreen,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.white : textColor,
+                            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: 12.5,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedSubcategory = cat.key;
+                                _selectedType = cat.type;
+                                if (widget.initialVenue == null) {
+                                  _populateDefaultItemsForSubcategory(cat.key);
+                                }
+                              });
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 // Field 0: Venue name
@@ -583,7 +678,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       label: Text(
                         _selectedType == VenueType.salon
                             ? (isAr ? '+ كرسي جديد' : '+ Add Chair')
-                            : (isAr ? '+ غرفة / ملعب' : '+ Add Room'),
+                            : (isAr ? '+ إضافة غرفة / ملعب' : '+ Add Room'),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -1133,457 +1228,99 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     );
   }
 
-  // DIALOG: Add Item (Room / Chair)
-  void _showAddItemDialog(bool isAr) {
-    final isSalon = _selectedType == VenueType.salon;
+  // DIALOG: Add / Edit Item (Room, Court, Chair)
+  void _showAddItemDialog(bool isAr) => _showItemEditorDialog(isAr: isAr);
+  void _showEditItemDialog(_EditableItem item, int idx, bool isAr) =>
+      _showItemEditorDialog(item: item, index: idx, isAr: isAr);
+
+  void _showItemEditorDialog({_EditableItem? item, int? index, required bool isAr}) {
+    final isEditing = item != null;
+    final isSalon = _selectedType == VenueType.salon || _selectedSubcategory == 'barbers';
     final isEscape = isEscapeRoom;
+    final isSports = isSportsVenue;
+
     final nameCtrl = TextEditingController(
-      text: isSalon ? 'Chair ${_items.length + 1}' : (isEscape ? 'Room ${_items.length + 1}' : 'Court ${_items.length + 1}'),
+      text: item?.name ??
+          (isSalon
+              ? 'Chair ${_items.length + 1}'
+              : (isEscape
+                  ? 'Room ${_items.length + 1}'
+                  : (isSports ? 'Court ${_items.length + 1}' : 'Unit ${_items.length + 1}'))),
     );
-    final kindCtrl = TextEditingController(text: isSalon ? 'Standard Station' : (isEscape ? 'Escape Room' : 'Standard'));
-    final rateCtrl = TextEditingController(text: isSalon ? '150' : (isEscape ? '150' : '350'));
-    final peakCtrl = TextEditingController(text: isSalon ? '150' : (isEscape ? '150' : '450'));
-    final minCapCtrl = TextEditingController(text: isEscape ? '2' : '1');
-    final maxCapCtrl = TextEditingController(text: isEscape ? '15' : '10');
-    final descCtrl = TextEditingController();
-    final imageCtrl = TextEditingController();
-    bool enablePeakPricing = false;
-    bool isTiered = isEscape;
-    final editableTiers = <MapEntry<TextEditingController, TextEditingController>>[
-      if (isEscape) ...[
+    final kindCtrl = TextEditingController(
+      text: item?.kind ??
+          (isEscape
+              ? 'Escape Room'
+              : (isSports
+                  ? (_selectedSubcategory == 'soccer' ? 'Football Pitch' : 'Padel Court')
+                  : (isSalon ? 'Master Station' : 'VIP Lounge'))),
+    );
+    final rateCtrl = TextEditingController(
+      text: item != null ? item.hourlyRate.toStringAsFixed(0) : (isSalon ? '150' : (isEscape ? '150' : '400')),
+    );
+    final peakCtrl = TextEditingController(
+      text: item != null ? item.peakRate.toStringAsFixed(0) : (isSalon ? '150' : (isEscape ? '150' : '400')),
+    );
+    final minCapCtrl = TextEditingController(
+      text: item?.minCapacity != null
+          ? item!.minCapacity.toString()
+          : (isEscape ? '2' : (isSports ? '4' : '1')),
+    );
+    final maxCapCtrl = TextEditingController(
+      text: item?.maxCapacity != null
+          ? item!.maxCapacity.toString()
+          : (isEscape ? '15' : (isSports ? '8' : '10')),
+    );
+    final descCtrl = TextEditingController(text: item?.description ?? '');
+    final imageCtrl = TextEditingController(text: item?.imageUrl ?? '');
+
+    bool enablePeakPricing = item != null && item.peakRate > 0 && item.peakRate != item.hourlyRate;
+    bool isTiered = isEscape || (item?.pricingMode == 'per_person_tiered');
+
+    // Escape Room Tiers ladder
+    final editableTiers = <MapEntry<TextEditingController, TextEditingController>>[];
+    if (item?.pricingTiers != null && item!.pricingTiers!.isNotEmpty) {
+      final sortedKeys = item.pricingTiers!.keys
+          .map((k) => int.tryParse(k))
+          .whereType<int>()
+          .toList()
+        ..sort();
+      for (final cap in sortedKeys) {
+        editableTiers.add(MapEntry(
+          TextEditingController(text: cap.toString()),
+          TextEditingController(text: (item.pricingTiers![cap.toString()] as num).toStringAsFixed(0)),
+        ));
+      }
+    } else if (isEscape) {
+      editableTiers.addAll([
         MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
         MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
         MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
-      ],
-    ];
+      ]);
+    }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-          final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
-          final surfaceBg = isDark ? const Color(0xFF162822) : Colors.grey.shade100;
-          final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade300;
-          final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-          final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
-          Future<void> pickUnitImage() async {
-            try {
-              final dataUrl = await ImageUploadService.pickImage();
-              if (dataUrl != null && dataUrl.isNotEmpty) {
-                setDialogState(() {
-                  imageCtrl.text = dataUrl;
-                });
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to load image: $e')),
-                );
-              }
-            }
-          }
-
-          return AlertDialog(
-            backgroundColor: dialogBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: borderColor),
-            ),
-            title: Text(
-              isSalon
-                  ? (isAr ? 'إضافة كرسي حلاقة جديد' : 'Add New Salon Chair')
-                  : (isAr ? 'إضافة غرفة أو ملعب جديد' : 'Add New Room or Court'),
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
-            ),
-            content: SingleChildScrollView(
-              child: SizedBox(
-                width: 440,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: nameCtrl,
-                      decoration: InputDecoration(
-                        labelText: isSalon ? 'اسم الكرسي / المحطة *' : 'اسم الغرفة / الملعب *',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: kindCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'النوع / الفئة (Standard, VIP, Panoramic...)',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (!enablePeakPricing) ...[
-                      TextFormField(
-                        controller: rateCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: isEscape
-                              ? (isAr ? 'سعر الفرد (جنيه) *' : 'Rate per Person (EGP) *')
-                              : (isSalon
-                                  ? (isAr ? 'السعر (جنيه) *' : 'Price (EGP) *')
-                                  : (isAr ? 'السعر (جنيه) *' : 'Rate (EGP) *')),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () {
-                          setDialogState(() {
-                            enablePeakPricing = true;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
-                              const SizedBox(width: 6),
-                              Text(
-                                isAr ? 'تفعيل سعر ذروة مختلف (إذا كان المكان يطبق أسعار ذروة)' : 'Add different Peak / Surge Rate',
-                                style: const TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: rateCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              controller: peakCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: isAr ? Alignment.centerLeft : Alignment.centerRight,
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                          onPressed: () {
-                            setDialogState(() {
-                              enablePeakPricing = false;
-                              peakCtrl.text = rateCtrl.text;
-                            });
-                          },
-                          icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
-                          label: Text(
-                            isAr ? 'إلغاء سعر الذروة (سعر ثابت)' : 'Disable peak rate (Fixed rate)',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: descCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: isAr ? 'وصف الغرفة أو التجهيزات (اختياري)' : 'Description & Features (Optional)',
-                        hintText: isSalon
-                            ? 'e.g. VIP reclining chair, hot towel service'
-                            : 'e.g. 4K OLED, 2 wireless controllers, sound system',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: minCapCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'أقل عدد أفراد (Min)' : 'Min Players',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: maxCapCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'أقصى عدد أفراد (Max)' : 'Max Players',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        isAr ? 'أسعار متدرجة حسب عدد الأفراد (Tiered Group Pricing)' : 'Tiered Pricing by Group Size',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
-                      ),
-                      subtitle: Text(
-                        isAr ? 'يقل سعر الفرد مع زيادة حجم المجموعة (مناسب للغرف واللاونج)' : 'Per-person rate drops as headcount increases',
-                        style: TextStyle(fontSize: 11.5, color: mutedColor),
-                      ),
-                      value: isTiered,
-                      onChanged: (val) {
-                        setDialogState(() {
-                          isTiered = val ?? false;
-                          if (isTiered && editableTiers.isEmpty) {
-                            editableTiers.addAll([
-                              MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
-                              MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
-                              MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
-                            ]);
-                          }
-                        });
-                      },
-                    ),
-                    if (isTiered) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: surfaceBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              isAr ? 'شرائح الأسعار (حسب حجم المجموعة):' : 'Group Pricing Tiers Ladder:',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textColor),
-                            ),
-                            const SizedBox(height: 8),
-                            for (int ti = 0; ti < editableTiers.length; ti++) ...[
-                              Row(
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: TextFormField(
-                                      controller: editableTiers[ti].key,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: isAr ? 'حتى عدد' : 'Up to people',
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    flex: 4,
-                                    child: TextFormField(
-                                      controller: editableTiers[ti].value,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: isAr ? 'سعر الفرد (جنيه)' : 'EGP / person',
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                                    onPressed: () {
-                                      setDialogState(() => editableTiers.removeAt(ti));
-                                    },
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                            ],
-                            Align(
-                              alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: () {
-                                  setDialogState(() {
-                                    final nextCap = (editableTiers.length + 1) * 3;
-                                    editableTiers.add(MapEntry(
-                                      TextEditingController(text: nextCap.toString()),
-                                      TextEditingController(text: '100'),
-                                    ));
-                                  });
-                                },
-                                icon: const Icon(Icons.add, size: 16),
-                                label: Text(isAr ? '+ إضافة شريحة سعر جديدة' : '+ Add Pricing Tier'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onPressed: pickUnitImage,
-                            icon: const Icon(Icons.file_upload_outlined, size: 18),
-                            label: Text(
-                              isSalon
-                                  ? (isAr ? 'رفع صورة الكرسي (ملف)' : 'Upload Chair Picture')
-                                  : (isAr ? 'رفع صورة الغرفة / الملعب (ملف)' : 'Upload Room Picture'),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-                            ),
-                          ),
-                        ),
-                        if (imageCtrl.text.trim().isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          IconButton.outlined(
-                            tooltip: isAr ? 'مسح الصورة' : 'Clear Image',
-                            icon: const Icon(Icons.close_rounded, size: 16),
-                            onPressed: () => setDialogState(() => imageCtrl.clear()),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: imageCtrl,
-                      onChanged: (_) => setDialogState(() {}),
-                      decoration: InputDecoration(
-                        labelText: isAr ? 'أو رابط صورة الوحدة (URL)' : 'Or Unit Picture URL',
-                        hintText: 'https://images.unsplash.com/...',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        prefixIcon: const Icon(Icons.link_rounded, size: 18),
-                      ),
-                    ),
-                    if (imageCtrl.text.trim().isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: surfaceBg,
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: HagzySmartImage(
-                            imageUrl: imageCtrl.text.trim(),
-                            fit: BoxFit.cover,
-                            errorWidget: Center(
-                              child: Text(
-                                isAr ? 'تعذر معاينة الصورة' : 'Could not preview image',
-                                style: TextStyle(fontSize: 11, color: mutedColor),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  isAr ? 'إلغاء' : 'Cancel',
-                  style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
-                ),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: kGreen),
-                onPressed: () {
-                  final n = nameCtrl.text.trim();
-                  if (n.isEmpty) return;
-                  final r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
-                  final p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
-
-                  Map<String, dynamic>? resolvedTiers;
-                  if (isTiered && editableTiers.isNotEmpty) {
-                    resolvedTiers = {};
-                    for (final t in editableTiers) {
-                      final cap = t.key.text.trim();
-                      final price = double.tryParse(t.value.text.trim()) ?? 0.0;
-                      if (cap.isNotEmpty && price > 0) {
-                        resolvedTiers[cap] = price;
-                      }
-                    }
-                  }
-                  final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isTiered ? 2 : 1);
-                  final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isTiered ? 15 : 10);
-
-                  setState(() {
-                    _items.add(_EditableItem(
-                      id: 'unit_${DateTime.now().microsecondsSinceEpoch}',
-                      name: n,
-                      kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : (isEscape ? 'Escape Room' : 'Standard'),
-                      hourlyRate: r,
-                      peakRate: p,
-                      description: descCtrl.text.trim(),
-                      imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
-                      pricingMode: isTiered ? 'per_person_tiered' : null,
-                      pricingTiers: resolvedTiers,
-                      minCapacity: minCap,
-                      maxCapacity: maxCap,
-                    ));
-                  });
-                  Navigator.pop(ctx);
-                },
-                child: Text(isAr ? 'إضافة' : 'Add'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // DIALOG: Edit Item
-  void _showEditItemDialog(_EditableItem item, int idx, bool isAr) {
-    final nameCtrl = TextEditingController(text: item.name);
-    final kindCtrl = TextEditingController(text: item.kind);
-    final isSalon = _selectedType == VenueType.salon;
-    final isEscape = isEscapeRoom;
-    final rateCtrl = TextEditingController(text: item.hourlyRate.toStringAsFixed(0));
-    final peakCtrl = TextEditingController(text: item.peakRate.toStringAsFixed(0));
-    final minCapCtrl = TextEditingController(text: item.minCapacity != null ? item.minCapacity.toString() : (isEscape ? '2' : '1'));
-    final maxCapCtrl = TextEditingController(text: item.maxCapacity != null ? item.maxCapacity.toString() : (isEscape ? '15' : '10'));
-    final descCtrl = TextEditingController(text: item.description);
-    final imageCtrl = TextEditingController(text: item.imageUrl ?? '');
-    final bool initialHasPeak = item.peakRate > 0 && item.peakRate != item.hourlyRate;
-    bool enablePeakPricing = initialHasPeak;
-    final editableTiers = <MapEntry<TextEditingController, TextEditingController>>[];
-    if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) {
-      for (final entry in item.pricingTiers!.entries) {
-        editableTiers.add(MapEntry(
-          TextEditingController(text: entry.key),
-          TextEditingController(text: (entry.value as num).toStringAsFixed(0)),
+    // Sports Match Durations Table
+    final editableDurations = <MapEntry<TextEditingController, TextEditingController>>[];
+    if (item?.customDurations != null && item!.customDurations!.isNotEmpty) {
+      final sortedMinutes = item.customDurations!.keys
+          .map((k) => int.tryParse(k))
+          .whereType<int>()
+          .toList()
+        ..sort();
+      for (final mins in sortedMinutes) {
+        editableDurations.add(MapEntry(
+          TextEditingController(text: mins.toString()),
+          TextEditingController(text: item.customDurations![mins.toString()]!.toStringAsFixed(0)),
         ));
       }
+    } else if (isSports) {
+      editableDurations.addAll([
+        MapEntry(TextEditingController(text: '60'), TextEditingController(text: '400')),
+        MapEntry(TextEditingController(text: '90'), TextEditingController(text: '550')),
+        MapEntry(TextEditingController(text: '120'), TextEditingController(text: '700')),
+        MapEntry(TextEditingController(text: '180'), TextEditingController(text: '1000')),
+      ]);
     }
-    bool isTiered = item.pricingMode == 'per_person_tiered' || editableTiers.isNotEmpty;
 
     showDialog(
       context: context,
@@ -1613,6 +1350,14 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
             }
           }
 
+          final dialogTitle = isEditing
+              ? (isAr ? 'تعديل تفاصيل وأسعار الوحدة' : 'Edit Unit Details & Rates')
+              : (isSalon
+                  ? (isAr ? 'إضافة كرسي حلاقة جديد' : 'Add New Salon Chair')
+                  : (isEscape
+                      ? (isAr ? 'إضافة غرفة هروب جديدة' : 'Add New Escape Room')
+                      : (isAr ? 'إضافة غرفة أو ملعب جديد' : 'Add New Room or Court')));
+
           return AlertDialog(
             backgroundColor: dialogBg,
             shape: RoundedRectangleBorder(
@@ -1620,12 +1365,12 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
               side: BorderSide(color: borderColor),
             ),
             title: Text(
-              isAr ? 'تعديل تفاصيل الوحدة والأسعار' : 'Edit Room / Chair & Rates',
+              dialogTitle,
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
             ),
             content: SingleChildScrollView(
               child: SizedBox(
-                width: 440,
+                width: 460,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1633,7 +1378,13 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     TextFormField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
-                        labelText: 'الاسم *',
+                        labelText: isEscape
+                            ? (isAr ? 'اسم غرفة الهروب *' : 'Escape Room Name *')
+                            : (isSports
+                                ? (isAr ? 'اسم الملعب *' : 'Court Name *')
+                                : (isSalon
+                                    ? (isAr ? 'اسم الكرسي / المحطة *' : 'Chair / Station Name *')
+                                    : (isAr ? 'اسم الغرفة / الجهاز *' : 'Room / Unit Name *'))),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -1641,180 +1392,26 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     TextFormField(
                       controller: kindCtrl,
                       decoration: InputDecoration(
-                        labelText: 'الفئة / النوع',
+                        labelText: isAr ? 'الفئة / النوع (Standard, Panoramic, VIP...)' : 'Category / Kind',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    if (!enablePeakPricing) ...[
+
+                    // ESCAPE ROOM FLOW: Story / Bio textarea + Range Ladder
+                    if (isEscape) ...[
                       TextFormField(
-                        controller: rateCtrl,
-                        keyboardType: TextInputType.number,
+                        controller: descCtrl,
+                        maxLines: 4,
                         decoration: InputDecoration(
-                          labelText: isEscape
-                              ? (isAr ? 'سعر الفرد (جنيه) *' : 'Rate per Person (EGP) *')
-                              : (isSalon
-                                  ? (isAr ? 'السعر (جنيه) *' : 'Price (EGP) *')
-                                  : (isAr ? 'السعر (جنيه) *' : 'Rate (EGP) *')),
+                          labelText: isAr ? '📖 قصة وسيناريو الغرفة (Storyline & Bio) *' : '📖 Room Storyline & Bio *',
+                          hintText: isAr
+                              ? 'أدخل قصة وسيناريو الغرفة بالتفصيل هنا ليقرأه العميل بوضوح (بدون أسعار أو عناوين)...'
+                              : 'Enter the room storyline and horror scenario for the customer...',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () {
-                          setDialogState(() {
-                            enablePeakPricing = true;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
-                              const SizedBox(width: 6),
-                              Text(
-                                isAr ? 'تفعيل سعر ذروة مختلف (إذا كان المكان يطبق أسعار ذروة)' : 'Add different Peak / Surge Rate',
-                                style: const TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: rateCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              controller: peakCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: isAr ? Alignment.centerLeft : Alignment.centerRight,
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                          onPressed: () {
-                            setDialogState(() {
-                              enablePeakPricing = false;
-                              peakCtrl.text = rateCtrl.text;
-                            });
-                          },
-                          icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
-                          label: Text(
-                            isAr ? 'إلغاء سعر الذروة (سعر ثابت)' : 'Disable peak rate (Fixed rate)',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: surfaceBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isAr ? '💰 أسعار المجموعات / حسب عدد الأفراد (ثابتة بدون ذروة):' : '💰 Tiered Pricing by Group Size (Flat / No Peak):',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textColor),
-                            ),
-                            const SizedBox(height: 6),
-                            ...item.pricingTiers!.entries.map((e) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Text(
-                                isAr ? '• حتى ${e.key} أفراد: ${e.value} جنيه للفرد' : '• Up to ${e.key} players: ${e.value} EGP / person',
-                                style: TextStyle(fontSize: 11.5, color: mutedColor),
-                              ),
-                            )),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: descCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: isAr ? 'وصف الغرفة أو التجهيزات (اختياري)' : 'Description & Features (Optional)',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: minCapCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'أقل عدد أفراد (Min)' : 'Min Players',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: maxCapCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'أقصى عدد أفراد (Max)' : 'Max Players',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        isAr ? 'أسعار متدرجة حسب عدد الأفراد (Tiered Group Pricing)' : 'Tiered Pricing by Group Size',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
-                      ),
-                      subtitle: Text(
-                        isAr ? 'يقل سعر الفرد مع زيادة حجم المجموعة (مناسب للغرف واللاونج)' : 'Per-person rate drops as headcount increases',
-                        style: TextStyle(fontSize: 11.5, color: mutedColor),
-                      ),
-                      value: isTiered,
-                      onChanged: (val) {
-                        setDialogState(() {
-                          isTiered = val ?? false;
-                          if (isTiered && editableTiers.isEmpty) {
-                            editableTiers.addAll([
-                              MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
-                              MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
-                              MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
-                            ]);
-                          }
-                        });
-                      },
-                    ),
-                    if (isTiered) ...[
+                      const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1825,21 +1422,54 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    isAr ? '💰 تسعير الشلة حسب عدد الأفراد:' : '💰 Group Pricing Ladder:',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textColor),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      editableTiers.clear();
+                                      editableTiers.addAll([
+                                        MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
+                                        MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
+                                        MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
+                                      ]);
+                                      minCapCtrl.text = '2';
+                                      maxCapCtrl.text = '15';
+                                    });
+                                  },
+                                  icon: const Icon(Icons.flash_on_rounded, size: 14, color: kGreen),
+                                  label: Text(
+                                    isAr ? 'تسعيرة أدرينالين' : 'Adrenaline Preset',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
                             Text(
-                              isAr ? 'شرائح الأسعار (حسب حجم المجموعة):' : 'Group Pricing Tiers Ladder:',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textColor),
+                              isAr ? 'يحدد سعر الفرد بناء على حجم الشلة الذي يختاره العميل' : 'Rate per person based on player headcount',
+                              style: TextStyle(fontSize: 11, color: mutedColor),
                             ),
                             const SizedBox(height: 8),
                             for (int ti = 0; ti < editableTiers.length; ti++) ...[
                               Row(
                                 children: [
                                   Expanded(
-                                    flex: 3,
+                                    flex: 4,
                                     child: TextFormField(
                                       controller: editableTiers[ti].key,
                                       keyboardType: TextInputType.number,
                                       decoration: InputDecoration(
-                                        labelText: isAr ? 'حتى عدد' : 'Up to people',
+                                        labelText: isAr ? 'حتى عدد أفراد' : 'Up to players',
+                                        hintText: '3, 5, 15',
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                         isDense: true,
                                       ),
@@ -1847,19 +1477,19 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    flex: 4,
+                                    flex: 5,
                                     child: TextFormField(
                                       controller: editableTiers[ti].value,
                                       keyboardType: TextInputType.number,
                                       decoration: InputDecoration(
-                                        labelText: isAr ? 'سعر الفرد (جنيه)' : 'EGP / person',
+                                        labelText: isAr ? 'سعر الفرد (جنيه)' : 'Price / person (EGP)',
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                         isDense: true,
                                       ),
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 18),
                                     onPressed: () {
                                       setDialogState(() => editableTiers.removeAt(ti));
                                     },
@@ -1880,15 +1510,258 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                     ));
                                   });
                                 },
-                                icon: const Icon(Icons.add, size: 16),
-                                label: Text(isAr ? '+ إضافة شريحة سعر جديدة' : '+ Add Pricing Tier'),
+                                icon: const Icon(Icons.add, size: 15),
+                                label: Text(isAr ? '+ إضافة شريحة سعر' : '+ Add Tier'),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 12),
+                    ]
+                    // SPORTS / PADEL FLOW: Description + Match Durations Table
+                    else if (isSports) ...[
+                      TextFormField(
+                        controller: descCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: isAr ? 'مواصفات وتجهيزات الملعب (اختياري)' : 'Description & Features (Optional)',
+                          hintText: isAr
+                              ? 'مثال: زجاج بانورامي، إضاءة ليد احترافية، نجيل موندو أزرق'
+                              : 'e.g. Panoramic glass, LED floodlights, Mondo turf',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: surfaceBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    isAr ? '⏱️ أوقات الماتش والأسعار:' : '⏱️ Match Durations & Rates:',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textColor),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      editableDurations.clear();
+                                      editableDurations.addAll([
+                                        MapEntry(TextEditingController(text: '60'), TextEditingController(text: '400')),
+                                        MapEntry(TextEditingController(text: '90'), TextEditingController(text: '550')),
+                                        MapEntry(TextEditingController(text: '120'), TextEditingController(text: '700')),
+                                        MapEntry(TextEditingController(text: '180'), TextEditingController(text: '1000')),
+                                      ]);
+                                    });
+                                  },
+                                  icon: const Icon(Icons.flash_on_rounded, size: 14, color: kGreen),
+                                  label: Text(
+                                    isAr ? 'تسعيرة بادل قياسية' : 'Padel Preset',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isAr ? 'حدد السعر الثابت لكل مدة ماتش يختارها العميل' : 'Define flat booking price for each duration',
+                              style: TextStyle(fontSize: 11, color: mutedColor),
+                            ),
+                            const SizedBox(height: 8),
+                            for (int di = 0; di < editableDurations.length; di++) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: TextFormField(
+                                      controller: editableDurations[di].key,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: isAr ? 'المدة (دقائق)' : 'Duration (min)',
+                                        hintText: '60, 90, 120',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 5,
+                                    child: TextFormField(
+                                      controller: editableDurations[di].value,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: isAr ? 'السعر الإجمالي (جنيه)' : 'Total Price (EGP)',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 18),
+                                    onPressed: () {
+                                      setDialogState(() => editableDurations.removeAt(di));
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            Align(
+                              alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    editableDurations.add(MapEntry(
+                                      TextEditingController(text: '60'),
+                                      TextEditingController(text: '400'),
+                                    ));
+                                  });
+                                },
+                                icon: const Icon(Icons.add, size: 15),
+                                label: Text(isAr ? '+ إضافة مدة ماتش' : '+ Add Duration'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ]
+                    // STANDARD FLOW (Salon, Lounge, PS5)
+                    else ...[
+                      if (!enablePeakPricing) ...[
+                        TextFormField(
+                          controller: rateCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: isSalon
+                                ? (isAr ? 'السعر (جنيه) *' : 'Price (EGP) *')
+                                : (isAr ? 'السعر بالساعة (جنيه) *' : 'Hourly Rate (EGP) *'),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () => setDialogState(() => enablePeakPricing = true),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isAr ? 'تفعيل سعر ذروة مختلف (إذا كان المكان يطبق أسعار ذروة)' : 'Add different Peak / Surge Rate',
+                                  style: const TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: rateCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextFormField(
+                                controller: peakCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: isAr ? Alignment.centerLeft : Alignment.centerRight,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                            onPressed: () {
+                              setDialogState(() {
+                                enablePeakPricing = false;
+                                peakCtrl.text = rateCtrl.text;
+                              });
+                            },
+                            icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
+                            label: Text(
+                              isAr ? 'إلغاء سعر الذروة (سعر ثابت)' : 'Disable peak rate (Fixed rate)',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: descCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: isAr ? 'الوصف والتجهيزات (اختياري)' : 'Description & Features (Optional)',
+                          hintText: isSalon
+                              ? 'e.g. VIP reclining chair, hot towel service'
+                              : 'e.g. 4K OLED, 2 wireless controllers, sound system',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
+
+                    // CAPACITY CONTROLS
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: minCapCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isEscape
+                                  ? (isAr ? 'أقل شلة (Min)' : 'Min Players')
+                                  : (isAr ? 'أقل عدد أفراد (Min)' : 'Min Headcount'),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: maxCapCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isEscape
+                                  ? (isAr ? 'أقصى شلة (Max)' : 'Max Players')
+                                  : (isAr ? 'أقصى عدد أفراد (Max)' : 'Max Headcount'),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // IMAGE UPLOAD & PREVIEW
                     Row(
                       children: [
                         Expanded(
@@ -1968,41 +1841,84 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                 onPressed: () {
                   final n = nameCtrl.text.trim();
                   if (n.isEmpty) return;
-                  final r = double.tryParse(rateCtrl.text.trim()) ?? item.hourlyRate;
-                  final p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
 
                   Map<String, dynamic>? resolvedTiers;
-                  if (isTiered && editableTiers.isNotEmpty) {
-                    resolvedTiers = {};
-                    for (final t in editableTiers) {
-                      final cap = t.key.text.trim();
-                      final price = double.tryParse(t.value.text.trim()) ?? 0.0;
-                      if (cap.isNotEmpty && price > 0) {
-                        resolvedTiers[cap] = price;
+                  Map<String, double>? resolvedDurations;
+                  double r = 0.0;
+                  double p = 0.0;
+
+                  if (isEscape) {
+                    if (editableTiers.isNotEmpty) {
+                      resolvedTiers = {};
+                      for (final t in editableTiers) {
+                        final cap = t.key.text.trim();
+                        final price = double.tryParse(t.value.text.trim()) ?? 0.0;
+                        if (cap.isNotEmpty && price > 0) {
+                          resolvedTiers[cap] = price;
+                        }
+                      }
+                    }
+                    r = resolvedTiers?.values.firstOrNull is num
+                        ? (resolvedTiers!.values.firstOrNull as num).toDouble()
+                        : 150.0;
+                    p = r;
+                  } else if (isSports) {
+                    if (editableDurations.isNotEmpty) {
+                      resolvedDurations = {};
+                      for (final d in editableDurations) {
+                        final mins = d.key.text.trim();
+                        final price = double.tryParse(d.value.text.trim()) ?? 0.0;
+                        if (mins.isNotEmpty && price > 0) {
+                          resolvedDurations[mins] = price;
+                        }
+                      }
+                    }
+                    r = resolvedDurations?['60'] ?? (resolvedDurations?.values.firstOrNull ?? 400.0);
+                    p = r;
+                  } else {
+                    r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
+                    p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
+                    if (isTiered && editableTiers.isNotEmpty) {
+                      resolvedTiers = {};
+                      for (final t in editableTiers) {
+                        final cap = t.key.text.trim();
+                        final price = double.tryParse(t.value.text.trim()) ?? 0.0;
+                        if (cap.isNotEmpty && price > 0) {
+                          resolvedTiers[cap] = price;
+                        }
                       }
                     }
                   }
-                  final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isTiered ? 2 : 1);
-                  final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isTiered ? 15 : 10);
+
+                  final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isEscape ? 2 : (isSports ? 4 : 1));
+                  final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isEscape ? 15 : (isSports ? 8 : 10));
 
                   setState(() {
-                    _items[idx] = _EditableItem(
-                      id: item.id,
+                    final updated = _EditableItem(
+                      id: item?.id ?? 'unit_${DateTime.now().microsecondsSinceEpoch}',
                       name: n,
-                      kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : item.kind,
+                      kind: kindCtrl.text.trim().isNotEmpty
+                          ? kindCtrl.text.trim()
+                          : (isEscape ? 'Escape Room' : (isSports ? 'Court' : 'Standard')),
                       hourlyRate: r,
                       peakRate: p,
                       description: descCtrl.text.trim(),
                       imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
-                      pricingMode: isTiered ? 'per_person_tiered' : null,
+                      pricingMode: isEscape || (isTiered && resolvedTiers != null) ? 'per_person_tiered' : null,
                       pricingTiers: resolvedTiers,
+                      customDurations: resolvedDurations,
                       minCapacity: minCap,
                       maxCapacity: maxCap,
                     );
+                    if (isEditing && index != null) {
+                      _items[index] = updated;
+                    } else {
+                      _items.add(updated);
+                    }
                   });
                   Navigator.pop(ctx);
                 },
-                child: Text(isAr ? 'حفظ' : 'Save'),
+                child: Text(isEditing ? (isAr ? 'حفظ التعديلات' : 'Save Changes') : (isAr ? 'إضافة' : 'Add')),
               ),
             ],
           );
@@ -2110,6 +2026,7 @@ class _EditableItem {
   String? imageUrl;
   String? pricingMode;
   Map<String, dynamic>? pricingTiers;
+  Map<String, double>? customDurations;
   int? minCapacity;
   int? maxCapacity;
 
@@ -2123,6 +2040,7 @@ class _EditableItem {
     this.imageUrl,
     this.pricingMode,
     this.pricingTiers,
+    this.customDurations,
     this.minCapacity,
     this.maxCapacity,
   });

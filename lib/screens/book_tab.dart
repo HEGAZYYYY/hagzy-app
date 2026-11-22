@@ -2736,12 +2736,35 @@ class _BookTabState extends State<BookTab> {
 
                                 if (isSports) {
                                   // SPORTS & PADEL COURTS: Court Pills + Match Duration Selection Phase
-                                  const sportsDurations = [
-                                    (60, '60 Minutes (1 Hour)', '٦٠ دقيقة (ساعة واحدة)', 'Quick Match / Warmup', 'ماتش سريع / تسخين'),
-                                    (90, '90 Minutes (1.5 Hours)', '٩٠ دقيقة (ساعة ونصف)', 'Standard Padel Match', 'ماتش بادل قياسي'),
-                                    (120, '120 Minutes (2 Hours)', '١٢٠ دقيقة (ساعتان)', 'Full Game / Rematch', 'ماتش كامل / ريماتش'),
-                                    (180, '180 Minutes (3 Hours)', '١٨٠ دقيقة (٣ ساعات)', 'Training / Tournament', 'تدريب مكثف / بطولة'),
-                                  ];
+                                  final List<(int, String, String, String, String)> sportsDurations =
+                                      (item != null && item.customDurations != null && item.customDurations!.isNotEmpty)
+                                          ? (item.customDurations!.keys
+                                              .map((k) => int.tryParse(k))
+                                              .whereType<int>()
+                                              .toList()
+                                            ..sort())
+                                              .map((mins) {
+                                              final h = mins / 60.0;
+                                              final labelEn = h == h.toInt()
+                                                  ? '${h.toInt()} Hour${h > 1 ? 's' : ''} ($mins min)'
+                                                  : '$h Hours ($mins min)';
+                                              final labelAr = mins == 60
+                                                  ? '٦٠ دقيقة (ساعة واحدة)'
+                                                  : (mins == 90
+                                                      ? '٩٠ دقيقة (ساعة ونصف)'
+                                                      : (mins == 120
+                                                          ? '١٢٠ دقيقة (ساعتان)'
+                                                          : (mins == 180
+                                                              ? '١٨٠ دقيقة (٣ ساعات)'
+                                                              : '$mins دقيقة')));
+                                              return (mins, labelEn, labelAr, 'Match Duration', 'مدة الماتش');
+                                            }).toList()
+                                          : const [
+                                              (60, '60 Minutes (1 Hour)', '٦٠ دقيقة (ساعة واحدة)', 'Quick Match / Warmup', 'ماتش سريع / تسخين'),
+                                              (90, '90 Minutes (1.5 Hours)', '٩٠ دقيقة (ساعة ونصف)', 'Standard Padel Match', 'ماتش بادل قياسي'),
+                                              (120, '120 Minutes (2 Hours)', '١٢٠ دقيقة (ساعتان)', 'Full Game / Rematch', 'ماتش كامل / ريماتش'),
+                                              (180, '180 Minutes (3 Hours)', '١٨٠ دقيقة (٣ ساعات)', 'Training / Tournament', 'تدريب مكثف / بطولة'),
+                                            ];
 
                                   return Padding(
                                     key: _spaceStepKey,
@@ -2821,7 +2844,7 @@ class _BookTabState extends State<BookTab> {
                                           ...sportsDurations.map((dur) {
                                             final minutes = dur.$1;
                                             final isSelected = _sportsDurationMinutes == minutes;
-                                            final durTotal = item.hourlyRate * minutes / 60;
+                                            final durTotal = item.priceForDuration(minutes);
                                             return Container(
                                               margin: const EdgeInsets.only(bottom: 8),
                                               decoration: BoxDecoration(
@@ -2926,7 +2949,7 @@ class _BookTabState extends State<BookTab> {
                                                   ),
                                                 ),
                                                 Text(
-                                                  '${formatMoney(item.hourlyRate * _sportsDurationMinutes / 60)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                  '${formatMoney(item.priceForDuration(_sportsDurationMinutes))} ${localized(widget.arabic, 'EGP', 'ج.م')}',
                                                   style: const TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w900,

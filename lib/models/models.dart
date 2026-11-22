@@ -191,6 +191,7 @@ class VenueItem {
     this.pricingTiers,
     this.minCapacity,
     this.maxCapacity,
+    this.customDurations,
   });
 
   final String id;
@@ -204,6 +205,7 @@ class VenueItem {
   final Map<String, dynamic>? pricingTiers;
   final int? minCapacity;
   final int? maxCapacity;
+  final Map<String, dynamic>? customDurations;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -217,6 +219,7 @@ class VenueItem {
         if (pricingTiers != null) 'pricing_tiers': pricingTiers,
         if (minCapacity != null) 'min_capacity': minCapacity,
         if (maxCapacity != null) 'max_capacity': maxCapacity,
+        if (customDurations != null && customDurations!.isNotEmpty) 'custom_durations': customDurations,
       };
 
   factory VenueItem.fromJson(Map<String, dynamic> json) {
@@ -236,6 +239,12 @@ class VenueItem {
     }
     final minCap = json['min_capacity'] ?? json['minCapacity'];
     final maxCap = json['max_capacity'] ?? json['maxCapacity'];
+    Map<String, dynamic>? durations;
+    if (json['custom_durations'] is Map) {
+      durations = Map<String, dynamic>.from(json['custom_durations'] as Map);
+    } else if (json['customDurations'] is Map) {
+      durations = Map<String, dynamic>.from(json['customDurations'] as Map);
+    }
     return VenueItem(
       id: (json['id'] ?? generateId()).toString(),
       name: (json['name'] ?? 'Unit').toString(),
@@ -248,7 +257,18 @@ class VenueItem {
       pricingTiers: tiers,
       minCapacity: minCap is num ? minCap.toInt() : int.tryParse(minCap?.toString() ?? ''),
       maxCapacity: maxCap is num ? maxCap.toInt() : int.tryParse(maxCap?.toString() ?? ''),
+      customDurations: durations,
     );
+  }
+
+  double priceForDuration(int minutes) {
+    if (customDurations != null && customDurations!.containsKey(minutes.toString())) {
+      final raw = customDurations![minutes.toString()];
+      if (raw is num) return raw.toDouble();
+      final parsed = double.tryParse(raw.toString());
+      if (parsed != null) return parsed;
+    }
+    return hourlyRate * minutes / 60.0;
   }
 
   double priceForHeadcount(int headcount) {

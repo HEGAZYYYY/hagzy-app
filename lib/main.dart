@@ -193,6 +193,8 @@ class _HagzyHomeState extends State<HagzyHome> {
   List<Venue> _venues = (!_isTestRuntime || kSeedNaderSalon)
       ? defaultPrototypeVenues()
       : [];
+  List<Venue> _archivedVenues = [];
+  Set<String> _deletedVenueIds = {};
   List<Booking> _bookings = [];
   List<Booking> _customerBookings = [];
   String _savedCustomerId = '';
@@ -387,28 +389,39 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<List<Venue>> _mergeWithSeedVenues(List<dynamic> rawVenues) async {
+    final trashedOrDeletedIds = {
+      ..._archivedVenues.map((v) => v.id),
+      ..._deletedVenueIds,
+    };
     final parsed = rawVenues
         .whereType<Map>()
         .map((v) => Venue.fromJson(Map<String, dynamic>.from(v)))
+        .where((v) => !trashedOrDeletedIds.contains(v.id))
         .toList();
     if (_isTestRuntime && !kSeedNaderSalon) {
       return parsed;
     }
     final seeded = await _loadSeedVenues(parsed);
-    return upsertNaderSalon(seeded);
+    return upsertNaderSalon(seeded).where((v) => !trashedOrDeletedIds.contains(v.id)).toList();
   }
 
   Future<List<Venue>> _loadSeedVenues(List<Venue> venues) async {
     final isTest = _isTestRuntime;
     if (isTest && !kSeedNaderSalon) return venues;
+    final trashedOrDeletedIds = {
+      ..._archivedVenues.map((v) => v.id),
+      ..._deletedVenueIds,
+    };
     try {
       final raw = await rootBundle.loadString('assets/venues_seed.json');
       final list = jsonDecode(raw) as List<dynamic>;
       final seeded = list
           .map((item) => Venue.fromJson(item as Map<String, dynamic>))
+          .where((v) => !trashedOrDeletedIds.contains(v.id))
           .toList();
-      final result = List<Venue>.of(venues);
+      final result = List<Venue>.of(venues.where((v) => !trashedOrDeletedIds.contains(v.id)));
       for (final venue in seeded) {
+        if (trashedOrDeletedIds.contains(venue.id)) continue;
         final index = result.indexWhere((v) =>
             v.id == venue.id ||
             v.name.trim().toLowerCase() == venue.name.trim().toLowerCase());
@@ -419,12 +432,16 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       if (result.isEmpty) {
-        return upsertNaderSalon(defaultPrototypeVenues());
+        return upsertNaderSalon(defaultPrototypeVenues())
+            .where((v) => !trashedOrDeletedIds.contains(v.id))
+            .toList();
       }
       return result;
     } catch (_) {
       if (isTest && !kSeedNaderSalon) return venues;
-      return upsertNaderSalon(venues.isNotEmpty ? venues : defaultPrototypeVenues());
+      return upsertNaderSalon(venues.isNotEmpty ? venues : defaultPrototypeVenues())
+          .where((v) => !trashedOrDeletedIds.contains(v.id))
+          .toList();
     }
   }
 
@@ -468,6 +485,19 @@ class _HagzyHomeState extends State<HagzyHome> {
             .where(_bookingHasNotExpired)
             .toList();
         _customerBookings = List.of(_bookings);
+      }
+      final archivedRaw = prefs.getString(kArchivedVenuesStorageKey);
+      if (archivedRaw != null) {
+        try {
+          final list = jsonDecode(archivedRaw) as List<dynamic>;
+          _archivedVenues = list
+              .map((v) => Venue.fromJson(v as Map<String, dynamic>))
+              .toList();
+        } catch (_) {}
+      }
+      final deletedList = prefs.getStringList(kDeletedVenueIdsStorageKey);
+      if (deletedList != null) {
+        _deletedVenueIds = deletedList.toSet();
       }
       _prefsLoaded = true;
       if (mounted) setState(() {});
@@ -749,6 +779,18 @@ class _HagzyHomeState extends State<HagzyHome> {
             ))
         .toList();
     return owned.length <= 1 ? owned : owned.take(1).toList();
+  }
+
+  List<Venue> get _portalArchivedVenues {
+    if (!_isSingularPartner) return _archivedVenues;
+    final owned = _archivedVenues
+        .where((v) => v.isOwnedBy(
+              userId: _savedCustomerId,
+              email: _savedCustomerEmail,
+              phone: _savedCustomerPhone,
+            ))
+        .toList();
+    return owned;
   }
 
   List<Booking> get _portalBookings {
@@ -1673,15 +1715,73 @@ class _HagzyHomeState extends State<HagzyHome> {
     );
   }
 
-  Future<void> _deleteVenue(Venue venue) async {
+  Future<void> _deleteVenue(Venue venue, {bool permanent = false}) async {
     await _runSave(() async {
-      if (_api.isConfigured && _adminToken != null) {
-        await _api.deleteVenue(_adminToken!, venue.id);
+      final prefs = await SharedPreferences.getInstance();
+      final isAr = _language == 'AR';
+      if (!permanent) {
+        // Soft delete / Move to Trash
+        _archivedVenues = [
+          ..._archivedVenues.where((v) => v.id != venue.id),
+          venue,
+        ];
+        await prefs.setString(
+          kArchivedVenuesStorageKey,
+          jsonEncode(_archivedVenues.map((v) => v.toJson()).toList()),
+        );
+        final nextVenues = _venues.where((value) => value.id != venue.id).toList();
+        await _commit(nextVenues, _bookings);
+        _message(isAr
+            ? 'تم نقل المكان إلى سلة المهملات. يمكنك استعادته في أي وقت.'
+            : 'Venue moved to Trash. You can restore it anytime.');
+      } else {
+        // Permanent Delete
+        _archivedVenues = _archivedVenues.where((v) => v.id != venue.id).toList();
+        _deletedVenueIds.add(venue.id);
+        await prefs.setString(
+          kArchivedVenuesStorageKey,
+          jsonEncode(_archivedVenues.map((v) => v.toJson()).toList()),
+        );
+        await prefs.setStringList(
+          kDeletedVenueIdsStorageKey,
+          _deletedVenueIds.toList(),
+        );
+        if (_api.isConfigured && _adminToken != null) {
+          try {
+            await _api.deleteVenue(_adminToken!, venue.id);
+          } catch (_) {}
+        }
+        final nextVenues = _venues.where((value) => value.id != venue.id).toList();
+        await _commit(
+          nextVenues,
+          _bookings.where((value) => value.venueId != venue.id).toList(),
+        );
+        _message(isAr
+            ? 'تم حذف المكان نهائياً وتطهير بياناته.'
+            : 'Venue permanently deleted.');
       }
-      await _commit(
-        _venues.where((value) => value.id != venue.id).toList(),
-        _bookings.where((value) => value.venueId != venue.id).toList(),
+    });
+  }
+
+  Future<void> _restoreVenue(Venue venue) async {
+    await _runSave(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final isAr = _language == 'AR';
+      _archivedVenues = _archivedVenues.where((v) => v.id != venue.id).toList();
+      _deletedVenueIds.remove(venue.id);
+      await prefs.setString(
+        kArchivedVenuesStorageKey,
+        jsonEncode(_archivedVenues.map((v) => v.toJson()).toList()),
       );
+      await prefs.setStringList(
+        kDeletedVenueIdsStorageKey,
+        _deletedVenueIds.toList(),
+      );
+      final nextVenues = [..._venues.where((v) => v.id != venue.id), venue];
+      await _commit(nextVenues, _bookings);
+      _message(isAr
+          ? 'تمت استعادة المكان إلى قائمة الأماكن النشطة!'
+          : 'Venue restored to active catalog!');
     });
   }
 
@@ -6231,6 +6331,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 onAddService: _addService,
                                                 onRemoveService: _removeService,
                                                 onDelete: _deleteVenue,
+                                                archivedVenues: _portalArchivedVenues,
+                                                onRestoreVenue: _restoreVenue,
+                                                onPermanentDeleteVenue: (v) => _deleteVenue(v, permanent: true),
                                                 onRemoveItem: _removeItem,
                                                 onSyncFirebase: _syncAllVenuesToCloud,
                                                 onExploreCustomerApp: () => setState(() {
@@ -6376,6 +6479,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             onAddService: _addService,
                                             onRemoveService: _removeService,
                                             onDelete: _deleteVenue,
+                                            archivedVenues: _portalArchivedVenues,
+                                            onRestoreVenue: _restoreVenue,
+                                            onPermanentDeleteVenue: (v) => _deleteVenue(v, permanent: true),
                                             onRemoveItem: _removeItem,
                                             onSyncFirebase: _syncAllVenuesToCloud,
                                           ),
