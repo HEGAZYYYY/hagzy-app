@@ -2300,7 +2300,7 @@ class _BookTabState extends State<BookTab> {
                                               : venue.type.icon,
                                           selected: sel,
                                           label:
-                                              '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/30m', '/٣٠ د') : localized(widget.arabic, '/h', '/س')}',
+                                              '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP', 'ج.م')}${venue.type == VenueType.salon ? localized(widget.arabic, '/30m', '/٣٠ د') : (venue.subCategories.contains('escape_rooms') ? localized(widget.arabic, '/person', '/فرد') : localized(widget.arabic, '/h', '/س'))}',
                                           onTap: () => _selectSpace(val.id),
                                         );
                                       }).toList(),
@@ -3049,7 +3049,9 @@ class ReservationQuote extends StatelessWidget {
         ? (item.hourlyRate > 0
             ? item.hourlyRate
             : (venue.services.isNotEmpty ? venue.services.first.price : 0.0))
-        : item.hourlyRate * estimatedMinutes / 60;
+        : (venue.subCategories.contains('escape_rooms')
+            ? item.hourlyRate
+            : item.hourlyRate * estimatedMinutes / 60);
     final rawDeposit = total * venue.depositPercent / 100;
     final deposit = rawDeposit > 0 && rawDeposit < 5.0 ? 5.0 : rawDeposit;
     return Container(
@@ -3862,9 +3864,12 @@ class VenueBrowseCard extends StatelessWidget {
                 : venue.items
                     .map((item) => item.hourlyRate)
                     .reduce((a, b) => a < b ? a : b);
+    final isEscape = venue.subCategories.contains('escape_rooms') || venue.name.toLowerCase().contains('escape');
     final rateLabel = venue.type == VenueType.salon
         ? localized(arabic, 'per service', 'للخدمة')
-        : localized(arabic, 'per hour', 'للساعة');
+        : (isEscape
+            ? localized(arabic, 'per person', 'للفرد')
+            : localized(arabic, 'per hour', 'للساعة'));
     final itemCount = venue.items.length;
     final spaceLabel = switch (venue.type) {
       VenueType.sports => itemCount == 1
@@ -3873,9 +3878,9 @@ class VenueBrowseCard extends StatelessWidget {
       VenueType.salon => itemCount == 1
           ? localized(arabic, 'Chair', 'كرسي')
           : localized(arabic, 'Chairs', 'كراسي'),
-      VenueType.lounge => itemCount == 1
-          ? localized(arabic, 'Space', 'مكان')
-          : localized(arabic, 'Spaces', 'أماكن'),
+      VenueType.lounge => isEscape
+          ? (itemCount == 1 ? localized(arabic, 'Room', 'غرفة') : localized(arabic, 'Rooms', 'غرف'))
+          : (itemCount == 1 ? localized(arabic, 'Space', 'مكان') : localized(arabic, 'Spaces', 'أماكن')),
     };
     final ratingStr = venue.rating.toStringAsFixed(1);
     final hasReviews = venue.reviews.isNotEmpty;

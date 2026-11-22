@@ -113,6 +113,18 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     'Kafr El Sheikh',
   ];
 
+  bool get isSalon => _selectedType == VenueType.salon;
+  bool get isEscapeRoom =>
+      widget.initialVenue?.subCategories.contains('escape_rooms') == true ||
+      _selectedAmenities.any((a) => a.contains('إسكيب') || a.toLowerCase().contains('escape')) ||
+      widget.initialVenue?.name.toLowerCase().contains('escape') == true ||
+      _nameController.text.toLowerCase().contains('escape') ||
+      _items.any((i) =>
+          i.kind.toLowerCase().contains('escape') ||
+          i.name.contains('دار الأيتام') ||
+          i.name.contains('آكلي لحوم البشر') ||
+          i.name.contains('اللعنة'));
+
   @override
   void initState() {
     super.initState();
@@ -139,9 +151,13 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
         name: i.name,
         kind: i.kind,
         hourlyRate: i.hourlyRate,
-        peakRate: i.multiRate > 0 ? i.multiRate : i.hourlyRate * 1.25,
+        peakRate: (i.multiRate > 0 && i.multiRate != i.hourlyRate) ? i.multiRate : i.hourlyRate,
         description: i.description,
         imageUrl: i.imageUrl,
+        pricingMode: i.pricingMode,
+        pricingTiers: i.pricingTiers,
+        minCapacity: i.minCapacity,
+        maxCapacity: i.maxCapacity,
       )).toList();
 
       _services = v.services.map((s) => _EditableService(
@@ -321,9 +337,13 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       name: i.name.trim(),
       kind: i.kind.trim(),
       hourlyRate: i.hourlyRate,
-      multiRate: i.peakRate,
+      multiRate: (i.peakRate > 0 && i.peakRate != i.hourlyRate) ? i.peakRate : 0.0,
       description: i.description.trim(),
       imageUrl: i.imageUrl?.trim().isNotEmpty == true ? i.imageUrl!.trim() : null,
+      pricingMode: i.pricingMode,
+      pricingTiers: i.pricingTiers,
+      minCapacity: i.minCapacity,
+      maxCapacity: i.maxCapacity,
     )).toList();
 
     final services = _services.map((s) => SalonService(
@@ -681,7 +701,11 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                       ),
                                     ),
                                     Text(
-                                      '${item.hourlyRate.toStringAsFixed(0)} EGP/hr',
+                                      isEscapeRoom
+                                          ? (isAr ? '${item.hourlyRate.toStringAsFixed(0)} ج.م / فرد' : '${item.hourlyRate.toStringAsFixed(0)} EGP / person')
+                                          : (isSalon
+                                              ? (isAr ? '${item.hourlyRate.toStringAsFixed(0)} ج.م' : '${item.hourlyRate.toStringAsFixed(0)} EGP')
+                                              : (isAr ? '${item.hourlyRate.toStringAsFixed(0)} ج.م/ساعة' : '${item.hourlyRate.toStringAsFixed(0)} EGP/hr')),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         color: isDark ? kGreenLight : kGreen,
@@ -693,6 +717,25 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                         '• Peak: ${item.peakRate.toStringAsFixed(0)} EGP',
                                         style: TextStyle(fontSize: 11.5, color: mutedColor),
                                       ),
+                                    if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
+                                      const SizedBox(width: 4),
+                                      ...item.pricingTiers!.entries.map((e) => Container(
+                                        margin: const EdgeInsets.only(left: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(5),
+                                        ),
+                                        child: Text(
+                                          isAr ? '≤${e.key} أفراد: ${e.value} ج' : '≤${e.key}p: ${e.value}EGP',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? kGreenLight : kGreenDark,
+                                          ),
+                                        ),
+                                      )),
+                                    ],
                                   ],
                                 ),
                               ],
@@ -1089,14 +1132,16 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
   // DIALOG: Add Item (Room / Chair)
   void _showAddItemDialog(bool isAr) {
     final isSalon = _selectedType == VenueType.salon;
+    final isEscape = isEscapeRoom;
     final nameCtrl = TextEditingController(
-      text: isSalon ? 'Chair ${_items.length + 1}' : 'Room ${_items.length + 1}',
+      text: isSalon ? 'Chair ${_items.length + 1}' : (isEscape ? 'Room ${_items.length + 1}' : 'Court ${_items.length + 1}'),
     );
-    final kindCtrl = TextEditingController(text: isSalon ? 'Standard Station' : 'Standard');
-    final rateCtrl = TextEditingController(text: isSalon ? '150' : '350');
-    final peakCtrl = TextEditingController(text: isSalon ? '200' : '450');
+    final kindCtrl = TextEditingController(text: isSalon ? 'Standard Station' : (isEscape ? 'Escape Room' : 'Standard'));
+    final rateCtrl = TextEditingController(text: isSalon ? '150' : (isEscape ? '150' : '350'));
+    final peakCtrl = TextEditingController(text: isSalon ? '150' : (isEscape ? '150' : '450'));
     final descCtrl = TextEditingController();
     final imageCtrl = TextEditingController();
+    bool enablePeakPricing = false;
 
     showDialog(
       context: context,
@@ -1161,31 +1206,86 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: rateCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
+                    if (!enablePeakPricing) ...[
+                      TextFormField(
+                        controller: rateCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: isEscape
+                              ? (isAr ? 'سعر الفرد (جنيه) *' : 'Rate per Person (EGP) *')
+                              : (isSalon
+                                  ? (isAr ? 'السعر (جنيه) *' : 'Price (EGP) *')
+                                  : (isAr ? 'السعر (جنيه) *' : 'Rate (EGP) *')),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () {
+                          setDialogState(() {
+                            enablePeakPricing = true;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                isAr ? 'تفعيل سعر ذروة مختلف (إذا كان المكان يطبق أسعار ذروة)' : 'Add different Peak / Surge Rate',
+                                style: const TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: peakCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: rateCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: peakCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: isAr ? Alignment.centerLeft : Alignment.centerRight,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                          onPressed: () {
+                            setDialogState(() {
+                              enablePeakPricing = false;
+                              peakCtrl.text = rateCtrl.text;
+                            });
+                          },
+                          icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
+                          label: Text(
+                            isAr ? 'إلغاء سعر الذروة (سعر ثابت)' : 'Disable peak rate (Fixed rate)',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: descCtrl,
@@ -1279,7 +1379,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   final n = nameCtrl.text.trim();
                   if (n.isEmpty) return;
                   final r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
-                  final p = double.tryParse(peakCtrl.text.trim()) ?? r;
+                  final p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
 
                   setState(() {
                     _items.add(_EditableItem(
@@ -1312,6 +1412,9 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     final descCtrl = TextEditingController(text: item.description);
     final imageCtrl = TextEditingController(text: item.imageUrl ?? '');
     final isSalon = _selectedType == VenueType.salon;
+    final isEscape = isEscapeRoom;
+    final bool initialHasPeak = item.peakRate > 0 && item.peakRate != item.hourlyRate;
+    bool enablePeakPricing = initialHasPeak;
 
     showDialog(
       context: context,
@@ -1374,31 +1477,114 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: rateCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
+                    if (!enablePeakPricing) ...[
+                      TextFormField(
+                        controller: rateCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: isEscape
+                              ? (isAr ? 'سعر الفرد (جنيه) *' : 'Rate per Person (EGP) *')
+                              : (isSalon
+                                  ? (isAr ? 'السعر (جنيه) *' : 'Price (EGP) *')
+                                  : (isAr ? 'السعر (جنيه) *' : 'Rate (EGP) *')),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () {
+                          setDialogState(() {
+                            enablePeakPricing = true;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                isAr ? 'تفعيل سعر ذروة مختلف (إذا كان المكان يطبق أسعار ذروة)' : 'Add different Peak / Surge Rate',
+                                style: const TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: peakCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: rateCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: isAr ? 'السعر العادي (جنيه)' : 'Regular Rate (EGP)',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: peakCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: isAr ? 'سعر الذروة (جنيه)' : 'Peak Rate (EGP)',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: isAr ? Alignment.centerLeft : Alignment.centerRight,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                          onPressed: () {
+                            setDialogState(() {
+                              enablePeakPricing = false;
+                              peakCtrl.text = rateCtrl.text;
+                            });
+                          },
+                          icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
+                          label: Text(
+                            isAr ? 'إلغاء سعر الذروة (سعر ثابت)' : 'Disable peak rate (Fixed rate)',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                    if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: surfaceBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isAr ? '💰 أسعار المجموعات / حسب عدد الأفراد (ثابتة بدون ذروة):' : '💰 Tiered Pricing by Group Size (Flat / No Peak):',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textColor),
+                            ),
+                            const SizedBox(height: 6),
+                            ...item.pricingTiers!.entries.map((e) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text(
+                                isAr ? '• حتى ${e.key} أفراد: ${e.value} جنيه للفرد' : '• Up to ${e.key} players: ${e.value} EGP / person',
+                                style: TextStyle(fontSize: 11.5, color: mutedColor),
+                              ),
+                            )),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: descCtrl,
@@ -1489,7 +1675,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   final n = nameCtrl.text.trim();
                   if (n.isEmpty) return;
                   final r = double.tryParse(rateCtrl.text.trim()) ?? item.hourlyRate;
-                  final p = double.tryParse(peakCtrl.text.trim()) ?? r;
+                  final p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
 
                   setState(() {
                     _items[idx] = _EditableItem(
@@ -1500,6 +1686,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       peakRate: p,
                       description: descCtrl.text.trim(),
                       imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
+                      pricingMode: item.pricingMode,
+                      pricingTiers: item.pricingTiers,
+                      minCapacity: item.minCapacity,
+                      maxCapacity: item.maxCapacity,
                     );
                   });
                   Navigator.pop(ctx);
@@ -1610,6 +1800,10 @@ class _EditableItem {
   double peakRate;
   String description;
   String? imageUrl;
+  String? pricingMode;
+  Map<String, dynamic>? pricingTiers;
+  int? minCapacity;
+  int? maxCapacity;
 
   _EditableItem({
     required this.id,
@@ -1619,6 +1813,10 @@ class _EditableItem {
     required this.peakRate,
     this.description = '',
     this.imageUrl,
+    this.pricingMode,
+    this.pricingTiers,
+    this.minCapacity,
+    this.maxCapacity,
   });
 }
 

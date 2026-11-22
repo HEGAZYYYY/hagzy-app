@@ -187,6 +187,10 @@ class VenueItem {
     this.multiRate = 0,
     this.description = '',
     this.imageUrl,
+    this.pricingMode,
+    this.pricingTiers,
+    this.minCapacity,
+    this.maxCapacity,
   });
 
   final String id;
@@ -196,6 +200,10 @@ class VenueItem {
   final double multiRate;
   final String description;
   final String? imageUrl;
+  final String? pricingMode;
+  final Map<String, dynamic>? pricingTiers;
+  final int? minCapacity;
+  final int? maxCapacity;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -205,6 +213,10 @@ class VenueItem {
         'multiRate': multiRate,
         if (description.isNotEmpty) 'description': description,
         if (imageUrl != null && imageUrl!.isNotEmpty) 'imageUrl': imageUrl,
+        if (pricingMode != null) 'pricing_mode': pricingMode,
+        if (pricingTiers != null) 'pricing_tiers': pricingTiers,
+        if (minCapacity != null) 'min_capacity': minCapacity,
+        if (maxCapacity != null) 'max_capacity': maxCapacity,
       };
 
   factory VenueItem.fromJson(Map<String, dynamic> json) {
@@ -216,6 +228,14 @@ class VenueItem {
     final multi = (rawMulti is num)
         ? rawMulti.toDouble()
         : (double.tryParse(rawMulti?.toString() ?? '') ?? 0.0);
+    Map<String, dynamic>? tiers;
+    if (json['pricing_tiers'] is Map) {
+      tiers = Map<String, dynamic>.from(json['pricing_tiers'] as Map);
+    } else if (json['pricingTiers'] is Map) {
+      tiers = Map<String, dynamic>.from(json['pricingTiers'] as Map);
+    }
+    final minCap = json['min_capacity'] ?? json['minCapacity'];
+    final maxCap = json['max_capacity'] ?? json['maxCapacity'];
     return VenueItem(
       id: (json['id'] ?? generateId()).toString(),
       name: (json['name'] ?? 'Unit').toString(),
@@ -224,7 +244,33 @@ class VenueItem {
       multiRate: multi,
       description: (json['description'] ?? '').toString(),
       imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
+      pricingMode: json['pricing_mode']?.toString() ?? json['pricingMode']?.toString(),
+      pricingTiers: tiers,
+      minCapacity: minCap is num ? minCap.toInt() : int.tryParse(minCap?.toString() ?? ''),
+      maxCapacity: maxCap is num ? maxCap.toInt() : int.tryParse(maxCap?.toString() ?? ''),
     );
+  }
+
+  double priceForHeadcount(int headcount) {
+    if (pricingTiers != null && pricingTiers!.isNotEmpty) {
+      final sortedSizes = pricingTiers!.keys
+          .map((k) => int.tryParse(k))
+          .whereType<int>()
+          .toList()
+        ..sort();
+      if (sortedSizes.isNotEmpty) {
+        if (headcount <= sortedSizes.first) {
+          return (pricingTiers![sortedSizes.first.toString()] as num?)?.toDouble() ?? hourlyRate;
+        }
+        for (int i = 0; i < sortedSizes.length; i++) {
+          if (headcount <= sortedSizes[i]) {
+            return (pricingTiers![sortedSizes[i].toString()] as num?)?.toDouble() ?? hourlyRate;
+          }
+        }
+        return (pricingTiers![sortedSizes.last.toString()] as num?)?.toDouble() ?? hourlyRate;
+      }
+    }
+    return hourlyRate;
   }
 }
 
@@ -1297,18 +1343,26 @@ Venue adrenalineEscapeRoomSample() => Venue(
           id: 'adrenaline-orphans',
           name: '👻 Orphans – دار الأيتام 🏚️🧸',
           kind: 'Escape Room (2 - 15 أفراد)',
-          hourlyRate: 100,
-          multiRate: 150,
+          hourlyRate: 150,
+          multiRate: 0,
+          pricingMode: 'per_person_tiered',
+          pricingTiers: const {'3': 150, '5': 120, '15': 100},
+          minCapacity: 2,
+          maxCapacity: 15,
           imageUrl: 'assets/adrenaline_escape_room.jpg',
           description:
-              '📖 القصة:\nدار أيتام مهجور من سنة 1920، اتجهرت بسبب لعنة حصلت جواه، وكل أطفال الدار اختفوا ومحدش عارف إيه اللي حصلهم… 👀\nبس لما كانوا بيعدّوا جنب الدار، كانوا بيسمعوا صوتين.. صوت ضحك الأطفال 😂 وأحيانًا صريخهم 😱\n\n⏳ قدامكم 60 دقيقة!\nالمطلوب إنكم تدخلوا تعرفوا إيه اللي حصل، وتهربوا قبل ما يحصل لكم زي ما حصل لهم! 🏃‍♂️💀\n\n👥 العدد: من أول فردين لحد 15 فرد.\n\n💰 الأسعار:\n• فردين أو 3 أفراد: 150 جنيه للفرد.\n• 4 أو 5 أفراد: 120 جنيه للفرد.\n• أكتر من 5 أفراد: 100 جنيه للفرد.\n\n📍 العنوان:\nبجوار الباب الخلفي لكافيه بليسمو، فرع الـ 47، شارع مستشفى تداوي.',
+              '📖 القصة:\nدار أيتام مهجور من سنة 1920، اتجهرت بسبب لعنة حصلت جواه، وكل أطفال الدار اختفوا ومحدش عارف إيه اللي حصلهم… 👀\nبس لما كانوا بيعدّوا جنب الدار، كانوا بيسمعوا صوتين.. صوت ضحك الأطفال 😂 وأحيانًا صريخهم 😱\n\n⏳ قدامكم 60 دقيقة!\nالمطلوب إنكم تدخلوا تعرفوا إيه اللي حصل، وتهربوا قبل ما يحصل لكم زي ما حصل لهم! 🏃‍♂️💀\n\n👥 العدد: من أول فردين لحد 15 فرد.\n\n💰 الأسعار:\n• 2 أو 3 أفراد: 150 جنيه للفرد.\n• 4 أو 5 أفراد: 120 جنيه للفرد.\n• أكتر من 5 أفراد: 100 جنيه للفرد.\n\n📍 العنوان:\nبجوار الباب الخلفي لكافيه بليسمو، فرع الـ 47، شارع مستشفى تداوي.',
         ),
         VenueItem(
           id: 'adrenaline-cannibal',
           name: '🔪 Cannibal – آكلي لحوم البشر 🩸☠️',
           kind: 'Escape Room (4 - 15 أفراد)',
-          hourlyRate: 100,
-          multiRate: 120,
+          hourlyRate: 120,
+          multiRate: 0,
+          pricingMode: 'per_person_tiered',
+          pricingTiers: const {'5': 120, '15': 100},
+          minCapacity: 4,
+          maxCapacity: 15,
           imageUrl: 'assets/adrenaline_escape_room.jpg',
           description:
               '📖 القصة:\nمخطوفين ف بيت راجل مجنون مش بيعمل حاجة فحياته غير انو يخطف الناس علشان يدبحهم وياكلهم قدامكو 60 دقيقة هتلحق تفك نفسك وتهرب ولا هتكون الوجبة الجاية بتاعته ☠️🔪\n\n👥 العدد: من أول 4 أفراد لحد 15 فرد.\n\n💰 الأسعار:\n• 4 أو 5 أفراد: 120 جنيه للفرد.\n• أكتر من 5 أفراد: 100 جنيه للفرد.\n\n📍 العنوان:\nبجوار الباب الخلفي لكافيه بليسمو، فرع الـ 47، شارع مستشفى تداوي.',
@@ -1317,8 +1371,12 @@ Venue adrenalineEscapeRoomSample() => Venue(
           id: 'adrenaline-the-curse',
           name: '👑 The Curse – اللعنة 🔑💀',
           kind: 'Escape Room (3 - 20 فرداً)',
-          hourlyRate: 150,
-          multiRate: 200,
+          hourlyRate: 200,
+          multiRate: 0,
+          pricingMode: 'per_person_tiered',
+          pricingTiers: const {'4': 200, '20': 150},
+          minCapacity: 3,
+          maxCapacity: 20,
           imageUrl: 'assets/adrenaline_escape_room.jpg',
           description:
               '📖 القصة:\nلعنة المكان هنا كانت مختلفة 😈 اللعنة حصلت عن طريق كاهن الملك اللي طمع ف الملك استخدم صولجان الملك ف انو يلعن جسمه ويجمده ويستولي علي المكان 🪄 عيلة الكاهن ده حفظت اللعنة طول الفتره دي 🕯️ انتو دخلتو المكان لكن للاسف الكاهن قبض عليكو واتربطو ⛓️ واحد صاحبكو بس هو اللي جه متاخر وهو اللي فايده انو يفككو وتفكو اللعنة وتهربو قبل رجوع الكاهن 🏃‍♂️👑\n\n👥 العدد: 3 أشخاص لحد 20 شخص.\n\n💰 الأسعار:\n• 3 أو 4 أفراد: 200 جنيه للفرد.\n• 5 أفراد أو أكتر: 150 جنيه للفرد.\n\n📍 العنوان:\nبجوار الباب الخلفي لكافيه بليسمو، فرع الـ 47، شارع مستشفى تداوي.',
