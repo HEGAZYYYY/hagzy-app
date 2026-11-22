@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hagzy_app/main.dart';
+import 'package:hagzy_app/models/models.dart';
 import 'package:hagzy_app/screens/book_tab.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('Escape room does not auto-assign room and Back to Rooms works properly', (tester) async {
-    tester.view.physicalSize = const Size(800, 1400);
+  testWidgets('Escape room headcount selector, tier pricing, confirmation and Back to Rooms works properly', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -21,12 +21,16 @@ void main() {
       location: 'Kafr El Sheikh',
       type: VenueType.lounge,
       subCategories: ['escape_rooms'],
+      depositPercent: 25,
       items: [
         VenueItem(
           id: 'adrenaline-orphans',
           name: '👻 Orphans – دار الأيتام ♣️🧸',
           kind: 'Escape Room',
           hourlyRate: 150,
+          minCapacity: 2,
+          maxCapacity: 15,
+          pricingTiers: const {'3': 150, '5': 120, '15': 100},
           description: 'Orphans story bio',
         ),
         VenueItem(
@@ -34,6 +38,9 @@ void main() {
           name: '🥩 Cannibal – آكل لحوم البشر 🩸☠️',
           kind: 'Escape Room',
           hourlyRate: 120,
+          minCapacity: 4,
+          maxCapacity: 15,
+          pricingTiers: const {'5': 120, '15': 100},
           description: 'Cannibal story bio',
         ),
         VenueItem(
@@ -41,6 +48,9 @@ void main() {
           name: '🔮 The Curse – اللعنة 👁️📜',
           kind: 'Escape Room',
           hourlyRate: 200,
+          minCapacity: 3,
+          maxCapacity: 20,
+          pricingTiers: const {'4': 200, '20': 150},
           description: 'Curse story bio',
         ),
       ],
@@ -75,19 +85,64 @@ void main() {
     expect(find.text('🔮 The Curse – اللعنة 👁️📜'), findsOneWidget);
     expect(find.text('Back to Rooms'), findsNothing);
 
-    // TAP ON CANNIBAL ROOM
-    final cannibalCard = find.text('🥩 Cannibal – آكل لحوم البشر 🩸☠️');
-    await tester.ensureVisible(cannibalCard);
-    await tester.tap(cannibalCard);
+    // TAP ON ORPHANS ROOM
+    final orphansCard = find.text('👻 Orphans – دار الأيتام ♣️🧸');
+    await tester.ensureVisible(orphansCard);
+    await tester.tap(orphansCard);
     await tester.pumpAndSettle();
 
-    // VERIFY PHASE 2: Cannibal room is now active!
+    // VERIFY PHASE 2: Orphans room is now active!
     expect(find.text('Back to Rooms'), findsOneWidget);
-    expect(find.text('Select Number of People'), findsOneWidget);
-    expect(find.text('4 or 5 players'), findsOneWidget);
-    expect(find.text('More than 5 players'), findsOneWidget);
+    expect(find.text('Number of Players (Shilla)'), findsOneWidget);
+    expect(find.text('Room capacity: 2 to 15 players'), findsOneWidget);
 
-    // TAP "< Back to Rooms"
+    // Default headcount is minCapacity = 2.
+    // Orphans pricing: 2 or 3 players -> 150 EGP/person. Total = 2 * 150 = 300 EGP.
+    expect(find.text('2 Players'), findsOneWidget);
+    expect(find.text('150 EGP/person'), findsOneWidget);
+    expect(find.text('300 EGP total'), findsOneWidget);
+
+    // Step 2 should NOT be unlocked yet
+    expect(find.text('Confirm Group Size (2 Players) · Total: 300 EGP'), findsOneWidget);
+
+    // TAP QUICK CHIP "5"
+    final chip5 = find.widgetWithText(ChoiceChip, '5');
+    await tester.ensureVisible(chip5);
+    await tester.tap(chip5);
+    await tester.pumpAndSettle();
+
+    // For 5 players: tier is 4-5 players -> 120 EGP/person. Total = 5 * 120 = 600 EGP.
+    expect(find.text('5 Players'), findsOneWidget);
+    expect(find.text('120 EGP/person'), findsOneWidget);
+    expect(find.text('600 EGP total'), findsOneWidget);
+    expect(find.text('Confirm Group Size (5 Players) · Total: 600 EGP'), findsOneWidget);
+
+    // TAP "+" to 6 Players
+    final plusBtn = find.byTooltip('Increase');
+    await tester.ensureVisible(plusBtn);
+    await tester.tap(plusBtn);
+    await tester.pumpAndSettle();
+
+    // For 6 players: tier is 6+ players -> 100 EGP/person. Total = 6 * 100 = 600 EGP.
+    expect(find.text('6 Players'), findsOneWidget);
+    expect(find.text('100 EGP/person'), findsOneWidget);
+    expect(find.text('600 EGP total'), findsOneWidget);
+    expect(find.text('Confirm Group Size (6 Players) · Total: 600 EGP'), findsOneWidget);
+
+    // TAP "Confirm Group Size"
+    final confirmBtn = find.text('Confirm Group Size (6 Players) · Total: 600 EGP');
+    await tester.ensureVisible(confirmBtn);
+    await tester.tap(confirmBtn);
+    await tester.pumpAndSettle();
+
+    // Group size is confirmed! Summary card shows:
+    expect(find.text('Group Size Confirmed'), findsOneWidget);
+    expect(find.text('Change'), findsOneWidget);
+
+    // Step 2 slot picker is now unlocked!
+    expect(find.text('Pick an Available Time'), findsOneWidget);
+
+    // TAP "Back to Rooms"
     final backBtn = find.text('Back to Rooms');
     await tester.ensureVisible(backBtn);
     await tester.tap(backBtn);
@@ -96,17 +151,6 @@ void main() {
     // VERIFY RETURN TO PHASE 1: Back to room selection cards!
     expect(find.text('Choose Your Escape Room'), findsOneWidget);
     expect(find.text('Back to Rooms'), findsNothing);
-    expect(find.text('🔮 The Curse – اللعنة 👁️📜'), findsOneWidget);
-
-    // TAP ON THE CURSE ROOM
-    final curseCard = find.text('🔮 The Curse – اللعنة 👁️📜');
-    await tester.ensureVisible(curseCard);
-    await tester.tap(curseCard);
-    await tester.pumpAndSettle();
-
-    // VERIFY PHASE 2: The Curse is now active with its specific options!
-    expect(find.text('Back to Rooms'), findsOneWidget);
-    expect(find.text('3 or 4 players'), findsOneWidget);
-    expect(find.text('5 or more players'), findsOneWidget);
+    expect(find.text('🥩 Cannibal – آكل لحوم البشر 🩸☠️'), findsOneWidget);
   });
 }

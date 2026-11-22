@@ -69,7 +69,7 @@ class _BookTabState extends State<BookTab> {
   DateTime _date = _defaultBookingDate();
   DateTime? _selectedStart;
   int _headcount = 2;
-  int? _escapeTierIndex;
+  bool _escapeGroupConfirmed = false;
   int _sportsDurationMinutes = 60;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -181,7 +181,7 @@ class _BookTabState extends State<BookTab> {
       setState(() {
         _venueId = null;
         _itemId = null;
-        _escapeTierIndex = null;
+        _escapeGroupConfirmed = false;
         _selectedStart = null;
       });
       return;
@@ -211,7 +211,6 @@ class _BookTabState extends State<BookTab> {
       final isEscape = value.subCategories.contains('escape_rooms') ||
           value.name.toLowerCase().contains('escape');
       _itemId = isEscape ? null : value.items.firstOrNull?.id;
-      _escapeTierIndex = null;
       _sportsDurationMinutes = 60;
       _selectedStart = null;
     });
@@ -236,7 +235,7 @@ class _BookTabState extends State<BookTab> {
       _itemId = itemId;
       _selectedStart = keepStart ? prevStart : null;
       _headcount = minCap;
-      _escapeTierIndex = null;
+      _escapeGroupConfirmed = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -2212,14 +2211,27 @@ class _BookTabState extends State<BookTab> {
                               child: Row(
                                 children: [
                                   Expanded(
-                                    child: _BookingStepPill(
-                                      stepNumber: '1',
-                                      title: localized(widget.arabic, 'Space', 'المساحة'),
-                                      subtitle: item?.name ??
-                                          localized(widget.arabic, 'Select', 'اختر'),
-                                      done: item != null,
-                                      active: activeStep == 1,
-                                      onTap: () => _scrollToKey(_spaceStepKey),
+                                    child: Builder(
+                                      builder: (context) {
+                                        final isEscape = venue.subCategories.contains('escape_rooms') ||
+                                            venue.name.toLowerCase().contains('escape');
+                                        final spaceSub = item != null
+                                            ? (isEscape
+                                                ? (_escapeGroupConfirmed
+                                                    ? '${item.name} ($_headcount ${localized(widget.arabic, 'p', 'فرد')})'
+                                                    : localized(widget.arabic, 'Pick players', 'حدد الأفراد'))
+                                                : item.name)
+                                            : localized(widget.arabic, 'Select', 'اختر');
+                                        final spaceDone = item != null && (!isEscape || _escapeGroupConfirmed);
+                                        return _BookingStepPill(
+                                          stepNumber: '1',
+                                          title: localized(widget.arabic, 'Space', 'المساحة'),
+                                          subtitle: spaceSub,
+                                          done: spaceDone,
+                                          active: activeStep == 1,
+                                          onTap: () => _scrollToKey(_spaceStepKey),
+                                        );
+                                      },
                                     ),
                                   ),
                                   Padding(
@@ -2442,10 +2454,17 @@ class _BookTabState extends State<BookTab> {
                                   }
 
                                   // Phase 2: Group Size Selection (when item != null)
+                                  final minCap = item.minCapacity ?? 2;
+                                  final maxCap = item.maxCapacity ?? 15;
+                                  if (_headcount < minCap) {
+                                    _headcount = minCap;
+                                  } else if (_headcount > maxCap) {
+                                    _headcount = maxCap;
+                                  }
+                                  final perPersonRate = item.priceForHeadcount(_headcount);
+                                  final total = perPersonRate * _headcount;
+                                  final deposit = total * venue.depositPercent / 100;
                                   final escapeOptions = _getEscapeRoomTierOptions(item);
-                                  final selectedOption = _escapeTierIndex != null && _escapeTierIndex! < escapeOptions.length
-                                      ? escapeOptions[_escapeTierIndex!]
-                                      : null;
 
                                   return Padding(
                                     key: _spaceStepKey,
@@ -2460,8 +2479,8 @@ class _BookTabState extends State<BookTab> {
                                               onTap: () {
                                                 setState(() {
                                                   _itemId = null;
-                                                  _escapeTierIndex = null;
-      _sportsDurationMinutes = 60;
+                                                  _escapeGroupConfirmed = false;
+                                                  _sportsDurationMinutes = 60;
                                                   _selectedStart = null;
                                                 });
                                               },
@@ -2522,205 +2541,456 @@ class _BookTabState extends State<BookTab> {
                                           isEscapeRoom: true,
                                         ),
                                         const SizedBox(height: 16),
-                                        // Selection Phase Question
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(7),
-                                              decoration: BoxDecoration(
-                                                color: kGreen.withValues(alpha: 0.14),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(Icons.groups_rounded, color: kGreen, size: 20),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    localized(widget.arabic, 'Select Number of People', 'اختر عدد أفراد الشلة'),
-                                                    style: TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight: FontWeight.w900,
-                                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    localized(widget.arabic, 'How many people will enter the room?', 'كم شخص هيدخل الغرفة؟'),
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        // Option cards directly from the ad
-                                        ...List.generate(escapeOptions.length, (idx) {
-                                          final opt = escapeOptions[idx];
-                                          final isSelected = _escapeTierIndex == idx;
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 8),
-                                            decoration: BoxDecoration(
-                                              color: isSelected
-                                                  ? (isDark ? kGreen.withValues(alpha: 0.22) : const Color(0xFFECFDF5))
-                                                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                                              borderRadius: BorderRadius.circular(14),
-                                              border: Border.all(
-                                                color: isSelected
-                                                    ? kGreen
-                                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                                                width: isSelected ? 2 : 1.2,
-                                              ),
-                                              boxShadow: isSelected
-                                                  ? [
-                                                      BoxShadow(
-                                                        color: kGreen.withValues(alpha: 0.2),
-                                                        blurRadius: 8,
-                                                        offset: const Offset(0, 2),
-                                                      ),
-                                                    ]
-                                                  : null,
-                                            ),
-                                            child: InkWell(
-                                              borderRadius: BorderRadius.circular(14),
-                                              onTap: () {
-                                                setState(() {
-                                                  _escapeTierIndex = idx;
-                                                  _headcount = opt.defaultHeadcount;
-                                                });
-                                              },
-                                              child: Padding(
-                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      isSelected
-                                                          ? Icons.radio_button_checked_rounded
-                                                          : Icons.radio_button_off_rounded,
-                                                      color: isSelected ? kGreen : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-                                                      size: 20,
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Text(
-                                                        localized(widget.arabic, opt.labelEn, opt.labelAr),
-                                                        style: TextStyle(
-                                                          fontSize: 15,
-                                                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                                                          color: isSelected
-                                                              ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    if (isSelected)
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                        decoration: BoxDecoration(
-                                                          color: kGreen,
-                                                          borderRadius: BorderRadius.circular(6),
-                                                        ),
-                                                        child: Text(
-                                                          localized(widget.arabic, 'Selected', 'تم الاختيار'),
-                                                          style: const TextStyle(
-                                                            color: Colors.white,
-                                                            fontSize: 11,
-                                                            fontWeight: FontWeight.w800,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }),
-                                        // Price Section (visible normally when option is chosen)
-                                        if (selectedOption != null) ...[
-                                          const SizedBox(height: 12),
+                                        if (_escapeGroupConfirmed) ...[
+                                          // Confirmed Group Size Summary Card
                                           Container(
-                                            padding: const EdgeInsets.all(14),
+                                            padding: const EdgeInsets.all(16),
                                             decoration: BoxDecoration(
-                                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                              borderRadius: BorderRadius.circular(14),
+                                              color: isDark ? const Color(0xFF132A22) : const Color(0xFFF0FDF4),
+                                              borderRadius: BorderRadius.circular(16),
                                               border: Border.all(
-                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                                width: 1.2,
+                                                color: isDark ? const Color(0xFF1F4D3C) : const Color(0xFFBBF7D0),
+                                                width: 1.5,
                                               ),
                                             ),
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.stretch,
                                               children: [
                                                 Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text(
-                                                      localized(widget.arabic, 'Rate per Player:', 'سعر الفرد:'),
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w700,
-                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                    Container(
+                                                      padding: const EdgeInsets.all(6),
+                                                      decoration: BoxDecoration(
+                                                        color: kGreen.withValues(alpha: 0.2),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const Icon(Icons.check_circle_rounded, color: kGreen, size: 20),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            localized(widget.arabic, 'Group Size Confirmed', 'تم تأكيد حجم الشلة'),
+                                                            style: TextStyle(
+                                                              fontSize: 14.5,
+                                                              fontWeight: FontWeight.w800,
+                                                              color: isDark ? kGreenLight : kGreenDark,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '$_headcount ${localized(widget.arabic, 'Players', 'أفراد')} · ${formatMoney(perPersonRate)} ${localized(widget.arabic, 'EGP / player', 'ج.م / فرد')}',
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
                                                     ),
-                                                    Text(
-                                                      '${formatMoney(selectedOption.pricePerPerson)} ${localized(widget.arabic, 'EGP / player', 'جنيه / فرد')}',
-                                                      style: const TextStyle(
-                                                        fontSize: 16,
-                                                        fontWeight: FontWeight.w900,
-                                                        color: kGreen,
+                                                    TextButton.icon(
+                                                      onPressed: () {
+                                                        setState(() {
+                                                          _escapeGroupConfirmed = false;
+                                                        });
+                                                      },
+                                                      icon: const Icon(Icons.edit_rounded, size: 15, color: kGreen),
+                                                      label: Text(
+                                                        localized(widget.arabic, 'Change', 'تعديل'),
+                                                        style: const TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: kGreen,
+                                                        ),
+                                                      ),
+                                                      style: TextButton.styleFrom(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                        backgroundColor: kGreen.withValues(alpha: 0.1),
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 6),
+                                                const SizedBox(height: 10),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  decoration: BoxDecoration(
+                                                    color: isDark ? const Color(0xFF0C1F18) : Colors.white,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(
+                                                      color: isDark ? const Color(0xFF1B3D30) : const Color(0xFFDCFCE7),
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        '${localized(widget.arabic, 'Total:', 'الإجمالي:')} ${formatMoney(total)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                        style: TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        '${localized(widget.arabic, 'Deposit:', 'العربون:')} ${formatMoney(deposit)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                        style: const TextStyle(
+                                                          fontSize: 12.5,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: Color(0xFF2563EB),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ] else ...[
+                                          // Interactive Headcount Selector Card
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                              borderRadius: BorderRadius.circular(18),
+                                              border: Border.all(
+                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                                width: 1.2,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                                              children: [
                                                 Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text(
-                                                      localized(widget.arabic, 'Total for Booking ($_headcount players):', 'إجمالي الحجز ($_headcount أفراد):'),
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w700,
-                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                    Container(
+                                                      padding: const EdgeInsets.all(7),
+                                                      decoration: BoxDecoration(
+                                                        color: kGreen.withValues(alpha: 0.14),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const Icon(Icons.groups_rounded, color: kGreen, size: 20),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            localized(widget.arabic, 'Number of Players (Shilla)', 'عدد أفراد الشلة'),
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight: FontWeight.w900,
+                                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            localized(
+                                                              widget.arabic,
+                                                              'Room capacity: $minCap to $maxCap players',
+                                                              'سعة الغرفة: من $minCap إلى $maxCap أفراد',
+                                                            ),
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
                                                     ),
-                                                    Text(
-                                                      '${formatMoney(selectedOption.pricePerPerson * _headcount)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
-                                                      style: TextStyle(
-                                                        fontSize: 16,
-                                                        fontWeight: FontWeight.w900,
-                                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                      decoration: BoxDecoration(
+                                                        color: kGreen.withValues(alpha: 0.14),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(color: kGreen.withValues(alpha: 0.28)),
+                                                      ),
+                                                      child: Text(
+                                                        '${formatMoney(perPersonRate)} ${localized(widget.arabic, 'EGP/person', 'ج.م/فرد')}',
+                                                        style: const TextStyle(
+                                                          fontSize: 12.5,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: kGreen,
+                                                        ),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 6),
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      localized(widget.arabic, 'Deposit Due Now (${venue.depositPercent}%):', 'العربون المطلوب الآن (${venue.depositPercent}%):'),
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                                      ),
+                                                const SizedBox(height: 16),
+                                                // Counter Row: [-] X Players [+]
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  decoration: BoxDecoration(
+                                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    border: Border.all(
+                                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                                                     ),
-                                                    Text(
-                                                      '${formatMoney((selectedOption.pricePerPerson * _headcount) * venue.depositPercent / 100)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
-                                                      style: const TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w800,
-                                                        color: Color(0xFF2563EB),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      IconButton(
+                                                        onPressed: _headcount > minCap
+                                                            ? () {
+                                                                setState(() {
+                                                                  _headcount--;
+                                                                });
+                                                              }
+                                                            : null,
+                                                        icon: const Icon(Icons.remove_circle_outline_rounded, size: 28),
+                                                        color: _headcount > minCap
+                                                            ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                                            : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                                                        tooltip: localized(widget.arabic, 'Decrease', 'تقليل'),
                                                       ),
+                                                      Column(
+                                                        children: [
+                                                          Text(
+                                                            '$_headcount ${localized(widget.arabic, 'Players', 'أفراد')}',
+                                                            style: TextStyle(
+                                                              fontSize: 20,
+                                                              fontWeight: FontWeight.w900,
+                                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '${formatMoney(total)} ${localized(widget.arabic, 'EGP total', 'ج.م إجمالي')}',
+                                                            style: const TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: kGreen,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      IconButton(
+                                                        onPressed: _headcount < maxCap
+                                                            ? () {
+                                                                setState(() {
+                                                                  _headcount++;
+                                                                });
+                                                              }
+                                                            : null,
+                                                        icon: const Icon(Icons.add_circle_outline_rounded, size: 28),
+                                                        color: _headcount < maxCap
+                                                            ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                                            : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                                                        tooltip: localized(widget.arabic, 'Increase', 'زيادة'),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                // Quick choice chips: minCap to maxCap
+                                                SingleChildScrollView(
+                                                  scrollDirection: Axis.horizontal,
+                                                  child: Row(
+                                                    children: List.generate(maxCap - minCap + 1, (i) {
+                                                      final count = minCap + i;
+                                                      final isSel = _headcount == count;
+                                                      return Padding(
+                                                        padding: const EdgeInsets.only(right: 6),
+                                                        child: ChoiceChip(
+                                                          label: Text(
+                                                            '$count',
+                                                            style: TextStyle(
+                                                              fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                                                              fontSize: 13,
+                                                              color: isSel
+                                                                  ? Colors.white
+                                                                  : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                                                            ),
+                                                          ),
+                                                          selected: isSel,
+                                                          selectedColor: kGreen,
+                                                          backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                                          side: BorderSide(
+                                                            color: isSel
+                                                                ? kGreen
+                                                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                                          ),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(10),
+                                                          ),
+                                                          onSelected: (_) {
+                                                            setState(() {
+                                                              _headcount = count;
+                                                            });
+                                                          },
+                                                        ),
+                                                      );
+                                                    }),
+                                                  ),
+                                                ),
+                                                if (escapeOptions.isNotEmpty) ...[
+                                                  const SizedBox(height: 12),
+                                                  // Pricing tiers ladder with active highlight
+                                                  Wrap(
+                                                    spacing: 8,
+                                                    runSpacing: 8,
+                                                    children: escapeOptions.map((opt) {
+                                                      final isActiveTier = _headcount >= opt.minPeople && _headcount <= opt.maxPeople;
+                                                      return Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                        decoration: BoxDecoration(
+                                                          color: isActiveTier
+                                                              ? (isDark ? kGreen.withValues(alpha: 0.22) : const Color(0xFFDCFCE7))
+                                                              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                                                          borderRadius: BorderRadius.circular(10),
+                                                          border: Border.all(
+                                                            color: isActiveTier
+                                                                ? kGreen
+                                                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                                            width: isActiveTier ? 1.5 : 1,
+                                                          ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            if (isActiveTier) ...[
+                                                              const Icon(Icons.check_circle_rounded, color: kGreen, size: 14),
+                                                              const SizedBox(width: 5),
+                                                            ],
+                                                            Text(
+                                                              '${localized(widget.arabic, opt.labelEn, opt.labelAr)}: ${formatMoney(opt.pricePerPerson)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight: isActiveTier ? FontWeight.w800 : FontWeight.w600,
+                                                                color: isActiveTier
+                                                                    ? (isDark ? kGreenLight : kGreenDark)
+                                                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    }).toList(),
+                                                  ),
+                                                ],
+                                                const SizedBox(height: 14),
+                                                // Live Price Breakdown Box
+                                                Container(
+                                                  padding: const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    border: Border.all(
+                                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                                                     ),
-                                                  ],
+                                                  ),
+                                                  child: Column(
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            localized(widget.arabic, 'Rate per Player:', 'سعر الفرد:'),
+                                                            style: TextStyle(
+                                                              fontSize: 12.5,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '${formatMoney(perPersonRate)} ${localized(widget.arabic, 'EGP / player', 'جنيه / فرد')}',
+                                                            style: const TextStyle(
+                                                              fontSize: 14.5,
+                                                              fontWeight: FontWeight.w900,
+                                                              color: kGreen,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 5),
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            localized(widget.arabic, 'Total for $_headcount players:', 'إجمالي $_headcount أفراد:'),
+                                                            style: TextStyle(
+                                                              fontSize: 12.5,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '${formatMoney(total)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                            style: TextStyle(
+                                                              fontSize: 15,
+                                                              fontWeight: FontWeight.w900,
+                                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 5),
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            localized(widget.arabic, 'Deposit Due Now (${venue.depositPercent}%):', 'العربون المطلوب الآن (${venue.depositPercent}%):'),
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.w600,
+                                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '${formatMoney(deposit)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                            style: const TextStyle(
+                                                              fontSize: 13,
+                                                              fontWeight: FontWeight.w800,
+                                                              color: Color(0xFF2563EB),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 14),
+                                                // Confirm Group Size Button
+                                                FilledButton.icon(
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _escapeGroupConfirmed = true;
+                                                    });
+                                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                      if (!mounted) return;
+                                                      _scrollToKey(_timeStepKey);
+                                                    });
+                                                  },
+                                                  icon: const Icon(Icons.check_rounded, size: 18),
+                                                  label: Text(
+                                                    localized(
+                                                      widget.arabic,
+                                                      'Confirm Group Size ($_headcount Players) · Total: ${formatMoney(total)} EGP',
+                                                      'تأكيد عدد الأفراد ($_headcount أفراد) · الإجمالي: ${formatMoney(total)} ج.م',
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                  style: FilledButton.styleFrom(
+                                                    backgroundColor: kGreen,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(14),
+                                                    ),
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -3033,7 +3303,7 @@ class _BookTabState extends State<BookTab> {
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeOutCubic,
                               alignment: Alignment.topCenter,
-                              child: (item != null && (!venue.subCategories.contains('escape_rooms') || _escapeTierIndex != null))
+                              child: (item != null && ((!venue.subCategories.contains('escape_rooms') && !venue.name.toLowerCase().contains('escape')) || _escapeGroupConfirmed))
                                   ? Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
