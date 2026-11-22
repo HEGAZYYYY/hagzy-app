@@ -963,17 +963,23 @@ class _BookTabState extends State<BookTab> {
   }
 
   List<Venue> _getMatchingVenues() {
-    final list = _venuesInSelectedArea().where((venue) {
+    final pool = _query.trim().isNotEmpty
+        ? upsertNaderSalon(widget.venues).where(_isPublicCatalogVenue)
+        : _venuesInSelectedArea();
+    final list = pool.where((venue) {
       final matchesCategory = _type == null || venue.type == _type;
       final matchesSubCategory = _subCategory == null ||
           venue.effectiveSubCategories.contains(_subCategory);
-      final matchesSearch =
-          '${venue.name} ${venue.location} ${venue.description} ${venue.effectiveSubCategories.join(' ')}'
+      final itemsText = venue.items
+          .map((i) => '${i.name} ${i.kind} ${i.description}')
+          .join(' ');
+      final matchesSearch = _query.isEmpty ||
+          '${venue.name} ${venue.location} ${venue.description} ${venue.effectiveSubCategories.join(' ')} $itemsText'
               .toLowerCase()
               .contains(_query.toLowerCase());
       final matchesFavorite =
           !_favoritesOnly || _favoriteIds.contains(venue.id);
-      final matchesArea = _locationMatchesArea(venue.location);
+      final matchesArea = _query.trim().isNotEmpty || _locationMatchesArea(venue.location);
       final matchesOpenNow = !_openNowOnly || _isVenueOpenNow(venue);
       return matchesCategory &&
           matchesSubCategory &&

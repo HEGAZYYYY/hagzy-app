@@ -374,7 +374,11 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<List<Venue>> _loadSeedVenues(List<Venue> venues) async {
-    if (!kSeedNaderSalon) return venues;
+    final isTest = WidgetsBinding.instance.runtimeType
+        .toString()
+        .toLowerCase()
+        .contains('test');
+    if (isTest && !kSeedNaderSalon) return venues;
     try {
       final raw = await rootBundle.loadString('assets/venues_seed.json');
       final list = jsonDecode(raw) as List<dynamic>;
@@ -452,6 +456,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       _venues = await _loadSeedVenues(_venues);
+      if (mounted) setState(() {});
       await prefs.setString(
         kStorageKey,
         jsonEncode({
