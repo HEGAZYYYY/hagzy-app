@@ -1964,6 +1964,7 @@ class _HagzyHomeState extends State<HagzyHome> {
     required VenueItem item,
     bool walkIn = false,
     DateTime? initialStart,
+    int? initialHeadcount,
   }) async {
     final arabic = _language == 'AR';
     final isTest = WidgetsBinding.instance.runtimeType
@@ -2048,6 +2049,12 @@ class _HagzyHomeState extends State<HagzyHome> {
     var useWallet = false;
     var walletDeducted = 0.0;
     var reminderOffsetMinutes = 120;
+    final isPerPerson = item.pricingMode == 'per_person_tiered' ||
+        (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ||
+        venue.subCategories.contains('escape_rooms');
+    final minCap = item.minCapacity ?? (isPerPerson ? 2 : 1);
+    final maxCap = item.maxCapacity ?? (isPerPerson ? 15 : 20);
+    var headcount = (initialHeadcount ?? minCap).clamp(minCap, maxCap);
     double walletBalance = 0.0;
     try {
       walletBalance = await HagzyWallet.getBalance();
@@ -2074,6 +2081,10 @@ class _HagzyHomeState extends State<HagzyHome> {
         return venue.services
             .where((service) => selectedServices.contains(service.id))
             .fold(0, (sum, service) => sum + service.price);
+      }
+      if (isPerPerson) {
+        final rate = item.priceForHeadcount(headcount);
+        return rate * headcount;
       }
       final rate =
           multi && item.multiRate > 0 ? item.multiRate : item.hourlyRate;
@@ -2434,7 +2445,91 @@ class _HagzyHomeState extends State<HagzyHome> {
                         onChanged: (value) =>
                             setDialogState(() => multi = value),
                       ),
-                    if (venue.type == VenueType.sports) ...[
+                    if (isPerPerson) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: kPage,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  localized(arabic, 'Number of Players (Shilla)', 'عدد أفراد الشلة / اللاعبين'),
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kInk),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: kGreen.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${item.priceForHeadcount(headcount).toStringAsFixed(0)} ${localized(arabic, "EGP/person", "ج.م / فرد")}',
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kGreen),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                IconButton.filledTonal(
+                                  onPressed: headcount > minCap
+                                      ? () => setDialogState(() => headcount--)
+                                      : null,
+                                  icon: const Icon(Icons.remove, size: 18),
+                                ),
+                                const SizedBox(width: 14),
+                                Text(
+                                  '$headcount ${localized(arabic, "Players", "أفراد")}',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kInk),
+                                ),
+                                const SizedBox(width: 14),
+                                IconButton.filledTonal(
+                                  onPressed: headcount < maxCap
+                                      ? () => setDialogState(() => headcount++)
+                                      : null,
+                                  icon: const Icon(Icons.add, size: 18),
+                                ),
+                              ],
+                            ),
+                            if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: item.pricingTiers!.entries.map((e) {
+                                  final cap = int.tryParse(e.key) ?? 1;
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: headcount <= cap ? kGreen.withValues(alpha: 0.14) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: headcount <= cap ? kGreen : kBorder),
+                                    ),
+                                    child: Text(
+                                      '≤$cap ${localized(arabic, "p", "فرد")}: ${e.value} ${localized(arabic, "EGP", "ج.م")}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: headcount <= cap ? FontWeight.w800 : FontWeight.w600,
+                                        color: headcount <= cap ? kGreen : kMuted,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ] else if (venue.type == VenueType.sports) ...[
                       const SizedBox(height: 14),
                       Text(
                         localized(arabic, 'Split Pitch Payment',
@@ -2991,7 +3086,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               selectedServices.contains(service.id))
                           .map((service) => service.name)
                           .toList(),
-                      splitCount: split,
+                      splitCount: isPerPerson ? headcount : split,
                       multiController: multi,
                       phone: phone.trim(),
                       email: walkIn ? '' : _savedCustomerEmail.trim(),
@@ -6084,11 +6179,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             arabic: arabic,
                                             initialVenueId: _targetVenueId,
                                             currentArea: _currentArea,
-                                            onBook: (venue, item, startsAt) =>
+                                            onBook: (venue, item, startsAt, [h]) =>
                                                 _createBooking(
                                               venue: venue,
                                               item: item,
                                               initialStart: startsAt,
+                                              initialHeadcount: h,
                                             ),
                                             onAddReview: _addReview,
                                             onAreaChanged: (area) {
@@ -6174,11 +6270,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                 bookings: _bookings,
                                                 arabic: arabic,
                                                 initialVenueId: _targetVenueId,
-                                                onBook: (venue, item, startsAt) =>
+                                                onBook: (venue, item, startsAt, [h]) =>
                                                     _createBooking(
                                                   venue: venue,
                                                   item: item,
                                                   initialStart: startsAt,
+                                                  initialHeadcount: h,
                                                 ),
                                                 onAddVenue: (type) => _addVenue(
                                                   initialType:

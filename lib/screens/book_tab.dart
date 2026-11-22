@@ -27,7 +27,7 @@ class BookTab extends StatefulWidget {
   final List<Venue> venues;
   final List<Booking> bookings;
   final bool arabic;
-  final void Function(Venue venue, VenueItem item, DateTime startsAt) onBook;
+  final Function onBook;
   final String? initialVenueId;
   final String? currentArea;
   final ValueChanged<VenueType?>? onAddVenue;
@@ -68,6 +68,7 @@ class _BookTabState extends State<BookTab> {
 
   DateTime _date = _defaultBookingDate();
   DateTime? _selectedStart;
+  int _headcount = 2;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _bookingSectionKey = GlobalKey();
@@ -223,9 +224,11 @@ class _BookTabState extends State<BookTab> {
       keepStart = _timesFor(venue, nextItem, estMin)
           .any((s) => s.start == prevStart && s.available);
     }
+    final minCap = nextItem?.minCapacity ?? 2;
     setState(() {
       _itemId = itemId;
       _selectedStart = keepStart ? prevStart : null;
+      _headcount = minCap;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -2544,7 +2547,8 @@ class _BookTabState extends State<BookTab> {
                                                                       widget.onBook(
                                                                           venue,
                                                                           item,
-                                                                          _selectedStart!),
+                                                                          _selectedStart!,
+                                                                          _headcount),
                                                                   child: Text(
                                                                     localized(
                                                                         widget
@@ -2612,10 +2616,12 @@ class _BookTabState extends State<BookTab> {
                                             arabic: widget.arabic,
                                             estimatedMinutes: estimatedMinutes,
                                             selectedStart: _selectedStart,
+                                            headcount: _headcount,
+                                            onHeadcountChanged: (h) => setState(() => _headcount = h),
                                             onReserve: _selectedStart == null
                                                 ? null
                                                 : () => widget.onBook(venue,
-                                                    item, _selectedStart!),
+                                                    item, _selectedStart!, _headcount),
                                           ),
                                         ),
                                       ],
@@ -2956,6 +2962,8 @@ class ReservationQuote extends StatelessWidget {
     required this.arabic,
     required this.selectedStart,
     required this.onReserve,
+    this.headcount = 2,
+    this.onHeadcountChanged,
   });
 
   final Venue venue;
@@ -2964,15 +2972,21 @@ class ReservationQuote extends StatelessWidget {
   final bool arabic;
   final DateTime? selectedStart;
   final VoidCallback? onReserve;
+  final int headcount;
+  final ValueChanged<int>? onHeadcountChanged;
 
   @override
   Widget build(BuildContext context) {
+    final isPerPerson = item.pricingMode == 'per_person_tiered' ||
+        (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) ||
+        venue.subCategories.contains('escape_rooms');
+    final perPersonRate = item.priceForHeadcount(headcount);
     final total = venue.type == VenueType.salon
         ? (item.hourlyRate > 0
             ? item.hourlyRate
             : (venue.services.isNotEmpty ? venue.services.first.price : 0.0))
-        : (venue.subCategories.contains('escape_rooms')
-            ? item.hourlyRate
+        : (isPerPerson
+            ? perPersonRate * headcount
             : item.hourlyRate * estimatedMinutes / 60);
     final rawDeposit = total * venue.depositPercent / 100;
     final deposit = rawDeposit > 0 && rawDeposit < 5.0 ? 5.0 : rawDeposit;
@@ -3056,6 +3070,74 @@ class ReservationQuote extends StatelessWidget {
                   )
                 : const SizedBox.shrink(),
           ),
+          if (isPerPerson) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: kGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kGreen.withValues(alpha: 0.22)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localized(arabic, 'Number of Players (Shilla)', 'عدد أفراد الشلة / اللاعبين'),
+                          style: TextStyle(
+                            color: kInk,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${formatMoney(perPersonRate)} ${localized(arabic, 'EGP / player', 'جنيه / فرد')}',
+                          style: const TextStyle(
+                            color: kGreen,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton.filledTonal(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: headcount > (item.minCapacity ?? 1)
+                            ? () => onHeadcountChanged?.call(headcount - 1)
+                            : null,
+                        icon: const Icon(Icons.remove, size: 16),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          '$headcount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: kInk,
+                          ),
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: headcount < (item.maxCapacity ?? 20)
+                            ? () => onHeadcountChanged?.call(headcount + 1)
+                            : null,
+                        icon: const Icon(Icons.add, size: 16),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
           Row(
             children: [
               Expanded(

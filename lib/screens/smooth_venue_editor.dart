@@ -1143,9 +1143,19 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     final kindCtrl = TextEditingController(text: isSalon ? 'Standard Station' : (isEscape ? 'Escape Room' : 'Standard'));
     final rateCtrl = TextEditingController(text: isSalon ? '150' : (isEscape ? '150' : '350'));
     final peakCtrl = TextEditingController(text: isSalon ? '150' : (isEscape ? '150' : '450'));
+    final minCapCtrl = TextEditingController(text: isEscape ? '2' : '1');
+    final maxCapCtrl = TextEditingController(text: isEscape ? '15' : '10');
     final descCtrl = TextEditingController();
     final imageCtrl = TextEditingController();
     bool enablePeakPricing = false;
+    bool isTiered = isEscape;
+    final editableTiers = <MapEntry<TextEditingController, TextEditingController>>[
+      if (isEscape) ...[
+        MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
+        MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
+        MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
+      ],
+    ];
 
     showDialog(
       context: context,
@@ -1306,6 +1316,131 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     Row(
                       children: [
                         Expanded(
+                          child: TextFormField(
+                            controller: minCapCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'أقل عدد أفراد (Min)' : 'Min Players',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: maxCapCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'أقصى عدد أفراد (Max)' : 'Max Players',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        isAr ? 'أسعار متدرجة حسب عدد الأفراد (Tiered Group Pricing)' : 'Tiered Pricing by Group Size',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
+                      ),
+                      subtitle: Text(
+                        isAr ? 'يقل سعر الفرد مع زيادة حجم المجموعة (مناسب للغرف واللاونج)' : 'Per-person rate drops as headcount increases',
+                        style: TextStyle(fontSize: 11.5, color: mutedColor),
+                      ),
+                      value: isTiered,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          isTiered = val ?? false;
+                          if (isTiered && editableTiers.isEmpty) {
+                            editableTiers.addAll([
+                              MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
+                              MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
+                              MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
+                            ]);
+                          }
+                        });
+                      },
+                    ),
+                    if (isTiered) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: surfaceBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              isAr ? 'شرائح الأسعار (حسب حجم المجموعة):' : 'Group Pricing Tiers Ladder:',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                            const SizedBox(height: 8),
+                            for (int ti = 0; ti < editableTiers.length; ti++) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: TextFormField(
+                                      controller: editableTiers[ti].key,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: isAr ? 'حتى عدد' : 'Up to people',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 4,
+                                    child: TextFormField(
+                                      controller: editableTiers[ti].value,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: isAr ? 'سعر الفرد (جنيه)' : 'EGP / person',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                                    onPressed: () {
+                                      setDialogState(() => editableTiers.removeAt(ti));
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            Align(
+                              alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    final nextCap = (editableTiers.length + 1) * 3;
+                                    editableTiers.add(MapEntry(
+                                      TextEditingController(text: nextCap.toString()),
+                                      TextEditingController(text: '100'),
+                                    ));
+                                  });
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                label: Text(isAr ? '+ إضافة شريحة سعر جديدة' : '+ Add Pricing Tier'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
                           child: FilledButton.tonalIcon(
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -1385,15 +1520,33 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   final r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
                   final p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
 
+                  Map<String, dynamic>? resolvedTiers;
+                  if (isTiered && editableTiers.isNotEmpty) {
+                    resolvedTiers = {};
+                    for (final t in editableTiers) {
+                      final cap = t.key.text.trim();
+                      final price = double.tryParse(t.value.text.trim()) ?? 0.0;
+                      if (cap.isNotEmpty && price > 0) {
+                        resolvedTiers[cap] = price;
+                      }
+                    }
+                  }
+                  final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isTiered ? 2 : 1);
+                  final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isTiered ? 15 : 10);
+
                   setState(() {
                     _items.add(_EditableItem(
                       id: 'unit_${DateTime.now().microsecondsSinceEpoch}',
                       name: n,
-                      kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : 'Standard',
+                      kind: kindCtrl.text.trim().isNotEmpty ? kindCtrl.text.trim() : (isEscape ? 'Escape Room' : 'Standard'),
                       hourlyRate: r,
                       peakRate: p,
                       description: descCtrl.text.trim(),
                       imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
+                      pricingMode: isTiered ? 'per_person_tiered' : null,
+                      pricingTiers: resolvedTiers,
+                      minCapacity: minCap,
+                      maxCapacity: maxCap,
                     ));
                   });
                   Navigator.pop(ctx);
@@ -1411,14 +1564,26 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
   void _showEditItemDialog(_EditableItem item, int idx, bool isAr) {
     final nameCtrl = TextEditingController(text: item.name);
     final kindCtrl = TextEditingController(text: item.kind);
-    final rateCtrl = TextEditingController(text: item.hourlyRate.toStringAsFixed(0));
-    final peakCtrl = TextEditingController(text: item.peakRate.toStringAsFixed(0));
-    final descCtrl = TextEditingController(text: item.description);
-    final imageCtrl = TextEditingController(text: item.imageUrl ?? '');
     final isSalon = _selectedType == VenueType.salon;
     final isEscape = isEscapeRoom;
+    final rateCtrl = TextEditingController(text: item.hourlyRate.toStringAsFixed(0));
+    final peakCtrl = TextEditingController(text: item.peakRate.toStringAsFixed(0));
+    final minCapCtrl = TextEditingController(text: item.minCapacity != null ? item.minCapacity.toString() : (isEscape ? '2' : '1'));
+    final maxCapCtrl = TextEditingController(text: item.maxCapacity != null ? item.maxCapacity.toString() : (isEscape ? '15' : '10'));
+    final descCtrl = TextEditingController(text: item.description);
+    final imageCtrl = TextEditingController(text: item.imageUrl ?? '');
     final bool initialHasPeak = item.peakRate > 0 && item.peakRate != item.hourlyRate;
     bool enablePeakPricing = initialHasPeak;
+    final editableTiers = <MapEntry<TextEditingController, TextEditingController>>[];
+    if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) {
+      for (final entry in item.pricingTiers!.entries) {
+        editableTiers.add(MapEntry(
+          TextEditingController(text: entry.key),
+          TextEditingController(text: (entry.value as num).toStringAsFixed(0)),
+        ));
+      }
+    }
+    bool isTiered = item.pricingMode == 'per_person_tiered' || editableTiers.isNotEmpty;
 
     showDialog(
       context: context,
@@ -1602,6 +1767,131 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     Row(
                       children: [
                         Expanded(
+                          child: TextFormField(
+                            controller: minCapCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'أقل عدد أفراد (Min)' : 'Min Players',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: maxCapCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'أقصى عدد أفراد (Max)' : 'Max Players',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        isAr ? 'أسعار متدرجة حسب عدد الأفراد (Tiered Group Pricing)' : 'Tiered Pricing by Group Size',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
+                      ),
+                      subtitle: Text(
+                        isAr ? 'يقل سعر الفرد مع زيادة حجم المجموعة (مناسب للغرف واللاونج)' : 'Per-person rate drops as headcount increases',
+                        style: TextStyle(fontSize: 11.5, color: mutedColor),
+                      ),
+                      value: isTiered,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          isTiered = val ?? false;
+                          if (isTiered && editableTiers.isEmpty) {
+                            editableTiers.addAll([
+                              MapEntry(TextEditingController(text: '3'), TextEditingController(text: '150')),
+                              MapEntry(TextEditingController(text: '5'), TextEditingController(text: '120')),
+                              MapEntry(TextEditingController(text: '15'), TextEditingController(text: '100')),
+                            ]);
+                          }
+                        });
+                      },
+                    ),
+                    if (isTiered) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: surfaceBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              isAr ? 'شرائح الأسعار (حسب حجم المجموعة):' : 'Group Pricing Tiers Ladder:',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                            const SizedBox(height: 8),
+                            for (int ti = 0; ti < editableTiers.length; ti++) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: TextFormField(
+                                      controller: editableTiers[ti].key,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: isAr ? 'حتى عدد' : 'Up to people',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 4,
+                                    child: TextFormField(
+                                      controller: editableTiers[ti].value,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: isAr ? 'سعر الفرد (جنيه)' : 'EGP / person',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                                    onPressed: () {
+                                      setDialogState(() => editableTiers.removeAt(ti));
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            Align(
+                              alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    final nextCap = (editableTiers.length + 1) * 3;
+                                    editableTiers.add(MapEntry(
+                                      TextEditingController(text: nextCap.toString()),
+                                      TextEditingController(text: '100'),
+                                    ));
+                                  });
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                label: Text(isAr ? '+ إضافة شريحة سعر جديدة' : '+ Add Pricing Tier'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
                           child: FilledButton.tonalIcon(
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -1681,6 +1971,20 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                   final r = double.tryParse(rateCtrl.text.trim()) ?? item.hourlyRate;
                   final p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
 
+                  Map<String, dynamic>? resolvedTiers;
+                  if (isTiered && editableTiers.isNotEmpty) {
+                    resolvedTiers = {};
+                    for (final t in editableTiers) {
+                      final cap = t.key.text.trim();
+                      final price = double.tryParse(t.value.text.trim()) ?? 0.0;
+                      if (cap.isNotEmpty && price > 0) {
+                        resolvedTiers[cap] = price;
+                      }
+                    }
+                  }
+                  final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isTiered ? 2 : 1);
+                  final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isTiered ? 15 : 10);
+
                   setState(() {
                     _items[idx] = _EditableItem(
                       id: item.id,
@@ -1690,10 +1994,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       peakRate: p,
                       description: descCtrl.text.trim(),
                       imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
-                      pricingMode: item.pricingMode,
-                      pricingTiers: item.pricingTiers,
-                      minCapacity: item.minCapacity,
-                      maxCapacity: item.maxCapacity,
+                      pricingMode: isTiered ? 'per_person_tiered' : null,
+                      pricingTiers: resolvedTiers,
+                      minCapacity: minCap,
+                      maxCapacity: maxCap,
                     );
                   });
                   Navigator.pop(ctx);

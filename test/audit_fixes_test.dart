@@ -50,7 +50,7 @@ void main() {
             venues: [testVenue, demoLab, salon, cairoClub],
             bookings: const [],
             arabic: false,
-            onBook: (_, __, ___) async {},
+            onBook: (_, __, ___, [____]) async {},
           ),
         ),
       ),
