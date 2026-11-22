@@ -221,7 +221,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               'Profile updated successfully!',
               'تم تحديث البيانات بنجاح!',
             )),
-            backgroundColor: kInk,
+            backgroundColor: kSnackBarBg,
             behavior: SnackBarBehavior.floating,
           ),
         );

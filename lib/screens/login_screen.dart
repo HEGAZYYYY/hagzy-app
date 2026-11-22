@@ -203,7 +203,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
-            backgroundColor: kInk,
+            backgroundColor: kSnackBarBg,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -352,7 +352,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               'Account verified and signed in successfully! Welcome to Hagzy.',
               'تم التحقق من الحساب وتسجيل الدخول بنجاح! مرحباً بك في حجزي.',
             )),
-            backgroundColor: kInk,
+            backgroundColor: kSnackBarBg,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -380,7 +380,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                   'Redirecting to Google Sign-In...',
                   'جاري الانتقال لتسجيل الدخول بجوجل...',
                 )),
-                backgroundColor: kInk,
+                backgroundColor: kSnackBarBg,
                 duration: const Duration(seconds: 4),
               ),
             );
@@ -455,7 +455,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 'Signed in with Google successfully!',
                 'تم تسجيل الدخول بجوجل بنجاح!',
               )),
-              backgroundColor: kInk,
+              backgroundColor: kSnackBarBg,
             ),
           );
         }
@@ -477,7 +477,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                   'Redirecting to Apple Sign-In...',
                   'جاري الانتقال لتسجيل الدخول بحساب أبل...',
                 )),
-                backgroundColor: kInk,
+                backgroundColor: kSnackBarBg,
                 duration: const Duration(seconds: 4),
               ),
             );
@@ -552,7 +552,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 'Signed in with Apple successfully!',
                 'تم تسجيل الدخول بحساب أبل بنجاح!',
               )),
-              backgroundColor: kInk,
+              backgroundColor: kSnackBarBg,
             ),
           );
         }

@@ -9,6 +9,7 @@ import 'google_fonts_stub.dart' if (dart.library.html) 'google_fonts_web.dart';
 // ---------------------------------------------------------------------------
 
 Color get kInk => kDarkMode.value ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+Color get kSnackBarBg => kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFF0F172A);
 const kDark = Color(0xFF064E3B);
 
 const kGreen = Color(0xFF059669);
@@ -318,6 +319,7 @@ class HagzyTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         contentTextStyle: const TextStyle(
             color: Colors.white, fontWeight: FontWeight.w600, height: 1.35),

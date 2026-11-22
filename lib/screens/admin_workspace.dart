@@ -1518,55 +1518,78 @@ class _PosTabState extends State<PosTab> {
         ),
         if (unreadNotifs.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Card(
-            color: const Color(0xFFF0FDF4),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+          Builder(
+            builder: (context) {
+              final isDark =
+                  Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+              return Card(
+                color: isDark ? const Color(0xFF132A22) : const Color(0xFFF0FDF4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF1F352D) : const Color(0xFFBBF7D0),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.notifications_active_rounded,
-                          color: kGreen, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        _t('New Booking Alerts (${unreadNotifs.length})', 'تنبيهات حجوزات جديدة (${unreadNotifs.length})'),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, color: kGreenDark),
+                      Row(
+                        children: [
+                          const Icon(Icons.notifications_active_rounded,
+                              color: kGreen, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            _t('New Booking Alerts (${unreadNotifs.length})', 'تنبيهات حجوزات جديدة (${unreadNotifs.length})'),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? kGreenLight : kGreenDark,
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 8),
+                      ...unreadNotifs.take(4).map((n) {
+                        final nId = (n['id'] ?? '').toString();
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            (n['title'] ?? 'New Alert').toString(),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          subtitle: Text(
+                            (n['body'] ?? '').toString(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF334155),
+                            ),
+                          ),
+                          trailing: widget.onMarkNotificationRead != null &&
+                                  nId.isNotEmpty
+                              ? TextButton(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: isDark ? kGreenLight : kGreenDark,
+                                  ),
+                                  onPressed: () =>
+                                      widget.onMarkNotificationRead!(nId),
+                                  child: Text(_t('Dismiss', 'تخطي')),
+                                )
+                              : null,
+                        );
+                      }),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  ...unreadNotifs.take(4).map((n) {
-                    final nId = (n['id'] ?? '').toString();
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        (n['title'] ?? 'New Alert').toString(),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
-                      subtitle: Text(
-                        (n['body'] ?? '').toString(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5),
-                      ),
-                      trailing: widget.onMarkNotificationRead != null &&
-                              nId.isNotEmpty
-                          ? TextButton(
-                              onPressed: () =>
-                                  widget.onMarkNotificationRead!(nId),
-                              child: Text(_t('Dismiss', 'تخطي')),
-                            )
-                          : null,
-                    );
-                  }),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ],
         const SizedBox(height: 14),
@@ -1889,7 +1912,7 @@ class AnalyticsTab extends StatelessWidget {
             onUpgradePro: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  backgroundColor: kInk,
+                  backgroundColor: kSnackBarBg,
                   content: const Text(
                       'Automated deposit protection is enabled on paid slots.'),
                 ),

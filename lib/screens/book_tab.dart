@@ -319,7 +319,7 @@ class _BookTabState extends State<BookTab> {
           SnackBar(
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
-            backgroundColor: kInk,
+            backgroundColor: kSnackBarBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
               side: BorderSide(color: kBorder),
@@ -510,7 +510,7 @@ class _BookTabState extends State<BookTab> {
                 ),
               ],
             ),
-            backgroundColor: kInk,
+            backgroundColor: kSnackBarBg,
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(

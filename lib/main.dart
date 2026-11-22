@@ -1656,16 +1656,25 @@ class _HagzyHomeState extends State<HagzyHome> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
+    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     messenger.showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: isDark ? const Color(0xFF2E4D41) : const Color(0xFF334155),
+            width: 1,
+          ),
+        ),
         content: Text(
           text,
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
-        backgroundColor: error ? Colors.red.shade700 : kInk,
+        backgroundColor: error
+            ? Colors.red.shade700
+            : (isDark ? const Color(0xFF1F352D) : const Color(0xFF0F172A)),
       ),
     );
   }
