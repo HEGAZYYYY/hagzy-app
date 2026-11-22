@@ -21,6 +21,7 @@ class BookTab extends StatefulWidget {
     this.onAddVenue,
     this.onAddReview,
     this.onAreaChanged,
+    this.onRefresh,
   });
 
   final List<Venue> venues;
@@ -36,6 +37,9 @@ class BookTab extends StatefulWidget {
   /// Notifies the app shell when the customer's area changes so other tabs
   /// (e.g. Profile) show the same governorate.
   final ValueChanged<String>? onAreaChanged;
+
+  /// Pull-to-refresh callback for syncing venues and bookings from the network.
+  final Future<void> Function()? onRefresh;
 
   @override
   State<BookTab> createState() => _BookTabState();
@@ -1014,10 +1018,11 @@ class _BookTabState extends State<BookTab> {
             ? 30
             : venue.services.first.minutes
         : 60;
-    return ListView(
+    final feed = ListView(
       // ignore: deprecated_member_use
       cacheExtent: 3000,
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
       children: [
         CustomerAreaBar(
@@ -1563,6 +1568,13 @@ class _BookTabState extends State<BookTab> {
         ],
       ],
     );
+    if (widget.onRefresh != null) {
+      return RefreshIndicator(
+        onRefresh: widget.onRefresh!,
+        child: feed,
+      );
+    }
+    return feed;
   }
 
   Widget _buildActiveCategoryFilterBanner() {

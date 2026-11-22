@@ -91,21 +91,35 @@ String findNearestGovernorate(double userLat, double userLng) {
   return nearest;
 }
 
+/// Determines whether an error was caused by a network disconnection or unreachable host.
+bool isNetworkError(Object error) {
+  final lower = error.toString().toLowerCase();
+  return lower.contains('socketexception') ||
+      lower.contains('clientexception') ||
+      lower.contains('failed host lookup') ||
+      lower.contains('xmlhttprequest') ||
+      lower.contains('connection refused') ||
+      lower.contains('network is unreachable') ||
+      lower.contains('handshakeexception') ||
+      lower.contains('connection timed out') ||
+      lower.contains('connection reset') ||
+      lower.contains('network error') ||
+      lower.contains('failed to fetch') ||
+      lower.contains('no address associated with hostname') ||
+      lower.contains('software caused connection abort') ||
+      lower.contains('timeoutexception');
+}
+
 /// Turns an exception into a message a customer can act on, instead of
 /// showing raw text like "Exception: SocketException: Failed host lookup".
 String friendlyError(Object error, {required bool arabic}) {
   final raw = error.toString();
   final lower = raw.toLowerCase();
-  if (lower.contains('socketexception') ||
-      lower.contains('clientexception') ||
-      lower.contains('failed host lookup') ||
-      lower.contains('xmlhttprequest') ||
-      lower.contains('connection refused') ||
-      lower.contains('network is unreachable')) {
+  if (isNetworkError(error)) {
     return localized(
         arabic,
-        'No internet connection. Check your network and try again.',
-        'لا يوجد اتصال بالإنترنت. تحقق من الشبكة وحاول مرة أخرى.');
+        'No internet connection. Please check your Wi-Fi or mobile data.',
+        'لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصال الواي فاي أو بيانات الهاتف.');
   }
   if (lower.contains('timeoutexception')) {
     return localized(arabic, 'The request timed out. Please try again.',

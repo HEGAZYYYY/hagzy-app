@@ -1267,9 +1267,14 @@ function escapeForInlineScript(json) {
 // Verifies an Apple identity token (RS256) against Apple's published keys.
 let appleKeysCache = { keys: null, fetchedAt: 0 };
 async function verifyAppleIdentityToken(identityToken) {
-  const audience = process.env.APPLE_CLIENT_ID;
-  if (IS_PROD && !audience) {
-    throw new Error('APPLE_CLIENT_ID is not configured on production server');
+  const allowedAudiences = [
+    process.env.APPLE_CLIENT_ID,
+    process.env.APPLE_BUNDLE_ID,
+    'com.hagzy.app',
+    'com.hagzy.app.service'
+  ].filter(Boolean);
+  if (IS_PROD && allowedAudiences.length === 0) {
+    throw new Error('APPLE_CLIENT_ID or APPLE_BUNDLE_ID is not configured on production server');
   }
   const [h, p, sig] = String(identityToken).split('.');
   if (!h || !p || !sig) throw new Error('Malformed identity token');
@@ -1287,7 +1292,7 @@ async function verifyAppleIdentityToken(identityToken) {
   if (!ok) throw new Error('Bad signature');
   const claims = JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
   if (claims.iss !== 'https://appleid.apple.com') throw new Error('Bad issuer');
-  if (audience && claims.aud !== audience) throw new Error('Bad audience');
+  if (allowedAudiences.length > 0 && !allowedAudiences.includes(claims.aud)) throw new Error('Bad audience');
   if (!claims.exp || claims.exp * 1000 < Date.now()) throw new Error('Token expired');
   return claims;
 }

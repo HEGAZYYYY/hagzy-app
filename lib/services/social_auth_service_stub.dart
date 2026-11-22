@@ -81,6 +81,12 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
       'token': idToken ?? '',
       'providerId': credential.userIdentifier ?? '',
     };
+  } on SignInWithAppleAuthorizationException catch (e) {
+    if (e.code == AuthorizationErrorCode.canceled) {
+      return null;
+    }
+    debugPrint('Apple Sign-In authorization error: ${e.message} (code: ${e.code})');
+    return {'error': e.message};
   } catch (e) {
     debugPrint('Apple Sign-In native error: $e');
     return {'error': e.toString()};

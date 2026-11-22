@@ -82,10 +82,12 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 
   void _startLiveRefreshTimer() {
     _liveRefreshTimer?.cancel();
-    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (!mounted) return;
-      final hasPending =
-          widget.bookings.any((b) => !b.cancelled && !b.isConfirmed);
+      final hasPending = widget.bookings.any((b) =>
+          !b.cancelled &&
+          !b.isConfirmed &&
+          b.status == 'pending_payment');
       if (hasPending) {
         widget.onRefresh?.call();
       }
@@ -418,9 +420,12 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     if (active.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      return RefreshIndicator(
+        onRefresh: widget.onRefresh ?? () async {},
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           IntroCard(
             title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
             subtitle: localized(
@@ -521,11 +526,15 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             ],
           ],
         ],
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-      children: [
+      ),
+    );
+  }
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh ?? () async {},
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        children: [
         IntroCard(
           title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
           subtitle: localized(arabic, 'Keep track of upcoming reservations.',
@@ -1061,8 +1070,9 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       );
     }),
       ],
-    );
-  }
+    ),
+  );
+}
 
   String _reminderLabel(int mins, bool arabic) {
     if (mins <= 0) return localized(arabic, 'Reminder Off', 'التذكير متوقف');

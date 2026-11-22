@@ -997,18 +997,34 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                _SocialSignInButton(
-                                  provider: 'google',
-                                  arabic: arabic,
-                                  onTap: _signInWithGoogle,
-                                ),
                                 if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
-                                  const SizedBox(height: 10),
                                   _SocialSignInButton(
                                     provider: 'apple',
                                     arabic: arabic,
                                     onTap: _signInWithApple,
                                   ),
+                                  const SizedBox(height: 10),
+                                  _SocialSignInButton(
+                                    provider: 'google',
+                                    arabic: arabic,
+                                    onTap: _signInWithGoogle,
+                                  ),
+                                ] else ...[
+                                  _SocialSignInButton(
+                                    provider: 'google',
+                                    arabic: arabic,
+                                    onTap: _signInWithGoogle,
+                                  ),
+                                  if (kIsWeb &&
+                                      (defaultTargetPlatform == TargetPlatform.iOS ||
+                                          defaultTargetPlatform == TargetPlatform.macOS)) ...[
+                                    const SizedBox(height: 10),
+                                    _SocialSignInButton(
+                                      provider: 'apple',
+                                      arabic: arabic,
+                                      onTap: _signInWithApple,
+                                    ),
+                                  ],
                                 ],
                                 const SizedBox(height: 16),
                                 Row(
@@ -1347,8 +1363,8 @@ class _SocialSignInButton extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               isApple
-                  ? localized(arabic, 'Continue with Apple',
-                      'المتابعة باستخدام Apple')
+                  ? localized(arabic, 'Sign in with Apple',
+                      'تسجيل الدخول باستخدام Apple')
                   : localized(arabic, 'Continue with Google',
                       'المتابعة باستخدام Google'),
               style: TextStyle(

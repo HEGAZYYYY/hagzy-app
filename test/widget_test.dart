@@ -240,6 +240,7 @@ void main() {
     await tester.ensureVisible(find.textContaining('Pay Deposit'));
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.textContaining('Pay Deposit'));
     await tester.tap(find.textContaining('Pay Deposit'));
     await tester.pumpAndSettle();
     expect(find.text('Secure Your Time'), findsOneWidget);
@@ -583,6 +584,7 @@ void main() {
     await tester.tap(find.text('My Bookings'));
     await tester.pumpAndSettle();
     expect(find.text('Cairo Padel Arena'), findsOneWidget);
+    await tester.ensureVisible(find.textContaining('Pay Deposit'));
     await tester.tap(find.textContaining('Pay Deposit'));
     await tester.pumpAndSettle();
     expect(find.text('Pay with Wallet or InstaPay'), findsOneWidget);
