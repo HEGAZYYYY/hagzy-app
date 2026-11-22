@@ -15,7 +15,8 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="Hagzy Payment Oracle"
+            app:logo="@mipmap/ic_launcher"
+            app:title="Hagzy Payment Gateway"
             app:titleTextColor="@color/text_primary" />
     </com.google.android.material.appbar.AppBarLayout>
 

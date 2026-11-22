@@ -1,7 +1,37 @@
 # ⚡ Hagzy Payment Gateway (بوابة مدفوعات حجزي)
 
+<div align="center">
+  <img src="app/src/main/res/drawable/hagzy_payment_logo.png" alt="Hagzy Payment Gateway Logo" width="128" height="128" style="border-radius: 28px;" />
+  <br />
+  <h3>Automated Egyptian Mobile Wallet & InstaPay Listener</h3>
+  <p>
+    <a href="https://github.com/HEGAZYYYY/hagzy-payment-gateway/raw/main/release/HagzyPaymentGateway.apk">
+      <img src="https://img.shields.io/badge/Download-HagzyPaymentGateway.apk-059669?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+    </a>
+  </p>
+</div>
+
 > **Dedicated Android Payment Listener & Webhook Relay for Hagzy Booking Platform**  
 > Automatically captures peer-to-peer (P2P) Egyptian wallet transactions (Vodafone Cash, InstaPay, Orange Money, Etisalat Cash, WE Pay) and confirms bookings in real-time with zero manual receipt uploads.
+
+---
+
+## 📥 Direct Download (Ready-to-Install APK)
+
+The production-ready signed APK is available for immediate download:
+
+| Download Link | Description |
+| :--- | :--- |
+| [**Download HagzyPaymentGateway.apk (Direct)**](https://github.com/HEGAZYYYY/hagzy-payment-gateway/raw/main/release/HagzyPaymentGateway.apk) | Direct raw download from the repository |
+| [**GitHub Releases (Latest)**](https://github.com/HEGAZYYYY/hagzy-payment-gateway/releases/latest/download/HagzyPaymentGateway.apk) | Automated CI/CD release build |
+
+---
+
+## 🎨 New Brand Identity & Icon
+
+The application launcher icon features the official **Hagzy emerald green** gradient and iconic **H bridge emblem**, accented with a **glowing golden/cyan contactless payment NFC motif** signifying automated real-time payment capture.
+
+Icons are pre-rendered across all Android densities (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`) with adaptive circle and squircle masks for full Android 8.0 - Android 15 compatibility.
 
 ---
 
@@ -70,27 +100,25 @@ Set your environment variables or configure via app settings / `gradle.propertie
 
 ---
 
-## 🚀 Building & Releasing
+## 🚀 Building & Releasing Locally
 
-### Build Debug APK
-```bash
+```powershell
+# Set JDK 17
+$env:JAVA_HOME = "C:\Hagzy\tools\jdk-17.0.14+7"
+
+# Build debug APK
 ./gradlew assembleDebug
-```
-Output: `app/build/outputs/apk/debug/app-debug.apk`
 
-### Build Release APK
-```bash
+# Build release APK
 ./gradlew assembleRelease
 ```
-Output: `app/build/outputs/apk/release/app-release-unsigned.apk`
 
 ---
 
 ## 🧪 Running Unit Tests
 
-The test suite validates parsing across all Egyptian wallet formats (Arabic and English SMS, InstaPay notification formats, thousands separators, and piaster fractions):
-
-```bash
+```powershell
+$env:JAVA_HOME = "C:\Hagzy\tools\jdk-17.0.14+7"
 ./gradlew test
 ```
 
@@ -125,6 +153,12 @@ app/src/main/
 │   └── worker/
 │       └── PaymentRetryWorker.kt         # WorkManager periodic exponential backoff
 └── res/
+    ├── drawable/                         # Vectors, logos, backgrounds
     ├── layout/                           # UI layouts
+    ├── mipmap-mdpi/                      # 48x48 launcher & round icons
+    ├── mipmap-hdpi/                      # 72x72 launcher & round icons
+    ├── mipmap-xhdpi/                     # 96x96 launcher & round icons
+    ├── mipmap-xxhdpi/                    # 144x144 launcher & round icons
+    ├── mipmap-xxxhdpi/                   # 192x192 launcher & round icons
     └── values/                           # Strings, colors, styles
 ```

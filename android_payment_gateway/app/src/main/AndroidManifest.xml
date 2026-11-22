@@ -20,9 +20,9 @@
     <application
         android:name=".GatewayApplication"
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_agenda"
+        android:icon="@mipmap/ic_launcher"
         android:label="Hagzy Payment Gateway"
-        android:roundIcon="@android:drawable/ic_menu_agenda"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.HagzyGateway">
 
