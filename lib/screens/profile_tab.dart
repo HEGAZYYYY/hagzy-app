@@ -336,6 +336,36 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                             ],
                           ],
                         ),
+                        if (signedIn &&
+                            (widget.customerName.trim().isEmpty ||
+                                widget.customerName.trim().toLowerCase() == 'customer' ||
+                                widget.customerName.trim().toLowerCase() == 'hagzy member')) ...[
+                          const SizedBox(height: 3),
+                          InkWell(
+                            onTap: () => setState(() => _isEditing = true),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.edit_note_rounded,
+                                      size: 16, color: kGreen),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    localized(arabic, 'Tap to set your full name',
+                                        'اضغط لإضافة اسمك بالكامل'),
+                                    style: const TextStyle(
+                                      color: kGreen,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
                           !signedIn

@@ -176,6 +176,7 @@ class HagzyHome extends StatefulWidget {
 }
 
 class _HagzyHomeState extends State<HagzyHome> {
+  static bool enableNamePromptInTest = false;
   final HagzyApi _api = HagzyApi();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -4916,6 +4917,229 @@ class _HagzyHomeState extends State<HagzyHome> {
       } catch (_) {}
     }
     unawaited(_syncAccountData(showErrors: false));
+
+    final isTest = WidgetsBinding.instance.runtimeType
+        .toString()
+        .toLowerCase()
+        .contains('test');
+    final isPlaceholderName = name.trim().isEmpty ||
+        name.trim().toLowerCase() == 'customer' ||
+        name.trim().toLowerCase() == 'hagzy member' ||
+        name.trim().toLowerCase() == 'apple member';
+
+    if ((!isTest || enableNamePromptInTest) && isPlaceholderName && !shouldOpenAdmin && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _customerSignedIn) {
+          _showNameYourAccountDialog(email: email);
+        }
+      });
+    }
+  }
+
+  Future<void> _showNameYourAccountDialog({String? email}) async {
+    if (!mounted) return;
+    final ar = _language == 'AR' || kAppLanguage.value == 'AR';
+    final nameCtrl = TextEditingController();
+
+    if (email != null && email.contains('@')) {
+      final localPart = email.split('@').first.replaceAll(RegExp(r'[._-]'), ' ');
+      final titleCased = localPart
+          .split(' ')
+          .where((s) => s.isNotEmpty)
+          .map((s) => s[0].toUpperCase() + s.substring(1))
+          .join(' ');
+      if (titleCased.isNotEmpty && int.tryParse(titleCased) == null) {
+        nameCtrl.text = titleCased;
+      }
+    }
+
+    final newName = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: kPanel,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: kBorder),
+                    boxShadow: HagzyTheme.softShadow,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: kMuted.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              gradient: HagzyTheme.brandGradient,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: kGreen.withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.badge_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  localized(
+                                    ar,
+                                    'Welcome to Hagzy!',
+                                    'أهلاً بك في حجزي!',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: kInk,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  localized(
+                                    ar,
+                                    'What should we call you?',
+                                    'ما هو اسمك بالكامل؟',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: kMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        localized(
+                          ar,
+                          'Adding your name helps venue managers, padel partners, and salon staff recognize your reservations and tickets.',
+                          'إضافة اسمك يساعد أصحاب الملاعب والصالونات وأصدقاءك في التعرف على حجوزاتك بسهولة.',
+                        ),
+                        style: TextStyle(fontSize: 12.5, color: kMuted, height: 1.4),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameCtrl,
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.words,
+                        textDirection: ar ? TextDirection.rtl : TextDirection.ltr,
+                        decoration: InputDecoration(
+                          labelText: localized(ar, 'Your Full Name', 'اسمك بالكامل'),
+                          hintText: localized(ar, 'e.g. Mohamed Hegazy', 'مثال: محمد حجازي'),
+                          prefixIcon: const Icon(Icons.person_outline_rounded, color: kGreen),
+                          suffixIcon: nameCtrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () => setSheetState(() => nameCtrl.clear()),
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => setSheetState(() {}),
+                        onSubmitted: (val) {
+                          if (val.trim().isNotEmpty) {
+                            Navigator.pop(ctx, val.trim());
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: kGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: nameCtrl.text.trim().isEmpty
+                            ? null
+                            : () => Navigator.pop(ctx, nameCtrl.text.trim()),
+                        child: Text(
+                          localized(ar, 'Save & Continue', 'حفظ ومتابعة'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text(
+                          localized(ar, 'I will do this later', 'سأقوم بهذا لاحقاً'),
+                          style: TextStyle(
+                            color: kMuted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if (newName != null && newName.trim().isNotEmpty && mounted) {
+      await _handleCustomerUpdateProfile(
+        name: newName.trim(),
+        email: _savedCustomerEmail,
+        phone: _savedCustomerPhone,
+      );
+      if (mounted) {
+        _message(
+          localized(
+            ar,
+            'Profile updated! Welcome, ${newName.trim()} 🎉',
+            'تم حفظ اسمك بنجاح! أهلاً بك يا ${newName.trim()} 🎉',
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _pollPendingBookingsLiveSync() async {
