@@ -91,7 +91,7 @@ class _BookTabState extends State<BookTab> {
     if (widget.initialVenueId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final initialVenue = upsertNaderSalon(widget.venues)
+        final initialVenue = widget.venues
             .where((v) => v.id == widget.initialVenueId)
             .firstOrNull;
         if (initialVenue != null) {
@@ -112,7 +112,7 @@ class _BookTabState extends State<BookTab> {
     if (widget.initialVenueId != null &&
         (widget.initialVenueId != oldWidget.initialVenueId ||
             _venueId != widget.initialVenueId)) {
-      final targetVenue = upsertNaderSalon(widget.venues)
+      final targetVenue = widget.venues
           .where((v) => v.id == widget.initialVenueId)
           .firstOrNull;
       if (targetVenue != null) {
@@ -914,7 +914,7 @@ class _BookTabState extends State<BookTab> {
   bool _isPublicCatalogVenue(Venue v) =>
       v.id != 'test-venue' && v.id != 'hagzy-demo-5egp';
 
-  Iterable<Venue> _venuesInSelectedArea() => upsertNaderSalon(widget.venues)
+  Iterable<Venue> _venuesInSelectedArea() => widget.venues
       .where((v) => _isPublicCatalogVenue(v) && _locationMatchesArea(v.location));
 
   bool _locationMatchesArea(String location) {
@@ -981,7 +981,7 @@ class _BookTabState extends State<BookTab> {
 
   List<Venue> _getMatchingVenues() {
     final pool = _query.trim().isNotEmpty
-        ? upsertNaderSalon(widget.venues).where(_isPublicCatalogVenue)
+        ? widget.venues.where(_isPublicCatalogVenue)
         : _venuesInSelectedArea();
     final list = pool.where((venue) {
       final matchesCategory = _type == null || venue.type == _type;

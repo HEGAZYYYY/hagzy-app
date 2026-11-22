@@ -402,7 +402,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       return parsed;
     }
     final seeded = await _loadSeedVenues(parsed);
-    return upsertNaderSalon(seeded).where((v) => !trashedOrDeletedIds.contains(v.id)).toList();
+    return seeded.where((v) => !trashedOrDeletedIds.contains(v.id)).toList();
   }
 
   Future<List<Venue>> _loadSeedVenues(List<Venue> venues) async {
@@ -432,7 +432,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       if (result.isEmpty) {
-        return upsertNaderSalon(defaultPrototypeVenues())
+        return defaultPrototypeVenues()
             .where((v) => !trashedOrDeletedIds.contains(v.id))
             .toList();
       }
@@ -499,6 +499,11 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (deletedList != null) {
         _deletedVenueIds = deletedList.toSet();
       }
+      _deletedVenueIds.add('nader-el-khawaga-kafr-el-sheikh');
+      await prefs.setStringList(
+        kDeletedVenueIdsStorageKey,
+        _deletedVenueIds.toList(),
+      );
       _prefsLoaded = true;
       if (mounted) setState(() {});
       final isTest = WidgetsBinding.instance.runtimeType
@@ -519,7 +524,19 @@ class _HagzyHomeState extends State<HagzyHome> {
         }
       }
       _venues = await _loadSeedVenues(_venues);
-      _venues = upsertNaderSalon(_venues);
+      _venues = _venues
+          .where((v) =>
+              v.id != 'nader-el-khawaga-kafr-el-sheikh' &&
+              !v.name.toLowerCase().contains('nader el khawaga') &&
+              !v.name.contains('نادر الخواجة') &&
+              !_deletedVenueIds.contains(v.id))
+          .toList();
+      _customerBookings = _customerBookings
+          .where((b) => b.venueId != 'nader-el-khawaga-kafr-el-sheikh')
+          .toList();
+      _bookings = _bookings
+          .where((b) => b.venueId != 'nader-el-khawaga-kafr-el-sheikh')
+          .toList();
       if (mounted) setState(() {});
       await prefs.setString(
         kStorageKey,
@@ -862,8 +879,16 @@ class _HagzyHomeState extends State<HagzyHome> {
       final raw = (res['notifications'] as List<dynamic>?) ?? const [];
       if (mounted) {
         setState(() {
-          _adminNotifications =
-              raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _adminNotifications = raw
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .where((n) {
+            final t = (n['title'] ?? '').toString().toLowerCase();
+            final b = (n['body'] ?? '').toString().toLowerCase();
+            return !t.contains('nader') &&
+                !b.contains('nader') &&
+                !b.contains('نادر') &&
+                !t.contains('نادر');
+          }).toList();
         });
       }
     } catch (_) {}

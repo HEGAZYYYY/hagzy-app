@@ -1406,7 +1406,6 @@ Venue adrenalineEscapeRoomSample() => Venue(
 
 List<Venue> defaultPrototypeVenues() => [
       demo5EgpVenueSample(),
-      naderSalonSample(),
       adrenalineEscapeRoomSample(),
       Venue(
         id: 'kafr-sports-arena',
@@ -1810,71 +1809,13 @@ List<Venue> defaultPrototypeVenues() => [
       ),
     ];
 
-List<Venue> _upsertSingleVenue(List<Venue> venues, Venue sample) {
-  final matches = venues
-      .where((venue) =>
-          venue.id == sample.id ||
-          (venue.name.trim().toLowerCase() == sample.name.toLowerCase() &&
-              venue.location.trim().toLowerCase() ==
-                  sample.location.toLowerCase()))
-      .toList();
-  if (matches.isEmpty) return [...venues, sample];
-
-  final primary = matches.first;
-  final items = <VenueItem>[];
-  final services = <SalonService>[];
-  for (final value in [...matches, sample]) {
-    for (final item in value.items) {
-      if (!items.any((saved) =>
-          saved.id == item.id ||
-          saved.name.trim().toLowerCase() == item.name.trim().toLowerCase())) {
-        items.add(item);
-      }
-    }
-    for (final service in value.services) {
-      if (!services.any((saved) =>
-          saved.id == service.id ||
-          saved.name.trim().toLowerCase() ==
-              service.name.trim().toLowerCase())) {
-        services.add(service);
-      }
-    }
-  }
-  final merged = primary.copyWith(
-    name: sample.name,
-    location: sample.location,
-    type: sample.type,
-    subCategories: sample.subCategories,
-    depositPercent: sample.depositPercent,
-    items: items,
-    services: services,
-    imageUrl: (primary.imageUrl != null && primary.imageUrl!.isNotEmpty)
-        ? primary.imageUrl
-        : sample.imageUrl,
-    galleryUrls: primary.galleryUrls.isNotEmpty
-        ? primary.galleryUrls
-        : sample.galleryUrls,
-    description: primary.description.isNotEmpty
-        ? primary.description
-        : sample.description,
-  );
-  final firstMatch = venues.indexWhere((venue) => matches.contains(venue));
-  return [
-    ...venues.take(firstMatch),
-    merged,
-    ...venues.skip(firstMatch).where((venue) => !matches.contains(venue)),
-  ];
-}
-
 List<Venue> upsertNaderSalon(List<Venue> venues) {
-  final isTest = WidgetsBinding.instance.runtimeType
-      .toString()
-      .toLowerCase()
-      .contains('test');
-  if (!kSeedNaderSalon && isTest) return venues;
-  var result = _upsertSingleVenue(venues, naderSalonSample());
-  result = _upsertSingleVenue(result, adrenalineEscapeRoomSample());
-  return result;
+  return venues
+      .where((v) =>
+          v.id != 'nader-el-khawaga-kafr-el-sheikh' &&
+          !v.name.toLowerCase().contains('nader el khawaga') &&
+          !v.name.contains('نادر الخواجة'))
+      .toList();
 }
 
 String? requiredValidator(String? value) =>
