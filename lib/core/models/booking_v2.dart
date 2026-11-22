@@ -1,4 +1,5 @@
 import 'bookable_unit.dart';
+import '../utils/datetime_iso.dart';
 
 /// Booking status lifecycle enum
 enum BookingStatus {
@@ -221,8 +222,8 @@ class HagzyBooking {
         'host_user_id': hostUserId,
         'host_name': hostName,
         'host_phone': hostPhone,
-        'start_time': startTime.toIso8601String(),
-        'end_time': endTime.toIso8601String(),
+        'start_time': iso8601WithOffset(startTime),
+        'end_time': iso8601WithOffset(endTime),
         'headcount': headcount,
         'selected_services': selectedServices.map((s) => s.toJson()).toList(),
         'selected_addons': selectedAddons.map((a) => a.toJson()).toList(),

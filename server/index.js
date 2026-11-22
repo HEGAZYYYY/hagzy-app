@@ -26,13 +26,15 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 const IS_TEST = process.env.NODE_ENV === 'test';
 const USE_POSTGRES = Boolean(process.env.DATABASE_URL && !IS_TEST);
 
+let db = null;
+
 // Payment deduplication & listener heartbeat tracking
 const processedPaymentHashes = new Set();
 let lastListenerHeartbeatAt = null;
 
-// Token Revocation Store with Expiring Denylist (Bounded memory)
+// Token Revocation Store with Expiring Denylist (Bounded memory, 90d lifetime to match longest tokens)
 const revokedTokens = new Map(); // tokenHash -> expiryTimestamp
-function revokeToken(token, maxLifetimeMs = 30 * 24 * 3600 * 1000) {
+function revokeToken(token, maxLifetimeMs = 90 * 24 * 3600 * 1000) {
   if (typeof token === 'string' && token.trim()) {
     const hash = crypto.createHash('sha256').update(token.trim()).digest('hex');
     revokedTokens.set(hash, Date.now() + maxLifetimeMs);
@@ -388,18 +390,24 @@ const DB_FILE = path.join(DATA_DIR, 'hagzy_db.json');
 
 let isHydrated = false;
 
+const { CAIRO_TZ, cairoOffsetMinutes, parseClientTimestamp } = require('./cairoTime');
+
 function markBookingConfirmed(b, { method, providerRef, amount, excess, actor = 'system', reason = 'Payment confirmed' } = {}) {
   if (!b) return b;
   try {
     transitionBookingStatus(b, BOOKING_STATUS.CONFIRMED, { actor, reason, auditLog: (db && db.auditLog) || [] });
-  } catch (_) {
-    b.status = 'confirmed';
-    b.confirmed = true;
-    b.isPendingPayment = false;
-    b.depositPaid = true;
-    b.paymentStatus = 'paid';
-    b.dueNow = 0;
-    b.holdExpiresAt = null;
+  } catch (err) {
+    if (err instanceof StateMachineError || err.name === 'StateMachineError') {
+      // Anti-resurrection invariant: a cancelled/expired/completed booking must
+      // NEVER be revived by a (late) payment. Signal the caller via null so the
+      // money is routed to the review queue for refund/manual credit instead.
+      console.warn(
+        `markBookingConfirmed refused: booking ${b.id} is '${b.status}' — ` +
+        `payment needs manual review (${reason})`
+      );
+      return null;
+    }
+    throw err;
   }
   if (method) b.paymentMethod = method;
   if (providerRef) b.paymentReference = providerRef;
@@ -591,28 +599,37 @@ async function hydratePostgres() {
     isHydrated = true;
     return;
   }
-  try {
-    // 1. Run authoritative relational schema migrations on the database
-    console.log('🐘 Executing PostgreSQL schema migrations...');
-    await runMigrations({ pool: pgPool });
-    console.log('🐘 Schema migrations up-to-date.');
+  const maxAttempts = 6;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      // 1. Run authoritative relational schema migrations on the database
+      console.log('🐘 Executing PostgreSQL schema migrations...');
+      await runMigrations({ pool: pgPool });
+      console.log('🐘 Schema migrations up-to-date.');
 
-    // 2. Hydrate in-memory state from normalized PostgreSQL tables (leaves empty tables clean at 0 rows)
-    const stats = await hydrateRelationalState(pgPool, db, {
-      localPaymentIntents,
-      localPaymentEvents,
-    });
-    isHydrated = true;
-    console.log(
-      `🐘 Relational PostgreSQL hydrated: ${stats.usersCount} users, ${stats.venuesCount} venues (${stats.unitsCount} units), ${stats.bookingsCount} bookings.`,
-    );
-  } catch (err) {
-    // Keep isHydrated = false on failure so no accidental saveDb() can wipe live rows.
-    console.error('PostgreSQL hydrate error (persistence paused until hydrated):', err.message);
+      // 2. Hydrate in-memory state from normalized PostgreSQL tables (leaves empty tables clean at 0 rows)
+      const stats = await hydrateRelationalState(pgPool, db, {
+        localPaymentIntents,
+        localPaymentEvents,
+      });
+      isHydrated = true;
+      console.log(
+        `🐘 Relational PostgreSQL hydrated: ${stats.usersCount} users, ${stats.venuesCount} venues (${stats.unitsCount} units), ${stats.bookingsCount} bookings.`,
+      );
+      return;
+    } catch (err) {
+      // Keep isHydrated = false on failure so no accidental saveDb() can wipe live rows.
+      console.error(`PostgreSQL hydrate attempt ${attempt}/${maxAttempts} failed:`, err.message);
+      if (attempt === maxAttempts) {
+        console.error('PostgreSQL hydrate retries exhausted. API returns 503 until the service restarts.');
+      } else {
+        await new Promise(r => setTimeout(r, Math.min(30000, 2000 * 2 ** (attempt - 1))));
+      }
+    }
   }
 }
 
-let db = loadDb();
+db = loadDb();
 db.walletLedger = db.walletLedger || [];
 db.auditLog = db.auditLog || [];
 db.reviewQueue = db.reviewQueue || [];
@@ -734,6 +751,20 @@ app.use(express.raw({
     if (!req.rawBody) req.rawBody = buf;
   }
 }));
+
+// Refuse API traffic until PostgreSQL state is hydrated. Serving the empty
+// in-memory db would show zero venues AND silently drop every write made
+// during the window (lost on restart). Render free tier reboots daily, so a
+// transient Supabase blip must fail closed, not serve empty.
+const HEALTH_PATHS = new Set(['/health', '/api/health', '/healthz', '/ping']);
+app.use((req, res, next) => {
+  if (!pgPool || isHydrated) return next();
+  if (HEALTH_PATHS.has(req.path)) return next();
+  return res.status(503).json({
+    error: 'Service is starting up. Please retry shortly.',
+    retryAfterSeconds: 10,
+  });
+});
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -1162,6 +1193,9 @@ function escapeForInlineScript(json) {
 let appleKeysCache = { keys: null, fetchedAt: 0 };
 async function verifyAppleIdentityToken(identityToken) {
   const audience = process.env.APPLE_CLIENT_ID;
+  if (IS_PROD && !audience) {
+    throw new Error('APPLE_CLIENT_ID is not configured on production server');
+  }
   const [h, p, sig] = String(identityToken).split('.');
   if (!h || !p || !sig) throw new Error('Malformed identity token');
   const header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
@@ -1237,6 +1271,13 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
     });
   }
 
+  // Per-target (phone/email) cooldown to block rotating-IP SMS abuse
+  const existingOtp = db.otps && db.otps[target];
+  if (existingOtp && existingOtp.createdAt && Date.now() - existingOtp.createdAt < 30 * 1000 && !isReviewer && !IS_TEST) {
+    const waitSecs = Math.ceil((30 * 1000 - (Date.now() - existingOtp.createdAt)) / 1000);
+    return res.status(429).json({ error: `Please wait ${waitSecs} seconds before requesting another code.` });
+  }
+
   // Optional fixed credentials for App Store / Play review. Off unless configured.
   const isReviewer = !!REVIEWER_TARGET && !!REVIEWER_CODE && target === REVIEWER_TARGET;
   const otp = isReviewer ? REVIEWER_CODE : crypto.randomInt(100000, 1000000).toString();
@@ -1244,6 +1285,7 @@ app.post('/api/auth/customer-otp/request', async (req, res) => {
   const hashedCode = crypto.createHash('sha256').update(otp).digest('hex');
   db.otps[target] = {
     hashedCode,
+    createdAt: Date.now(),
     expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     name: String(name || '').slice(0, 80),
@@ -1598,12 +1640,17 @@ app.post('/api/auth/social/apple', async (req, res) => {
       return res.status(401).json({ error: 'Invalid Apple token' });
     }
 
+    const tokenHadVerifiedEmail = Boolean(verifiedEmail);
     if (!verifiedEmail) {
-      verifiedEmail = email ? email.toLowerCase() : `${verifiedId.slice(0, 10)}@privaterelay.appleid.com`;
+      verifiedEmail = `${verifiedId.slice(0, 10)}@privaterelay.appleid.com`;
     }
 
-    // Find or create customer
-    let user = db.users.find(u => (u.appleUserId && u.appleUserId === verifiedId) || (u.email && u.email.toLowerCase() === verifiedEmail));
+    // Find or create customer: ONLY match existing email if verified by Apple token claims!
+    // Never allow an unverified client-supplied email in req.body to hijack existing accounts.
+    let user = db.users.find(u =>
+      (u.appleUserId && u.appleUserId === verifiedId) ||
+      (tokenHadVerifiedEmail && u.email && u.email.toLowerCase() === verifiedEmail)
+    );
     if (!user) {
       user = {
         id: buildCleanUserId({ name: verifiedName, email: verifiedEmail, phone: '' }),
@@ -2938,7 +2985,7 @@ app.post('/api/bookings', optionalAuth, async (req, res) => {
     req.user = db.users.find(u => u.id === req.admin.id) || req.admin;
   }
 
-  const start = new Date(body.startsAt);
+  const start = parseClientTimestamp(body.startsAt);
   const duration = Number(body.durationMinutes);
   if (isNaN(start.getTime())) return res.status(400).json({ error: 'Invalid start time' });
   if (!Number.isInteger(duration) || duration < 15 || duration > 720) {
@@ -3823,7 +3870,7 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
           };
         }
 
-        markBookingConfirmed(b, {
+        const confirmedBooking = markBookingConfirmed(b, {
           method,
           providerRef,
           amount: numAmount,
@@ -3831,6 +3878,32 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
           actor: 'payment_oracle',
           reason: 'Automated exact payment match'
         });
+        if (!confirmedBooking) {
+          // The booking was cancelled/expired after the intent was created.
+          // Keep it dead and queue the money for manual refund or wallet credit.
+          const inactiveEntry = {
+            id: `rev_inactive_${Date.now()}`,
+            paymentMethod: method,
+            senderIdentifier: normalizedSender,
+            amount: numAmount,
+            providerRef,
+            rawText: redactRawPaymentText(rawText),
+            status: 'BOOKING_INACTIVE',
+            intentId: matchedIntent.id || matchedIntent.intent_id,
+            bookingId: b.id,
+            reason: 'Booking was cancelled/expired before the transfer arrived. Needs manual refund or wallet credit.',
+            receivedAt: now.toISOString()
+          };
+          db.reviewQueue.push(inactiveEntry);
+          saveDb(db);
+          return {
+            success: true,
+            matched: false,
+            requiresReview: true,
+            status: 'BOOKING_INACTIVE',
+            message: 'Booking is no longer active. Payment sent to review queue for refund/credit.'
+          };
+        }
         notifyVenueOwner({
           venue: (db.venues || []).find(v => v.id === b.venueId),
           booking: b,
@@ -4058,11 +4131,28 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     }
 
     if (localBooking) {
-      markBookingConfirmed(localBooking, { method, amount: receivedAmt, excess });
-      const venueObj = (db.venues || []).find(v => v.id === localBooking.venueId);
-      notifyVenueOwner({ venue: venueObj, booking: localBooking, eventType: 'booking_confirmed' });
+      const confirmedBooking = markBookingConfirmed(localBooking, { method, amount: receivedAmt, excess });
+      if (confirmedBooking) {
+        const venueObj = (db.venues || []).find(v => v.id === localBooking.venueId);
+        notifyVenueOwner({ venue: venueObj, booking: localBooking, eventType: 'booking_confirmed' });
+        syncBookingToFirebase(localBooking);
+      } else {
+        // Booking died between intent creation and retroactive verification —
+        // keep it dead and queue the received money for manual handling.
+        db.reviewQueue.push({
+          id: `rev_retro_${Date.now()}`,
+          paymentMethod: method,
+          senderIdentifier: normalizedSender,
+          amount: receivedAmt,
+          providerRef: evt.provider_ref || `retro_${evtId}`,
+          status: 'BOOKING_INACTIVE',
+          intentId,
+          bookingId,
+          reason: 'Booking was cancelled/expired before retroactive payment verification.',
+          receivedAt: now.toISOString()
+        });
+      }
       saveDb(db);
-      syncBookingToFirebase(localBooking);
     } else if (bookingId.startsWith('wallet_topup_') && req.user) {
       const u = db.users ? db.users.find(usr => usr.id === req.user.id) : null;
       if (u) {
@@ -4230,13 +4320,19 @@ app.post('/api/admin/payments/review-queue/:id/attach', authenticateAdmin, (req,
     if (!req.isPlatformOwner && (!venue || !doesPartnerOwnVenue(req.admin, venue))) {
       return res.status(403).json({ error: 'Forbidden: You do not own this venue' });
     }
-    markBookingConfirmed(booking, {
+    const confirmedBooking = markBookingConfirmed(booking, {
       method: item.paymentMethod,
       providerRef: item.providerRef,
       amount: item.amount,
       actor: req.admin ? req.admin.email : 'admin',
       reason: 'Manual match from review queue',
     });
+    if (!confirmedBooking) {
+      return res.status(409).json({
+        error: `Booking ${bookingId} is '${booking.status}' and cannot be confirmed. ` +
+          'Credit the customer wallet (userId) or refund the transfer instead.'
+      });
+    }
     notifyVenueOwner({ venue, booking, eventType: 'booking_confirmed' });
     syncBookingToFirebase(booking);
   } else if (!req.isPlatformOwner) {
@@ -5214,5 +5310,5 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, buildFallbackVenueFromTemplateNode };
+module.exports = { app, buildFallbackVenueFromTemplateNode, parseClientTimestamp };
 

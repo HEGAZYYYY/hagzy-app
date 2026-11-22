@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/utils/datetime_iso.dart';
 import '../theme/hagzy_theme.dart';
 
 const egyptGovernorates = <(String, String)>[
@@ -995,7 +996,7 @@ class Booking {
         'venueId': venueId,
         'itemId': itemId,
         'customer': customer,
-        'startsAt': startsAt.toIso8601String(),
+        'startsAt': iso8601WithOffset(startsAt),
         'durationMinutes': durationMinutes,
         'price': price,
         'serviceNames': serviceNames,
@@ -1008,7 +1009,7 @@ class Booking {
         'status': status,
         'confirmed': isConfirmed,
         'paymentStatus': paymentStatus,
-        'holdExpiresAt': holdExpiresAt?.toIso8601String(),
+        'holdExpiresAt': holdExpiresAt != null ? iso8601WithOffset(holdExpiresAt!) : null,
         if (paymentMethod.isNotEmpty) 'paymentMethod': paymentMethod,
         if (paymentReference.isNotEmpty) 'paymentReference': paymentReference,
         if (promoCode.isNotEmpty) 'promoCode': promoCode,
@@ -1037,7 +1038,10 @@ class Booking {
     DateTime parseDate(dynamic raw) {
       if (raw == null) return DateTime.now();
       if (raw is DateTime) return raw;
-      return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+      final parsed = DateTime.tryParse(raw.toString());
+      if (parsed == null) return DateTime.now();
+      // Server timestamps are UTC ("...Z"); show them in device-local time.
+      return parsed.isUtc ? parsed.toLocal() : parsed;
     }
 
     final rawDur = json['durationMinutes'] ?? json['duration_minutes'] ?? 60;

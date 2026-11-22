@@ -424,40 +424,6 @@ class _HagzyHomeState extends State<HagzyHome> {
               (_savedCustomerIsAdmin ? 'owner' : (_savedCustomerIsPartner ? 'partner' : 'customer'));
           _savedPartnerStatus = profile['partnerStatus'] as String? ??
               ((_savedCustomerIsAdmin || _savedCustomerIsPartner) ? 'approved' : 'none');
-          if (kIsWeb) {
-            try {
-              final tokenParam = Uri.base.queryParameters['token'] ??
-                  Uri.base.queryParameters['auth_token'];
-              final nameParam = Uri.base.queryParameters['auth_name'];
-              final emailParam = Uri.base.queryParameters['auth_email'];
-              if (tokenParam != null && tokenParam.isNotEmpty) {
-                _customerToken = tokenParam;
-                _customerSignedIn = true;
-        _browsingAsGuest = false;
-                if (nameParam != null && nameParam.isNotEmpty) {
-                  _savedCustomerName = nameParam;
-                }
-                if (emailParam != null && emailParam.isNotEmpty) {
-                  _savedCustomerEmail = emailParam;
-                }
-              }
-            } catch (_) {}
-          }
-        } catch (_) {}
-      } else if (kIsWeb) {
-        try {
-          final tokenParam = Uri.base.queryParameters['token'] ??
-              Uri.base.queryParameters['auth_token'];
-          final nameParam = Uri.base.queryParameters['auth_name'];
-          final emailParam = Uri.base.queryParameters['auth_email'];
-          if (tokenParam != null && tokenParam.isNotEmpty) {
-            _customerToken = tokenParam;
-            _customerSignedIn = true;
-        _browsingAsGuest = false;
-            _savedCustomerName = nameParam ??
-                (emailParam?.split('@')[0] ?? 'Hagzy Member');
-            _savedCustomerEmail = emailParam ?? '';
-          }
         } catch (_) {}
       }
       _currentArea = prefs.getString('hagzy_customer_area') ?? kAllEgyptAreas;
