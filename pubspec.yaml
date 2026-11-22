@@ -35,3 +35,4 @@ flutter:
   assets:
     - assets/hagzy_logo.svg
     - assets/venues_seed.json
+    - assets/adrenaline_escape_room.jpg

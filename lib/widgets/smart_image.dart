@@ -43,6 +43,15 @@ class HagzySmartImage extends StatelessWidget {
         }
       } catch (_) {}
     }
+    if (trimmed.startsWith('assets/')) {
+      return Image.asset(
+        trimmed,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: (_, __, ___) => errorWidget ?? const SizedBox.shrink(),
+      );
+    }
     return Image.network(
       trimmed,
       fit: fit,
