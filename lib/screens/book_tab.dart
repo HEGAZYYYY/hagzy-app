@@ -52,6 +52,7 @@ class _BookTabState extends State<BookTab> {
   Set<String> _dismissedBookAgainVenueIds = {};
   bool _favoritesOnly = false;
   bool _sortByPrice = false;
+  bool _openNowOnly = false;
   bool _showMapView = false;
   bool _isAutoAssigningGps = false;
   static DateTime _defaultBookingDate() {
@@ -79,13 +80,7 @@ class _BookTabState extends State<BookTab> {
       _area = widget.currentArea!;
     }
     _loadCustomerPreferences();
-    if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _autoAssignGpsAreaDirectly(silentIfDenied: true);
-        }
-      });
-    }
+    // Contextual GPS: location permission is requested on tap of "Map & Near Me" or location button rather than interrupting app launch.
     if (widget.initialVenueId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -957,6 +952,16 @@ class _BookTabState extends State<BookTab> {
     );
   }
 
+  bool _isVenueOpenNow(Venue v) {
+    final nowHour = DateTime.now().hour;
+    if (v.openHour == 0 && v.closeHour == 24) return true;
+    if (v.closeHour > v.openHour) {
+      return nowHour >= v.openHour && nowHour < v.closeHour;
+    } else {
+      return nowHour >= v.openHour || nowHour < v.closeHour;
+    }
+  }
+
   List<Venue> _getMatchingVenues() {
     final list = _venuesInSelectedArea().where((venue) {
       final matchesCategory = _type == null || venue.type == _type;
@@ -969,11 +974,13 @@ class _BookTabState extends State<BookTab> {
       final matchesFavorite =
           !_favoritesOnly || _favoriteIds.contains(venue.id);
       final matchesArea = _locationMatchesArea(venue.location);
+      final matchesOpenNow = !_openNowOnly || _isVenueOpenNow(venue);
       return matchesCategory &&
           matchesSubCategory &&
           matchesSearch &&
           matchesFavorite &&
-          matchesArea;
+          matchesArea &&
+          matchesOpenNow;
     }).toList()
       ..sort((a, b) {
         if (!_sortByPrice) return a.name.compareTo(b.name);
@@ -1361,14 +1368,23 @@ class _BookTabState extends State<BookTab> {
                     widget.arabic, 'Map & Near Me', 'على الخريطة وقريب مني'),
                 onTap: () => setState(() => _showMapView = !_showMapView),
               ),
-              if (_sortByPrice) ...[
-                const SizedBox(width: 8),
-                CustomPill(
-                  icon: Icons.south,
-                  label: localized(widget.arabic, 'Lowest Price', 'أقل سعر'),
-                  selected: false,
-                ),
-              ],
+              const SizedBox(width: 8),
+              CustomPill(
+                selected: _openNowOnly,
+                icon: Icons.access_time_filled_rounded,
+                label: localized(widget.arabic, 'Open Now', 'مفتوح الآن'),
+                onTap: () => setState(() => _openNowOnly = !_openNowOnly),
+              ),
+              const SizedBox(width: 8),
+              CustomPill(
+                selected: _sortByPrice,
+                icon: Icons.swap_vert_rounded,
+                label: localized(
+                    widget.arabic,
+                    _sortByPrice ? 'Lowest Price' : 'Sort: Price',
+                    _sortByPrice ? 'أقل سعر' : 'ترتيب: السعر'),
+                onTap: () => setState(() => _sortByPrice = !_sortByPrice),
+              ),
             ],
           ),
         ),

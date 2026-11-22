@@ -1,105 +1,629 @@
 [
   {
-    "id": "hagzy-demo-5egp",
-    "name": "Hagzy 5 EGP Test Lab (تجربة ٥ جنيه)",
-    "location": "Kafr El Sheikh & Cairo",
-    "type": "lounge",
+    "id": "smash-padel-tagamoa",
+    "name": "Smash Padel Club (سماش بادل كلوب)",
+    "location": "التجمع الخامس، القاهرة الجديدة",
+    "type": "sports",
+    "subCategories": [
+      "padel"
+    ],
     "ownerPhone": "01015325250",
-    "depositPercent": 100,
-    "imageUrl": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1000&q=80",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=New+Cairo+Egypt",
+    "description": "مجمع ملاعب بادل بانورامية مجهزة بأحدث معايير WPT في التجمع الخامس مع كافيه وغرف تبديل ملابس.",
+    "instaPayAddress": "smash.padel@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 8,
+    "closeHour": 24,
+    "rating": 4.9,
+    "amenities": [
+      "ملاعب بانورامية WPT",
+      "تأجير مضارب وكرات",
+      "كافيه ومطعم",
+      "إضاءة ليلية LED",
+      "باركينج خاص"
+    ],
+    "items": [
+      {
+        "id": "smash-court-1",
+        "name": "Court 1 - Panoramic WPT (الملعب البانورامي ١)",
+        "kind": "Padel court",
+        "hourlyRate": 400,
+        "multiRate": 0
+      },
+      {
+        "id": "smash-court-2",
+        "name": "Court 2 - Panoramic WPT (الملعب البانورامي ٢)",
+        "kind": "Padel court",
+        "hourlyRate": 400,
+        "multiRate": 0
+      },
+      {
+        "id": "smash-court-3",
+        "name": "Court 3 - Standard Court (الملعب الكلاسيكي ٣)",
+        "kind": "Padel court",
+        "hourlyRate": 350,
+        "multiRate": 0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "champions-turf-cairo",
+    "name": "Champions Arena 5v5 (ملعب تشامبيونز خماسي)",
+    "location": "المعادي، القاهرة",
+    "type": "sports",
+    "subCategories": [
+      "football",
+      "soccer"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 20,
+    "imageUrl": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Maadi+Cairo+Egypt",
+    "description": "ملاعب كرة قدم خماسية بنجيل صناعي ألماني معتمد، إضاءة ليلية احترافية، وغرف ملابس مجهزة بالكامل.",
+    "instaPayAddress": "champions.turf@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 10,
+    "closeHour": 24,
+    "rating": 4.85,
+    "amenities": [
+      "نجيل صناعي معتمد FIFA",
+      "كشافات ليلية احترافية",
+      "غرف ملابس واستحمام",
+      "كافتيريا للمشروبات"
+    ],
+    "items": [
+      {
+        "id": "champions-pitch-a",
+        "name": "5v5 AstroTurf Pitch A (ملعب خماسي أ)",
+        "kind": "Soccer pitch",
+        "hourlyRate": 280,
+        "multiRate": 0
+      },
+      {
+        "id": "champions-pitch-b",
+        "name": "5v5 AstroTurf Pitch B (ملعب خماسي ب)",
+        "kind": "Soccer pitch",
+        "hourlyRate": 280,
+        "multiRate": 0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "zayed-padel-park",
+    "name": "Zayed Padel Park (زايد بادل بارك)",
+    "location": "الشيخ زايد، الجيزة",
+    "type": "sports",
+    "subCategories": [
+      "padel",
+      "tennis"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Sheikh+Zayed+Egypt",
+    "description": "نادي بادل عصري في قلب الشيخ زايد يوفر ملاعب بادل وتنس مع مدربين معتمدين.",
+    "instaPayAddress": "zayed.padel@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 8,
+    "closeHour": 23,
+    "rating": 4.92,
+    "amenities": [
+      "ملاعب بادل وتنس",
+      "متجر معدات رياضية",
+      "لاونج خارجي",
+      "مشروبات وعصائر فريش"
+    ],
+    "items": [
+      {
+        "id": "zayed-padel-1",
+        "name": "Padel Court 1 (ملعب بادل ١)",
+        "kind": "Padel court",
+        "hourlyRate": 380,
+        "multiRate": 0
+      },
+      {
+        "id": "zayed-tennis-1",
+        "name": "Tennis Clay Court (ملعب تنس ترابي)",
+        "kind": "Tennis court",
+        "hourlyRate": 300,
+        "multiRate": 0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "bunker-lounge-maadi",
+    "name": "The Bunker Gaming Lounge (بانكر لاونج)",
+    "location": "المعادي، القاهرة",
+    "type": "lounge",
+    "subCategories": [
+      "playstation",
+      "billiards"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 20,
+    "imageUrl": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Maadi+Gaming+Lounge",
+    "description": "أكبر لاونج جيمنج وبلايستيشن في المعادي بشاشات 75 بوصة 4K وطاولات بلياردو أولمبية.",
+    "instaPayAddress": "bunker.lounge@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 11,
+    "closeHour": 24,
+    "rating": 4.88,
+    "amenities": [
+      "غرف PS5 VIP خاصة",
+      "شاشات 4K HDR",
+      "طاولات بلياردو احترافية",
+      "منيو مشروبات وسناكس"
+    ],
+    "items": [
+      {
+        "id": "bunker-ps5-vip-1",
+        "name": "VIP PS5 Suite 1 (غرفة بلايستيشن في آي بي ١)",
+        "kind": "PlayStation room",
+        "hourlyRate": 150,
+        "multiRate": 200
+      },
+      {
+        "id": "bunker-ps5-vip-2",
+        "name": "VIP PS5 Suite 2 (غرفة بلايستيشن في آي بي ٢)",
+        "kind": "PlayStation room",
+        "hourlyRate": 150,
+        "multiRate": 200
+      },
+      {
+        "id": "bunker-billiards-1",
+        "name": "Tournament Pool Table (طاولة بلياردو أولمبية)",
+        "kind": "Billiards table",
+        "hourlyRate": 120,
+        "multiRate": 0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "enigma-escape-cairo",
+    "name": "Enigma Escape Arena (إنيجما إسكيب روم)",
+    "location": "التجمع الأول، القاهرة الجديدة",
+    "type": "lounge",
+    "subCategories": [
+      "escape_rooms",
+      "entertainment"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=New+Cairo+Escape+Room",
+    "description": "تجارب غرف هروب تفاعلية مثيرة مليئة بالألغاز والغموض مناسبة للأصدقاء والشركات.",
+    "instaPayAddress": "enigma.escape@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 12,
+    "closeHour": 24,
+    "rating": 4.95,
+    "amenities": [
+      "ألغاز تفاعلية بالكامل",
+      "أجواء سينمائية وإضاءة ذكية",
+      "مناسب للمجموعات 2-8 أشخاص"
+    ],
+    "items": [
+      {
+        "id": "enigma-pharaoh",
+        "name": "The Pharaohs Tomb (مقبرة الفراعنة المفقودة)",
+        "kind": "Escape room",
+        "hourlyRate": 250,
+        "multiRate": 400
+      },
+      {
+        "id": "enigma-heist",
+        "name": "Bank Vault Heist (سرقة الخزنة الكبرى)",
+        "kind": "Escape room",
+        "hourlyRate": 250,
+        "multiRate": 400
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "respawn-gaming-hub",
+    "name": "Respawn Esports Lounge (ريسبون جيمنج هاب)",
+    "location": "مدينة نصر، القاهرة",
+    "type": "lounge",
+    "subCategories": [
+      "playstation",
+      "table_tennis"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 20,
+    "imageUrl": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80",
     "galleryUrls": [
       "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80"
     ],
-    "googleMapsUrl": "https://maps.google.com/?q=Cairo+Egypt",
-    "description": "مختبر حجزي التجريبي لاختبار دفع ٥ جنيه عبر إنستاباي وفودافون كاش والتأكيد الفوري.",
-    "instaPayAddress": "01015325250",
+    "googleMapsUrl": "https://maps.google.com/?q=Nasr+City+Gaming+Cairo",
+    "description": "مركز ألعاب إلكترونية متكامل بمدينة نصر يضم أجهزة بلايستيشن 5 وطاولات بينج بونج وبلياردو.",
+    "instaPayAddress": "respawn.hub@instapay",
     "vodafoneCashNumber": "01015325250",
-    "openHour": 0,
+    "openHour": 11,
     "closeHour": 24,
-    "rating": 5.0,
-    "amenities": ["Instant Verification", "5 EGP Demo", "AC", "Wi-Fi"],
-    "subCategories": ["playstation"],
-    "staffMembers": ["Demo Host / كابتن التجربة"],
+    "rating": 4.82,
+    "amenities": [
+      "أحدث ألعاب PS5",
+      "بينج بونج وبلياردو",
+      "إنترنت فائق السرعة",
+      "تكييف مركزي"
+    ],
     "items": [
       {
-        "id": "demo-slot-5egp",
-        "name": "5 EGP Test Slot (حجز تجريبي ٥ جنيه)",
-        "kind": "PlayStation / PS5",
-        "hourlyRate": 5.0,
-        "multiRate": 0.0
+        "id": "respawn-ps5-suite",
+        "name": "PS5 Lounge 1 (غرفة بلايستيشن ١)",
+        "kind": "PlayStation room",
+        "hourlyRate": 130,
+        "multiRate": 180
+      },
+      {
+        "id": "respawn-pingpong",
+        "name": "Ping Pong Arena (طاولة بينج بونج)",
+        "kind": "Table tennis",
+        "hourlyRate": 80,
+        "multiRate": 0
       }
     ],
-    "services": [
-      {
-        "id": "demo-svc-5egp",
-        "name": "5 EGP Test Booking",
-        "minutes": 60,
-        "price": 5.0
-      }
-    ]
+    "services": []
   },
   {
     "id": "nader-el-khawaga-kafr-el-sheikh",
-    "name": "Nader El Khawaga",
-    "location": "Kafr El Sheikh",
+    "name": "Salon Nader El Khawaga (صالون نادر الخواجة)",
+    "location": "كفر الشيخ",
     "type": "salon",
+    "subCategories": [
+      "salon",
+      "barber"
+    ],
     "ownerPhone": "01024129393",
     "depositPercent": 30,
-    "imageUrl": "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1000&q=80",
+    "imageUrl": "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1200&q=80",
     "galleryUrls": [
       "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=800&q=80"
+      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80"
     ],
-    "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Nader+El+Khawaga+Kafr+El+Sheikh",
-    "description": "Premier men's grooming & barbershop in Kafr El Sheikh offering precision haircuts, beard styling, and VIP chair service.",
+    "googleMapsUrl": "https://maps.google.com/?q=Kafr+El+Sheikh+Barber",
+    "description": "الصالون الرجالي الأرقى في كفر الشيخ مع كابتن نادر، حلاقة دقن وشعر وعناية متكاملة بالبشرة.",
     "instaPayAddress": "nader.salon@instapay",
     "vodafoneCashNumber": "01024129393",
     "openHour": 10,
-    "closeHour": 22,
-    "rating": 4.9,
-    "amenities": ["AC", "Wi-Fi", "VIP Chair", "Kids Friendly"],
+    "closeHour": 23,
+    "rating": 4.95,
+    "amenities": [
+      "كرسي حلاقة VIP",
+      "جلسات تنظيف بشرة بالبخار",
+      "تعقيم كامل للأدوات",
+      "ضيافة ومشروبات"
+    ],
+    "staffMembers": [
+      "كابتن نادر (Master Barber)",
+      "كابتن حسن (Senior Stylist)"
+    ],
     "items": [
       {
-        "id": "nader-el-khawaga-chair-1",
-        "name": "Barber Chair 1",
-        "kind": "Barber / chair",
-        "hourlyRate": 150.0,
-        "multiRate": 0.0
+        "id": "nader-chair-1",
+        "name": "VIP Chair 1 (كرسي في آي بي ١)",
+        "kind": "Barber chair",
+        "hourlyRate": 160,
+        "multiRate": 0
       },
       {
-        "id": "nader-el-khawaga-chair-2",
-        "name": "Barber Chair 2 (VIP)",
-        "kind": "Barber / chair",
-        "hourlyRate": 200.0,
-        "multiRate": 0.0
+        "id": "nader-chair-2",
+        "name": "Master Chair 2 (كرسي الماستر ٢)",
+        "kind": "Barber chair",
+        "hourlyRate": 200,
+        "multiRate": 0
       }
     ],
     "services": [
       {
         "id": "nader-haircut",
-        "name": "Haircut",
+        "name": "قص شعر وتصفيف احترافي",
         "minutes": 30,
-        "price": 150.0
+        "price": 160
       },
       {
-        "id": "nader-beard-trim",
-        "name": "Beard trim",
+        "id": "nader-beard",
+        "name": "تحديد وتهذيب اللحية بالفوطة الساخنة",
         "minutes": 20,
-        "price": 100.0
+        "price": 100
       },
       {
-        "id": "nader-haircut-beard",
-        "name": "Haircut + beard",
-        "minutes": 45,
-        "price": 220.0
-      },
-      {
-        "id": "nader-kids-haircut",
-        "name": "Kids haircut",
-        "minutes": 25,
-        "price": 100.0
+        "id": "nader-full-groom",
+        "name": "باكدج العريس (شعر + لحية + بخار وماسك)",
+        "minutes": 60,
+        "price": 320
       }
     ]
+  },
+  {
+    "id": "letoile-beauty-cairo",
+    "name": "L'Étoile Beauty Lounge (صالون ليتوال بيوتي)",
+    "location": "الزمالك، القاهرة",
+    "type": "salon",
+    "subCategories": [
+      "salon",
+      "spa"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Zamalek+Beauty+Salon+Cairo",
+    "description": "صالون تجميل وعناية بالبشرة والشعر والأظافر في الزمالك بمنتجات عضوية عالمية.",
+    "instaPayAddress": "letoile.salon@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 10,
+    "closeHour": 22,
+    "rating": 4.93,
+    "amenities": [
+      "أخصائيات شعر وبشرة محترفات",
+      "منتجات فرنسية أصلية",
+      "قسم خاص للسبا والمساج",
+      "خدمة VIP"
+    ],
+    "staffMembers": [
+      "مادام كلير (Stylist Director)",
+      "أستاذة ياسمين (Skin Specialist)"
+    ],
+    "items": [
+      {
+        "id": "letoile-station-1",
+        "name": "Styling Station 1 (محطة التصفيف ١)",
+        "kind": "Salon station",
+        "hourlyRate": 220,
+        "multiRate": 0
+      },
+      {
+        "id": "letoile-spa-suite",
+        "name": "Private Spa Suite (جناح السبا الخاص)",
+        "kind": "Spa suite",
+        "hourlyRate": 350,
+        "multiRate": 0
+      }
+    ],
+    "services": [
+      {
+        "id": "letoile-hydrafacial",
+        "name": "جلسة هيدرافيشال لتنظيف وتنعيم البشرة",
+        "minutes": 45,
+        "price": 350
+      },
+      {
+        "id": "letoile-hair-styling",
+        "name": "تصفيف وسيشوار وبوتكس علاجي للشعر",
+        "minutes": 45,
+        "price": 280
+      },
+      {
+        "id": "letoile-manicure",
+        "name": "مانيكير وباديكير سبا متكامل",
+        "minutes": 40,
+        "price": 220
+      }
+    ]
+  },
+  {
+    "id": "the-gentleman-barber-zayed",
+    "name": "The Gentleman Barbershop (ذا جينتلمان باربر)",
+    "location": "الشيخ زايد، الجيزة",
+    "type": "salon",
+    "subCategories": [
+      "salon",
+      "barber"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Sheikh+Zayed+Barbershop",
+    "description": "صالون كلاسيكي إنجليزي في الشيخ زايد مع أفضل مصففي الشعر وخبراء العناية باللحية.",
+    "instaPayAddress": "gentleman.barber@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 10,
+    "closeHour": 23,
+    "rating": 4.89,
+    "amenities": [
+      "أجواء كلاسيكية فخمة",
+      "إسبريسو وقهوة مجانية",
+      "كراسي جلدية مريحة",
+      "شاشات عرض رياضية"
+    ],
+    "items": [
+      {
+        "id": "gentleman-chair-1",
+        "name": "Gentleman Chair 1 (كرسي كلاسيك ١)",
+        "kind": "Barber chair",
+        "hourlyRate": 180,
+        "multiRate": 0
+      },
+      {
+        "id": "gentleman-chair-2",
+        "name": "Gentleman Chair 2 (كرسي كلاسيك ٢)",
+        "kind": "Barber chair",
+        "hourlyRate": 180,
+        "multiRate": 0
+      }
+    ],
+    "services": [
+      {
+        "id": "gentleman-haircut",
+        "name": "قصة شعر كلاسيكية أو عصرية",
+        "minutes": 30,
+        "price": 180
+      },
+      {
+        "id": "gentleman-beard-oil",
+        "name": "حلاقة لحية موس وعناية بالزيوت الطبيعية",
+        "minutes": 25,
+        "price": 120
+      }
+    ]
+  },
+  {
+    "id": "hive-coworking-tagamoa",
+    "name": "The Hive Coworking (ذا هايف مساحة عمل مشتركة)",
+    "location": "التجمع الخامس، القاهرة الجديدة",
+    "type": "workspace",
+    "subCategories": [
+      "workspace",
+      "meeting_rooms"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 20,
+    "imageUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=New+Cairo+Coworking",
+    "description": "مساحة عمل مشتركة وقاعات اجتماعات مجهزة بأعلى التقنيات وسرعات إنترنت فايبر فائقة.",
+    "instaPayAddress": "hive.work@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 9,
+    "closeHour": 23,
+    "rating": 4.91,
+    "amenities": [
+      "إنترنت فايبر 200 ميجا",
+      "شاشات عرض بروجيكتور",
+      "مشروبات وبوفيه مفتوح",
+      "غرف مكالمات خاصة"
+    ],
+    "items": [
+      {
+        "id": "hive-meeting-room-1",
+        "name": "Executive Meeting Room (غرفة اجتماعات تنفيذية ٨ أشخاص)",
+        "kind": "Meeting room",
+        "hourlyRate": 250,
+        "multiRate": 350
+      },
+      {
+        "id": "hive-private-office",
+        "name": "Private Team Office (مكتب خاص لفرق العمل)",
+        "kind": "Private office",
+        "hourlyRate": 300,
+        "multiRate": 0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "station-study-hub-dokki",
+    "name": "The Station Study & Work Hub (ذا ستيشن ورك هاب)",
+    "location": "الدقي، الجيزة",
+    "type": "workspace",
+    "subCategories": [
+      "workspace",
+      "study"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 20,
+    "imageUrl": "https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Dokki+Study+Hub+Cairo",
+    "description": "بيئة هادئة ومثالية للمذاكرة والعمل عن بعد بالدقي مع إمكانية حجز غرف دراسة للمجموعات.",
+    "instaPayAddress": "station.work@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 9,
+    "closeHour": 23,
+    "rating": 4.86,
+    "amenities": [
+      "أجواء هادئة للمذاكرة",
+      "مشروبات دافئة وسناكس",
+      "منافذ شحن لكل مقعد",
+      "طباعة وتصوير أوراق"
+    ],
+    "items": [
+      {
+        "id": "station-group-room",
+        "name": "Study Group Room (غرفة مذاكرة للمجموعات ٦ أشخاص)",
+        "kind": "Study room",
+        "hourlyRate": 150,
+        "multiRate": 200
+      },
+      {
+        "id": "station-quiet-desk",
+        "name": "Quiet Focus Station (مكتب تركيز هادئ)",
+        "kind": "Quiet desk",
+        "hourlyRate": 50,
+        "multiRate": 0
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": "soundwave-podcast-studio",
+    "name": "SoundWave Podcast & Media Studio (ستوديو ساوند ويف)",
+    "location": "مدينة نصر، القاهرة",
+    "type": "workspace",
+    "subCategories": [
+      "workspace",
+      "studio"
+    ],
+    "ownerPhone": "01015325250",
+    "depositPercent": 25,
+    "imageUrl": "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=1200&q=80",
+    "galleryUrls": [
+      "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80"
+    ],
+    "googleMapsUrl": "https://maps.google.com/?q=Nasr+City+Podcast+Studio",
+    "description": "ستوديو تصوير وبودكاست مجهز بعوازل صوتية احترافية، ميكروفونات Shure SM7B، وكاميرات 4K.",
+    "instaPayAddress": "soundwave.studio@instapay",
+    "vodafoneCashNumber": "01015325250",
+    "openHour": 10,
+    "closeHour": 23,
+    "rating": 4.96,
+    "amenities": [
+      "ميكروفونات Shure SM7B",
+      "إضاءات سينمائية Aputure",
+      "عزل صوتي احترافي 100%",
+      "كاميرات Sony 4K"
+    ],
+    "items": [
+      {
+        "id": "soundwave-studio-a",
+        "name": "4-Mic Podcast Studio (ستوديو بودكاست ٤ مايك)",
+        "kind": "Podcast studio",
+        "hourlyRate": 350,
+        "multiRate": 500
+      },
+      {
+        "id": "soundwave-booth",
+        "name": "Voiceover & Dubbing Booth (كابينة تسجيل فويس أوفر)",
+        "kind": "Voiceover booth",
+        "hourlyRate": 200,
+        "multiRate": 0
+      }
+    ],
+    "services": []
   }
 ]

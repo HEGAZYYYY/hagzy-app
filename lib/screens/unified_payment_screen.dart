@@ -206,7 +206,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     return val;
   }
 
-  String _localized(String en, String ar) => widget.arabic ? ar : en;
+  String _localized(String en, String ar) => (widget.arabic || isArabicMode) ? ar : en;
 
   Future<void> _initiatePaymentIntent({String? overrideSender}) async {
     setState(() {

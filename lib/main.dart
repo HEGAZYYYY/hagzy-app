@@ -34,10 +34,7 @@ void main() async {
 
 const bool kDemoLogin = bool.fromEnvironment('HAGZY_DEMO_LOGIN');
 
-/// The app language, lifted above MaterialApp so that dialogs, bottom sheets
-/// and snackbars (which live in the Navigator overlay, above the home screen)
-/// get the right locale and text direction, not the device's.
-final ValueNotifier<String> kAppLanguage = ValueNotifier<String>('EN');
+// The app language is defined and exported from theme/hagzy_theme.dart.
 
 class HagzyApp extends StatelessWidget {
   const HagzyApp({
@@ -872,6 +869,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           bJson['checkedIn'] == true || bJson['status'] == 'checked_in';
       final sigVerified = details['signatureVerified'] == true;
 
+      final ar = _language == 'AR' || kAppLanguage.value == 'AR';
       await showDialog<void>(
         context: context,
         builder: (ctx) => StatefulBuilder(
@@ -883,9 +881,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                   color: kGreen,
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('Scanned Booking Check-In',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                Expanded(
+                  child: Text(
+                    localized(ar, 'Scanned Booking Check-In', 'تسجيل حضور عبر الباركود'),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                  ),
                 ),
               ],
             ),
@@ -893,16 +893,20 @@ class _HagzyHomeState extends State<HagzyHome> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Guest: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
+                Text('${localized(ar, 'Guest', 'العميل')}: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
                 if ((bJson['phone'] ?? '').toString().isNotEmpty)
-                  Text('Phone: ${bJson['phone']}'),
-                Text('Venue: ${bJson['venueName'] ?? bJson['venueId']}'),
-                Text('Unit: ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
-                Text('Status: ${checkedInNow ? 'CHECKED IN ✓' : bJson['status']}'),
+                  Text('${localized(ar, 'Phone', 'الهاتف')}: ${bJson['phone']}'),
+                Text('${localized(ar, 'Venue', 'المكان')}: ${bJson['venueName'] ?? bJson['venueId']}'),
+                Text('${localized(ar, 'Unit', 'الوحدة')}: ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
+                Text('${localized(ar, 'Status', 'الحالة')}: ${checkedInNow ? localized(ar, 'CHECKED IN ✓', 'تم الحضور ✓') : bJson['status']}'),
                 const SizedBox(height: 8),
                 if (fin.isNotEmpty)
                   Text(
-                    'Deposit Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP',
+                    localized(
+                      ar,
+                      'Deposit Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP',
+                      'المدفوع: ${fin['paidAmount']} ج.م · المتبقي بالمكان: ${fin['remainingDue']} ج.م',
+                    ),
                     style: const TextStyle(
                         fontWeight: FontWeight.w800, color: kGreenDark),
                   ),
@@ -911,7 +915,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
+                child: Text(localized(ar, 'Close', 'إغلاق')),
               ),
               if (!checkedInNow)
                 FilledButton.icon(
@@ -920,7 +924,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                     setDlgState(() => checkedInNow = true);
                   },
                   icon: const Icon(Icons.how_to_reg_rounded, size: 18),
-                  label: const Text('Check In Guest'),
+                  label: Text(localized(ar, 'Check In Guest', 'تسجيل حضور العميل')),
                 ),
             ],
           ),
@@ -6060,13 +6064,31 @@ class _HagzyHomeState extends State<HagzyHome> {
     );
   }
 
-  Widget _buildAdminLogin() => Scaffold(
+  Widget _buildAdminLogin() {
+    final ar = _language == 'AR' || kAppLanguage.value == 'AR';
+    return Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('Venue owner sign in'),
+          title: Text(localized(ar, 'Venue owner sign in', 'دخول أصحاب الأماكن والشركاء')),
           actions: [
             IconButton(
-              tooltip: kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+              tooltip: ar ? 'English' : 'العربية',
+              onPressed: () => _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
+              style: IconButton.styleFrom(
+                backgroundColor: kDarkMode.value
+                    ? const Color(0xFF162822)
+                    : kSurfaceTint,
+                foregroundColor: kDarkMode.value ? kGold : kGreen,
+                side: BorderSide(color: kBorder),
+              ),
+              icon: Text(
+                _language == 'AR' ? 'EN' : 'عربي',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              tooltip: kDarkMode.value ? (ar ? 'الوضع النهاري' : 'Light Mode') : (ar ? 'الوضع الليلي' : 'Dark Mode'),
               onPressed: _toggleDarkMode,
               style: IconButton.styleFrom(
                 backgroundColor: kDarkMode.value
@@ -6084,7 +6106,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             TextButton.icon(
               onPressed: () => setState(() => _mode = 'customer'),
               icon: const Icon(Icons.arrow_back_rounded),
-              label: const Text('Customer Mode'),
+              label: Text(localized(ar, 'Customer Mode', 'تطبيق العملاء')),
             ),
           ],
         ),
@@ -6111,7 +6133,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Welcome back',
+                        localized(ar, 'Welcome back', 'مرحباً بك مجدداً'),
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
@@ -6123,9 +6145,17 @@ class _HagzyHomeState extends State<HagzyHome> {
                       Text(
                         _api.isConfigured
                             ? (_customerSignedIn && !_isAuthorizedAdmin
-                                ? 'Partner Verification'
-                                : 'Sign in with your email, phone number, or Google account to access your venue dashboard or request partner verification.')
-                            : 'Connect your Hagzy API to sign in and sync venue data across devices.',
+                                ? localized(ar, 'Partner Verification', 'توثيق حساب شريك')
+                                : localized(
+                                    ar,
+                                    'Sign in with your email, phone number, or Google account to access your venue dashboard or request partner verification.',
+                                    'سجّل الدخول عبر بريدك، هاتفك، أو حساب جوجل لإدارة مكانك أو تقديم طلب توثيق شريك جديد.',
+                                  ))
+                            : localized(
+                                ar,
+                                'Connect your Hagzy API to sign in and sync venue data across devices.',
+                                'اتصل بسيرفر حجزي لتسجيل الدخول ومزامنة بيانات الملاعب والأماكن.',
+                              ),
                         style: TextStyle(color: kMuted, height: 1.4),
                       ),
                       const SizedBox(height: 22),
@@ -6151,7 +6181,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       size: 36, color: kGreen),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Verification Pending',
+                                    localized(ar, 'Verification Pending', 'في انتظار التحقق والاعتماد'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 18,
@@ -6161,7 +6191,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Your request for "${(_myPartnerRequest?['venueName'] ?? 'your venue').toString()}" is awaiting platform owner verification.',
+                                    localized(
+                                      ar,
+                                      'Your request for "${(_myPartnerRequest?['venueName'] ?? 'your venue').toString()}" is awaiting platform owner verification.',
+                                      'طلبك لـ "${(_myPartnerRequest?['venueName'] ?? 'مكانك').toString()}" قيد المراجعة والاعتماد من إدارة المنصة.',
+                                    ),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: kMuted, fontSize: 13.5),
                                   ),
@@ -6174,7 +6208,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     ),
                                     onPressed: _working ? null : _refreshPartnerApprovalStatus,
                                     icon: const Icon(Icons.refresh_rounded, size: 18),
-                                    label: const Text('Check Approval Status'),
+                                    label: Text(localized(ar, 'Check Approval Status', 'تحديث حالة الموافقة')),
                                   ),
                                   const SizedBox(height: 8),
                                   TextButton(
@@ -6184,7 +6218,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               _partnerConfirmedInterest = true;
                                               _partnerShowRequestForm = true;
                                             }),
-                                    child: const Text('Edit Request Details'),
+                                    child: Text(localized(ar, 'Edit Request Details', 'تعديل بيانات الطلب')),
                                   ),
                                   TextButton(
                                     onPressed: _working
@@ -6195,7 +6229,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               setState(() => _mode = 'adminLogin');
                                             }
                                           },
-                                    child: const Text('Switch Account'),
+                                    child: Text(localized(ar, 'Switch Account', 'تبديل الحساب')),
                                   ),
                                 ],
                               ),
@@ -6216,7 +6250,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       size: 40, color: kGreen),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Become a Hagzy Venue Owner?',
+                                    localized(ar, 'Become a Hagzy Venue Owner?', 'هل تود الانضمام كشريك صاحب مكان؟'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 18,
@@ -6226,7 +6260,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Do you own a padel court, salon, PlayStation lounge, or workspace and want to list and manage bookings on Hagzy?',
+                                    localized(
+                                      ar,
+                                      'Do you own a padel court, salon, PlayStation lounge, or workspace and want to list and manage bookings on Hagzy?',
+                                      'هل تمتلك ملعب بادل أو كورة، صالون حلاقة، صالة بلايستيشن أو مساحة عمل وتريد إدارتها وتلقي الحجوزات على حجزي؟',
+                                    ),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 13.5,
@@ -6244,9 +6282,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     onPressed: () => setState(
                                         () => _partnerConfirmedInterest = true),
                                     icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                                    label: const Text(
-                                      'Yes, I want to be a Venue Owner',
-                                      style: TextStyle(fontWeight: FontWeight.w800),
+                                    label: Text(
+                                      localized(ar, 'Yes, I want to be a Venue Owner', 'نعم، أريد التسجيل كصاحب مكان'),
+                                      style: const TextStyle(fontWeight: FontWeight.w800),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -6255,7 +6293,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _mode = 'customer';
                                       _tab = 0;
                                     }),
-                                    child: const Text('No, return to Customer App'),
+                                    child: Text(localized(ar, 'No, return to Customer App', 'لا، العودة لتطبيق العملاء')),
                                   ),
                                   const SizedBox(height: 12),
                                   const Divider(),
@@ -6266,9 +6304,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _loginError = null;
                                     }),
                                     icon: const Icon(Icons.lock_outline_rounded, size: 16, color: kGreen),
-                                    label: const Text(
-                                      'Already an Owner? Sign in with Owner Password',
-                                      style: TextStyle(fontWeight: FontWeight.w700),
+                                    label: Text(
+                                      localized(ar, 'Already an Owner? Sign in with Owner Password', 'لديك حساب بالفعل؟ الدخول بكلمة المرور'),
+                                      style: const TextStyle(fontWeight: FontWeight.w700),
                                     ),
                                   ),
                                   if (kDebugMode ||
@@ -6278,9 +6316,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     FilledButton.tonalIcon(
                                       onPressed: _openOwnerWorkspaceDirectly,
                                       icon: const Icon(Icons.admin_panel_settings_rounded, size: 18),
-                                      label: const Text(
-                                        'Enter Owner Workspace (Direct Access)',
-                                        style: TextStyle(fontWeight: FontWeight.w800),
+                                      label: Text(
+                                        localized(ar, 'Enter Owner Workspace (Direct Access)', 'دخول لوحة الشريك (وصول مباشر)'),
+                                        style: const TextStyle(fontWeight: FontWeight.w800),
                                       ),
                                     ),
                                   ],
@@ -6300,8 +6338,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 children: [
                                   Text(
                                     _savedPartnerStatus == 'rejected'
-                                        ? 'Request Rejected — Update & Resubmit'
-                                        : 'Request Your Venue Dashboard',
+                                        ? localized(ar, 'Request Rejected — Update & Resubmit', 'تم رفض الطلب — عدل البيانات وأعد الإرسال')
+                                        : localized(ar, 'Request Your Venue Dashboard', 'طلب لوحة تحكم لمكانك'),
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
@@ -6310,14 +6348,18 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Signed in as ${_savedCustomerEmail.isNotEmpty ? _savedCustomerEmail : _savedCustomerPhone}',
+                                    localized(
+                                      ar,
+                                      'Signed in as ${_savedCustomerEmail.isNotEmpty ? _savedCustomerEmail : _savedCustomerPhone}',
+                                      'مسجل الدخول كـ ${_savedCustomerEmail.isNotEmpty ? _savedCustomerEmail : _savedCustomerPhone}',
+                                    ),
                                     style: TextStyle(fontSize: 12.5, color: kMuted),
                                   ),
                                   const SizedBox(height: 12),
                                   TextField(
                                     controller: _partnerOwnerNameController,
                                     decoration: InputDecoration(
-                                      labelText: 'Owner Full Name',
+                                      labelText: localized(ar, 'Owner Full Name', 'اسم صاحب المكان بالكامل'),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -6325,7 +6367,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   TextField(
                                     controller: _partnerVenueNameController,
                                     decoration: InputDecoration(
-                                      labelText: 'Venue Name *',
+                                      labelText: localized(ar, 'Venue Name *', 'اسم المكان / الملعب *'),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -6334,14 +6376,14 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     initialValue: _partnerVenueType,
                                     isExpanded: true,
                                     decoration: InputDecoration(
-                                      labelText: 'Venue Category',
+                                      labelText: localized(ar, 'Venue Category', 'تصنيف المكان'),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                    items: const [
-                                      DropdownMenuItem(value: 'padel', child: Text('Padel / Football')),
-                                      DropdownMenuItem(value: 'salon', child: Text('Salon / Barber')),
-                                      DropdownMenuItem(value: 'playstation', child: Text('PlayStation / Lounge')),
-                                      DropdownMenuItem(value: 'workspace', child: Text('Workspace / Studio')),
+                                    items: [
+                                      DropdownMenuItem(value: 'padel', child: Text(localized(ar, 'Padel / Football', 'بادل / كرة قدم'))),
+                                      DropdownMenuItem(value: 'salon', child: Text(localized(ar, 'Salon / Barber', 'صالون / حلاقة وتجميل'))),
+                                      DropdownMenuItem(value: 'playstation', child: Text(localized(ar, 'PlayStation / Lounge', 'بلايستيشن / ألعاب ترفيهية'))),
+                                      DropdownMenuItem(value: 'workspace', child: Text(localized(ar, 'Workspace / Studio', 'مساحة عمل / استوديو'))),
                                     ],
                                     onChanged: (val) {
                                       if (val != null) setState(() => _partnerVenueType = val);
@@ -6351,7 +6393,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   TextField(
                                     controller: _partnerCityController,
                                     decoration: InputDecoration(
-                                      labelText: 'City',
+                                      labelText: localized(ar, 'City', 'المدينة / المحافظة'),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -6359,7 +6401,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   TextField(
                                     controller: _partnerAddressController,
                                     decoration: InputDecoration(
-                                      labelText: 'Address',
+                                      labelText: localized(ar, 'Address', 'العنوان بالتفصيل'),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -6368,7 +6410,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     controller: _partnerNotesController,
                                     maxLines: 2,
                                     decoration: InputDecoration(
-                                      labelText: 'Notes (optional)',
+                                      labelText: localized(ar, 'Notes (optional)', 'ملاحظات إضافية (اختياري)'),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -6386,8 +6428,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             width: 20,
                                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                           )
-                                        : const Text('Submit Request for Verification',
-                                            style: TextStyle(fontWeight: FontWeight.w800)),
+                                        : Text(
+                                            localized(ar, 'Submit Request for Verification', 'إرسال الطلب للاعتماد'),
+                                            style: const TextStyle(fontWeight: FontWeight.w800),
+                                          ),
                                   ),
                                   const SizedBox(height: 6),
                                   Wrap(
@@ -6397,7 +6441,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     children: [
                                       TextButton(
                                         onPressed: _working ? null : _refreshPartnerApprovalStatus,
-                                        child: const Text('Check Status'),
+                                        child: Text(localized(ar, 'Check Status', 'متابعة الحالة')),
                                       ),
                                       TextButton(
                                         onPressed: _working
@@ -6408,7 +6452,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                   setState(() => _mode = 'adminLogin');
                                                 }
                                               },
-                                        child: const Text('Switch Account'),
+                                        child: Text(localized(ar, 'Switch Account', 'تبديل الحساب')),
                                       ),
                                     ],
                                   ),
@@ -6426,7 +6470,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ),
                             onPressed: _working ? null : _loginAdminWithGoogle,
                             icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-                            label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                            label: Text(
+                              localized(ar, 'Continue with Google', 'متابعة بحساب Google'),
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           OutlinedButton.icon(
@@ -6445,7 +6492,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _loginError = null;
                                     }),
                             icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
-                            label: const Text('Continue with Email or Phone OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                            label: Text(
+                              localized(ar, 'Continue with Email or Phone OTP', 'تسجيل الدخول بالهاتف أو البريد'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                            ),
                           ),
                           const SizedBox(height: 10),
                           TextButton.icon(
@@ -6457,7 +6507,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _loginError = null;
                                     }),
                             icon: const Icon(Icons.lock_outline_rounded, size: 18),
-                            label: const Text('Sign in with Owner Password', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                            label: Text(
+                              localized(ar, 'Sign in with Owner Password', 'الدخول بكلمة المرور للمدير'),
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ] else if (_adminShowPasswordAuth) ...[
                           Container(
@@ -6476,7 +6529,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'Owner Password Sign In',
+                                        localized(ar, 'Owner Password Sign In', 'تسجيل دخول صاحب المكان بكلمة المرور'),
                                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk),
                                       ),
                                     ),
@@ -6496,7 +6549,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: InputDecoration(
-                                    labelText: 'Owner Email',
+                                    labelText: localized(ar, 'Owner Email', 'البريد الإلكتروني للمدير'),
                                     prefixIcon: const Icon(Icons.email_outlined, color: kGreen, size: 20),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
@@ -6506,7 +6559,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   controller: _passwordController,
                                   obscureText: !_showAdminPassword,
                                   decoration: InputDecoration(
-                                    labelText: 'Password',
+                                    labelText: localized(ar, 'Password', 'كلمة المرور'),
                                     prefixIcon: const Icon(Icons.lock_outline_rounded, color: kGreen, size: 20),
                                     suffixIcon: IconButton(
                                       icon: Icon(
@@ -6536,7 +6589,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           width: 20,
                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                         )
-                                      : const Text('Sign In to Owner Portal', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                      : Text(localized(ar, 'Sign In to Owner Portal', 'تسجيل الدخول للوحة الإدارة'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                                 ),
                                 const SizedBox(height: 6),
                                 Center(
@@ -6547,7 +6600,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                               _adminShowPasswordAuth = false;
                                               _loginError = null;
                                             }),
-                                    child: const Text('← Other Sign-In Methods', style: TextStyle(fontSize: 12.5)),
+                                    child: Text(localized(ar, '← Other Sign-In Methods', '← طرق دخول أخرى'), style: const TextStyle(fontSize: 12.5)),
                                   ),
                                 ),
                               ],
@@ -6570,7 +6623,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        _adminPhoneCodeSent ? 'Enter Verification Code' : 'Email or Phone Login',
+                                        _adminPhoneCodeSent
+                                            ? localized(ar, 'Enter Verification Code', 'أدخل رمز التحقق')
+                                            : localized(ar, 'Email or Phone Login', 'الدخول بالهاتف أو البريد'),
                                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk),
                                       ),
                                     ),
@@ -6592,8 +6647,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     controller: _adminPhoneController,
                                     keyboardType: TextInputType.emailAddress,
                                     decoration: InputDecoration(
-                                      labelText: 'Email or Phone Number',
-                                      hintText: 'owner@venue.com or 010XXXXXXXX',
+                                      labelText: localized(ar, 'Email or Phone Number', 'البريد الإلكتروني أو رقم الهاتف'),
+                                      hintText: localized(ar, 'owner@venue.com or 010XXXXXXXX', '010XXXXXXXX أو owner@venue.com'),
                                       prefixIcon: const Icon(Icons.alternate_email_rounded, color: kGreen, size: 20),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
@@ -6613,11 +6668,18 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             width: 20,
                                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                           )
-                                        : const Text('Send Verification Code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                        : Text(
+                                            localized(ar, 'Send Verification Code', 'إرسال كود التحقق'),
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+                                          ),
                                   ),
                                 ] else ...[
                                   Text(
-                                    'Code sent to ${_adminPhoneController.text}. Enter the 6-digit code:',
+                                    localized(
+                                      ar,
+                                      'Code sent to ${_adminPhoneController.text}. Enter the 6-digit code:',
+                                      'تم إرسال كود التحقق إلى ${_adminPhoneController.text}. أدخل الرمز المكون من 6 أرقام:',
+                                    ),
                                     style: TextStyle(fontSize: 13, color: kMuted),
                                   ),
                                   const SizedBox(height: 10),
@@ -6652,7 +6714,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                             width: 20,
                                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                           )
-                                        : const Text('Verify & Enter Owner Workspace', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                        : Text(
+                                            localized(ar, 'Verify & Enter Owner Workspace', 'تأكيد ودخول لوحة الشريك'),
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+                                          ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
@@ -6665,11 +6730,17 @@ class _HagzyHomeState extends State<HagzyHome> {
                                                   _adminPhoneCodeSent = false;
                                                   _adminOtpController.clear();
                                                 }),
-                                        child: const Text('Change Email / Phone', style: TextStyle(fontSize: 12.5)),
+                                        child: Text(
+                                          localized(ar, 'Change Email / Phone', 'تغيير البريد / الهاتف'),
+                                          style: const TextStyle(fontSize: 12.5),
+                                        ),
                                       ),
                                       TextButton(
                                         onPressed: _working ? null : _sendAdminPhoneOtp,
-                                        child: const Text('Resend Code', style: TextStyle(fontSize: 12.5)),
+                                        child: Text(
+                                          localized(ar, 'Resend Code', 'إعادة إرسال الكود'),
+                                          style: const TextStyle(fontSize: 12.5),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -6703,7 +6774,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                         ],
                         const SizedBox(height: 18),
                         Text(
-                          'Protected Access: Administrative privileges are strictly restricted to verified owner credentials.',
+                          localized(
+                            ar,
+                            'Protected Access: Administrative privileges are strictly restricted to verified owner credentials.',
+                            'وصول محمي: صلاحيات الإدارة مقتصرة فقط على الشركاء وأصحاب الأماكن المعتمدين.',
+                          ),
                           style: TextStyle(color: kMuted, fontSize: 12.0, height: 1.4),
                           textAlign: TextAlign.center,
                         ),
@@ -6739,4 +6814,5 @@ class _HagzyHomeState extends State<HagzyHome> {
           ),
         ),
       );
+  }
 }

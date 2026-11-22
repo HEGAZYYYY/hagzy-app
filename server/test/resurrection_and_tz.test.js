@@ -200,6 +200,78 @@ test('INTEGRATION SUITE: Server timezone parsing and booking anti-resurrection',
     assert.match(attachRes.json.error, /cancelled/i);
   });
 
+  await t.test('REFUNDS & EXCESS DEPOSIT: Excess deposit and cancellation >= 6h credit to user wallet', async () => {
+    // 1. Register a dedicated test customer
+    const phone = '01055667788';
+    const email = 'walletuser@test.dev';
+    const regRes = await call('POST', '/api/auth/customer/register', {
+      body: { name: 'Wallet Refund User', email, phone, password: 'password123' },
+    });
+    assert.equal(regRes.status, 201);
+    const userToken = regRes.json.token;
+
+    const initialMe = await call('GET', '/api/customer/profile', { token: userToken });
+    assert.equal(initialMe.status, 200);
+    assert.equal(Number(initialMe.json.customer.walletBalance || 0), 0);
+
+    // 2. Create booking 24 hours in the future
+    const futureDate = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+    const bRes = await call('POST', '/api/bookings', {
+      token: userToken,
+      body: {
+        venueId: testVenueId,
+        itemId: 'court-1',
+        startsAt: futureDate,
+        durationMinutes: 60,
+        price: 200,
+        dueNow: 50,
+        customer: 'Wallet Refund User',
+        phone,
+      },
+    });
+    assert.equal(bRes.status, 200);
+    const bookingId = bRes.json.booking.id;
+    const payableAmount = bRes.json.booking.dueNow || 50;
+
+    // 3. Create payment intent for 50 EGP
+    const intentRes = await call('POST', '/api/payments/intent', {
+      token: userToken,
+      body: {
+        bookingId,
+        paymentMethod: 'MOBILE_WALLET',
+        senderIdentifier: phone,
+      },
+    });
+    assert.equal(intentRes.status, 200);
+    const expectedPayable = intentRes.json.payableAmount || payableAmount;
+    const overpaymentAmount = Number((expectedPayable + 20).toFixed(2));
+
+    // 4. Overpayment transfer arrives: customer sends 20 EGP excess!
+    const rawText = `تم استلام مبلغ ${overpaymentAmount} جنيه من رقم ${phone}`;
+    const listenerRes = await call('POST', '/api/payments/listener', {
+      headers: { 'x-listener-key': 'test-listener-secret-res' },
+      body: { text: rawText, sender: phone },
+    });
+    assert.equal(listenerRes.status, 200);
+    assert.equal(listenerRes.json.matched, true);
+    assert.equal(listenerRes.json.bookingId, bookingId);
+
+    // 5. Verify excess 20 EGP was credited to user's wallet
+    const meAfterExcess = await call('GET', '/api/customer/profile', { token: userToken });
+    assert.equal(meAfterExcess.status, 200);
+    assert.equal(Number(meAfterExcess.json.customer.walletBalance), 20, 'Excess 20 EGP must be in wallet');
+
+    // 6. Cancel the booking (24h before start >= 6h)
+    const cancelRes = await call('POST', `/api/bookings/${bookingId}/cancel`, { token: userToken });
+    assert.equal(cancelRes.status, 200);
+    assert.equal(cancelRes.json.booking.status, 'cancelled');
+
+    // 7. Verify full paid deposit is refunded to wallet, total balance = 20 + overpaymentAmount
+    const meAfterCancel = await call('GET', '/api/customer/profile', { token: userToken });
+    assert.equal(meAfterCancel.status, 200);
+    assert.equal(Number(meAfterCancel.json.customer.walletBalance), Number((20 + overpaymentAmount).toFixed(2)), 'Wallet balance should reflect excess + deposit refund');
+  });
+
   if (proc) proc.kill();
   if (dataDir) fs.rmSync(dataDir, { recursive: true, force: true });
 });

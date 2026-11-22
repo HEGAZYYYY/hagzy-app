@@ -419,6 +419,78 @@ function markBookingConfirmed(b, { method, providerRef, amount, excess, actor = 
   return b;
 }
 
+function findUserIdForBooking(booking, explicitUserId = null) {
+  if (explicitUserId && explicitUserId !== 'guest') return explicitUserId;
+  if (!booking) return null;
+  if (booking.customerId && booking.customerId !== 'guest') return booking.customerId;
+  if (booking.userId && booking.userId !== 'guest') return booking.userId;
+  if (booking.ownerId && booking.ownerId !== 'guest') return booking.ownerId;
+  const cleanPhone = String(booking.phone || booking.customerPhone || '').replace(/\D/g, '');
+  if (cleanPhone && db && Array.isArray(db.users)) {
+    const matched = db.users.find(u => u.phone && u.phone.replace(/\D/g, '') === cleanPhone);
+    if (matched) return matched.id;
+  }
+  const email = String(booking.email || booking.customerEmail || '').toLowerCase().trim();
+  if (email && db && Array.isArray(db.users)) {
+    const matched = db.users.find(u => u.email && u.email.toLowerCase().trim() === email);
+    if (matched) return matched.id;
+  }
+  return null;
+}
+
+function creditUserWallet(userId, amount, { referenceId, description, actor = 'system' } = {}) {
+  const numAmt = Number(amount);
+  if (!userId || !numAmt || numAmt <= 0) return 0;
+  if (!db) return 0;
+  if (!db.walletLedger) db.walletLedger = [];
+  try {
+    recordLedgerEntry(db.walletLedger, {
+      userId,
+      amount: Number(numAmt.toFixed(2)),
+      type: LEDGER_ENTRY_TYPE.TOPUP,
+      referenceId: referenceId || `credit_${Date.now()}`,
+      description: description || 'Account wallet credit',
+      actor
+    });
+    const u = db.users ? db.users.find(usr => usr.id === userId) : null;
+    if (u) {
+      u.walletBalance = calculateWalletBalance(u.id, db.walletLedger);
+      syncUserToFirebase(u);
+    }
+    return numAmt;
+  } catch (err) {
+    console.warn('creditUserWallet warning:', err.message);
+    return 0;
+  }
+}
+
+function seedRealisticVenuesIfSparse() {
+  if (!db || !Array.isArray(db.venues)) return;
+  const localSeed = path.join(DATA_DIR, 'venues_seed.json');
+  const rootSeed = path.join(__dirname, '..', 'assets', 'venues_seed.json');
+  const seedPath = fs.existsSync(localSeed) ? localSeed : (fs.existsSync(rootSeed) ? rootSeed : null);
+  if (seedPath && fs.existsSync(seedPath)) {
+    try {
+      const seedList = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+      if (Array.isArray(seedList) && seedList.length > 0) {
+        let addedCount = 0;
+        for (const v of seedList) {
+          if (!db.venues.some(existing => existing.id === v.id)) {
+            db.venues.push(v);
+            addedCount++;
+          }
+        }
+        if (addedCount > 0) {
+          console.log(`🌱 Seeded ${addedCount} realistic venues to marketplace (total: ${db.venues.length})`);
+          saveDb(db);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not seed realistic venues:', e.message);
+    }
+  }
+}
+
 function computeBookingQrSig(bookingId, venueId) {
   return crypto
     .createHmac('sha256', JWT_SECRET)
@@ -616,6 +688,9 @@ async function hydratePostgres() {
       console.log(
         `🐘 Relational PostgreSQL hydrated: ${stats.usersCount} users, ${stats.venuesCount} venues (${stats.unitsCount} units), ${stats.bookingsCount} bookings.`,
       );
+      if (stats.venuesCount <= 1) {
+        seedRealisticVenuesIfSparse();
+      }
       return;
     } catch (err) {
       // Keep isHydrated = false on failure so no accidental saveDb() can wipe live rows.
@@ -3260,23 +3335,23 @@ app.post('/api/bookings/:id/cancel', authenticateCustomer, (req, res) => {
     return res.status(err.statusCode || 400).json({ error: err.message });
   }
 
-  // Wallet deposit refund: full refund if cancelled >= 6 hours before start
+  // Deposit refund: full refund to wallet if cancelled >= 6 hours before start
   const hoursUntilStart = (new Date(booking.startsAt).getTime() - Date.now()) / (3600 * 1000);
-  if (booking.paymentMethod === 'wallet' && hoursUntilStart >= 6) {
-    const refundAmt = Number(booking.depositAmount || booking.dueNow || booking.actualPaidAmount || booking.price || 0);
+  if (hoursUntilStart >= 6) {
+    const refundAmt = Number(
+      booking.actualPaidAmount ||
+      (booking.status === 'confirmed' || booking.confirmed ? booking.depositAmount : 0) ||
+      (booking.paymentMethod === 'wallet' ? (booking.dueNow || booking.price || 0) : 0) ||
+      0
+    );
     if (refundAmt > 0) {
-      try {
-        recordLedgerEntry(db.walletLedger, {
-          userId: user.id,
-          amount: refundAmt,
-          type: LEDGER_ENTRY_TYPE.REFUND,
+      const refundTargetUserId = user.id || findUserIdForBooking(booking);
+      if (refundTargetUserId) {
+        creditUserWallet(refundTargetUserId, refundAmt, {
           referenceId: booking.id,
           description: `Full refund for cancellation >=6h before start (${booking.id})`,
           actor: 'system'
         });
-        user.walletBalance = calculateWalletBalance(user.id, db.walletLedger);
-      } catch (wErr) {
-        console.warn('Wallet refund ledger notice:', wErr.message);
       }
     }
   }
@@ -3904,6 +3979,16 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
             message: 'Booking is no longer active. Payment sent to review queue for refund/credit.'
           };
         }
+        if (excessAmount > 0) {
+          const targetUserId = findUserIdForBooking(b, matchedIntent.user_id);
+          if (targetUserId) {
+            creditUserWallet(targetUserId, excessAmount, {
+              referenceId: b.id,
+              description: `Excess deposit credited to wallet (${b.id})`,
+              actor: 'payment_oracle'
+            });
+          }
+        }
         notifyVenueOwner({
           venue: (db.venues || []).find(v => v.id === b.venueId),
           booking: b,
@@ -3976,6 +4061,16 @@ async function finalizePaymentVerification({ paymentMethod, senderIdentifier, am
           actor: 'payment_listener',
           reason: `Automated match via incoming ${method} transfer notification`
         });
+        if (excessAmount > 0) {
+          const targetUserId = findUserIdForBooking(b, matchedIntent.user_id);
+          if (targetUserId) {
+            creditUserWallet(targetUserId, excessAmount, {
+              referenceId: b.id,
+              description: `Excess deposit credited to wallet (${b.id})`,
+              actor: 'payment_oracle'
+            });
+          }
+        }
         notifyVenueOwner({
           venue: (db.venues || []).find(v => v.id === b.venueId),
           booking: b,
@@ -4133,6 +4228,16 @@ app.post('/api/payments/intent', optionalAuth, async (req, res) => {
     if (localBooking) {
       const confirmedBooking = markBookingConfirmed(localBooking, { method, amount: receivedAmt, excess });
       if (confirmedBooking) {
+        if (excess > 0) {
+          const targetUserId = findUserIdForBooking(localBooking, req.user?.id);
+          if (targetUserId) {
+            creditUserWallet(targetUserId, excess, {
+              referenceId: localBooking.id,
+              description: `Excess deposit credited to wallet (${localBooking.id})`,
+              actor: 'payment_oracle_retroactive'
+            });
+          }
+        }
         const venueObj = (db.venues || []).find(v => v.id === localBooking.venueId);
         notifyVenueOwner({ venue: venueObj, booking: localBooking, eventType: 'booking_confirmed' });
         syncBookingToFirebase(localBooking);
@@ -4952,25 +5057,13 @@ app.post('/api/chatbot/message', async (req, res) => {
   return res.json({ success: true, reply });
 });
 
-app.post('/api/internal/run-reminders', async (req, res) => {
-  const secret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET || '';
-  const authHeader = String(req.headers.authorization || '');
-  const keyHeader = String(req.headers['x-listener-key'] || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '')).trim();
-  let authorized = Boolean(secret && keyHeader && secret.length === keyHeader.length && crypto.timingSafeEqual(Buffer.from(keyHeader), Buffer.from(secret)));
-  if (!authorized && authHeader.startsWith('Bearer ')) {
-    try {
-      const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
-      authorized = Boolean(decoded && (decoded.role === 'owner' || decoded.isAdmin));
-    } catch (_) {}
-  }
-  if (!authorized) return res.status(401).json({ error: 'Unauthorized reminder runner' });
-
+async function executeBookingReminders({ forceMarkSent = false } = {}) {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
   const results = [];
   let sentCount = 0;
 
-  for (const b of db.bookings || []) {
+  for (const b of (db && db.bookings) || []) {
     if (!b.confirmed || b.cancelled || b.checkedIn || b.reminderSentAt) continue;
     const offsetMins = b.reminderOffsetMinutes !== undefined && b.reminderOffsetMinutes !== null
       ? Number(b.reminderOffsetMinutes)
@@ -5006,15 +5099,32 @@ app.post('/api/internal/run-reminders', async (req, res) => {
     if (sendRes && sendRes.sent) {
       b.reminderSentAt = nowIso;
       sentCount++;
-    } else if (req.body?.forceMarkSent) {
+    } else if (forceMarkSent) {
       b.reminderSentAt = nowIso;
       sentCount++;
     }
-    results.push({ bookingId: b.id, sent: Boolean(sendRes?.sent || req.body?.forceMarkSent) });
+    results.push({ bookingId: b.id, sent: Boolean(sendRes?.sent || forceMarkSent) });
   }
 
   saveDb(db);
-  return res.json({ success: true, checkedAt: nowIso, sentCount, results });
+  return { checkedAt: nowIso, sentCount, results };
+}
+
+app.post('/api/internal/run-reminders', async (req, res) => {
+  const secret = process.env.PAYMENT_LISTENER_KEY || process.env.PAYMENT_WEBHOOK_SECRET || '';
+  const authHeader = String(req.headers.authorization || '');
+  const keyHeader = String(req.headers['x-listener-key'] || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '')).trim();
+  let authorized = Boolean(secret && keyHeader && secret.length === keyHeader.length && crypto.timingSafeEqual(Buffer.from(keyHeader), Buffer.from(secret)));
+  if (!authorized && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+      authorized = Boolean(decoded && (decoded.role === 'owner' || decoded.isAdmin));
+    } catch (_) {}
+  }
+  if (!authorized) return res.status(401).json({ error: 'Unauthorized reminder runner' });
+
+  const outcome = await executeBookingReminders({ forceMarkSent: Boolean(req.body?.forceMarkSent) });
+  return res.json({ success: true, ...outcome });
 });
 
 // AI Venue Generator (Gemini 1.5 Flash + Egyptian Market Template Fallback)
@@ -5308,6 +5418,13 @@ if (require.main === module) {
     console.log(`\n🚀 Hagzy server is live on port ${PORT} (bound to 0.0.0.0)`);
     console.log(`📡 Venues loaded: ${db.venues.length} · 👥 Users: ${db.users.length}\n`);
   });
+  if (process.env.NODE_ENV !== 'test') {
+    setInterval(() => {
+      executeBookingReminders().catch(err => {
+        console.warn('Background reminder runner tick notice:', err.message);
+      });
+    }, 5 * 60 * 1000);
+  }
 }
 
 module.exports = { app, buildFallbackVenueFromTemplateNode, parseClientTimestamp };

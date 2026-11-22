@@ -254,15 +254,15 @@ class HagzyBooking {
     final rawParticipants = json['participant_ids'] as List<dynamic>? ?? [];
 
     DateTime start = DateTime.now();
-    if (json['start_time'] != null) {
-      start = DateTime.tryParse(json['start_time'].toString()) ?? DateTime.now();
-    } else if (json['startsAt'] != null) {
-      start = DateTime.tryParse(json['startsAt'].toString()) ?? DateTime.now();
+    final rawStart = json['start_time'] ?? json['startsAt'];
+    if (rawStart != null) {
+      start = parseIso8601AsLocal(rawStart.toString());
     }
 
     DateTime end = start.add(const Duration(hours: 1));
-    if (json['end_time'] != null) {
-      end = DateTime.tryParse(json['end_time'].toString()) ?? end;
+    final rawEnd = json['end_time'];
+    if (rawEnd != null) {
+      end = parseIso8601AsLocal(rawEnd.toString());
     } else if (json['durationMinutes'] != null) {
       end = start.add(Duration(minutes: (json['durationMinutes'] as num).toInt()));
     }

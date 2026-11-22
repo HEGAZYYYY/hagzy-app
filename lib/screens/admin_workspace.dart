@@ -7,6 +7,8 @@ import '../widgets/common_widgets.dart';
 import '../core/models/models_v2.dart';
 import '../features/merchant_portal/merchant_portal.dart';
 
+String _t(String en, String ar) => localized(isArabicMode, en, ar);
+
 Venue venueFromHagzyVenue(HagzyVenue v) {
   VenueType type = VenueType.sports;
   if (v.categories.contains('barber') || v.categories.contains('grooming')) {
@@ -128,19 +130,19 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
           child: Row(
             children: [
               _AdminKpiTile(
-                label: 'Bookings',
+                label: _t('Bookings', 'الحجوزات'),
                 value: '${widget.bookings.length}',
                 accent: kInk,
               ),
               const SizedBox(width: 8),
               _AdminKpiTile(
-                label: 'Confirmed',
+                label: _t('Confirmed', 'المؤكدة'),
                 value: '$confirmedCount',
                 accent: kGreenDark,
               ),
               const SizedBox(width: 8),
               _AdminKpiTile(
-                label: 'Pending',
+                label: _t('Pending', 'قيد الانتظار'),
                 value: '$pendingCount',
                 accent: pendingCount > 0 ? const Color(0xFFD97706) : kMuted,
               ),
@@ -154,33 +156,33 @@ class _AdminManageWorkspaceState extends State<AdminManageWorkspace> {
             runSpacing: 6,
             children: [
               CustomPill(
-                label: 'Manage venues',
+                label: _t('Manage venues', 'إدارة الأماكن'),
                 icon: Icons.storefront_outlined,
                 selected: _section == 0,
                 onTap: () => setState(() => _section = 0),
               ),
               CustomPill(
-                label: 'POS timeline',
+                label: _t('POS timeline', 'المواعيد ونقاط البيع'),
                 icon: Icons.view_timeline_outlined,
                 selected: _section == 1,
                 onTap: () => setState(() => _section = 1),
               ),
               CustomPill(
                 label: pendingCount > 0
-                    ? 'Analytics ($pendingCount pending)'
-                    : 'Analytics',
+                    ? _t('Analytics ($pendingCount pending)', 'التقارير ($pendingCount معلق)')
+                    : _t('Analytics', 'الأرباح والتقارير'),
                 icon: Icons.insights_rounded,
                 selected: _section == 2,
                 onTap: () => setState(() => _section = 2),
               ),
               CustomPill(
-                label: 'Users & CRM',
+                label: _t('Users & CRM', 'العملاء وإدارة الحسابات'),
                 icon: Icons.people_alt_rounded,
                 selected: _section == 3,
                 onTap: () => setState(() => _section = 3),
               ),
               CustomPill(
-                label: 'Gateway & Queue',
+                label: _t('Gateway & Queue', 'بوابة الدفع والمراجعة'),
                 icon: Icons.bolt_rounded,
                 selected: _section == 4,
                 onTap: () => setState(() => _section = 4),
@@ -989,13 +991,13 @@ class _PosTabState extends State<PosTab> {
           final fin = loaded?['financialSummary'] as Map<String, dynamic>?;
           final sigVerified = loaded?['signatureVerified'] == true;
           return AlertDialog(
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.qr_code_scanner_rounded, color: kGreen),
-                SizedBox(width: 8),
+                const Icon(Icons.qr_code_scanner_rounded, color: kGreen),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Verify / Scan Booking QR',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                  child: Text(_t('Verify / Scan Booking QR', 'فحص وتأكيد كود الحجز QR'),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                 ),
               ],
             ),
@@ -1005,14 +1007,14 @@ class _PosTabState extends State<PosTab> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Paste the scanned QR link from your camera app or enter a Booking ID to verify entry & remaining balance:',
+                    _t('Paste the scanned QR link from your camera app or enter a Booking ID to verify entry & remaining balance:', 'الصق رابط الـ QR الممسوح من الكاميرا أو أدخل كود الحجز للتحقق وتسجيل الحضور:'),
                     style: TextStyle(fontSize: 12, color: kMuted),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: ctrl,
                     decoration: InputDecoration(
-                      labelText: 'QR URL or Booking ID',
+                      labelText: _t('QR URL or Booking ID', 'رابط QR أو كود الحجز'),
                       hintText: 'https://hagzy.shop/partner?scanBooking=...',
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.search_rounded),
@@ -1057,8 +1059,8 @@ class _PosTabState extends State<PosTab> {
                               const SizedBox(width: 6),
                               Text(
                                 sigVerified
-                                    ? 'Signed QR Verified ✓'
-                                    : 'Booking Details',
+                                    ? _t('Signed QR Verified ✓', 'كود QR موثق ومؤكد ✓')
+                                    : _t('Booking Details', 'تفاصيل الحجز'),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: sigVerified ? kGreen : kInk,
@@ -1067,15 +1069,15 @@ class _PosTabState extends State<PosTab> {
                             ],
                           ),
                           const Divider(height: 14),
-                          Text('Guest: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
+                          Text('${_t('Guest', 'العميل')}: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
                           if ((bJson['phone'] ?? '').toString().isNotEmpty)
-                            Text('Phone: ${bJson['phone']}'),
-                          Text('Venue/Unit: ${bJson['venueName'] ?? bJson['venueId']} · ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
-                          Text('Status: ${checkedInNow ? 'CHECKED IN ✓' : bJson['status']}'),
+                            Text('${_t('Phone', 'الهاتف')}: ${bJson['phone']}'),
+                          Text('${_t('Venue/Unit', 'المكان / الوحدة')}: ${bJson['venueName'] ?? bJson['venueId']} · ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
+                          Text('${_t('Status', 'الحالة')}: ${checkedInNow ? _t('CHECKED IN ✓', 'تم الحضور ✓') : bJson['status']}'),
                           const SizedBox(height: 6),
                           if (fin != null)
                             Text(
-                              'Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP',
+                              _t('Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP', 'المدفوع: ${fin['paidAmount']} ج.م · المتبقي عند الحضور: ${fin['remainingDue']} ج.م'),
                               style: const TextStyle(
                                   fontWeight: FontWeight.w800, color: kGreenDark),
                             ),
@@ -1089,12 +1091,12 @@ class _PosTabState extends State<PosTab> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
+                child: Text(_t('Close', 'إغلاق')),
               ),
               if (bJson == null)
                 FilledButton(
                   onPressed: loading ? null : () => runLookup(setDlgState),
-                  child: const Text('Lookup'),
+                  child: Text(_t('Lookup', 'بحث')),
                 ),
               if (bJson != null && !checkedInNow && widget.onCheckInBooking != null)
                 FilledButton.icon(
@@ -1117,7 +1119,7 @@ class _PosTabState extends State<PosTab> {
                           }
                         },
                   icon: const Icon(Icons.how_to_reg_rounded, size: 18),
-                  label: const Text('Check In Guest'),
+                  label: Text(_t('Check In Guest', 'تسجيل حضور العميل')),
                 ),
             ],
           );
@@ -1159,7 +1161,7 @@ class _PosTabState extends State<PosTab> {
               const Icon(Icons.lock_clock_outlined, color: Color(0xFFD97706)),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Block Slot · ${item.name}',
+                child: Text('${_t('Block Slot', 'إغلاق موعد')} · ${item.name}',
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.w800)),
               ),
@@ -1171,13 +1173,13 @@ class _PosTabState extends State<PosTab> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                    'Prevent online customers from reserving this time slot:',
+                    _t('Prevent online customers from reserving this time slot:', 'منع الحجز أونلاين في هذه الفترة:'),
                     style: TextStyle(fontSize: 12, color: kMuted)),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: chosenReason,
                   decoration: InputDecoration(
-                    labelText: 'Block Reason / سبب الإغلاق',
+                    labelText: _t('Block Reason / سبب الإغلاق', 'سبب الإغلاق'),
                     filled: true,
                     fillColor: kPage,
                   ),
@@ -1216,11 +1218,11 @@ class _PosTabState extends State<PosTab> {
                         if (chosenT != null) setDlgState(() => time = chosenT);
                       }
                     },
-                    child: const Text('Change'),
+                    child: Text(_t('Change', 'تغيير')),
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text('Duration:',
+                Text(_t('Duration:', 'المدة:'),
                     style: TextStyle(fontSize: 12, color: kMuted)),
                 const SizedBox(height: 6),
                 Wrap(
@@ -1240,7 +1242,7 @@ class _PosTabState extends State<PosTab> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: Text(_t('Cancel', 'إلغاء')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -1248,7 +1250,7 @@ class _PosTabState extends State<PosTab> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Lock Slot'),
+              child: Text(_t('Lock Slot', 'تأكيد الإغلاق')),
             ),
           ],
         ),
@@ -1285,8 +1287,8 @@ class _PosTabState extends State<PosTab> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
         IntroCard(
-          title: 'POS timeline',
-          subtitle: 'Confirmed bookings, QR check-in, and temporary unpaid holds.',
+          title: _t('POS timeline', 'جدول مواعيد الحجوزات'),
+          subtitle: _t('Confirmed bookings, QR check-in, and temporary unpaid holds.', 'الحجوزات المؤكدة، فحص كود الـ QR، والمواعيد المعلقة.'),
           icon: Icons.view_timeline_outlined,
           action: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1294,11 +1296,11 @@ class _PosTabState extends State<PosTab> {
               FilledButton.tonalIcon(
                 onPressed: _openQrVerifyDialog,
                 icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
-                label: const Text('Scan QR Pass'),
+                label: Text(_t('Scan QR Pass', 'فحص كود QR')),
               ),
               if (allActive.isNotEmpty) ...[
                 const SizedBox(width: 8),
-                Text('${allActive.length} active',
+                Text(_t('${allActive.length} active', '${allActive.length} حجز نشط'),
                     style: const TextStyle(
                         color: kGreen, fontWeight: FontWeight.bold)),
               ],
@@ -1320,7 +1322,7 @@ class _PosTabState extends State<PosTab> {
                           color: kGreen, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        'New Booking Alerts (${unreadNotifs.length})',
+                        _t('New Booking Alerts (${unreadNotifs.length})', 'تنبيهات حجوزات جديدة (${unreadNotifs.length})'),
                         style: const TextStyle(
                             fontWeight: FontWeight.w800, color: kGreenDark),
                       ),
@@ -1348,7 +1350,7 @@ class _PosTabState extends State<PosTab> {
                           ? TextButton(
                               onPressed: () =>
                                   widget.onMarkNotificationRead!(nId),
-                              child: const Text('Dismiss'),
+                              child: Text(_t('Dismiss', 'تخطي')),
                             )
                           : null,
                     );
@@ -1366,8 +1368,8 @@ class _PosTabState extends State<PosTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Walk-in & Slot Blocker',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(_t('Walk-in & Slot Blocker', 'حجز مباشر وتقفيل المواعيد'),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   ...widget.venues.expand((venue) => venue.items.map(
                         (item) => ListTile(
@@ -1395,7 +1397,7 @@ class _PosTabState extends State<PosTab> {
                         ),
                       )),
                   if (widget.venues.every((venue) => venue.items.isEmpty))
-                    const Text('Add bookable spaces in Manage venues.'),
+                    Text(_t('Add bookable spaces in Manage venues.', 'أضف ملاعب أو وحدات قابلة للحجز من إدارة الأماكن.')),
                 ],
               ),
             ),
@@ -1406,19 +1408,21 @@ class _PosTabState extends State<PosTab> {
             spacing: 8,
             children: [
               CustomPill(
-                label: 'All (${allActive.length})',
+                label: _t('All (${allActive.length})', 'الكل (${allActive.length})'),
                 selected: _filter == 'all',
                 onTap: () => setState(() => _filter = 'all'),
               ),
               CustomPill(
-                label:
+                label: _t(
                     'Pending Deposit (${allActive.where((b) => b.isPendingPayment).length})',
+                    'في انتظار العربون (${allActive.where((b) => b.isPendingPayment).length})'),
                 selected: _filter == 'pending',
                 onTap: () => setState(() => _filter = 'pending'),
               ),
               CustomPill(
-                label:
+                label: _t(
                     'Confirmed (${allActive.where((b) => b.isConfirmed).length})',
+                    'مؤكد (${allActive.where((b) => b.isConfirmed).length})'),
                 selected: _filter == 'confirmed',
                 onTap: () => setState(() => _filter = 'confirmed'),
               ),
@@ -1427,10 +1431,10 @@ class _PosTabState extends State<PosTab> {
         ],
         const SizedBox(height: 8),
         if (active.isEmpty)
-          const EmptyCard(
+          EmptyCard(
             icon: Icons.event_note_outlined,
-            title: 'No active bookings',
-            body: 'New customer and walk-in bookings appear here.',
+            title: _t('No active bookings', 'لا توجد حجوزات نشطة'),
+            body: _t('New customer and walk-in bookings appear here.', 'ستظهر هنا حجوزات العملاء الجديدة وحجوزات الملعب المباشرة.'),
           ),
         ...active.map((booking) {
           final venue =
@@ -1550,8 +1554,8 @@ class _PosTabState extends State<PosTab> {
                                   size: 16),
                               label: Text(
                                 booking.paymentReference.isNotEmpty
-                                    ? 'Verify & Confirm Deposit'
-                                    : 'Confirm Deposit (${formatMoney(booking.dueNow ?? 0)} EGP)',
+                                    ? _t('Verify & Confirm Deposit', 'فحص وتأكيد العربون')
+                                    : _t('Confirm Deposit (${formatMoney(booking.dueNow ?? 0)} EGP)', 'تأكيد العربون (${formatMoney(booking.dueNow ?? 0)} ج.م)'),
                               ),
                             ),
                           if (booking.isConfirmed && !booking.checkedIn && widget.onCheckInBooking != null)
@@ -1563,7 +1567,7 @@ class _PosTabState extends State<PosTab> {
                                     : null,
                               ),
                               icon: const Icon(Icons.how_to_reg_rounded, size: 16),
-                              label: const Text('Check In'),
+                              label: Text(_t('Check In', 'تسجيل الحضور')),
                             ),
                           if (booking.checkedIn)
                             Container(
@@ -1573,9 +1577,9 @@ class _PosTabState extends State<PosTab> {
                                 color: const Color(0xFFE0F2FE),
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              child: const Text(
-                                'Checked In ✓',
-                                style: TextStyle(
+                              child: Text(
+                                _t('Checked In ✓', 'تم الحضور ✓'),
+                                style: const TextStyle(
                                   color: Color(0xFF0369A1),
                                   fontWeight: FontWeight.w800,
                                   fontSize: 12,
@@ -1586,7 +1590,7 @@ class _PosTabState extends State<PosTab> {
                             OutlinedButton.icon(
                               onPressed: () => _messageCustomer(booking),
                               icon: const Icon(Icons.chat_outlined, size: 16),
-                              label: const Text('WhatsApp Customer'),
+                              label: Text(_t('WhatsApp Customer', 'واتساب العميل')),
                             ),
                         ],
                       ),

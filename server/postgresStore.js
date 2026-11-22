@@ -176,7 +176,9 @@ function mapVenueToRow(v, validUserIds) {
     reviews_count: Math.max(0, Math.round(cleanNum(v.reviewsCount, 0))),
     is_active: v.isActive !== false,
     is_deleted: Boolean(v.isDeleted),
-    images: Array.isArray(v.images) ? v.images : [],
+    images: Array.isArray(v.images) && v.images.length > 0
+      ? v.images
+      : (v.imageUrl ? [v.imageUrl] : (Array.isArray(v.galleryUrls) ? v.galleryUrls : [])),
     amenities: Array.isArray(v.amenities) ? v.amenities : [],
     rules: Array.isArray(v.rules) ? v.rules : [],
     services: Array.isArray(v.services) ? v.services : [],
@@ -210,6 +212,12 @@ function mapRowToVenue(row) {
   base.isActive = row.is_active !== false;
   if (row.is_deleted) base.isDeleted = true;
   base.images = Array.isArray(row.images) ? row.images : [];
+  if (!base.imageUrl && base.images.length > 0) {
+    base.imageUrl = base.images[0];
+  }
+  if (!base.galleryUrls || !base.galleryUrls.length) {
+    base.galleryUrls = base.images;
+  }
   base.amenities = Array.isArray(row.amenities) ? row.amenities : [];
   base.rules = Array.isArray(row.rules) ? row.rules : [];
   base.services = Array.isArray(row.services) ? row.services : [];

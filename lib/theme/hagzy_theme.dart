@@ -42,6 +42,8 @@ const kSeedNaderSalon = bool.fromEnvironment(
 );
 
 final ValueNotifier<bool> kDarkMode = ValueNotifier<bool>(false);
+final ValueNotifier<String> kAppLanguage = ValueNotifier<String>('EN');
+bool get isArabicMode => kAppLanguage.value == 'AR';
 
 class HagzyTheme {
   static bool get _isTest => WidgetsBinding.instance.runtimeType
