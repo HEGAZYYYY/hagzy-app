@@ -181,6 +181,7 @@ class _BookTabState extends State<BookTab> {
       setState(() {
         _venueId = null;
         _itemId = null;
+        _escapeTierIndex = null;
         _selectedStart = null;
       });
       return;
@@ -207,7 +208,11 @@ class _BookTabState extends State<BookTab> {
         _suppressCollapseAnimVenueId = null;
       }
       _venueId = value.id;
-      _itemId = value.items.firstOrNull?.id;
+      final isEscape = value.subCategories.contains('escape_rooms') ||
+          value.name.toLowerCase().contains('escape');
+      _itemId = isEscape ? null : value.items.firstOrNull?.id;
+      _escapeTierIndex = null;
+      _sportsDurationMinutes = 60;
       _selectedStart = null;
     });
     _scrollToVenue(value.id);
@@ -231,10 +236,13 @@ class _BookTabState extends State<BookTab> {
       _itemId = itemId;
       _selectedStart = keepStart ? prevStart : null;
       _headcount = minCap;
+      _escapeTierIndex = null;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final ctx = _timeStepKey.currentContext;
+      final isEscape = venue?.subCategories.contains('escape_rooms') == true ||
+          (venue?.name.toLowerCase().contains('escape') ?? false);
+      final ctx = (isEscape ? _spaceStepKey : _timeStepKey).currentContext;
       if (ctx != null) {
         Scrollable.ensureVisible(
           ctx,
@@ -1015,9 +1023,12 @@ class _BookTabState extends State<BookTab> {
         .toList();
     final venue =
         matchingVenues.where((value) => value.id == _venueId).firstOrNull;
+    final isEscape = venue != null &&
+        (venue.subCategories.contains('escape_rooms') ||
+            venue.name.toLowerCase().contains('escape'));
     final item =
         venue?.items.where((value) => value.id == _itemId).firstOrNull ??
-            venue?.items.firstOrNull;
+            (isEscape ? null : venue?.items.firstOrNull);
     final estimatedMinutes = venue?.type == VenueType.salon
         ? venue!.services.isEmpty
             ? 30
