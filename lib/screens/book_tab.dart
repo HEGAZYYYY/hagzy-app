@@ -69,6 +69,7 @@ class _BookTabState extends State<BookTab> {
   DateTime _date = _defaultBookingDate();
   DateTime? _selectedStart;
   int _headcount = 2;
+  int? _escapeTierIndex;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _bookingSectionKey = GlobalKey();
@@ -2259,94 +2260,534 @@ class _BookTabState extends State<BookTab> {
                             ),
 
                             // Section 1: Space / Option Selector
-                            Padding(
-                              key: _spaceStepKey,
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 18, 20, 14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          localized(widget.arabic,
-                                              'Choose Your Space', 'اختر المساحة'),
-                                          style: TextStyle(
-                                            fontSize: 15.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: kInk,
-                                            letterSpacing: -0.2,
+                            Builder(
+                              builder: (context) {
+                                final isEscape = venue.subCategories.contains('escape_rooms') ||
+                                    venue.name.toLowerCase().contains('escape');
+
+                                if (isEscape) {
+                                  // ESCAPE ROOM SPECIFIC STEP FLOW:
+                                  // Phase 1: Room Selection (when item == null)
+                                  if (item == null) {
+                                    return Padding(
+                                      key: _spaceStepKey,
+                                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(7),
+                                                decoration: BoxDecoration(
+                                                  color: kGreen.withValues(alpha: 0.12),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.meeting_room_rounded, color: kGreen, size: 20),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      localized(widget.arabic, 'Choose Your Escape Room', 'اختر غرفة الهروب'),
+                                                      style: TextStyle(
+                                                        fontSize: 16.5,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: kInk,
+                                                        letterSpacing: -0.2,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      localized(widget.arabic, 'Tap a room to enter and choose your group size', 'اضغط على الغرفة لدخول التجربة واختيار عدد أفراد الشلة'),
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: kMuted,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
+                                          const SizedBox(height: 16),
+                                          ...venue.items.map((room) {
+                                            final hasImg = room.imageUrl != null && room.imageUrl!.isNotEmpty;
+                                            return Container(
+                                              margin: const EdgeInsets.only(bottom: 14),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                                borderRadius: BorderRadius.circular(18),
+                                                border: Border.all(
+                                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                                  width: 1.2,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 3),
+                                                  ),
+                                                ],
+                                              ),
+                                              clipBehavior: Clip.antiAlias,
+                                              child: InkWell(
+                                                onTap: () => _selectSpace(room.id),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                  children: [
+                                                    if (hasImg)
+                                                      HagzySmartImage(
+                                                        imageUrl: room.imageUrl!,
+                                                        height: 140,
+                                                        width: double.infinity,
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    Padding(
+                                                      padding: const EdgeInsets.all(14),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: Text(
+                                                                  room.name,
+                                                                  style: TextStyle(
+                                                                    fontSize: 16,
+                                                                    fontWeight: FontWeight.w900,
+                                                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              Container(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFFFEF3C7),
+                                                                  borderRadius: BorderRadius.circular(8),
+                                                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFB45309)),
+                                                                    const SizedBox(width: 4),
+                                                                    Text(
+                                                                      localized(widget.arabic, '60 min', '٦٠ دقيقة'),
+                                                                      style: const TextStyle(
+                                                                        fontSize: 11,
+                                                                        fontWeight: FontWeight.w800,
+                                                                        color: Color(0xFFB45309),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          if (room.description.isNotEmpty) ...[
+                                                            const SizedBox(height: 8),
+                                                            Text(
+                                                              room.description,
+                                                              maxLines: 3,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: TextStyle(
+                                                                fontSize: 13.5,
+                                                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                                                height: 1.45,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                          const SizedBox(height: 12),
+                                                          Align(
+                                                            alignment: Alignment.centerRight,
+                                                            child: FilledButton.icon(
+                                                              onPressed: () => _selectSpace(room.id),
+                                                              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                                              label: Text(
+                                                                localized(widget.arabic, 'Select Room', 'اختر هذه الغرفة'),
+                                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                                              ),
+                                                              style: FilledButton.styleFrom(
+                                                                backgroundColor: kGreen,
+                                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }),
+                                        ],
                                       ),
+                                    );
+                                  }
+
+                                  // Phase 2: Group Size Selection (when item != null)
+                                  final escapeOptions = _getEscapeRoomTierOptions(item);
+                                  final selectedOption = _escapeTierIndex != null && _escapeTierIndex! < escapeOptions.length
+                                      ? escapeOptions[_escapeTierIndex!]
+                                      : null;
+
+                                  return Padding(
+                                    key: _spaceStepKey,
+                                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Back to Room Selection Bar
+                                        Row(
+                                          children: [
+                                            InkWell(
+                                              onTap: () {
+                                                setState(() {
+                                                  _itemId = null;
+                                                  _escapeTierIndex = null;
+                                                  _selectedStart = null;
+                                                });
+                                              },
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(widget.arabic ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_rounded, size: 13, color: kInk),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      localized(widget.arabic, 'Back to Rooms', 'العودة للغرف'),
+                                                      style: TextStyle(
+                                                        fontSize: 12.5,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: kInk,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: kGreen.withValues(alpha: 0.12),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  border: Border.all(color: kGreen.withValues(alpha: 0.25)),
+                                                ),
+                                                child: Text(
+                                                  item.name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: kGreen,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 14),
+                                        // Full room detail story card
+                                        _RoomDetailCard(
+                                          item: item,
+                                          isDark: isDark,
+                                          arabic: widget.arabic,
+                                          isEscapeRoom: true,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Selection Phase Question
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(7),
+                                              decoration: BoxDecoration(
+                                                color: kGreen.withValues(alpha: 0.14),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(Icons.groups_rounded, color: kGreen, size: 20),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    localized(widget.arabic, 'Select Number of People', 'اختر عدد أفراد الشلة'),
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    localized(widget.arabic, 'How many people will enter the room?', 'كم شخص هيدخل الغرفة؟'),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        // Option cards directly from the ad
+                                        ...List.generate(escapeOptions.length, (idx) {
+                                          final opt = escapeOptions[idx];
+                                          final isSelected = _escapeTierIndex == idx;
+                                          return Container(
+                                            margin: const EdgeInsets.only(bottom: 8),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? (isDark ? kGreen.withValues(alpha: 0.22) : const Color(0xFFECFDF5))
+                                                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? kGreen
+                                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                                width: isSelected ? 2 : 1.2,
+                                              ),
+                                              boxShadow: isSelected
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: kGreen.withValues(alpha: 0.2),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(14),
+                                              onTap: () {
+                                                setState(() {
+                                                  _escapeTierIndex = idx;
+                                                  _headcount = opt.defaultHeadcount;
+                                                });
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      isSelected
+                                                          ? Icons.radio_button_checked_rounded
+                                                          : Icons.radio_button_off_rounded,
+                                                      color: isSelected ? kGreen : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                                                      size: 20,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Text(
+                                                        localized(widget.arabic, opt.labelEn, opt.labelAr),
+                                                        style: TextStyle(
+                                                          fontSize: 15,
+                                                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                                                          color: isSelected
+                                                              ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (isSelected)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                        decoration: BoxDecoration(
+                                                          color: kGreen,
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: Text(
+                                                          localized(widget.arabic, 'Selected', 'تم الاختيار'),
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w800,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                        // Price Section (visible normally when option is chosen)
+                                        if (selectedOption != null) ...[
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            padding: const EdgeInsets.all(14),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                                width: 1.2,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      localized(widget.arabic, 'Rate per Player:', 'سعر الفرد:'),
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${formatMoney(selectedOption.pricePerPerson)} ${localized(widget.arabic, 'EGP / player', 'جنيه / فرد')}',
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: kGreen,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      localized(widget.arabic, 'Total for Booking ($_headcount players):', 'إجمالي الحجز ($_headcount أفراد):'),
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${formatMoney(selectedOption.pricePerPerson * _headcount)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                      style: TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      localized(widget.arabic, 'Deposit Due Now (${venue.depositPercent}%):', 'العربون المطلوب الآن (${venue.depositPercent}%):'),
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${formatMoney((selectedOption.pricePerPerson * _headcount) * venue.depositPercent / 100)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: Color(0xFF2563EB),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                // STANDARD VENUE FLOW (Sports, Salons, Cafes, Lounges):
+                                return Padding(
+                                  key: _spaceStepKey,
+                                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              localized(widget.arabic, 'Choose Your Space', 'اختر المساحة'),
+                                              style: TextStyle(
+                                                fontSize: 15.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: kInk,
+                                                letterSpacing: -0.2,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      if (venue.items.isEmpty)
+                                        Text(
+                                          localized(
+                                              widget.arabic,
+                                              'This venue has no bookable spaces yet.',
+                                              'لا توجد مساحات متاحة للحجز حالياً.'),
+                                          style: TextStyle(color: kMuted),
+                                        )
+                                      else
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: venue.items.map((val) {
+                                            final sel = val.id == item?.id;
+                                            return CustomPill(
+                                              icon: sel
+                                                  ? Icons.check_circle_rounded
+                                                  : venue.type.icon,
+                                              selected: sel,
+                                              label: () {
+                                                if (venue.type == VenueType.salon) {
+                                                  return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/30m', 'ج.م/٣٠ د')}';
+                                                }
+                                                return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}';
+                                              }(),
+                                              onTap: () => _selectSpace(val.id),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      if (item != null && ((item.imageUrl != null && item.imageUrl!.isNotEmpty) || item.description.isNotEmpty)) ...[
+                                        _RoomDetailCard(
+                                          item: item,
+                                          isDark: isDark,
+                                          arabic: widget.arabic,
+                                          isEscapeRoom: false,
+                                        ),
+                                      ],
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  if (venue.items.isEmpty)
-                                    Text(
-                                      localized(
-                                          widget.arabic,
-                                          'This venue has no bookable spaces yet.',
-                                          'لا توجد مساحات متاحة للحجز حالياً.'),
-                                      style: TextStyle(color: kMuted),
-                                    )
-                                  else
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: venue.items.map((val) {
-                                        final sel = val.id == item?.id;
-                                        return CustomPill(
-                                          icon: sel
-                                              ? Icons.check_circle_rounded
-                                              : venue.type.icon,
-                                          selected: sel,
-                                          label: () {
-                                            final isTiered = val.pricingMode == 'per_person_tiered' ||
-                                                (val.pricingTiers != null && val.pricingTiers!.isNotEmpty) ||
-                                                venue.subCategories.contains('escape_rooms');
-                                            if (isTiered) {
-                                              final rate = sel ? val.priceForHeadcount(_headcount) : (val.pricingTiers != null && val.pricingTiers!.isNotEmpty ? val.pricingTiers!.values.map((v) => (v as num).toDouble()).reduce((a, b) => a < b ? a : b) : val.hourlyRate);
-                                              return sel
-                                                  ? '${val.name} · ${formatMoney(rate)} ${localized(widget.arabic, 'EGP/p', 'ج.م/فرد')}'
-                                                  : '${val.name} · ${localized(widget.arabic, 'from', 'من')} ${formatMoney(rate)} ${localized(widget.arabic, 'EGP/p', 'ج.م/فرد')}';
-                                            } else if (venue.type == VenueType.salon) {
-                                              return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/30m', 'ج.م/٣٠ د')}';
-                                            }
-                                            return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}';
-                                          }(),
-                                          onTap: () => _selectSpace(val.id),
-                                        );
-                                      }).toList(),
-                                    ),
-                                   if (item != null && ((item.imageUrl != null && item.imageUrl!.isNotEmpty) || item.description.isNotEmpty)) ...[
-                                      _RoomDetailCard(
-                                        item: item,
-                                        isDark: isDark,
-                                        arabic: widget.arabic,
-                                        isEscapeRoom: venue.subCategories.contains('escape_rooms'),
-                                      ),
-                                    ],
-                                    if (item != null && (item.pricingMode == 'per_person_tiered' || (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) || venue.subCategories.contains('escape_rooms'))) ...[
-                                      _HeadcountPricingStep(
-                                        item: item,
-                                        venue: venue,
-                                        headcount: _headcount,
-                                        arabic: widget.arabic,
-                                        isDark: isDark,
-                                        onChanged: (h) => setState(() => _headcount = h),
-                                      ),
-                                    ],
-                                ],
-                              ),
+                                );
+                              },
                             ),
-
                             AnimatedSize(
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeOutCubic,
                               alignment: Alignment.topCenter,
-                              child: item != null
+                              child: (item != null && (!venue.subCategories.contains('escape_rooms') || _escapeTierIndex != null))
                                   ? Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
@@ -2653,6 +3094,126 @@ class _BookTabState extends State<BookTab> {
                           ],
                         ),
                       );
+  }
+
+
+  List<EscapeRoomTierOption> _getEscapeRoomTierOptions(VenueItem item) {
+    if (item.id == 'adrenaline-orphans') {
+      return const [
+        EscapeRoomTierOption(
+          labelAr: 'فردين أو 3 أفراد',
+          labelEn: '2 or 3 players',
+          minPeople: 2,
+          maxPeople: 3,
+          defaultHeadcount: 3,
+          pricePerPerson: 150,
+        ),
+        EscapeRoomTierOption(
+          labelAr: '4 أو 5 أفراد',
+          labelEn: '4 or 5 players',
+          minPeople: 4,
+          maxPeople: 5,
+          defaultHeadcount: 4,
+          pricePerPerson: 120,
+        ),
+        EscapeRoomTierOption(
+          labelAr: 'أكتر من 5 أفراد',
+          labelEn: 'More than 5 players',
+          minPeople: 6,
+          maxPeople: 15,
+          defaultHeadcount: 6,
+          pricePerPerson: 100,
+        ),
+      ];
+    } else if (item.id == 'adrenaline-cannibal') {
+      return const [
+        EscapeRoomTierOption(
+          labelAr: '4 أو 5 أفراد',
+          labelEn: '4 or 5 players',
+          minPeople: 4,
+          maxPeople: 5,
+          defaultHeadcount: 4,
+          pricePerPerson: 120,
+        ),
+        EscapeRoomTierOption(
+          labelAr: 'أكتر من 5 أفراد',
+          labelEn: 'More than 5 players',
+          minPeople: 6,
+          maxPeople: 15,
+          defaultHeadcount: 6,
+          pricePerPerson: 100,
+        ),
+      ];
+    } else if (item.id == 'adrenaline-the-curse') {
+      return const [
+        EscapeRoomTierOption(
+          labelAr: '3 أو 4 أفراد',
+          labelEn: '3 or 4 players',
+          minPeople: 3,
+          maxPeople: 4,
+          defaultHeadcount: 4,
+          pricePerPerson: 200,
+        ),
+        EscapeRoomTierOption(
+          labelAr: '5 أفراد أو أكتر',
+          labelEn: '5 or more players',
+          minPeople: 5,
+          maxPeople: 20,
+          defaultHeadcount: 5,
+          pricePerPerson: 150,
+        ),
+      ];
+    }
+
+    if (item.pricingTiers != null && item.pricingTiers!.isNotEmpty) {
+      final sortedEntries = item.pricingTiers!.entries
+          .map((e) => MapEntry(int.tryParse(e.key) ?? 999, (e.value as num).toDouble()))
+          .toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      final minCap = item.minCapacity ?? 2;
+      final maxCap = item.maxCapacity ?? 15;
+      var prevCap = minCap - 1;
+      final list = <EscapeRoomTierOption>[];
+      for (final e in sortedEntries) {
+        final cap = e.key;
+        final price = e.value;
+        final from = prevCap + 1;
+        final isLast = cap >= maxCap || e == sortedEntries.last;
+        String ar;
+        String en;
+        if (from == cap) {
+          ar = '$cap أفراد';
+          en = '$cap players';
+        } else if (isLast) {
+          ar = 'أكتر من $prevCap أفراد';
+          en = 'More than $prevCap players';
+        } else {
+          ar = '$from أو $cap أفراد';
+          en = '$from or $cap players';
+        }
+        list.add(EscapeRoomTierOption(
+          labelAr: ar,
+          labelEn: en,
+          minPeople: from,
+          maxPeople: cap,
+          defaultHeadcount: from,
+          pricePerPerson: price,
+        ));
+        prevCap = cap;
+      }
+      return list;
+    }
+
+    return [
+      EscapeRoomTierOption(
+        labelAr: 'جميع الأحجام',
+        labelEn: 'All Group Sizes',
+        minPeople: item.minCapacity ?? 2,
+        maxPeople: item.maxCapacity ?? 15,
+        defaultHeadcount: item.minCapacity ?? 2,
+        pricePerPerson: item.hourlyRate,
+      ),
+    ];
   }
 
   List<TimeSlot> _timesFor(Venue venue, VenueItem item, int durationMinutes) {
@@ -5585,337 +6146,20 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
   }
 }
 
+class EscapeRoomTierOption {
+  final String labelAr;
+  final String labelEn;
+  final int minPeople;
+  final int maxPeople;
+  final int defaultHeadcount;
+  final double pricePerPerson;
 
-class _HeadcountPricingStep extends StatelessWidget {
-  const _HeadcountPricingStep({
-    required this.item,
-    required this.venue,
-    required this.headcount,
-    required this.arabic,
-    required this.isDark,
-    required this.onChanged,
+  const EscapeRoomTierOption({
+    required this.labelAr,
+    required this.labelEn,
+    required this.minPeople,
+    required this.maxPeople,
+    required this.defaultHeadcount,
+    required this.pricePerPerson,
   });
-
-  final VenueItem item;
-  final Venue venue;
-  final int headcount;
-  final bool arabic;
-  final bool isDark;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final minCap = item.minCapacity ?? 2;
-    final maxCap = item.maxCapacity ?? 15;
-    final currentRate = item.priceForHeadcount(headcount);
-    final total = currentRate * headcount;
-    final rawDeposit = total * venue.depositPercent / 100;
-    final deposit = (rawDeposit > 0 && rawDeposit < 5.0) ? 5.0 : rawDeposit;
-
-    final sortedEntries = (item.pricingTiers ?? const {}).entries
-        .map((e) => MapEntry(int.tryParse(e.key) ?? 999, (e.value as num).toDouble()))
-        .toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
-    int? activeCap;
-    for (final entry in sortedEntries) {
-      if (headcount <= entry.key) {
-        activeCap = entry.key;
-        break;
-      }
-    }
-    if (activeCap == null && sortedEntries.isNotEmpty) {
-      activeCap = sortedEntries.last.key;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? kGreenLight.withValues(alpha: 0.3) : kGreen.withValues(alpha: 0.25),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: kGreen.withValues(alpha: isDark ? 0.15 : 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark ? kGreen.withValues(alpha: 0.25) : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: kGreen.withValues(alpha: 0.3)),
-                ),
-                child: const Icon(Icons.group_rounded, color: kGreen, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localized(arabic, '1. Choose Number of Players', '١. اختر عدد أفراد الشلة / اللاعبين'),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    Text(
-                      localized(arabic, 'Price updates live based on your group size', 'السعر بيتحدد تلقائياً حسب عدد الأفراد اللي هتختارهم'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate((maxCap - minCap + 1).clamp(1, 30), (index) {
-                final count = minCap + index;
-                final isSelected = count == headcount;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: InkWell(
-                    onTap: () => onChanged(count),
-                    borderRadius: BorderRadius.circular(12),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? kGreen
-                            : (isDark ? const Color(0xFF334155) : Colors.white),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? kGreen
-                              : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                          width: isSelected ? 2 : 1,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: kGreen.withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$count',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: isSelected
-                                  ? Colors.white
-                                  : (isDark ? Colors.white : const Color(0xFF1E293B)),
-                            ),
-                          ),
-                          Text(
-                            localized(arabic, 'players', 'أفراد'),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected
-                                  ? Colors.white.withValues(alpha: 0.9)
-                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      localized(arabic, 'Rate per Player:', 'سعر الفرد:'),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    Text(
-                      '${formatMoney(currentRate)} ${localized(arabic, 'EGP / player', 'جنيه / فرد')}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: kGreen,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      localized(arabic, 'Total ($headcount players):', 'إجمالي الحجز ($headcount أفراد):'),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    Text(
-                      '${formatMoney(total)} ${localized(arabic, 'EGP', 'ج.م')}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      localized(arabic, 'Deposit Due Now (${venue.depositPercent}%):', 'العربون المطلوب الآن (${venue.depositPercent}%):'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    Text(
-                      '${formatMoney(deposit)} ${localized(arabic, 'EGP', 'ج.م')}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF2563EB),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (sortedEntries.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              localized(arabic, 'Group Pricing Brackets:', 'شرائح أسعار المجموعات:'),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: () {
-                var prevCap = minCap - 1;
-                final widgets = <Widget>[];
-                for (final e in sortedEntries) {
-                  final cap = e.key;
-                  final price = e.value;
-                  final from = prevCap + 1;
-                  final isActive = cap == activeCap;
-                  String label;
-                  if (from == cap) {
-                    label = arabic ? '$cap أفراد: ${price.toStringAsFixed(0)} ج.م/فرد' : '$cap players: ${price.toStringAsFixed(0)} EGP/p';
-                  } else if (cap >= maxCap) {
-                    label = arabic ? 'أكتر من $prevCap أفراد ($from - $cap): ${price.toStringAsFixed(0)} ج.م/فرد' : '$from+ players ($from - $cap): ${price.toStringAsFixed(0)} EGP/p';
-                  } else {
-                    label = arabic ? '$from أو $cap أفراد: ${price.toStringAsFixed(0)} ج.م/فرد' : '$from - $cap players: ${price.toStringAsFixed(0)} EGP/p';
-                  }
-                  prevCap = cap;
-                  widgets.add(
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? (isDark ? kGreen.withValues(alpha: 0.28) : const Color(0xFFD1FAE5))
-                            : (isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isActive ? kGreen : (isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0)),
-                          width: isActive ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isActive) ...[
-                            const Icon(Icons.check_circle, size: 14, color: kGreen),
-                            const SizedBox(width: 4),
-                          ],
-                          Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
-                              color: isActive
-                                  ? (isDark ? kGreenLight : kGreenDark)
-                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                            ),
-                          ),
-                          if (isActive) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              arabic ? '(المطبق)' : '(Active)',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: kGreen,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                }
-                return widgets;
-              }(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }
