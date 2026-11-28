@@ -1,12 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <defs>
-    <linearGradient id="hagzy" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#047857"/>
-      <stop offset="1" stop-color="#059669"/>
-    </linearGradient>
-  </defs>
-  <rect width="256" height="256" rx="64" fill="url(#hagzy)"/>
-  <path d="M 80 70.4 L 80 185.6" stroke="#FFFFFF" stroke-width="24.32" stroke-linecap="round"/>
-  <path d="M 176 70.4 L 176 185.6" stroke="#FFFFFF" stroke-width="24.32" stroke-linecap="round"/>
-  <path d="M 80 134.4 Q 128 92.8 176 134.4" stroke="#FFFFFF" stroke-width="24.32" stroke-linecap="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <rect width="256" height="256" rx="48" fill="#141311"/>
+  <path d="M48 188 V92 A54 54 0 0 1 156 92" stroke="#FAF8F3" stroke-width="34" stroke-linecap="butt"/>
+  <path d="M208 68 V164 A54 54 0 0 1 100 164" stroke="#FAF8F3" stroke-width="34" stroke-linecap="butt"/>
+  <circle cx="128" cy="128" r="22" fill="#FF4D30"/>
 </svg>

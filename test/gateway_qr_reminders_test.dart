@@ -274,10 +274,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(checkedInId, 'bk_confirmed_1');
 
-    // Switch to Gateway & Queue tab: live oracle status + 1-tap Attach
+    // Switch to Gateway & Queue tab: live gateway status + 1-tap Attach
     await tester.tap(find.text('Gateway & Queue'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Android Gateway Oracle: ACTIVE'), findsOneWidget);
+    expect(find.textContaining('Payment Gateway: Active'), findsOneWidget);
     expect(find.textContaining('Review Queue (1 open)'), findsOneWidget);
 
     await tester.tap(find.text('Attach'));

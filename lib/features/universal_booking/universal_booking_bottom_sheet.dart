@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/models/models_v2.dart';
+import '../../widgets/hagzy_motion.dart';
 
 /// Polymorphic Booking Bottom Sheet (Rule #1 & Principle 2)
 /// Dynamically switches UI between:
@@ -31,10 +32,8 @@ class UniversalBookingBottomSheet extends StatefulWidget {
     required ValueChanged<HagzyBooking> onLockSlotAndProceed,
     bool isArabic = false,
   }) {
-    return showModalBottomSheet(
+    return showHagzySheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => UniversalBookingBottomSheet(
         unit: unit,
         venue: venue,
@@ -91,21 +90,24 @@ class _UniversalBookingBottomSheetState
     final isAr = widget.isArabic;
     final pricing = _currentPricing;
 
-    return Material(
-      color: theme.scaffoldBackgroundColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
         constraints: BoxConstraints(
+          maxWidth: 580,
           maxHeight: MediaQuery.of(context).size.height * 0.90,
         ),
-        child: Column(
+        child: Material(
+          color: theme.scaffoldBackgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            side: BorderSide(
+              color: theme.colorScheme.primary.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
         children: [
           // Drag handle
           Container(
@@ -181,9 +183,10 @@ class _UniversalBookingBottomSheetState
           _buildContrastAnchoredBottomBar(theme, isAr, pricing),
         ],
       ),
-    ),
-  );
-}
+        ),
+      ),
+    );
+  }
 
   Widget _buildTimePickerRow(ThemeData theme, bool isAr) {
     final timeStr =
@@ -337,10 +340,16 @@ class _UniversalBookingBottomSheetState
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              isAr ? 'حجم المجموعة (كل ما تزيدوا السعر يقل!)' : 'Group Size (More Friends = Cheaper!)',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            Expanded(
+              child: Text(
+                isAr
+                    ? 'حجم المجموعة (كل ما تزيدوا السعر يقل!)'
+                    : 'Group Size (More Friends = Cheaper!)',
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -623,51 +632,66 @@ class _UniversalBookingBottomSheetState
         children: [
           // Hero Anchor: Total Value + Per-Person Split
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                isAr
-                    ? 'إجمالي الحجز: $total ج.م ($_headcount أفراد • $perPerson ج.م/فرد)'
-                    : 'Total Value: $total EGP ($_headcount Players • $perPerson EGP/ea)',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+              Expanded(
+                child: Text(
+                  isAr
+                      ? 'إجمالي الحجز: $total ج.م ($_headcount أفراد • $perPerson ج.م/فرد)'
+                      : 'Total Value: $total EGP ($_headcount Players • $perPerson EGP/ea)',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
 
-          // Deposit Hold Callout
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.lock_clock_rounded,
-                      size: 15, color: theme.colorScheme.primary),
-                  const SizedBox(width: 4),
-                  Text(
-                    isAr
-                      ? 'تأكيد الحجز الآن: $deposit ج.م فقط'
-                      : 'Lock Instant Hold Now: $deposit EGP only',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+          // Deposit Hold Callout (wraps cleanly on narrow mobile viewports)
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_clock_rounded,
+                        size: 15, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        isAr
+                            ? 'تأكيد الحجز الآن: $deposit ج.م فقط'
+                            : 'Lock Instant Hold Now: $deposit EGP only',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: theme.colorScheme.primary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Text(
-                isAr ? 'الباقي $remaining ج.م كاش بالمكان' : 'Remaining $remaining EGP at venue',
-                style: TextStyle(
-                  fontSize: 12.0,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ],
                 ),
-              ),
-            ],
+                Text(
+                  isAr
+                      ? 'الباقي $remaining ج.م كاش بالمكان'
+                      : 'Remaining $remaining EGP at venue',
+                  style: TextStyle(
+                    fontSize: 12.0,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 

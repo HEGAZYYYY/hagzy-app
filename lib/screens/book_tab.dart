@@ -137,7 +137,7 @@ class _BookTabState extends State<BookTab> {
           bookingCtx,
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeOutCubic,
-          alignment: 0.05,
+          alignment: 0.0,
         );
         return;
       }
@@ -441,10 +441,8 @@ class _BookTabState extends State<BookTab> {
 
   Future<void> _openVenueDetails(Venue venue) async {
     final arabic = widget.arabic;
-    await showModalBottomSheet<void>(
+    await showHagzySheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, modalSetState) {
           final isFav = _favoriteIds.contains(venue.id);
@@ -625,9 +623,11 @@ class _BookTabState extends State<BookTab> {
     var locatingGps = false;
     String? gpsError;
 
-    final result = await showDialog<({String area, bool viaGps})>(
+    final result = await showHagzyAdaptiveModal<({String area, bool viaGps})>(
       context: context,
-      builder: (context) => StatefulBuilder(
+      maxWidth: 460,
+      maxHeightFactor: 0.88,
+      builder: (context, isSheet) => StatefulBuilder(
         builder: (context, setDialogState) {
           final options = [
             (
@@ -643,193 +643,180 @@ class _BookTabState extends State<BookTab> {
           ].where((entry) =>
               entry.$1.toLowerCase().contains(query.toLowerCase()) ||
               entry.$2.contains(query));
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
+          return HagzyModalCard(
+            isSheet: isSheet,
+            maxWidth: 460,
+            scrollable: false,
+            icon: Icons.location_on_rounded,
+            title: localized(
+                widget.arabic, 'Choose a governorate', 'اختر المحافظة'),
+            subtitle: localized(
+              widget.arabic,
+              'See places and live slots near your area',
+              'اعرض الأماكن والمواعيد المتاحة في منطقتك',
             ),
-            title: Text(localized(
-                widget.arabic, 'Choose a governorate', 'اختر المحافظة')),
+            onClose: () => Navigator.pop(context),
+            secondaryLabel: localized(widget.arabic, 'Cancel', 'إلغاء'),
+            onSecondary: () => Navigator.pop(context),
             content: SizedBox(
-              width: 420,
-              height: 520,
+              height: isSheet ? 380 : 410,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: locatingGps
-                          ? null
-                          : () async {
-                              if (WidgetsBinding.instance.runtimeType
-                                  .toString()
-                                  .contains('Test')) {
-                                Navigator.pop(context,
-                                    (area: 'Cairo', viaGps: true));
+                  HagzyTap(
+                    scaleDown: 0.98,
+                    haptic: HagzyHapticStyle.selection,
+                    onTap: locatingGps
+                        ? null
+                        : () async {
+                            if (WidgetsBinding.instance.runtimeType
+                                .toString()
+                                .contains('Test')) {
+                              Navigator.pop(
+                                  context, (area: 'Cairo', viaGps: true));
+                              return;
+                            }
+                            setDialogState(() {
+                              locatingGps = true;
+                              gpsError = null;
+                            });
+                            try {
+                              final serviceEnabled =
+                                  await Geolocator.isLocationServiceEnabled();
+                              if (!serviceEnabled) {
+                                setDialogState(() {
+                                  locatingGps = false;
+                                  gpsError = localized(
+                                      widget.arabic,
+                                      'Location services disabled. Please enable GPS.',
+                                      'خدمات الموقع غير مفعلة، يرجى تفعيل الـ GPS');
+                                });
                                 return;
                               }
-                              setDialogState(() {
-                                locatingGps = true;
-                                gpsError = null;
-                              });
-                              try {
-                                final serviceEnabled =
-                                    await Geolocator.isLocationServiceEnabled();
-                                if (!serviceEnabled) {
-                                  setDialogState(() {
-                                    locatingGps = false;
-                                    gpsError = localized(
-                                        widget.arabic,
-                                        'Location services disabled. Please enable GPS.',
-                                        'خدمات الموقع غير مفعلة، يرجى تفعيل الـ GPS');
-                                  });
-                                  return;
-                                }
-                                var perm = await Geolocator.checkPermission();
+                              var perm = await Geolocator.checkPermission();
+                              if (perm == LocationPermission.denied) {
+                                perm = await Geolocator.requestPermission();
                                 if (perm == LocationPermission.denied) {
-                                  perm = await Geolocator.requestPermission();
-                                  if (perm == LocationPermission.denied) {
-                                    setDialogState(() {
-                                      locatingGps = false;
-                                      gpsError = localized(
-                                          widget.arabic,
-                                          'Location permission denied.',
-                                          'تم رفض إذن تحديد الموقع');
-                                    });
-                                    return;
-                                  }
-                                }
-                                if (perm == LocationPermission.deniedForever) {
                                   setDialogState(() {
                                     locatingGps = false;
                                     gpsError = localized(
                                         widget.arabic,
-                                        'Location permission permanently denied.',
-                                        'إذن الموقع محظور في إعدادات الجهاز');
+                                        'Location permission denied.',
+                                        'تم رفض إذن تحديد الموقع');
                                   });
                                   return;
-                                }
-
-                                final pos = await Geolocator.getCurrentPosition(
-                                  locationSettings: const LocationSettings(
-                                    accuracy: LocationAccuracy.medium,
-                                    timeLimit: Duration(seconds: 8),
-                                  ),
-                                );
-                                final nearest = findNearestGovernorate(
-                                    pos.latitude, pos.longitude);
-                                if (context.mounted) {
-                                  Navigator.pop(context,
-                                      (area: nearest, viaGps: true));
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  setDialogState(() {
-                                    locatingGps = false;
-                                    gpsError = localized(
-                                        widget.arabic,
-                                        'Could not detect location via GPS.',
-                                        'تعذر تحديد موقعك الحالي عبر GPS');
-                                  });
                                 }
                               }
-                            },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              kGreen.withValues(alpha: 0.14),
-                              kGreen.withValues(alpha: 0.04),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: kGreen.withValues(alpha: 0.35),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: kGreen,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: kGreen.withValues(alpha: 0.28),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: locatingGps
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(9),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.my_location_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    locatingGps
-                                        ? localized(
-                                            widget.arabic,
-                                            'Detecting your location...',
-                                            'جاري تحديد موقعك عبر GPS...')
-                                        : localized(
-                                            widget.arabic,
-                                            'Auto-Assign Area via GPS',
-                                            'تحديد منطقتي تلقائياً عبر GPS'),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13.5,
-                                      color: kInk,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    localized(
+                              if (perm == LocationPermission.deniedForever) {
+                                setDialogState(() {
+                                  locatingGps = false;
+                                  gpsError = localized(
                                       widget.arabic,
-                                      'Finds nearest Egyptian governorate in 1 tap',
-                                      'يحدد أقرب محافظة لك في مصر بضغطة واحدة',
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 12.0,
-                                      color: kMuted,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              size: 14,
-                              color: kMuted,
-                            ),
-                          ],
+                                      'Location permission permanently denied.',
+                                      'إذن الموقع محظور في إعدادات الجهاز');
+                                });
+                                return;
+                              }
+
+                              final pos = await Geolocator.getCurrentPosition(
+                                locationSettings: const LocationSettings(
+                                  accuracy: LocationAccuracy.medium,
+                                  timeLimit: Duration(seconds: 8),
+                                ),
+                              );
+                              final nearest = findNearestGovernorate(
+                                  pos.latitude, pos.longitude);
+                              if (context.mounted) {
+                                Navigator.pop(
+                                    context, (area: nearest, viaGps: true));
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                setDialogState(() {
+                                  locatingGps = false;
+                                  gpsError = localized(
+                                      widget.arabic,
+                                      'Could not detect location via GPS.',
+                                      'تعذر تحديد موقعك الحالي عبر GPS');
+                                });
+                              }
+                            }
+                          },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: kSurfaceTint,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: kBrandAccent.withValues(alpha: 0.32),
+                          width: 1.1,
                         ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: kBrandAccent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: locatingGps
+                                ? const Padding(
+                                    padding: EdgeInsets.all(9),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.my_location_rounded,
+                                    color: Colors.white,
+                                    size: 19,
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  locatingGps
+                                      ? localized(
+                                          widget.arabic,
+                                          'Detecting your location...',
+                                          'جاري تحديد موقعك عبر GPS...')
+                                      : localized(
+                                          widget.arabic,
+                                          'Auto-Assign Area via GPS',
+                                          'تحديد منطقتي تلقائياً عبر GPS'),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                    color: kInk,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  localized(
+                                    widget.arabic,
+                                    'Finds nearest Egyptian governorate in 1 tap',
+                                    'يحدد أقرب محافظة لك في مصر بضغطة واحدة',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 12.0,
+                                    color: kMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          HagzyDirectionalChevron(size: 18, color: kBrandAccent),
+                        ],
                       ),
                     ),
                   ),
@@ -839,19 +826,18 @@ class _BookTabState extends State<BookTab> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: kError.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline,
-                              size: 16, color: Colors.redAccent),
+                          Icon(Icons.error_outline, size: 16, color: kError),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               gpsError!,
-                              style: const TextStyle(
-                                color: Colors.redAccent,
+                              style: TextStyle(
+                                color: kError,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -869,24 +855,21 @@ class _BookTabState extends State<BookTab> {
                     decoration: InputDecoration(
                       hintText: localized(widget.arabic, 'Search governorates',
                           'ابحث عن محافظة'),
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: const Icon(Icons.search_rounded),
                     ),
                     onChanged: (value) =>
                         setDialogState(() => query = value.trim()),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Expanded(
                     child: ListView.separated(
                       itemCount: options.length,
-                      separatorBuilder: (context, index) =>
-                          const Divider(height: 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
                       itemBuilder: (context, index) {
                         final entry = options.elementAt(index);
-                        return ListTile(
-                          title: Text(entry.$2),
-                          trailing: entry.$1 == _area
-                              ? const Icon(Icons.check, color: kGreen)
-                              : null,
+                        return HagzyGroupedRow(
+                          title: entry.$2,
+                          selected: entry.$1 == _area,
                           onTap: () => Navigator.pop(
                               context, (area: entry.$1, viaGps: false)),
                         );
@@ -896,12 +879,6 @@ class _BookTabState extends State<BookTab> {
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(localized(widget.arabic, 'Cancel', 'إلغاء')),
-              ),
-            ],
           );
         },
       ),
@@ -1033,98 +1010,218 @@ class _BookTabState extends State<BookTab> {
             ? 30
             : venue.services.first.minutes
         : 60;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = screenWidth >= HagzyTokens.breakpointTablet;
+
+    final areaBarWidget = CustomerAreaBar(
+      area: governorateName(_area, widget.arabic),
+      arabic: widget.arabic,
+      onTap: _chooseArea,
+      onGpsTap: () => _autoAssignGpsAreaDirectly(silentIfDenied: false),
+      isLocating: _isAutoAssigningGps,
+    );
+
+    final searchFieldWidget = TextField(
+      controller: _searchController,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: kInk,
+      ),
+      decoration: InputDecoration(
+        hintText: localized(
+          widget.arabic,
+          'Search padel, football, salons, gaming...',
+          'ابحث عن ملاعب، صالونات، بلايستيشن، كافيهات...',
+        ),
+        hintStyle: TextStyle(
+          color: kMuted,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: kDarkMode.value ? kVolt : kObsidian,
+          size: 20,
+        ),
+        suffixIcon: _query.isEmpty
+            ? null
+            : IconButton(
+                tooltip: localized(widget.arabic, 'Clear search', 'مسح البحث'),
+                onPressed: () => setState(() {
+                  _query = '';
+                  _searchController.clear();
+                }),
+                icon: const Icon(Icons.close_rounded, size: 18),
+              ),
+        filled: false,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+      ),
+      onChanged: (value) => setState(() {
+        _query = value;
+        _venueId = null;
+        _itemId = null;
+        _selectedStart = null;
+      }),
+    );
+
+    // Clean Warm Where + Search Command Card
+    final unifiedCommandConsole = Container(
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+        border: Border.all(color: kBorder, width: 1.0),
+        boxShadow: HagzyTheme.subtleShadow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: isWide
+          ? IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      child: areaBarWidget,
+                    ),
+                  ),
+                  VerticalDivider(width: 1, thickness: 1, color: kBorder),
+                  Expanded(
+                    flex: 6,
+                    child: Center(child: searchFieldWidget),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  child: areaBarWidget,
+                ),
+                Divider(height: 1, thickness: 1, color: kBorder),
+                searchFieldWidget,
+              ],
+            ),
+    );
+
+    final areaVenues = _venuesInSelectedArea().toList();
+    final categoryCards = [
+      _CategoryVisualCard(
+        title: localized(widget.arabic, 'Everything', 'الكل'),
+        subtitle: localized(widget.arabic, 'All Places', 'جميع الأماكن'),
+        icon: Icons.grid_view_rounded,
+        isSelected: _type == null,
+        gradient: const [kObsidian, kObsidianSoft],
+        glowColor: kVolt,
+        count: areaVenues.length,
+        arabic: widget.arabic,
+        onTap: () => _selectCategory(null),
+      ),
+      _CategoryVisualCard(
+        title: localized(widget.arabic, 'Sports', 'ملاعب ورياضة'),
+        subtitle: localized(widget.arabic, 'Padel & Football', 'بادل وكرة قدم'),
+        icon: Icons.sports_soccer_rounded,
+        isSelected: _type == VenueType.sports,
+        gradient: const [kObsidian, kObsidianSoft],
+        glowColor: kVolt,
+        count: areaVenues.where((v) => v.type == VenueType.sports).length,
+        arabic: widget.arabic,
+        onTap: () => _selectCategory(VenueType.sports),
+      ),
+      _CategoryVisualCard(
+        title: localized(widget.arabic, 'Grooming', 'حلاقة وعناية'),
+        subtitle: localized(widget.arabic, 'Hair & Beauty', 'صالونات وحلاقة'),
+        icon: Icons.content_cut_rounded,
+        isSelected: _type == VenueType.salon,
+        gradient: const [kObsidian, kObsidianSoft],
+        glowColor: kVolt,
+        count: areaVenues.where((v) => v.type == VenueType.salon).length,
+        arabic: widget.arabic,
+        onTap: () => _selectCategory(VenueType.salon),
+      ),
+      _CategoryVisualCard(
+        title: localized(widget.arabic, 'Entertainment', 'ترفيه وألعاب'),
+        subtitle:
+            localized(widget.arabic, 'Gaming & Tables', 'ألعاب وبلايستيشن'),
+        icon: Icons.sports_esports_rounded,
+        isSelected: _type == VenueType.lounge,
+        gradient: const [kObsidian, kObsidianSoft],
+        glowColor: kVolt,
+        count: areaVenues.where((v) => v.type == VenueType.lounge).length,
+        arabic: widget.arabic,
+        onTap: () => _selectCategory(VenueType.lounge),
+      ),
+    ];
+
+    // Desktop 4-Column Clean Category Strip
+    final desktopCategoryMatrix = Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          Expanded(child: categoryCards[0]),
+          const SizedBox(width: 10),
+          Expanded(child: categoryCards[1]),
+          const SizedBox(width: 10),
+          Expanded(child: categoryCards[2]),
+          const SizedBox(width: 10),
+          Expanded(child: categoryCards[3]),
+        ],
+      ),
+    );
+
+    // Compact Single-Row Category Rail on Mobile (keeps venues visible above the fold)
+    final compactCategoryRail = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          categoryCards[0],
+          const SizedBox(width: 8),
+          categoryCards[1],
+          const SizedBox(width: 8),
+          categoryCards[2],
+          const SizedBox(width: 8),
+          categoryCards[3],
+        ],
+      ),
+    );
+
+    final heroWidget = RepaintBoundary(
+      child: CustomerHero(
+        venueCount: areaVenues.length,
+        type: _type,
+        arabic: widget.arabic,
+      ),
+    );
+
     final feed = ListView(
       // ignore: deprecated_member_use
       cacheExtent: 3000,
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 10 : 6,
+        isWide ? 24 : 16,
+        isWide ? 52 : 104,
+      ),
       children: [
-        CustomerAreaBar(
-          area: governorateName(_area, widget.arabic),
-          arabic: widget.arabic,
-          onTap: _chooseArea,
-          onGpsTap: () => _autoAssignGpsAreaDirectly(silentIfDenied: false),
-          isLocating: _isAutoAssigningGps,
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: kDarkMode.value ? 0.25 : 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _searchController,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: kInk,
-            ),
-            decoration: InputDecoration(
-              hintText: localized(
-                  widget.arabic,
-                  'Search padel, football, salons, gaming...',
-                  'ابحث عن ملاعب، صالونات، بلايستيشن، كافيهات...'),
-              hintStyle: TextStyle(
-                color: kMuted,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: const Icon(Icons.search_rounded, color: kGreen, size: 21),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: localized(widget.arabic, 'Clear search', 'مسح البحث'),
-                      onPressed: () => setState(() {
-                        _query = '';
-                        _searchController.clear();
-                      }),
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                    ),
-              filled: true,
-              fillColor: kDarkMode.value ? const Color(0xFF111B17) : Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide(
-                  color: kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFFE2E8F0),
-                  width: 1,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide(
-                  color: kDarkMode.value ? const Color(0xFF1F352D) : const Color(0xFFE2E8F0),
-                  width: 1,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: const BorderSide(color: kGreen, width: 1.5),
-              ),
-            ),
-            onChanged: (value) => setState(() {
-              _query = value;
-              _venueId = null;
-              _itemId = null;
-              _selectedStart = null;
-            }),
-          ),
-        ),
-        const SizedBox(height: 8),
-        RepaintBoundary(
-          child: CustomerHero(
-            venueCount: _venuesInSelectedArea().length,
-            type: _type,
-            arabic: widget.arabic,
-          ),
-        ),
+        // 1. Clean Consumer Header + Location/Search + Category Strip
+        heroWidget,
+        SizedBox(height: isWide ? 8 : 10),
+        unifiedCommandConsole,
+        if (isWide) ...[
+          desktopCategoryMatrix,
+        ],
+
         if (bookAgainVenues.isNotEmpty) ...[
           const SizedBox(height: 12),
           SectionHeading(
@@ -1150,7 +1247,7 @@ class _BookTabState extends State<BookTab> {
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: 80,
+            height: 86,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: bookAgainVenues.length,
@@ -1158,128 +1255,143 @@ class _BookTabState extends State<BookTab> {
               itemBuilder: (context, index) {
                 final v = bookAgainVenues[index];
                 final isCurrent = _venueId == v.id;
-                return PressableScale(
-                  scaleDown: 0.96,
-                  onTap: () => _selectVenue(v, toggleIfSame: false),
-                  child: Ink(
-                    width: 220,
-                    decoration: BoxDecoration(
-                      color: kPanel,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: isCurrent ? kGreen : kBorder,
-                        width: isCurrent ? 1.5 : 1,
+                return HagzyInteractiveSurface(
+                  hoverLift: 1.5,
+                  pressScale: 0.97,
+                  builder: (context, hovered, _) => Material(
+                    color: Colors.transparent,
+                    child: Ink(
+                      width: 248,
+                      decoration: BoxDecoration(
+                        color: kPanel,
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusLarge),
+                        border: Border.all(
+                          color: isCurrent ? kBrandAccent : kBorder,
+                          width: isCurrent ? 1.5 : 1.0,
+                        ),
+                        boxShadow: HagzyTheme.subtleShadow,
                       ),
-                      boxShadow: HagzyTheme.softShadow,
-                    ),
-                    child: Stack(
-                      children: [
-                        InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () => _selectVenue(v, toggleIfSame: false),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    gradient: HagzyTheme.brandGradient,
-                                    borderRadius: BorderRadius.circular(13),
+                      child: Stack(
+                        children: [
+                          InkWell(
+                            borderRadius:
+                                BorderRadius.circular(HagzyTokens.radiusLarge),
+                            onTap: () {
+                              HagzyHaptics.light();
+                              _selectVenue(v, toggleIfSame: false);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
+                                  12, 8, 34, 8),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: kSurfaceTint,
+                                      borderRadius: BorderRadius.circular(
+                                          HagzyTokens.radiusSmall),
+                                    ),
+                                    child: Icon(v.type.icon,
+                                        color: kBrandAccent, size: 19),
                                   ),
-                                  child: Icon(v.type.icon,
-                                      color: Colors.white, size: 21),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        v.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 13.5,
-                                          color: kInk,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        v.location.isEmpty
-                                            ? localized(
-                                                widget.arabic, 'Egypt', 'مصر')
-                                            : v.location,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: kMuted,
-                                          fontSize: 12.0,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.bolt_rounded,
-                                              size: 13, color: kGreen),
-                                          const SizedBox(width: 2),
-                                          Text(
-                                            localized(widget.arabic, 'Book Now',
-                                                'احجز الآن'),
-                                            style: const TextStyle(
-                                              color: kGreen,
-                                              fontSize: 12.0,
-                                              fontWeight: FontWeight.w800,
-                                            ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          displayLocalizedTitle(
+                                              v.name, widget.arabic),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13.5,
+                                            height: 1.18,
+                                            color: kInk,
                                           ),
-                                        ],
-                                      ),
-                                    ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          v.location.isEmpty
+                                              ? localized(
+                                                  widget.arabic, 'Egypt', 'مصر')
+                                              : displayLocalizedLocation(
+                                                  v.location, widget.arabic),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: kMuted,
+                                            fontSize: 11.5,
+                                            height: 1.18,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.arrow_outward_rounded,
+                                                size: 13, color: kBrandAccent),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              localized(widget.arabic,
+                                                  'Book Now', 'احجز الآن'),
+                                              style: TextStyle(
+                                                color: kBrandAccent,
+                                                fontSize: 11.5,
+                                                height: 1.15,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned.directional(
-                          textDirection: widget.arabic
-                              ? TextDirection.rtl
-                              : TextDirection.ltr,
-                          top: 6,
-                          end: 6,
-                          child: Tooltip(
-                            message: localized(
-                              widget.arabic,
-                              'Remove from Book Again',
-                              'إزالة من احجز مرة أخرى',
-                            ),
-                            child: InkWell(
-                              onTap: () => _removeBookAgainVenue(v),
-                              borderRadius: BorderRadius.circular(999),
-                              child: Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: kInk.withValues(alpha: 0.06),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.close_rounded,
-                                  size: 13,
-                                  color: kMuted,
+                          Positioned.directional(
+                            textDirection: widget.arabic
+                                ? TextDirection.rtl
+                                : TextDirection.ltr,
+                            top: 6,
+                            end: 6,
+                            child: Tooltip(
+                              message: localized(
+                                widget.arabic,
+                                'Remove from Book Again',
+                                'إزالة من احجز مرة أخرى',
+                              ),
+                              child: InkWell(
+                                onTap: () => _removeBookAgainVenue(v),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: kSurfaceSubtle,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    size: 14,
+                                    color: kMuted,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -1287,132 +1399,70 @@ class _BookTabState extends State<BookTab> {
             ),
           ),
         ],
+        if (!isWide) ...[
+          const SizedBox(height: 10),
+          compactCategoryRail,
+        ],
         const SizedBox(height: 10),
-        Text(
-          localized(widget.arabic, 'Categories', 'استكشف التصنيفات'),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: [
-              _CategoryVisualCard(
-                title: localized(widget.arabic, 'Everything', 'الكل'),
-                subtitle: localized(widget.arabic, 'All Places', 'جميع الأماكن'),
-                icon: Icons.grid_view_rounded,
-                isSelected: _type == null,
-                gradient: const [Color(0xFF064E3B), Color(0xFF047857)],
-                glowColor: kGreen,
-                count: _venuesInSelectedArea().length,
-                arabic: widget.arabic,
-                onTap: () => _selectCategory(null),
+
+        // 3. Editorial Borderless Subcategory Tab Rail + Machined Utility Strip
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildSubCategoryFilterRow(matchingVenues),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  CustomPill(
+                    selected: !_favoritesOnly,
+                    label: localized(
+                        widget.arabic, 'All Places', 'كل الأماكن'),
+                    onTap: () => setState(() => _favoritesOnly = false),
+                  ),
+                  const SizedBox(width: 8),
+                  CustomPill(
+                    selected: _favoritesOnly,
+                    icon: _favoriteIds.isNotEmpty
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    label: localized(widget.arabic, 'Saved', 'المفضلة'),
+                    badge: _favoriteIds.isNotEmpty
+                        ? '${_favoriteIds.length}'
+                        : null,
+                    onTap: () =>
+                        setState(() => _favoritesOnly = !_favoritesOnly),
+                  ),
+                  const SizedBox(width: 8),
+                  CustomPill(
+                    selected: _showMapView,
+                    icon: Icons.map_outlined,
+                    label: localized(widget.arabic, 'Map & Near Me',
+                        'على الخريطة وقريب مني'),
+                    onTap: () => setState(() => _showMapView = !_showMapView),
+                  ),
+                  const SizedBox(width: 8),
+                  CustomPill(
+                    selected: _openNowOnly,
+                    icon: Icons.access_time_filled_rounded,
+                    label: localized(widget.arabic, 'Open Now', 'مفتوح الآن'),
+                    onTap: () => setState(() => _openNowOnly = !_openNowOnly),
+                  ),
+                  const SizedBox(width: 8),
+                  CustomPill(
+                    selected: _sortByPrice,
+                    icon: Icons.swap_vert_rounded,
+                    label: localized(
+                        widget.arabic,
+                        _sortByPrice ? 'Lowest Price' : 'Sort: Price',
+                        _sortByPrice ? 'أقل سعر' : 'ترتيب: السعر'),
+                    onTap: () => setState(() => _sortByPrice = !_sortByPrice),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              _CategoryVisualCard(
-                title: localized(widget.arabic, 'Grooming', 'حلاقة وعناية'),
-                subtitle: localized(widget.arabic, 'Hair & Beauty', 'صالونات وحلاقة'),
-                icon: Icons.content_cut_rounded,
-                isSelected: _type == VenueType.salon,
-                gradient: const [Color(0xFF115E59), Color(0xFF0F766E)],
-                glowColor: const Color(0xFF0F766E),
-                count: _venuesInSelectedArea()
-                    .where((v) => v.type == VenueType.salon)
-                    .length,
-                arabic: widget.arabic,
-                onTap: () => _selectCategory(VenueType.salon),
-              ),
-              const SizedBox(width: 8),
-              _CategoryVisualCard(
-                title: localized(widget.arabic, 'Entertainment', 'ترفيه وألعاب'),
-                subtitle: localized(widget.arabic, 'Gaming & Tables', 'ألعاب وبلايستيشن'),
-                icon: Icons.sports_esports_rounded,
-                isSelected: _type == VenueType.lounge,
-                gradient: const [Color(0xFF0F172A), Color(0xFF064E3B)],
-                glowColor: kGreenDark,
-                count: _venuesInSelectedArea()
-                    .where((v) => v.type == VenueType.lounge)
-                    .length,
-                arabic: widget.arabic,
-                onTap: () => _selectCategory(VenueType.lounge),
-              ),
-              const SizedBox(width: 8),
-              _CategoryVisualCard(
-                title: localized(widget.arabic, 'Sports', 'ملاعب ورياضة'),
-                subtitle: localized(widget.arabic, 'Padel & Football', 'بادل وكرة قدم'),
-                icon: Icons.sports_soccer_rounded,
-                isSelected: _type == VenueType.sports,
-                gradient: const [Color(0xFF064E3B), Color(0xFF059669)],
-                glowColor: kGreen,
-                count: _venuesInSelectedArea()
-                    .where((v) => v.type == VenueType.sports)
-                    .length,
-                arabic: widget.arabic,
-                onTap: () => _selectCategory(VenueType.sports),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildSubCategoryFilterRow(matchingVenues),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              IconButton(
-                tooltip: localized(
-                    widget.arabic,
-                    _sortByPrice ? 'Sort Alphabetically' : 'Sort by Price',
-                    _sortByPrice ? 'ترتيب أبجدي' : 'ترتيب حسب السعر'),
-                visualDensity: VisualDensity.compact,
-                onPressed: () => setState(() => _sortByPrice = !_sortByPrice),
-                icon: Icon(
-                    _sortByPrice ? Icons.sort_by_alpha : Icons.swap_vert_rounded),
-              ),
-              CustomPill(
-                selected: !_favoritesOnly,
-                label: localized(widget.arabic, 'All Places', 'كل الأماكن'),
-                onTap: () => setState(() => _favoritesOnly = false),
-              ),
-              const SizedBox(width: 8),
-              CustomPill(
-                selected: _favoritesOnly,
-                icon: _favoriteIds.isNotEmpty
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
-                label: localized(widget.arabic, 'Saved', 'المفضلة'),
-                badge: _favoriteIds.isNotEmpty ? '${_favoriteIds.length}' : null,
-                onTap: () => setState(() => _favoritesOnly = !_favoritesOnly),
-              ),
-              const SizedBox(width: 8),
-              CustomPill(
-                selected: _showMapView,
-                icon: Icons.map_outlined,
-                label: localized(
-                    widget.arabic, 'Map & Near Me', 'على الخريطة وقريب مني'),
-                onTap: () => setState(() => _showMapView = !_showMapView),
-              ),
-              const SizedBox(width: 8),
-              CustomPill(
-                selected: _openNowOnly,
-                icon: Icons.access_time_filled_rounded,
-                label: localized(widget.arabic, 'Open Now', 'مفتوح الآن'),
-                onTap: () => setState(() => _openNowOnly = !_openNowOnly),
-              ),
-              const SizedBox(width: 8),
-              CustomPill(
-                selected: _sortByPrice,
-                icon: Icons.swap_vert_rounded,
-                label: localized(
-                    widget.arabic,
-                    _sortByPrice ? 'Lowest Price' : 'Sort: Price',
-                    _sortByPrice ? 'أقل سعر' : 'ترتيب: السعر'),
-                onTap: () => setState(() => _sortByPrice = !_sortByPrice),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         if (_showMapView && matchingVenues.isNotEmpty) ...[
@@ -1499,9 +1549,12 @@ class _BookTabState extends State<BookTab> {
         else ...[
           if (_type != null) ...[
             _buildActiveCategoryFilterBanner(),
-            ...matchingVenues.expand(
-              (value) => _buildVenueCardAndBooking(
-                  value, venue, item, estimatedMinutes),
+            ..._buildResponsiveVenueCollection(
+              matchingVenues,
+              venue,
+              item,
+              estimatedMinutes,
+              isWide: isWide,
             ),
           ] else ...[
             ..._buildCategorizedVenues(
@@ -1509,6 +1562,7 @@ class _BookTabState extends State<BookTab> {
               venue,
               item,
               estimatedMinutes,
+              isWide: isWide,
             ),
           ],
           const SizedBox(height: 24),
@@ -1533,7 +1587,7 @@ class _BookTabState extends State<BookTab> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.location_on_rounded,
                       size: 15,
                       color: kGreen,
@@ -1596,21 +1650,20 @@ class _BookTabState extends State<BookTab> {
     final isDark =
         Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final type = _type!;
-    final (label, icon, color) = switch (type) {
+    final (label, icon) = switch (type) {
       VenueType.salon => (
-          localized(widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
+          localized(
+              widget.arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
           Icons.content_cut_rounded,
-          isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E),
         ),
       VenueType.lounge => (
-          localized(widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
+          localized(
+              widget.arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
           Icons.sports_esports_rounded,
-          isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
         ),
       VenueType.sports => (
           localized(widget.arabic, 'Sports & Courts', 'ملاعب ورياضة'),
           Icons.sports_soccer_rounded,
-          isDark ? const Color(0xFF34D399) : kGreen,
         ),
     };
 
@@ -1621,21 +1674,25 @@ class _BookTabState extends State<BookTab> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark
-            ? color.withValues(alpha: 0.16)
-            : color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF151713) : kObsidian,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
         border: Border.all(
-          color: isDark
-              ? color.withValues(alpha: 0.45)
-              : color.withValues(alpha: 0.25),
-          width: 1.2,
+          color: kVolt.withValues(alpha: isDark ? 0.45 : 0.30),
+          width: 1.1,
         ),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: kVermilion,
+              borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+            ),
+            child: Icon(icon, size: 16, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Row(
               children: [
@@ -1643,51 +1700,28 @@ class _BookTabState extends State<BookTab> {
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: const TextStyle(
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : color,
+                      color: Colors.white,
                     ),
                   ),
                 ),
                 if (activeSubDef != null) ...[
                   const SizedBox(width: 6),
                   Text(
-                    '›',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white70 : color.withValues(alpha: 0.6),
+                    '/',
+                    style: hagzyMonoStyle(
+                      fontSize: 12,
+                      color: kVolt,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? color.withValues(alpha: 0.28)
-                          : color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: isDark
-                          ? Border.all(color: color.withValues(alpha: 0.35))
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(activeSubDef.icon, size: 13, color: color),
-                        const SizedBox(width: 4),
-                        Text(
-                          activeSubDef.title(widget.arabic),
-                          style: TextStyle(
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? const Color(0xFFF1F5F9) : color,
-                          ),
-                        ),
-                      ],
-                    ),
+                  HagzyMonoTag(
+                    label: activeSubDef.title(widget.arabic),
+                    backgroundColor: const Color(0xFF1F2028),
+                    foregroundColor: kVolt,
+                    borderColor: kVolt.withValues(alpha: 0.35),
                   ),
                 ],
               ],
@@ -1695,18 +1729,14 @@ class _BookTabState extends State<BookTab> {
           ),
           InkWell(
             onTap: () => _selectCategory(null),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(7),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
-                color: isDark
-                    ? color.withValues(alpha: 0.22)
-                    : color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(7),
                 border: Border.all(
-                  color: isDark
-                      ? color.withValues(alpha: 0.45)
-                      : color.withValues(alpha: 0.20),
+                  color: Colors.white.withValues(alpha: 0.18),
                 ),
               ),
               child: Row(
@@ -1714,17 +1744,17 @@ class _BookTabState extends State<BookTab> {
                 children: [
                   Text(
                     localized(widget.arabic, 'Show All', 'عرض الكل'),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : color,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     Icons.close_rounded,
                     size: 14,
-                    color: isDark ? Colors.white : color,
+                    color: kVolt,
                   ),
                 ],
               ),
@@ -1751,18 +1781,16 @@ class _BookTabState extends State<BookTab> {
       null => localized(widget.arabic, 'All', 'الكل'),
     };
 
-    final defaultAccent = switch (_type) {
-      VenueType.salon => const Color(0xFF6366F1),
-      VenueType.lounge => const Color(0xFF8B5CF6),
-      VenueType.sports => kGreen,
-      null => kGreen,
-    };
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 40,
+        Container(
+          height: 44,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: kBorder, width: 1.0),
+            ),
+          ),
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1774,22 +1802,17 @@ class _BookTabState extends State<BookTab> {
                 isSelected: _subCategory == null,
                 count: allVenuesInArea.length,
                 arabic: widget.arabic,
-                accentColor: defaultAccent,
+                accentColor: kAccentSurface,
                 onTap: () => _selectSubCategory(null),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               ...subList.map((s) {
                 final count = allVenuesInArea
                     .where((v) => v.effectiveSubCategories.contains(s.id))
                     .length;
                 final isSelected = _subCategory == s.id;
-                final accentColor = switch (s.parentType) {
-                  VenueType.salon => const Color(0xFF0F766E),
-                  VenueType.lounge => kGreenDark,
-                  VenueType.sports => kGreen,
-                };
                 return Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  padding: const EdgeInsetsDirectional.only(end: 6),
                   child: _SubCategoryVisualPill(
                     label: s.title(widget.arabic),
                     emoji: s.emoji,
@@ -1797,7 +1820,7 @@ class _BookTabState extends State<BookTab> {
                     isSelected: isSelected,
                     count: count,
                     arabic: widget.arabic,
-                    accentColor: accentColor,
+                    accentColor: kAccentSurface,
                     onTap: () => _selectSubCategory(s.id),
                   ),
                 );
@@ -1819,45 +1842,27 @@ class _BookTabState extends State<BookTab> {
     final def = findSubCategoryDef(_subCategory!);
     if (def == null) return const SizedBox.shrink();
 
-    final baseAccent = switch (def.parentType) {
-      VenueType.salon => const Color(0xFF6366F1),
-      VenueType.lounge => const Color(0xFF8B5CF6),
-      VenueType.sports => kGreen,
-    };
-
-    final accentColor = isDark
-        ? switch (def.parentType) {
-            VenueType.salon => const Color(0xFF818CF8),
-            VenueType.lounge => const Color(0xFFA78BFA),
-            VenueType.sports => const Color(0xFF34D399),
-          }
-        : baseAccent;
-
     final matchingCount = _getMatchingVenues().length;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark
-            ? accentColor.withValues(alpha: 0.16)
-            : accentColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        color: kPanel,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
         border: Border.all(
-          color: isDark
-              ? accentColor.withValues(alpha: 0.45)
-              : accentColor.withValues(alpha: 0.28),
-          width: 1.2,
+          color: isDark ? kVolt.withValues(alpha: 0.40) : kBorderStrong,
+          width: 1.1,
         ),
       ),
       child: Row(
         children: [
-          Icon(def.icon, size: 17, color: accentColor),
+          Icon(def.icon, size: 16, color: isDark ? kVolt : kObsidian),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '${def.title(widget.arabic)}: ${localized(widget.arabic, '$matchingCount ${matchingCount == 1 ? 'place' : 'places'} available', '$matchingCount ${matchingCount == 1 ? 'مكان متاح' : 'أماكن متاحة'}')}',
               style: TextStyle(
-                color: isDark ? const Color(0xFFF1F5F9) : accentColor,
+                color: kInk,
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
               ),
@@ -1865,19 +1870,13 @@ class _BookTabState extends State<BookTab> {
           ),
           InkWell(
             onTap: () => _selectSubCategory(null),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(7),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isDark
-                    ? accentColor.withValues(alpha: 0.22)
-                    : accentColor.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark
-                      ? accentColor.withValues(alpha: 0.45)
-                      : accentColor.withValues(alpha: 0.20),
-                ),
+                color: kSurfaceSubtle,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: kBorder),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1887,14 +1886,14 @@ class _BookTabState extends State<BookTab> {
                     style: TextStyle(
                       fontSize: 12.0,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFFF1F5F9) : accentColor,
+                      color: kInk,
                     ),
                   ),
                   const SizedBox(width: 3),
                   Icon(
                     Icons.close_rounded,
                     size: 14,
-                    color: isDark ? const Color(0xFFF1F5F9) : accentColor,
+                    color: kInk,
                   ),
                 ],
               ),
@@ -1909,8 +1908,9 @@ class _BookTabState extends State<BookTab> {
     List<Venue> matchingVenues,
     Venue? selectedVenue,
     VenueItem? item,
-    int estimatedMinutes,
-  ) {
+    int estimatedMinutes, {
+    bool isWide = false,
+  }) {
     if (matchingVenues.isEmpty) return const [];
 
     final groomingVenues = matchingVenues
@@ -1938,9 +1938,12 @@ class _BookTabState extends State<BookTab> {
           arabic: widget.arabic,
           onSeeAll: () => _selectCategory(VenueType.salon),
         ),
-        ...groomingVenues.expand(
-          (v) => _buildVenueCardAndBooking(
-              v, selectedVenue, item, estimatedMinutes),
+        ..._buildResponsiveVenueCollection(
+          groomingVenues,
+          selectedVenue,
+          item,
+          estimatedMinutes,
+          isWide: isWide,
         ),
         const SizedBox(height: 10),
       ],
@@ -1958,9 +1961,12 @@ class _BookTabState extends State<BookTab> {
           arabic: widget.arabic,
           onSeeAll: () => _selectCategory(VenueType.lounge),
         ),
-        ...entertainmentVenues.expand(
-          (v) => _buildVenueCardAndBooking(
-              v, selectedVenue, item, estimatedMinutes),
+        ..._buildResponsiveVenueCollection(
+          entertainmentVenues,
+          selectedVenue,
+          item,
+          estimatedMinutes,
+          isWide: isWide,
         ),
         const SizedBox(height: 10),
       ],
@@ -1978,13 +1984,104 @@ class _BookTabState extends State<BookTab> {
           arabic: widget.arabic,
           onSeeAll: () => _selectCategory(VenueType.sports),
         ),
-        ...sportsVenues.expand(
-          (v) => _buildVenueCardAndBooking(
-              v, selectedVenue, item, estimatedMinutes),
+        ..._buildResponsiveVenueCollection(
+          sportsVenues,
+          selectedVenue,
+          item,
+          estimatedMinutes,
+          isWide: isWide,
         ),
         const SizedBox(height: 10),
       ],
     ];
+  }
+
+  /// Renders venues in a crisp 2-column responsive grid on tablet/desktop
+  /// (>= 900px) with full-width expandable booking drawers below the active row,
+  /// and a streamlined single-column feed on compact screens.
+  List<Widget> _buildResponsiveVenueCollection(
+    List<Venue> venues,
+    Venue? selectedVenue,
+    VenueItem? item,
+    int estimatedMinutes, {
+    required bool isWide,
+  }) {
+    if (!isWide) {
+      return venues
+          .expand((v) => _buildVenueCardAndBooking(
+              v, selectedVenue, item, estimatedMinutes))
+          .toList();
+    }
+
+    final rows = <Widget>[];
+    for (var i = 0; i < venues.length; i += 2) {
+      final first = venues[i];
+      final second = (i + 1 < venues.length) ? venues[i + 1] : null;
+      final rowSelected = (selectedVenue != null &&
+              (first.id == selectedVenue.id || second?.id == selectedVenue.id))
+          ? selectedVenue
+          : null;
+
+      Widget buildCard(Venue v, int cardIndex) {
+        final isSel = v.id == selectedVenue?.id;
+        return HagzyReveal(
+          index: cardIndex,
+          stepMs: 50,
+          child: AnimatedOpacity(
+            duration: HagzyTokens.durationMedium,
+            opacity: (selectedVenue != null && !isSel) ? 0.56 : 1.0,
+            child: RepaintBoundary(
+              child: VenueBrowseCard(
+                key: _venueCardKeys.putIfAbsent(v.id, () => GlobalKey()),
+                venue: v,
+                bookings: widget.bookings,
+                arabic: widget.arabic,
+                selected: isSel,
+                favorite: _favoriteIds.contains(v.id),
+                onTap: () => _selectVenue(v),
+                onFavorite: () => _toggleFavorite(v),
+                onDetails: () => _openVenueDetails(v),
+              ),
+            ),
+          ),
+        );
+      }
+
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: buildCard(first, i)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: second != null
+                    ? buildCard(second, i + 1)
+                    : const SizedBox(),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (rowSelected != null) {
+        final reducedMotion = HagzyMotion.reduced(context);
+        final bookingWidget =
+            _buildBookingSection(rowSelected, item, estimatedMinutes);
+        rows.add(
+          reducedMotion
+              ? bookingWidget
+              : AnimatedSize(
+                  duration: HagzyTokens.durationMedium,
+                  curve: HagzyTokens.curveStandard,
+                  alignment: Alignment.topCenter,
+                  child: bookingWidget,
+                ),
+        );
+      }
+    }
+    return rows;
   }
 
   List<Widget> _buildVenueCardAndBooking(
@@ -1994,12 +2091,20 @@ class _BookTabState extends State<BookTab> {
     int estimatedMinutes,
   ) {
     final selected = value.id == selectedVenue?.id;
+    final reducedMotion = HagzyMotion.reduced(context);
+    final skipSizeAnimation =
+        reducedMotion || (!selected && _suppressCollapseAnimVenueId == value.id);
+    final bookingChild = (selected && selectedVenue != null)
+        ? _buildBookingSection(selectedVenue, item, estimatedMinutes)
+        : const SizedBox.shrink();
     return [
       Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 240),
-          opacity: (selectedVenue != null && !selected) ? 0.52 : 1.0,
+          duration: reducedMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          opacity: (selectedVenue != null && !selected) ? 0.56 : 1.0,
           child: RepaintBoundary(
             child: VenueBrowseCard(
               key: _venueCardKeys.putIfAbsent(value.id, () => GlobalKey()),
@@ -2015,18 +2120,16 @@ class _BookTabState extends State<BookTab> {
           ),
         ),
       ),
-      AnimatedSize(
-        duration: selected
-            ? const Duration(milliseconds: 260)
-            : (_suppressCollapseAnimVenueId == value.id
-                ? Duration.zero
-                : const Duration(milliseconds: 220)),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: (selected && selectedVenue != null)
-            ? _buildBookingSection(selectedVenue, item, estimatedMinutes)
-            : const SizedBox.shrink(),
-      ),
+      skipSizeAnimation
+          ? bookingChild
+          : AnimatedSize(
+              duration: selected
+                  ? const Duration(milliseconds: 260)
+                  : const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: bookingChild,
+            ),
     ];
   }
 
@@ -2039,175 +2142,139 @@ class _BookTabState extends State<BookTab> {
     final activeStep = item == null ? 1 : (_selectedStart == null ? 2 : 3);
     return Container(
       key: _bookingSectionKey,
-      margin: const EdgeInsets.only(bottom: 18),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: kPanel,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
         border: Border.all(
-          color: kGreen.withValues(alpha: 0.45),
-          width: 1.8,
+          color: kAccentSurface,
+          width: 1.6,
         ),
-        boxShadow: [
-          ...HagzyTheme.softShadow,
-          BoxShadow(
-            color: kGreen.withValues(alpha: isDark ? 0.22 : 0.12),
-            blurRadius: 28,
-            spreadRadius: -2,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow: HagzyTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-                            // Breadfast / Talabat-style Top Tray Header
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    kGreen.withValues(alpha: isDark ? 0.18 : 0.08),
-                                    kGreenLight.withValues(alpha: isDark ? 0.10 : 0.05),
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                border: Border(
-                                  bottom: BorderSide(color: kBorder),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      gradient: HagzyTheme.brandGradient,
-                                      borderRadius: BorderRadius.circular(13),
-                                    ),
-                                    child: Icon(
-                                      venue.type.icon,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          localized(widget.arabic,
-                                              'Your Booking', 'حجزك'),
-                                          style: TextStyle(
-                                            fontSize: 16.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: kInk,
-                                            letterSpacing: -0.3,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${venue.name}${venue.location.isEmpty ? '' : ' · ${venue.location}'}',
-                                          style: TextStyle(
-                                            color: kMuted,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: _favoriteIds.contains(venue.id)
-                                        ? localized(widget.arabic,
-                                            'Remove from Saved', 'إزالة من المفضلة')
-                                        : localized(widget.arabic, 'Save Venue',
-                                            'حفظ في المفضلة'),
-                                    onPressed: () => _toggleFavorite(venue),
-                                    icon: Icon(
-                                      _favoriteIds.contains(venue.id)
-                                          ? Icons.favorite_rounded
-                                          : Icons.favorite_border_rounded,
-                                      color: _favoriteIds.contains(venue.id)
-                                          ? const Color(0xFFE11D48)
-                                          : kMuted,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  PressableScale(
-                                    scaleDown: 0.92,
-                                    onTap: () {
-                                      setState(() {
-                                        _venueId = null;
-                                        _itemId = null;
-                                        _selectedStart = null;
-                                      });
-                                      _scrollController.animateTo(
-                                        0,
-                                        duration:
-                                            const Duration(milliseconds: 300),
-                                        curve: Curves.easeOutCubic,
-                                      );
-                                    },
-                                    child: TextButton.icon(
-                                      style: TextButton.styleFrom(
-                                        backgroundColor: kPanel,
-                                        foregroundColor: kInk,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(999),
-                                          side:
-                                              BorderSide(color: kBorder),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                      ),
-                                      onPressed: () {
-                                        setState(() {
-                                          _venueId = null;
-                                          _itemId = null;
-                                          _selectedStart = null;
-                                        });
-                                        _scrollController.animateTo(
-                                          0,
-                                          duration:
-                                              const Duration(milliseconds: 300),
-                                          curve: Curves.easeOutCubic,
-                                        );
-                                      },
-                                      icon: const Icon(Icons.close_rounded,
-                                          size: 15),
-                                      label: Text(
-                                        localized(
-                                            widget.arabic, 'Close', 'إغلاق'),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+          // Pitch-Black Hardware Sequencer Top Tray Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 15, 14, 15),
+            decoration: const BoxDecoration(
+              color: kObsidian,
+              border: Border(
+                bottom: BorderSide(color: Color(0xFF26262F)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: kVermilion,
+                    borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+                  ),
+                  child: Icon(
+                    venue.type.icon,
+                    size: 19,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        localized(widget.arabic, 'Your Booking', 'حجزك'),
+                        style: hagzyTextStyle(
+                          arabic: widget.arabic,
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${displayLocalizedTitle(venue.name, widget.arabic)}${venue.location.isEmpty ? '' : ' · ${displayLocalizedLocation(venue.location, widget.arabic)}'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: _favoriteIds.contains(venue.id)
+                      ? localized(widget.arabic, 'Remove from Saved',
+                          'إزالة من المفضلة')
+                      : localized(
+                          widget.arabic, 'Save Venue', 'حفظ في المفضلة'),
+                  onPressed: () => _toggleFavorite(venue),
+                  icon: Icon(
+                    _favoriteIds.contains(venue.id)
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: _favoriteIds.contains(venue.id)
+                        ? kSignal
+                        : Colors.white.withValues(alpha: 0.72),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF282522),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(44, 40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusSmall),
+                      side: const BorderSide(color: Color(0xFF3A3631)),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                  ),
+                  onPressed: () {
+                    HagzyHaptics.selection();
+                    setState(() {
+                      _venueId = null;
+                      _itemId = null;
+                      _selectedStart = null;
+                    });
+                    _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 280),
+                      curve: HagzyMotion.curveDialogEnter,
+                    );
+                  },
+                  icon: const Icon(Icons.close_rounded, size: 15),
+                  label: Text(
+                    localized(widget.arabic, 'Close', 'إغلاق'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-                            // Visual 3-Step Eye-Guide Progression Bar
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF090F0D).withValues(alpha: 0.55)
-                                    : kSurfaceTint.withValues(alpha: 0.65),
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: isDark ? const Color(0xFF1F352D) : kBorder,
-                                  ),
-                                ),
-                              ),
+          // Precision 3-Step Sequencer Progress Bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF14141A) : kSurfaceSubtle,
+              border: Border(
+                bottom: BorderSide(color: kBorder),
+              ),
+            ),
                               child: Row(
                                 children: [
                                   Expanded(
@@ -2236,12 +2303,9 @@ class _BookTabState extends State<BookTab> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Icon(
-                                      widget.arabic
-                                          ? Icons.chevron_left_rounded
-                                          : Icons.chevron_right_rounded,
+                                    child: HagzyDirectionalChevron(
                                       size: 16,
-                                      color: kGreen.withValues(alpha: 0.65),
+                                      color: kMuted,
                                     ),
                                   ),
                                   Expanded(
@@ -2258,12 +2322,9 @@ class _BookTabState extends State<BookTab> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Icon(
-                                      widget.arabic
-                                          ? Icons.chevron_left_rounded
-                                          : Icons.chevron_right_rounded,
+                                    child: HagzyDirectionalChevron(
                                       size: 16,
-                                      color: kGreen.withValues(alpha: 0.65),
+                                      color: kMuted,
                                     ),
                                   ),
                                   Expanded(
@@ -2307,7 +2368,7 @@ class _BookTabState extends State<BookTab> {
                                                   color: kGreen.withValues(alpha: 0.12),
                                                   shape: BoxShape.circle,
                                                 ),
-                                                child: const Icon(Icons.meeting_room_rounded, color: kGreen, size: 20),
+                                                child: Icon(Icons.meeting_room_rounded, color: kGreen, size: 20),
                                               ),
                                               const SizedBox(width: 10),
                                               Expanded(
@@ -2342,19 +2403,13 @@ class _BookTabState extends State<BookTab> {
                                             return Container(
                                               margin: const EdgeInsets.only(bottom: 14),
                                               decoration: BoxDecoration(
-                                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                                borderRadius: BorderRadius.circular(18),
+                                                color: kPanel,
+                                                borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
                                                 border: Border.all(
-                                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                                  width: 1.2,
+                                                  color: kBorder,
+                                                  width: 1.1,
                                                 ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-                                                    blurRadius: 10,
-                                                    offset: const Offset(0, 3),
-                                                  ),
-                                                ],
+                                                boxShadow: HagzyTheme.subtleShadow,
                                               ),
                                               clipBehavior: Clip.antiAlias,
                                               child: InkWell(
@@ -2382,32 +2437,15 @@ class _BookTabState extends State<BookTab> {
                                                                   style: TextStyle(
                                                                     fontSize: 16,
                                                                     fontWeight: FontWeight.w900,
-                                                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                                    color: kInk,
                                                                   ),
                                                                 ),
                                                               ),
-                                                              Container(
-                                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFFFEF3C7),
-                                                                  borderRadius: BorderRadius.circular(8),
-                                                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
-                                                                ),
-                                                                child: Row(
-                                                                  mainAxisSize: MainAxisSize.min,
-                                                                  children: [
-                                                                    const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFB45309)),
-                                                                    const SizedBox(width: 4),
-                                                                    Text(
-                                                                      localized(widget.arabic, '60 min', '٦٠ دقيقة'),
-                                                                      style: const TextStyle(
-                                                                        fontSize: 11,
-                                                                        fontWeight: FontWeight.w800,
-                                                                        color: Color(0xFFB45309),
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                ),
+                                                              HagzyMonoTag(
+                                                                label: localized(widget.arabic, '60 min', '٦٠ دقيقة'),
+                                                                backgroundColor: kSurfaceSubtle,
+                                                                foregroundColor: kInk,
+                                                                borderColor: kBorder,
                                                               ),
                                                             ],
                                                           ),
@@ -2419,24 +2457,31 @@ class _BookTabState extends State<BookTab> {
                                                               overflow: TextOverflow.ellipsis,
                                                               style: TextStyle(
                                                                 fontSize: 13.5,
-                                                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                                                color: kMuted,
                                                                 height: 1.45,
                                                               ),
                                                             ),
                                                           ],
                                                           const SizedBox(height: 12),
                                                           Align(
-                                                            alignment: Alignment.centerRight,
+                                                            alignment: AlignmentDirectional.centerEnd,
                                                             child: FilledButton.icon(
                                                               onPressed: () => _selectSpace(room.id),
-                                                              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                                              icon: const Icon(
+                                                                Icons.arrow_forward_rounded,
+                                                                size: 16,
+                                                                color: Colors.white,
+                                                              ),
                                                               label: Text(
                                                                 localized(widget.arabic, 'Select Room', 'اختر هذه الغرفة'),
                                                                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                                                               ),
                                                               style: FilledButton.styleFrom(
-                                                                backgroundColor: kGreen,
-                                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                                backgroundColor: kAccentSurface,
+                                                                foregroundColor: kAccentOnSurface,
+                                                                shape: RoundedRectangleBorder(
+                                                                  borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall + 2),
+                                                                ),
                                                               ),
                                                             ),
                                                           ),
@@ -2522,7 +2567,7 @@ class _BookTabState extends State<BookTab> {
                                                   item.name,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 12.5,
                                                     fontWeight: FontWeight.w800,
                                                     color: kGreen,
@@ -2564,7 +2609,7 @@ class _BookTabState extends State<BookTab> {
                                                         color: kGreen.withValues(alpha: 0.2),
                                                         shape: BoxShape.circle,
                                                       ),
-                                                      child: const Icon(Icons.check_circle_rounded, color: kGreen, size: 20),
+                                                      child: Icon(Icons.check_circle_rounded, color: kGreen, size: 20),
                                                     ),
                                                     const SizedBox(width: 10),
                                                     Expanded(
@@ -2596,10 +2641,10 @@ class _BookTabState extends State<BookTab> {
                                                           _escapeGroupConfirmed = false;
                                                         });
                                                       },
-                                                      icon: const Icon(Icons.edit_rounded, size: 15, color: kGreen),
+                                                      icon: Icon(Icons.edit_rounded, size: 15, color: kGreen),
                                                       label: Text(
                                                         localized(widget.arabic, 'Change', 'تعديل'),
-                                                        style: const TextStyle(
+                                                        style: TextStyle(
                                                           fontSize: 13,
                                                           fontWeight: FontWeight.w800,
                                                           color: kGreen,
@@ -2678,7 +2723,7 @@ class _BookTabState extends State<BookTab> {
                                                         color: kGreen.withValues(alpha: 0.14),
                                                         shape: BoxShape.circle,
                                                       ),
-                                                      child: const Icon(Icons.groups_rounded, color: kGreen, size: 20),
+                                                      child: Icon(Icons.groups_rounded, color: kGreen, size: 20),
                                                     ),
                                                     const SizedBox(width: 10),
                                                     Expanded(
@@ -2717,7 +2762,7 @@ class _BookTabState extends State<BookTab> {
                                                       ),
                                                       child: Text(
                                                         '${formatMoney(perPersonRate)} ${localized(widget.arabic, 'EGP/person', 'ج.م/فرد')}',
-                                                        style: const TextStyle(
+                                                        style: TextStyle(
                                                           fontSize: 12.5,
                                                           fontWeight: FontWeight.w800,
                                                           color: kGreen,
@@ -2766,7 +2811,7 @@ class _BookTabState extends State<BookTab> {
                                                           ),
                                                           Text(
                                                             '${formatMoney(total)} ${localized(widget.arabic, 'EGP total', 'ج.م إجمالي')}',
-                                                            style: const TextStyle(
+                                                            style: TextStyle(
                                                               fontSize: 12,
                                                               fontWeight: FontWeight.w700,
                                                               color: kGreen,
@@ -2859,7 +2904,7 @@ class _BookTabState extends State<BookTab> {
                                                           mainAxisSize: MainAxisSize.min,
                                                           children: [
                                                             if (isActiveTier) ...[
-                                                              const Icon(Icons.check_circle_rounded, color: kGreen, size: 14),
+                                                              Icon(Icons.check_circle_rounded, color: kGreen, size: 14),
                                                               const SizedBox(width: 5),
                                                             ],
                                                             Text(
@@ -2904,7 +2949,7 @@ class _BookTabState extends State<BookTab> {
                                                           ),
                                                           Text(
                                                             '${formatMoney(perPersonRate)} ${localized(widget.arabic, 'EGP / player', 'جنيه / فرد')}',
-                                                            style: const TextStyle(
+                                                            style: TextStyle(
                                                               fontSize: 14.5,
                                                               fontWeight: FontWeight.w900,
                                                               color: kGreen,
@@ -3066,7 +3111,7 @@ class _BookTabState extends State<BookTab> {
                                             return CustomPill(
                                               icon: sel ? Icons.check_circle_rounded : venue.type.icon,
                                               selected: sel,
-                                              label: '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}',
+                                              label: '${displayLocalizedTitle(val.name, widget.arabic)} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}',
                                               onTap: () => _selectSpace(val.id),
                                             );
                                           }).toList(),
@@ -3082,7 +3127,7 @@ class _BookTabState extends State<BookTab> {
                                                   color: kGreen.withValues(alpha: 0.14),
                                                   shape: BoxShape.circle,
                                                 ),
-                                                child: const Icon(Icons.timer_outlined, color: kGreen, size: 20),
+                                                child: Icon(Icons.timer_outlined, color: kGreen, size: 20),
                                               ),
                                               const SizedBox(width: 10),
                                               Expanded(
@@ -3119,27 +3164,18 @@ class _BookTabState extends State<BookTab> {
                                               margin: const EdgeInsets.only(bottom: 8),
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? (isDark ? kGreen.withValues(alpha: 0.22) : const Color(0xFFECFDF5))
-                                                    : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                                                borderRadius: BorderRadius.circular(14),
+                                                    ? (isDark ? const Color(0xFF1A1E14) : kObsidian)
+                                                    : kSurfaceSubtle.withValues(alpha: 0.55),
+                                                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
                                                 border: Border.all(
                                                   color: isSelected
-                                                      ? kGreen
-                                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                                                  width: isSelected ? 2 : 1.2,
+                                                      ? (isDark ? kVolt : kObsidian)
+                                                      : kBorder,
+                                                  width: isSelected ? 1.6 : 1.1,
                                                 ),
-                                                boxShadow: isSelected
-                                                    ? [
-                                                        BoxShadow(
-                                                          color: kGreen.withValues(alpha: 0.2),
-                                                          blurRadius: 8,
-                                                          offset: const Offset(0, 2),
-                                                        ),
-                                                      ]
-                                                    : null,
                                               ),
                                               child: InkWell(
-                                                borderRadius: BorderRadius.circular(14),
+                                                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
                                                 onTap: () {
                                                   setState(() {
                                                     _sportsDurationMinutes = minutes;
@@ -3153,7 +3189,7 @@ class _BookTabState extends State<BookTab> {
                                                         isSelected
                                                             ? Icons.radio_button_checked_rounded
                                                             : Icons.radio_button_off_rounded,
-                                                        color: isSelected ? kGreen : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                                                        color: isSelected ? kVolt : kMuted,
                                                         size: 20,
                                                       ),
                                                       const SizedBox(width: 12),
@@ -3164,11 +3200,9 @@ class _BookTabState extends State<BookTab> {
                                                             Text(
                                                               localized(widget.arabic, dur.$2, dur.$3),
                                                               style: TextStyle(
-                                                                fontSize: 15,
+                                                                fontSize: 14.5,
                                                                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                                                                color: isSelected
-                                                                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                                                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                                                                color: isSelected ? Colors.white : kInk,
                                                               ),
                                                             ),
                                                             const SizedBox(height: 2),
@@ -3176,7 +3210,9 @@ class _BookTabState extends State<BookTab> {
                                                               localized(widget.arabic, dur.$4, dur.$5),
                                                               style: TextStyle(
                                                                 fontSize: 11.5,
-                                                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                                color: isSelected
+                                                                    ? Colors.white.withValues(alpha: 0.68)
+                                                                    : kMuted,
                                                                 fontWeight: FontWeight.w600,
                                                               ),
                                                             ),
@@ -3185,10 +3221,11 @@ class _BookTabState extends State<BookTab> {
                                                       ),
                                                       Text(
                                                         '${formatMoney(durTotal)} ${localized(widget.arabic, 'EGP', 'ج.م')}',
-                                                        style: TextStyle(
-                                                          fontSize: 14,
+                                                        style: hagzyMonoStyle(
+                                                          fontSize: 13.5,
                                                           fontWeight: FontWeight.w800,
-                                                          color: isSelected ? kGreen : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
+                                                          color: isSelected ? kVolt : kInk,
+                                                          arabic: widget.arabic,
                                                         ),
                                                       ),
                                                     ],
@@ -3201,11 +3238,9 @@ class _BookTabState extends State<BookTab> {
                                           Container(
                                             padding: const EdgeInsets.all(12),
                                             decoration: BoxDecoration(
-                                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(
-                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                              ),
+                                              color: kSurfaceSubtle,
+                                              borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+                                              border: Border.all(color: kBorder),
                                             ),
                                             child: Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3215,15 +3250,19 @@ class _BookTabState extends State<BookTab> {
                                                   style: TextStyle(
                                                     fontSize: 13,
                                                     fontWeight: FontWeight.w700,
-                                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                    color: kMuted,
                                                   ),
                                                 ),
-                                                Text(
-                                                  '${formatMoney(item.priceForDuration(_sportsDurationMinutes))} ${localized(widget.arabic, 'EGP', 'ج.م')}',
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: kGreen,
+                                                HagzyAnimatedValue(
+                                                  valueKey: _sportsDurationMinutes,
+                                                  child: Text(
+                                                    '${formatMoney(item.priceForDuration(_sportsDurationMinutes))} ${localized(widget.arabic, 'EGP', 'ج.م')}',
+                                                    style: hagzyMonoStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: isDark ? kVolt : kObsidian,
+                                                      arabic: widget.arabic,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -3277,10 +3316,12 @@ class _BookTabState extends State<BookTab> {
                                                   : venue.type.icon,
                                               selected: sel,
                                               label: () {
+                                                final labelName = displayLocalizedTitle(
+                                                    val.name, widget.arabic);
                                                 if (venue.type == VenueType.salon) {
-                                                  return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/30m', 'ج.م/٣٠ د')}';
+                                                  return '$labelName · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/30m', 'ج.م/٣٠ د')}';
                                                 }
-                                                return '${val.name} · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}';
+                                                return '$labelName · ${formatMoney(val.hourlyRate)} ${localized(widget.arabic, 'EGP/h', 'ج.م/س')}';
                                               }(),
                                               onTap: () => _selectSpace(val.id),
                                             );
@@ -3408,7 +3449,7 @@ class _BookTabState extends State<BookTab> {
                                                                 MainAxisSize
                                                                     .min,
                                                             children: [
-                                                              const Icon(
+                                                              Icon(
                                                                   Icons
                                                                       .calendar_month_rounded,
                                                                   size: 15,
@@ -3456,25 +3497,24 @@ class _BookTabState extends State<BookTab> {
                                                                         10),
                                                             decoration:
                                                                 BoxDecoration(
-                                                              gradient: HagzyTheme
-                                                                  .obsidianGradient,
+                                                              color: kObsidian,
                                                               borderRadius:
                                                                   BorderRadius
                                                                       .circular(
-                                                                          16),
+                                                                          HagzyTokens
+                                                                              .radiusMedium),
                                                               border: Border.all(
-                                                                  color: kGreen
+                                                                  color: kVolt
                                                                       .withValues(
                                                                           alpha:
                                                                               0.5)),
                                                             ),
                                                             child: Row(
                                                               children: [
-                                                                const Icon(
+                                                                Icon(
                                                                   Icons
                                                                       .check_circle_rounded,
-                                                                  color: Color(
-                                                                      0xFFA7F3D0),
+                                                                  color: kVolt,
                                                                   size: 18,
                                                                 ),
                                                                 const SizedBox(
@@ -3483,7 +3523,7 @@ class _BookTabState extends State<BookTab> {
                                                                   child: Text(
                                                                     '${TimeOfDay.fromDateTime(_selectedStart!).format(context)} · ${item.name}',
                                                                     style:
-                                                                        const TextStyle(
+                                                                        hagzyMonoStyle(
                                                                       color: Colors
                                                                           .white,
                                                                       fontWeight:
@@ -3491,6 +3531,8 @@ class _BookTabState extends State<BookTab> {
                                                                               .w800,
                                                                       fontSize:
                                                                           12.5,
+                                                                      arabic: widget
+                                                                          .arabic,
                                                                     ),
                                                                     maxLines: 1,
                                                                     overflow:
@@ -3504,10 +3546,9 @@ class _BookTabState extends State<BookTab> {
                                                                   style: FilledButton
                                                                       .styleFrom(
                                                                     backgroundColor:
-                                                                        kGreenLight,
+                                                                        kVermilion,
                                                                     foregroundColor:
-                                                                        Colors
-                                                                            .white,
+                                                                        Colors.white,
                                                                     visualDensity:
                                                                         VisualDensity
                                                                             .compact,
@@ -3520,7 +3561,7 @@ class _BookTabState extends State<BookTab> {
                                                                     shape: RoundedRectangleBorder(
                                                                         borderRadius:
                                                                             BorderRadius.circular(
-                                                                                999)),
+                                                                                HagzyTokens.radiusSmall)),
                                                                   ),
                                                                   onPressed: () =>
                                                                       widget.onBook(
@@ -3858,6 +3899,8 @@ class _BookTabState extends State<BookTab> {
   }
 
   Widget _buildDateStrip(bool arabic) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final today = DateTime.now();
     // Calculate calendar dates without 24h DST duplication
     final days = List.generate(
@@ -3865,7 +3908,7 @@ class _BookTabState extends State<BookTab> {
       (index) => DateTime(today.year, today.month, today.day + index),
     );
     return SizedBox(
-      height: 92,
+      height: 88,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: days.length,
@@ -3874,46 +3917,34 @@ class _BookTabState extends State<BookTab> {
           final isSelected = d.year == _date.year &&
               d.month == _date.month &&
               d.day == _date.day;
+          final selBg = isDark ? kVermilion : kObsidian;
+          const selFg = Colors.white;
+          final selSub = Colors.white.withValues(alpha: 0.78);
           return Padding(
-            padding:
-                EdgeInsets.only(right: arabic ? 0 : 10, left: arabic ? 10 : 0),
-            child: PressableScale(
-              scaleDown: 0.94,
+            padding: const EdgeInsetsDirectional.only(end: 8),
+            child: HagzyInteractiveSurface(
+              hoverLift: 1.5,
+              pressScale: 0.94,
               onTap: () {
                 setState(() {
                   _date = d;
                   _selectedStart = null;
                 });
               },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                width: 70,
+              builder: (context, hovered, _) => AnimatedContainer(
+                duration: HagzyMotion.durationMicro,
+                curve: HagzyMotion.curveSnappy,
+                width: 68,
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  gradient: isSelected ? HagzyTheme.brandGradient : null,
-                  color: isSelected ? null : kPage,
-                  borderRadius: BorderRadius.circular(20),
+                  color: isSelected ? selBg : kPanel,
+                  borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFF10B981) : kBorder.withValues(alpha: 0.9),
-                    width: isSelected ? 1.8 : 1,
+                    color: isSelected
+                        ? selBg
+                        : (hovered ? kBorderStrong : kBorder),
+                    width: isSelected ? 1.5 : 1.1,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF059669).withValues(alpha: 0.35),
-                            blurRadius: 14,
-                            spreadRadius: 0,
-                            offset: const Offset(0, 5),
-                          ),
-                        ]
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -3924,22 +3955,21 @@ class _BookTabState extends State<BookTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.0,
+                        fontSize: 11.5,
                         height: 1.1,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        letterSpacing: 0.2,
-                        color: isSelected ? Colors.white.withValues(alpha: 0.9) : kMuted,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w600,
+                        color: isSelected ? selSub : kMuted,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
-                      '${d.day}',
-                      style: TextStyle(
+                      '${d.day}'.padLeft(2, '0'),
+                      style: hagzyMonoStyle(
                         fontSize: 18,
-                        height: 1.1,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
-                        color: isSelected ? Colors.white : kInk,
+                        color: isSelected ? selFg : kInk,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -3948,21 +3978,19 @@ class _BookTabState extends State<BookTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.0,
+                        fontSize: 11.0,
                         height: 1.1,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? Colors.white.withValues(alpha: 0.9) : kMuted,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? selSub : kMuted,
                       ),
                     ),
                     if (isSelected) ...[
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 4),
                       Container(
-                        width: 5,
-                        height: 5,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
+                        width: 16,
+                        height: 2.5,
+                        color: isDark ? Colors.white : kVermilion,
                       ),
                     ],
                   ],
@@ -4088,11 +4116,13 @@ class ReservationQuote extends StatelessWidget {
             : item.hourlyRate * estimatedMinutes / 60);
     final rawDeposit = total * venue.depositPercent / 100;
     final deposit = rawDeposit > 0 && rawDeposit < 5.0 ? 5.0 : rawDeposit;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     return Container(
       decoration: BoxDecoration(
-        color: kPage,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kBorder),
+        color: kSurfaceSubtle.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+        border: Border.all(color: kBorder, width: 1.1),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -4107,20 +4137,25 @@ class ReservationQuote extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: HagzyTheme.obsidianGradient,
-                      borderRadius: BorderRadius.circular(18),
+                      color: kObsidian,
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusMedium),
+                      border: Border.all(
+                        color: kVolt.withValues(alpha: 0.45),
+                      ),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 42,
-                          height: 42,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
-                            gradient: HagzyTheme.coralGradient,
-                            borderRadius: BorderRadius.circular(13),
+                            color: kVermilion,
+                            borderRadius:
+                                BorderRadius.circular(HagzyTokens.radiusSmall),
                           ),
                           child: const Icon(Icons.event_available_rounded,
-                              color: Colors.white, size: 21),
+                              color: Colors.white, size: 20),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -4138,37 +4173,27 @@ class ReservationQuote extends StatelessWidget {
                               const SizedBox(height: 3),
                               Text(
                                 formatDateTime(selectedStart!),
-                                style: const TextStyle(
-                                  color: Color(0xFFA7F3D0),
+                                style: hagzyMonoStyle(
+                                  color: kVolt,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 12.5,
+                                  fontSize: 12.0,
+                                  arabic: arabic,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '$estimatedMinutes min',
-                            style: const TextStyle(
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
+                        HagzyMonoTag(
+                          label: '$estimatedMinutes min',
+                          backgroundColor: const Color(0xFF1A1A22),
+                          foregroundColor: Colors.white,
+                          borderColor: Colors.white.withValues(alpha: 0.16),
                         ),
                       ],
                     ),
                   )
                 : const SizedBox.shrink(),
           ),
-          
           Row(
             children: [
               Expanded(
@@ -4177,18 +4202,23 @@ class ReservationQuote extends StatelessWidget {
                   children: [
                     Text(
                       localized(arabic, 'Total', 'الإجمالي'),
-                      style: TextStyle(
+                      style: hagzyMonoStyle(
                           color: kMuted,
-                          fontSize: 12.0,
-                          fontWeight: FontWeight.w700),
+                          fontSize: 11.0,
+                          fontWeight: FontWeight.w700,
+                          arabic: arabic),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${formatMoney(total)} ${localized(arabic, 'EGP', 'جنيه')}',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          color: kInk),
+                    HagzyAnimatedValue(
+                      valueKey: total.toStringAsFixed(0),
+                      child: Text(
+                        '${formatMoney(total)} ${localized(arabic, 'EGP', 'جنيه')}',
+                        style: hagzyMonoStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            color: kInk,
+                            arabic: arabic),
+                      ),
                     ),
                   ],
                 ),
@@ -4197,28 +4227,42 @@ class ReservationQuote extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: kGreen.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: kGreen.withValues(alpha: 0.22)),
+                  color: isDark
+                      ? kVolt.withValues(alpha: 0.12)
+                      : kObsidian,
+                  borderRadius:
+                      BorderRadius.circular(HagzyTokens.radiusMedium),
+                  border: Border.all(
+                    color: isDark
+                        ? kVolt.withValues(alpha: 0.35)
+                        : kObsidian,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       '${localized(arabic, 'Deposit', 'العربون')} (${formatMoney(venue.depositPercent)}%)',
-                      style: const TextStyle(
-                        color: kGreen,
-                        fontSize: 12.0,
+                      style: hagzyMonoStyle(
+                        color: isDark
+                            ? kVolt.withValues(alpha: 0.85)
+                            : Colors.white.withValues(alpha: 0.72),
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w800,
+                        arabic: arabic,
                       ),
                     ),
-                    const SizedBox(height: 1),
-                    Text(
-                      '${formatMoney(deposit)} ${localized(arabic, 'EGP', 'جنيه')}',
-                      style: const TextStyle(
-                          color: kGreen,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15),
+                    const SizedBox(height: 2),
+                    HagzyAnimatedValue(
+                      valueKey: deposit.toStringAsFixed(0),
+                      child: Text(
+                        '${formatMoney(deposit)} ${localized(arabic, 'EGP', 'جنيه')}',
+                        style: hagzyMonoStyle(
+                            color: kVolt,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            arabic: arabic),
+                      ),
                     ),
                   ],
                 ),
@@ -4228,8 +4272,8 @@ class ReservationQuote extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.verified_user_outlined,
-                  size: 15, color: kCobalt),
+              Icon(Icons.verified_user_outlined,
+                  size: 15, color: isDark ? kVolt : kObsidian),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -4248,27 +4292,34 @@ class ReservationQuote extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          PressableScale(
-            scaleDown: 0.97,
-            onTap: onReserve,
-            child: SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: kGreenLight,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: kAccentSurface,
+                foregroundColor: kAccentOnSurface,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(HagzyTokens.radiusMedium),
                 ),
-                onPressed: onReserve,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                label: Text(
-                  localized(arabic, 'Reserve & pay deposit', 'احجز وادفع العربون'),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w900, fontSize: 14.5),
-                ),
+              ),
+              onPressed: onReserve == null
+                  ? null
+                  : () {
+                      HagzyHaptics.medium();
+                      onReserve!();
+                    },
+              icon: Icon(
+                Icons.arrow_forward_rounded,
+                size: 18,
+                color: onReserve == null ? kMuted : Colors.white,
+              ),
+              label: Text(
+                localized(
+                    arabic, 'Reserve & pay deposit', 'احجز وادفع العربون'),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
           ),
@@ -4307,72 +4358,65 @@ class TimeSlotPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark =
         Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-    return PressableScale(
+    final selBg = isDark ? kVermilion : kObsidian;
+    const selFg = Colors.white;
+    return HagzyInteractiveSurface(
+      enabled: available,
+      hoverLift: 1.0,
+      pressScale: 0.96,
+      haptic: HagzyHapticStyle.selection,
       onTap: onTap,
-      scaleDown: 0.96,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
+      builder: (context, hovered, _) => AnimatedContainer(
+        duration: HagzyMotion.durationMicro,
+        curve: HagzyMotion.curveSnappy,
+        constraints: const BoxConstraints(minHeight: 44),
         decoration: BoxDecoration(
-          gradient: selected ? HagzyTheme.brandGradient : null,
           color: selected
-              ? null
+              ? selBg
               : available
                   ? kPanel
-                  : (isDark
-                      ? const Color(0xFF0F172A)
-                      : const Color(0xFFF1F5F9)),
-          borderRadius: BorderRadius.circular(13),
+                  : kSurfaceSubtle.withValues(alpha: 0.75),
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
           border: Border.all(
             color: selected
-                ? kGreen
+                ? selBg
                 : available
-                    ? kBorder
-                    : (isDark
-                        ? const Color(0xFF1F352D)
-                        : const Color(0xFFE2E8F0)),
-            width: selected ? 1.5 : 1,
+                    ? (hovered ? kBorderStrong : kBorder)
+                    : kBorder.withValues(alpha: 0.55),
+            width: selected ? 1.5 : 1.0,
           ),
-          boxShadow: selected ? HagzyTheme.emeraldGlowShadow : null,
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(13),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (selected || !available) ...[
-                    Icon(
-                      selected
-                          ? Icons.check_circle_rounded
-                          : Icons.lock_clock_outlined,
-                      size: 14,
-                      color: selected
-                          ? Colors.white
-                          : const Color(0xFF94A3B8),
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected
-                          ? Colors.white
-                          : available
-                              ? kInk
-                              : const Color(0xFF94A3B8),
-                      fontSize: 12,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
-                    ),
-                  ),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected || !available) ...[
+                Icon(
+                  selected
+                      ? Icons.check_rounded
+                      : Icons.lock_clock_outlined,
+                  size: 13,
+                  color: selected
+                      ? Colors.white
+                      : kMuted.withValues(alpha: 0.65),
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: hagzyMonoStyle(
+                  color: selected
+                      ? selFg
+                      : available
+                          ? kInk
+                          : kMuted.withValues(alpha: 0.60),
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                  arabic: isArabicMode,
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -4397,138 +4441,145 @@ class CustomerAreaBar extends StatelessWidget {
   final bool isLocating;
 
   @override
-  Widget build(BuildContext context) => PressableScale(
-        onTap: onTap,
-        scaleDown: 0.985,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: kGreenDark.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Icon(Icons.location_on_rounded,
-                    color: kGreenDark, size: 18),
+  Widget build(BuildContext context) {
+    return HagzyTap(
+      onTap: onTap,
+      scaleDown: 0.985,
+      haptic: HagzyHapticStyle.selection,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: kSurfaceTint,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localized(arabic, 'YOUR AREA', 'محافظتك'),
-                      style: TextStyle(
-                        color: kMuted,
-                        fontSize: 12.0,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
+              child: Icon(
+                Icons.location_on_rounded,
+                color: kBrandAccent,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    localized(arabic, 'Location', 'الموقع'),
+                    style: TextStyle(
+                      color: kMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
                     ),
-                    Row(
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          area,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: kInk,
+                            letterSpacing: arabic ? 0 : -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          color: kMuted, size: 18),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (onGpsTap != null) ...[
+              Tooltip(
+                message: localized(arabic, 'Auto-assign via GPS',
+                    'تحديد منطقتي تلقائياً عبر GPS'),
+                child: HagzyTap(
+                  scaleDown: 0.95,
+                  haptic: HagzyHapticStyle.selection,
+                  enabled: !isLocating,
+                  onTap: isLocating ? null : onGpsTap,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 38),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    margin: const EdgeInsetsDirectional.only(end: 6),
+                    decoration: BoxDecoration(
+                      color: kSurfaceSubtle,
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusSmall),
+                    ),
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            area,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                              color: kInk,
-                              letterSpacing: -0.3,
+                        if (isLocating)
+                          SizedBox(
+                            width: 13,
+                            height: 13,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              valueColor: AlwaysStoppedAnimation<Color>(kInk),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          Icon(Icons.my_location_rounded,
+                              color: kBrandAccent, size: 14),
+                        const SizedBox(width: 5),
+                        Text(
+                          'GPS',
+                          style: hagzyMonoStyle(
+                            color: kInk,
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.keyboard_arrow_down_rounded,
-                            color: kInk, size: 18),
                       ],
-                    ),
-                  ],
-                ),
-              ),
-              if (onGpsTap != null) ...[
-                Tooltip(
-                  message: localized(
-                      arabic, 'Auto-assign via GPS', 'تحديد منطقتي تلقائياً عبر GPS'),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: isLocating ? null : onGpsTap,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      margin: const EdgeInsetsDirectional.only(end: 8),
-                      decoration: BoxDecoration(
-                        color: kGreenDark.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                        border:
-                            Border.all(color: kGreenDark.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isLocating)
-                            const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.8,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(kGreenDark),
-                              ),
-                            )
-                          else
-                            const Icon(Icons.my_location_rounded,
-                                color: kGreenDark, size: 14),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'GPS',
-                            style: TextStyle(
-                              color: kGreenDark,
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                 ),
-              ],
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: kPanel,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: kBorder),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      localized(arabic, 'Change', 'تغيير'),
-                      style: TextStyle(
-                        color: kInk,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        color: kInk, size: 16),
-                  ],
-                ),
               ),
             ],
-          ),
+            Container(
+              constraints: const BoxConstraints(minHeight: 38),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              decoration: BoxDecoration(
+                color: kSurfaceSubtle,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    localized(arabic, 'Change', 'تغيير'),
+                    style: TextStyle(
+                      color: kInk,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_down_rounded,
+                      color: kInk, size: 15),
+                ],
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 class CustomerHero extends StatelessWidget {
@@ -4543,201 +4594,157 @@ class CustomerHero extends StatelessWidget {
   final VenueType? type;
   final bool arabic;
 
-  (List<Color>, IconData, String, String, Color) get _content => switch (type) {
+  (IconData, String, String) get _content => switch (type) {
         VenueType.sports => (
-            const [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF059669)],
-            Icons.sports_tennis,
+            Icons.sports_tennis_rounded,
             localized(arabic, 'Sports & Courts', 'ملاعب ورياضة'),
-            localized(arabic, 'Courts, Pitches & Split-Pay Matches',
-                'ملاعب ومباريات مع تقسيم الدفع'),
-            const Color(0xFFA7F3D0),
+            localized(arabic, 'Padel courts, football pitches & instant holds',
+                'ملاعب بادل وكرة قدم بتثبيت فوري'),
           ),
         VenueType.salon => (
-            const [Color(0xFF134E4A), Color(0xFF0F766E), Color(0xFF14B8A6)],
-            Icons.content_cut,
+            Icons.content_cut_rounded,
             localized(arabic, 'Grooming & Barbershops', 'حلاقة وعناية وصالونات'),
-            localized(arabic, 'Barbershops, Grooming & Chair Locks',
-                'حلاقة وعناية وحجز الكراسي'),
-            const Color(0xFF99F6E4),
+            localized(arabic, 'Barbershops & salons with instant appointments',
+                'صالونات حلاقة وعناية بحجز فوري'),
           ),
         VenueType.lounge => (
-            const [Color(0xFF0F172A), Color(0xFF1F352D), Color(0xFF065F46)],
-            Icons.sports_esports,
+            Icons.sports_esports_rounded,
             localized(arabic, 'Entertainment & Lounges', 'ترفيه وألعاب وكافيهات'),
-            localized(arabic, 'PS5 VIP Rooms, Billiards & Ping Pong',
-                'غرف بلايستيشن وبلياردو وبينغ بونغ'),
-            const Color(0xFFA7F3D0),
+            localized(arabic, 'PS5 rooms, billiards, ping pong & escape rooms',
+                'غرف بلايستيشن وبلياردو وغرف هروب'),
           ),
         null => (
-            const [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF059669)],
-            Icons.event_available,
-            localized(arabic, 'Find your next favorite', 'اكتشف مكانك المفضل'),
+            Icons.explore_rounded,
+            localized(arabic, 'Book your next spot', 'احجز مكانك في لحظة'),
             venueCount > 0
                 ? (arabic
-                    ? '$venueCount ${venueCount == 1 ? 'مكان محلي متاح' : 'أماكن محلية متاحة'}'
-                    : '$venueCount local ${venueCount == 1 ? 'place' : 'places'} to explore')
-                : localized(arabic, 'Instant slot booking & deposits in Egypt', 'حجز فوري وتأكيد بالعربون في مصر'),
-            const Color(0xFFA7F3D0),
+                    ? (venueCount == 1
+                        ? 'مكان واحد متاح للحجز الفوري'
+                        : venueCount == 2
+                            ? 'مكانان متاحان للحجز الفوري'
+                            : venueCount <= 10
+                                ? '$venueCount أماكن متاحة للحجز الفوري'
+                                : '$venueCount مكاناً متاحاً للحجز الفوري')
+                    : '$venueCount local ${venueCount == 1 ? 'place' : 'places'} ready to book')
+                : localized(arabic, 'Instant booking across Egypt',
+                    'حجز فوري في جميع أنحاء مصر'),
           ),
-      };
-
-  String get _image => switch (type) {
-        VenueType.sports =>
-          'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=640&q=75',
-        VenueType.salon =>
-          'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=640&q=75',
-        VenueType.lounge =>
-          'https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=640&q=75',
-        null =>
-          'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=640&q=75',
       };
 
   @override
   Widget build(BuildContext context) {
     final content = _content;
-    final borderColor = switch (type) {
-      VenueType.salon => const Color(0xFF5EEAD4).withValues(alpha: 0.28),
-      VenueType.lounge => const Color(0xFF34D399).withValues(alpha: 0.24),
-      _ => const Color(0xFF6EE7B7).withValues(alpha: 0.28),
-    };
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
+
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeOutCubic,
+      duration: HagzyTokens.durationMedium,
+      switchInCurve: HagzyTokens.curveDialogEnter,
       switchOutCurve: Curves.easeInCubic,
-      child: Container(
+      child: Padding(
         key: ValueKey(type),
-        constraints: const BoxConstraints(minHeight: 88),
-        padding: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: content.$1,
-            begin: AlignmentDirectional.bottomStart,
-            end: AlignmentDirectional.topEnd,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: borderColor,
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: content.$1.first.withValues(alpha: 0.25),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: HagzySmartImage(
-                imageUrl: _image,
-                fit: BoxFit.cover,
-                cacheWidth: 640,
-                errorWidget: Align(
-                  alignment:
-                      arabic ? Alignment.centerLeft : Alignment.centerRight,
-                  child: Icon(content.$2,
-                      size: 132, color: Colors.white.withValues(alpha: .16)),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin:
-                        arabic ? Alignment.centerRight : Alignment.centerLeft,
-                    end: arabic ? Alignment.centerLeft : Alignment.centerRight,
-                    stops: const [0, .50, 1],
-                    colors: [
-                      content.$1.first.withValues(alpha: .96),
-                      content.$1.first.withValues(alpha: .84),
-                      content.$1.last.withValues(alpha: .30),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Align(
-                alignment:
-                    arabic ? Alignment.centerRight : Alignment.centerLeft,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      arabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.16)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          LivePulseDot(color: content.$5, size: 5),
-                          const SizedBox(width: 5),
-                          Text(
-                            content.$3,
-                            style: TextStyle(
-                              color: content.$5,
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.0,
-                            ),
+        padding: EdgeInsets.only(top: isWide ? 6 : 2, bottom: isWide ? 2 : 0),
+        child: isWide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          content.$2,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: hagzyDisplayStyle(
+                            arabic: arabic,
+                            color: kInk,
+                            fontSize: 24,
+                            height: arabic ? 1.24 : 1.15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      width: MediaQuery.sizeOf(context).width * .64,
-                      child: Text(
-                        content.$4,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          height: 1.15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.3,
                         ),
-                      ),
+                        const SizedBox(height: 3),
+                        Text(
+                          content.$3,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: kMuted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Row(
+                  ),
+                  const SizedBox(width: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: kPanel,
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusFull),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.verified_rounded,
-                            size: 13, color: kGreenLight),
-                        const SizedBox(width: 4),
+                        const LivePulseDot(color: kVermilion, size: 7),
+                        const SizedBox(width: 8),
                         Text(
-                          arabic
-                              ? '$venueCount ${venueCount == 1 ? 'مكان قريب' : 'أماكن قريبة'} · حجز فوري'
-                              : '$venueCount ${venueCount == 1 ? 'place' : 'places'} nearby · Instant hold',
+                          localized(
+                            arabic,
+                            'Instant Hold · InstaPay & Wallet',
+                            'تثبيت فوري · إنستاباي والمحفظة',
+                          ),
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.82),
-                            fontSize: 12.0,
+                            color: kInk,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          content.$2,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: hagzyDisplayStyle(
+                            arabic: arabic,
+                            color: kInk,
+                            fontSize: 20,
+                            height: arabic ? 1.25 : 1.15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        Text(
+                          content.$3,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: kMuted,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -4867,12 +4874,6 @@ class VenueBrowseCard extends StatelessWidget {
     );
   }
 
-  Color get _accent => switch (venue.type) {
-        VenueType.sports => kGreen,
-        VenueType.salon => const Color(0xFF0F766E),
-        VenueType.lounge => kGreenDark,
-      };
-
   String get _image =>
       (venue.imageUrl != null && venue.imageUrl!.isNotEmpty)
           ? venue.imageUrl!
@@ -4887,8 +4888,6 @@ class VenueBrowseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final lowestPrice =
         venue.type == VenueType.salon && venue.services.isNotEmpty
             ? venue.services
@@ -4920,436 +4919,373 @@ class VenueBrowseCard extends StatelessWidget {
     final ratingStr = venue.rating.toStringAsFixed(1);
     final hasReviews = venue.reviews.isNotEmpty;
     final reviewCount = venue.reviews.length;
-    return AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
+    final displayName = displayLocalizedTitle(venue.name, arabic);
+    final displayLocation = venue.location.isEmpty
+        ? localized(arabic, 'Location available on booking', 'تفاصيل الموقع عند الحجز')
+        : displayLocalizedLocation(venue.location, arabic);
+    // Warm Consumer Venue Card (clean elevation, refined 14px radius, crisp photo)
+    return HagzyInteractiveSurface(
+      hoverLift: 2.0,
+      pressScale: 0.98,
+      builder: (context, hovered, _) => AnimatedContainer(
+        duration: HagzyMotion.durationRelease,
+        curve: HagzyMotion.curveRelease,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow:
-              selected ? HagzyTheme.emeraldGlowShadow : HagzyTheme.softShadow,
-        ),
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(
-              color: selected ? kGreen : kBorder,
-              width: selected ? 2.0 : 1,
-            ),
+          color: kPanel,
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+          border: Border.all(
+            color: selected
+                ? kBrandAccent
+                : (hovered ? kBorderStrong : kBorder),
+            width: selected ? 1.6 : 1.0,
           ),
+          boxShadow: hovered ? HagzyTheme.softShadow : HagzyTheme.subtleShadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
           child: InkWell(
-            onTap: onTap,
+            onTap: () {
+              HagzyHaptics.light();
+              onTap();
+            },
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 172,
+                // Edge-to-edge Venue Photograph
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).width >=
+                          HagzyTokens.breakpointTablet
+                      ? 176
+                      : 196,
                   width: double.infinity,
-                  padding: EdgeInsets.zero,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFF0F172A),
-                        _accent.withValues(alpha: .85),
-                      ],
-                      begin: Alignment.bottomLeft,
-                      end: Alignment.topRight,
-                    ),
-                  ),
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: HagzySmartImage(
-                          imageUrl: _image,
-                          fit: BoxFit.cover,
-                          cacheWidth: 640,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const HagzyShimmerBox(
-                              width: double.infinity,
-                              height: 172,
-                              borderRadius: 0,
-                            );
-                          },
-                          errorWidget: const SizedBox.shrink(),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              stops: const [0.0, 0.45, 1.0],
-                              colors: [
-                                Colors.black.withValues(alpha: 0.20),
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.58),
-                              ],
+                        child: AnimatedScale(
+                          scale: hovered && !HagzyMotion.reduced(context)
+                              ? 1.035
+                              : 1.0,
+                          duration: HagzyMotion.durationFluid,
+                          curve: HagzyMotion.curveDialogEnter,
+                          child: HagzySmartImage(
+                            imageUrl: _image,
+                            fit: BoxFit.cover,
+                            cacheWidth: 640,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const HagzyShimmerBox(
+                                width: double.infinity,
+                                height: 204,
+                                borderRadius: 0,
+                              );
+                            },
+                            errorWidget: Container(
+                              color: kSurfaceSubtle,
+                              alignment: Alignment.center,
+                              child: Icon(venue.type.icon,
+                                  size: 36, color: kMuted),
                             ),
                           ),
                         ),
                       ),
-                      Positioned.fill(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Stack(
-                            children: [
-                              Align(
-                                alignment: AlignmentDirectional.topStart,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF0F172A).withValues(alpha: 0.78),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.16)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(venue.type.icon,
-                                          size: 12, color: Colors.white),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        switch (venue.type) {
-                                          VenueType.sports => localized(
-                                              arabic, 'SPORTS & COURTS', 'رياضة وملاعب'),
-                                          VenueType.salon => localized(
-                                              arabic, 'GROOMING & SALONS', 'حلاقة وعناية'),
-                                          VenueType.lounge => localized(
-                                              arabic, 'ENTERTAINMENT', 'ترفيه وألعاب'),
-                                        },
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12.0,
-                                            letterSpacing: .7,
-                                            fontWeight: FontWeight.w800),
-                                      ),
-                                    ],
-                                  ),
+                      // Top-Start Category Pill
+                      PositionedDirectional(
+                        top: 10,
+                        start: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: kObsidian.withValues(alpha: 0.72),
+                            borderRadius:
+                                BorderRadius.circular(HagzyTokens.radiusFull),
+                          ),
+                          child: Text(
+                            switch (venue.type) {
+                              VenueType.sports =>
+                                localized(arabic, 'Sports', 'رياضة وملاعب'),
+                              VenueType.salon =>
+                                localized(arabic, 'Grooming', 'حلاقة وعناية'),
+                              VenueType.lounge =>
+                                localized(arabic, 'Entertainment', 'ترفيه وألعاب'),
+                            },
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Top-End Favorite Button (>= 44x44 touch target)
+                      PositionedDirectional(
+                        top: 6,
+                        end: 6,
+                        child: IconButton(
+                          tooltip: favorite
+                              ? localized(
+                                  arabic,
+                                  'Remove from Saved Places',
+                                  'إزالة من الأماكن المفضلة')
+                              : localized(
+                                  arabic, 'Save to Favorites', 'حفظ في المفضلة'),
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                            backgroundColor: favorite
+                                ? kVermilion
+                                : kObsidian.withValues(alpha: 0.68),
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                          ),
+                          onPressed: () {
+                            HagzyHaptics.selection();
+                            onFavorite();
+                          },
+                          icon: Icon(
+                            favorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                      // Bottom-Start Availability Pill
+                      PositionedDirectional(
+                        bottom: 10,
+                        start: 10,
+                        child: selected
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: kVermilion,
+                                  borderRadius: BorderRadius.circular(
+                                      HagzyTokens.radiusFull),
                                 ),
-                              ),
-                              Align(
-                                alignment: AlignmentDirectional.topEnd,
-                                child: Material(
-                                  color: isDark
-                                      ? const Color(0xFF1F352D).withValues(alpha: 0.88)
-                                      : (favorite ? Colors.white : Colors.white.withValues(alpha: 0.94)),
-                                  shape: const CircleBorder(),
-                                  elevation: favorite ? 3 : 2,
-                                  shadowColor: favorite
-                                      ? const Color(0xFFE11D48).withValues(alpha: 0.4)
-                                      : Colors.black26,
-                                  child: IconButton(
-                                    tooltip: favorite
-                                        ? localized(arabic, 'Remove from Saved Places',
-                                            'إزالة من الأماكن المفضلة')
-                                        : localized(arabic, 'Save to Favorites',
-                                            'حفظ في المفضلة'),
-                                    visualDensity: VisualDensity.compact,
-                                    onPressed: onFavorite,
-                                    icon: Icon(
-                                      favorite
-                                          ? Icons.favorite_rounded
-                                          : Icons.favorite_border_rounded,
-                                      color: favorite
-                                          ? const Color(0xFFE11D48)
-                                          : (isDark ? Colors.white : const Color(0xFF0F172A)),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Align(
-                                alignment: Alignment.bottomLeft,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 9, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: isDark
-                                            ? const Color(0xFF0F172A).withValues(alpha: 0.88)
-                                            : Colors.white.withValues(alpha: 0.95),
-                                        borderRadius: BorderRadius.circular(999),
-                                        border: isDark
-                                            ? Border.all(
-                                                color: Colors.white.withValues(alpha: 0.20),
-                                                width: 0.8,
-                                              )
-                                            : null,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            hasReviews
-                                                ? Icons.star_rounded
-                                                : Icons.fiber_new_rounded,
-                                            size: 14,
-                                            color: hasReviews
-                                                ? const Color(0xFFF59E0B)
-                                                : (isDark ? const Color(0xFF34D399) : kGreen),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            hasReviews
-                                                ? localized(
-                                                    arabic,
-                                                    '$ratingStr ($reviewCount) · Verified',
-                                                    '$ratingStr ($reviewCount) · مكان معتمد')
-                                                : localized(
-                                                    arabic, 'New Venue', 'مكان جديد'),
-                                            style: TextStyle(
-                                              fontSize: 12.0,
-                                              fontWeight: FontWeight.w800,
-                                              color: isDark
-                                                  ? const Color(0xFFF8FAFC)
-                                                  : const Color(0xFF0F172A),
-                                            ),
-                                          ),
-                                        ],
+                                    const Icon(Icons.check_rounded,
+                                        color: Colors.white, size: 13),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      localized(arabic, 'Selected', 'محدد'),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
                                 ),
+                              )
+                            : Builder(
+                                builder: (context) {
+                                  final avail = _computeLiveAvailability();
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: kObsidian.withValues(alpha: 0.80),
+                                      borderRadius: BorderRadius.circular(
+                                          HagzyTokens.radiusFull),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: avail.isAvailableNow
+                                                ? const Color(0xFF4ADE80)
+                                                : const Color(0xFFFBBF24),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          avail.label,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
-                            ],
-                          ),
-                        ),
                       ),
                     ],
                   ),
                 ),
+
+                // Clean Card Body
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 15, 18, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
-                              venue.name,
-                              style: TextStyle(
-                                fontSize: 17,
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: hagzyDisplayStyle(
+                                arabic: arabic,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
+                                letterSpacing: -0.25,
                                 color: kInk,
                               ),
                             ),
                           ),
-                          if (selected)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: kGreen.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.check_circle,
-                                      color: kGreen, size: 14),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    localized(arabic, 'Selected', 'محدد'),
-                                    style: const TextStyle(
-                                      color: kGreen,
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Builder(
-                              builder: (context) {
-                                final avail = _computeLiveAvailability();
-                                final badgeColor = avail.isAvailableNow
-                                    ? kGreen
-                                    : const Color(0xFFD97706);
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 9, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: badgeColor.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: badgeColor.withValues(alpha: 0.28),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 6.5,
-                                        height: 6.5,
-                                        decoration: BoxDecoration(
-                                          color: badgeColor,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        avail.label,
-                                        style: TextStyle(
-                                          color: badgeColor,
-                                          fontSize: 12.0,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: kSurfaceSubtle,
+                              borderRadius:
+                                  BorderRadius.circular(HagzyTokens.radiusXs),
                             ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  hasReviews
+                                      ? Icons.star_rounded
+                                      : Icons.verified_rounded,
+                                  size: 13,
+                                  color: hasReviews ? kGold : kBrandAccent,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  hasReviews
+                                      ? '$ratingStr ($reviewCount)'
+                                      : localized(arabic, 'New', 'جديد'),
+                                  style: hagzyMonoStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: kInk,
+                                    arabic: arabic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Row(
                         children: [
                           Icon(Icons.location_on_outlined,
-                              size: 15, color: kMuted),
+                              size: 14, color: kMuted),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              venue.location.isEmpty
-                                  ? localized(
-                                      arabic,
-                                      'Location Details Available on Booking',
-                                      'تفاصيل الموقع عند الحجز')
-                                  : venue.location,
+                              displayLocation,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: kMuted,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                           InkWell(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                             onTap: () async {
                               final rawUrl = venue.googleMapsUrl.trim();
                               final uri = rawUrl.isNotEmpty
                                   ? Uri.parse(rawUrl)
-                                  : Uri.https('www.google.com', '/maps/search/', {
+                                  : Uri.https(
+                                      'www.google.com', '/maps/search/', {
                                       'api': '1',
-                                      'query': '${venue.name} ${venue.location} Egypt'.trim(),
+                                      'query':
+                                          '${venue.name} ${venue.location} Egypt'
+                                              .trim(),
                                     });
                               await launchUrl(uri,
                                   mode: LaunchMode.externalApplication);
                             },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 3),
+                                  horizontal: 4, vertical: 2),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.directions_outlined,
-                                      size: 14, color: kGreen),
-                                  const SizedBox(width: 3),
                                   Text(
-                                    localized(
-                                        arabic, 'Directions', 'الاتجاهات'),
-                                    style: const TextStyle(
-                                      color: kGreen,
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.w800,
+                                    localized(arabic, 'Directions', 'الاتجاهات'),
+                                    style: TextStyle(
+                                      color: kInk,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
+                                  const SizedBox(width: 2),
+                                  Icon(Icons.north_east_rounded,
+                                      size: 13, color: kBrandAccent),
                                 ],
                               ),
                             ),
                           ),
                         ],
                       ),
-                      if (venue.amenities.isNotEmpty || venue.items.isNotEmpty) ...[
+                      if (venue.items.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
-                          [...venue.amenities.take(3), if (venue.items.isNotEmpty) '${venue.items.length} $spaceLabel'].join('  ·  '),
+                          [
+                            '\u2068${venue.items.length} $spaceLabel\u2069',
+                            '\u2068${localized(arabic, 'Instant Hold', 'تثبيت فوري')}\u2069',
+                          ].join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: kMuted,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
                       Row(
-                        children: [
-                          Icon(
-                            Icons.verified_user_rounded,
-                            size: 14,
-                            color:
-                                isDark ? const Color(0xFF34D399) : kGreenDark,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              localized(
-                                arabic,
-                                '15-min free hold · InstaPay & Wallet accepted',
-                                'حجز مبدئي ١٥ دقيقة · إنستاباي والمحفظة',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? const Color(0xFF34D399)
-                                    : kGreenDark,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: RichText(
                               text: TextSpan(
-                                style: TextStyle(
-                                    color: kInk, fontSize: 12.5),
+                                style: TextStyle(color: kInk, fontSize: 13),
                                 children: [
-                                  TextSpan(
-                                    text:
-                                        localized(arabic, 'From ', 'يبدأ من '),
-                                    style: TextStyle(
-                                        color: kMuted,
-                                        fontWeight: FontWeight.w600),
-                                  ),
                                   TextSpan(
                                     text: lowestPrice == null
                                         ? localized(arabic, 'Price on Request',
                                             'السعر عند الطلب')
                                         : '${formatMoney(lowestPrice)} ${localized(arabic, 'EGP', 'ج.م')}',
-                                    style: TextStyle(
+                                    style: hagzyMonoStyle(
                                       color: kInk,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      fontFeatures: const [
-                                        FontFeature.tabularFigures(),
-                                      ],
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      arabic: arabic,
                                     ),
                                   ),
                                   if (lowestPrice != null)
                                     TextSpan(
-                                      text: ' $rateLabel',
+                                      text: ' / $rateLabel',
                                       style: TextStyle(
-                                          color: kMuted,
-                                          fontWeight: FontWeight.w600),
+                                        color: kMuted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -5359,46 +5295,62 @@ class VenueBrowseCard extends StatelessWidget {
                             IconButton(
                               tooltip: localized(arabic, 'Venue Info & Reviews',
                                   'التفاصيل والتقييمات'),
-                              visualDensity: VisualDensity.compact,
-                              onPressed: onDetails,
-                              icon: Icon(Icons.info_outline_rounded,
-                                  size: 20, color: kMuted),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          PressableScale(
-                            scaleDown: 0.94,
-                            onTap: onTap,
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: selected
-                                    ? const Color(0xFFEF4444)
-                                        .withValues(alpha: 0.12)
-                                    : kGreenDark,
-                                foregroundColor: selected
-                                    ? const Color(0xFFEF4444)
-                                    : Colors.white,
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(44, 44),
+                                backgroundColor: kSurfaceSubtle,
+                                foregroundColor: kInk,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(999)),
-                                minimumSize: const Size(108, 48),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 12),
-                                elevation: 0,
+                                  borderRadius: BorderRadius.circular(
+                                      HagzyTokens.radiusMedium),
+                                ),
                               ),
-                              onPressed: onTap,
-                              icon: Icon(
+                              onPressed: () {
+                                HagzyHaptics.selection();
+                                onDetails!();
+                              },
+                              icon: const Icon(Icons.info_outline_rounded,
+                                  size: 18),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  selected ? kVermilion : kAccentSurface,
+                              foregroundColor:
+                                  selected ? Colors.white : kAccentOnSurface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    HagzyTokens.radiusMedium),
+                              ),
+                              minimumSize: const Size(108, 44),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 11),
+                              elevation: 0,
+                            ),
+                            onPressed: () {
+                              HagzyHaptics.light();
+                              onTap();
+                            },
+                            icon: AnimatedSlide(
+                              duration: HagzyMotion.durationMicro,
+                              offset: hovered && !selected
+                                  ? Offset(arabic ? -0.14 : 0.14, 0)
+                                  : Offset.zero,
+                              child: Icon(
                                 selected
                                     ? Icons.close_rounded
-                                    : Icons.calendar_today_rounded,
-                                size: 15,
+                                    : Icons.arrow_forward_rounded,
+                                size: 16,
+                                color: Colors.white,
                               ),
-                              label: Text(
-                                selected
-                                    ? localized(arabic, 'Close', 'إغلاق')
-                                    : localized(
-                                        arabic, 'Book', 'احجز'),
-                                style:
-                                    const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            label: Text(
+                              selected
+                                  ? localized(arabic, 'Close', 'إغلاق')
+                                  : localized(arabic, 'Book', 'احجز'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -5411,7 +5363,8 @@ class VenueBrowseCard extends StatelessWidget {
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -5455,67 +5408,75 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
     var comment = '';
     var rating = 5.0;
     final arabic = widget.arabic;
-    final submitted = await showDialog<bool>(
+    final submitted = await showHagzyAdaptiveModal<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(localized(arabic, 'Rate ${widget.venue.name}',
-              'قيّم ${widget.venue.name}')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (idx) {
-                    final star = idx + 1;
-                    return IconButton(
-                      tooltip: localized(
-                          arabic, '$star out of 5', '$star من 5'),
-                      onPressed: () =>
-                          setDialogState(() => rating = star.toDouble()),
-                      icon: Icon(
+      builder: (ctx, isSheet) => StatefulBuilder(
+        builder: (ctx, setDialogState) => HagzyModalCard(
+          isSheet: isSheet,
+          icon: Icons.star_rounded,
+          iconColor: const Color(0xFFF59E0B),
+          iconBackgroundColor: const Color(0xFFF59E0B).withValues(alpha: 0.14),
+          title: localized(arabic, 'Rate ${widget.venue.name}',
+              'قيّم ${widget.venue.name}'),
+          subtitle: localized(
+            arabic,
+            'Share how your visit went to help other guests.',
+            'شاركنا رأيك في التجربة لمساعدة الزوار الآخرين.',
+          ),
+          onClose: () => Navigator.pop(ctx, false),
+          primaryUseFilledButton: true,
+          primaryLabel: localized(arabic, 'Submit Review', 'إرسال التقييم'),
+          onPrimary: () {
+            if (author.trim().isEmpty) return;
+            Navigator.pop(ctx, true);
+          },
+          secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+          onSecondary: () => Navigator.pop(ctx, false),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (idx) {
+                  final star = idx + 1;
+                  return HagzyTap(
+                    scaleDown: 0.90,
+                    haptic: HagzyHapticStyle.selection,
+                    onTap: () => setDialogState(() => rating = star.toDouble()),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
                         star <= rating
                             ? Icons.star_rounded
                             : Icons.star_border_rounded,
                         color: const Color(0xFFF59E0B),
-                        size: 30,
+                        size: 34,
                       ),
-                    );
-                  }),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                textInputAction: TextInputAction.next,
+                onChanged: (v) => author = v,
+                decoration: InputDecoration(
+                  labelText: localized(arabic, 'Your Name', 'الاسم'),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  onChanged: (v) => author = v,
-                  decoration: InputDecoration(
-                    labelText: localized(arabic, 'Your Name', 'الاسم'),
-                  ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                textInputAction: TextInputAction.done,
+                onChanged: (v) => comment = v,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText:
+                      localized(arabic, 'Your Experience', 'تجربتك (اختياري)'),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  onChanged: (v) => comment = v,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText:
-                        localized(arabic, 'Your Experience', 'تجربتك (اختياري)'),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(localized(arabic, 'Cancel', 'إلغاء')),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (author.trim().isEmpty) return;
-                Navigator.pop(ctx, true);
-              },
-              child: Text(localized(arabic, 'Submit Review', 'إرسال التقييم')),
-            ),
-          ],
         ),
       ),
     );
@@ -5564,14 +5525,14 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        venue.name,
+                        displayLocalizedTitle(venue.name, arabic),
                         style: const TextStyle(
                             fontSize: 20, fontWeight: FontWeight.w800),
                       ),
                       Text(
                         venue.location.isEmpty
                             ? venue.type.label
-                            : '${venue.location} · ${venue.type.label}',
+                            : '${displayLocalizedLocation(venue.location, arabic)} · ${venue.type.label}',
                         style: TextStyle(color: kMuted, fontSize: 12),
                       ),
                     ],
@@ -5653,38 +5614,68 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (venue.galleryUrls.isNotEmpty) ...[
-                      SizedBox(
-                        height: 128,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: venue.galleryUrls.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 10),
-                          itemBuilder: (context, idx) => ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: HagzySmartImage(
-                              imageUrl: venue.galleryUrls[idx],
-                              width: 210,
-                              height: 128,
-                              fit: BoxFit.cover,
-                              errorWidget: Container(
-                                width: 210,
-                                height: 128,
-                                color: kPage,
-                                alignment: Alignment.center,
-                                child: Icon(venue.type.icon, color: kGreen),
+                      if (venue.galleryUrls.length == 1)
+                        ClipRRect(
+                          borderRadius:
+                              BorderRadius.circular(HagzyTokens.radiusLarge),
+                          child: HagzySmartImage(
+                            imageUrl: venue.galleryUrls.first,
+                            width: double.infinity,
+                            height: 176,
+                            fit: BoxFit.cover,
+                            errorWidget: Container(
+                              width: double.infinity,
+                              height: 176,
+                              color: kSurfaceSubtle,
+                              alignment: Alignment.center,
+                              child: Icon(venue.type.icon,
+                                  color: kBrandAccent, size: 32),
+                            ),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 148,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: venue.galleryUrls.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 10),
+                            itemBuilder: (context, idx) => ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusLarge),
+                              child: HagzySmartImage(
+                                imageUrl: venue.galleryUrls[idx],
+                                width: 224,
+                                height: 148,
+                                fit: BoxFit.cover,
+                                errorWidget: Container(
+                                  width: 224,
+                                  height: 148,
+                                  color: kSurfaceSubtle,
+                                  alignment: Alignment.center,
+                                  child: Icon(venue.type.icon,
+                                      color: kBrandAccent),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                       const SizedBox(height: 14),
                     ],
                     if (venue.description.isNotEmpty) ...[
-                      Text(
-                        venue.description,
-                        style: TextStyle(color: kInk, height: 1.45),
-                      ),
+                      Builder(builder: (context) {
+                        final desc = displayLocalizedDescription(venue, arabic);
+                        return Directionality(
+                          textDirection: isPrimarilyArabic(desc)
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          child: Text(
+                            desc,
+                            style: TextStyle(color: kInk, height: 1.5),
+                          ),
+                        );
+                      }),
                       const SizedBox(height: 12),
                     ],
                     Wrap(
@@ -5692,8 +5683,8 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                       runSpacing: 8,
                       children: [
                         Chip(
-                          avatar: const Icon(Icons.access_time,
-                              size: 15, color: kGreen),
+                          avatar: Icon(Icons.access_time,
+                              size: 15, color: kBrandAccent),
                           label: Text(
                             localized(
                               arabic,
@@ -5704,8 +5695,8 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                           ),
                         ),
                         Chip(
-                          avatar: const Icon(Icons.percent,
-                              size: 15, color: kGreen),
+                          avatar: Icon(Icons.percent,
+                              size: 15, color: kBrandAccent),
                           label: Text(
                             localized(
                               arabic,
@@ -5717,8 +5708,10 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                         ),
                         ...venue.amenities.map(
                           (a) => Chip(
-                            label:
-                                Text(a, style: const TextStyle(fontSize: 12)),
+                            label: Text(
+                              displayLocalizedAmenity(a, arabic),
+                              style: const TextStyle(fontSize: 12),
+                            ),
                           ),
                         ),
                       ],
@@ -5746,15 +5739,17 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF162822) : kPage,
-                            borderRadius: BorderRadius.circular(12),
+                            color: kSurfaceSubtle.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(
+                                HagzyTokens.radiusMedium),
                             border: Border.all(color: kBorder),
                           ),
                           child: Row(
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: (it.imageUrl != null && it.imageUrl!.isNotEmpty)
+                                child: (it.imageUrl != null &&
+                                        it.imageUrl!.isNotEmpty)
                                     ? HagzySmartImage(
                                         imageUrl: it.imageUrl!,
                                         width: 48,
@@ -5763,17 +5758,17 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                                         errorWidget: Container(
                                           width: 48,
                                           height: 48,
-                                          color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
+                                          color: kObsidian,
                                           child: Icon(venue.type.icon,
-                                              color: isDark ? kGreenLight : kGreenDark, size: 20),
+                                              color: kVolt, size: 20),
                                         ),
                                       )
                                     : Container(
                                         width: 48,
                                         height: 48,
-                                        color: isDark ? const Color(0xFF1E3A2F) : kSurfaceTint,
+                                        color: kObsidian,
                                         child: Icon(venue.type.icon,
-                                            color: isDark ? kGreenLight : kGreenDark, size: 20),
+                                            color: kVolt, size: 20),
                                       ),
                               ),
                               const SizedBox(width: 10),
@@ -5785,34 +5780,36 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            it.name,
+                                            displayLocalizedTitle(
+                                                it.name, arabic),
                                             style: TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 13,
-                                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13.5,
+                                                color: kInk),
                                           ),
                                         ),
                                         Text(
                                           '${formatMoney(it.hourlyRate)} ${localized(arabic, 'EGP', 'ج.م')}',
-                                          style: TextStyle(
+                                          style: hagzyMonoStyle(
                                               fontWeight: FontWeight.w800,
-                                              color: isDark ? kGreenLight : kGreenDark,
-                                              fontSize: 12.5),
+                                              color: isDark ? kVolt : kObsidian,
+                                              fontSize: 12.5,
+                                              arabic: arabic),
                                         ),
                                       ],
                                     ),
-                                     if (it.description.isNotEmpty) ...[
-                                       const SizedBox(height: 4),
-                                       Text(
-                                         it.description,
-                                         style: TextStyle(
-                                             color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
-                                             fontSize: 13.5,
-                                             height: 1.45),
-                                         maxLines: 4,
-                                         overflow: TextOverflow.ellipsis,
-                                       ),
-                                     ],
+                                    if (it.description.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        it.description,
+                                        style: TextStyle(
+                                            color: kMuted,
+                                            fontSize: 13.0,
+                                            height: 1.45),
+                                        maxLines: 4,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -5988,118 +5985,146 @@ class _CategoryVisualCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-    return PressableScale(
+    final compact = MediaQuery.sizeOf(context).width < HagzyTokens.breakpointTablet;
+    return HagzyTap(
+      scaleDown: 0.96,
+      haptic: HagzyHapticStyle.selection,
       onTap: onTap,
-      scaleDown: 0.95,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFF047857), Color(0xFF059669)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isSelected ? null : (isDark ? const Color(0xFF111B17) : Colors.white),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? kGreenLight.withValues(alpha: 0.5)
-                : kBorder,
-            width: isSelected ? 1.5 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: kGreen.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  )
-                ],
+        duration: HagzyMotion.durationMicro,
+        curve: HagzyMotion.curveSnappy,
+        constraints: BoxConstraints(minHeight: compact ? 44 : 58),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 13 : 14,
+          vertical: compact ? 9 : 12,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : (isDark ? const Color(0xFF1F352D) : const Color(0xFFF1F5F9)),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 16,
-                color: isSelected ? Colors.white : kGreen,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: isSelected ? Colors.white : kInk,
-                        letterSpacing: -0.2,
+        decoration: BoxDecoration(
+          color: isSelected ? kAccentSurface : kPanel,
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+          border: Border.all(
+            color: isSelected ? kAccentSurface : kBorder,
+            width: 1.0,
+          ),
+          boxShadow: isSelected ? HagzyTheme.subtleShadow : null,
+        ),
+        child: compact
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: isSelected ? kAccentOnSurface : kBrandAccent,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                      color: isSelected ? kAccentOnSurface : kInk,
+                    ),
+                  ),
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : kSurfaceSubtle,
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusFull),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: hagzyMonoStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? Colors.white : kMuted,
+                          arabic: arabic,
+                        ),
                       ),
                     ),
-                    if (count > 0) ...[
-                      const SizedBox(width: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.white.withValues(alpha: 0.22)
-                              : (isDark ? const Color(0xFF1F352D) : const Color(0xFFF1F5F9)),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '$count',
+                  ],
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.16)
+                          : kSurfaceTint,
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusSmall),
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 18,
+                      color: isSelected ? Colors.white : kBrandAccent,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected ? Colors.white : kMuted,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: isSelected ? kAccentOnSurface : kInk,
                           ),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12.0,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected
-                        ? Colors.white.withValues(alpha: 0.85)
-                        : kMuted,
+                        const SizedBox(height: 1),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.78)
+                                : kMuted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                  if (count > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : kSurfaceSubtle,
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusFull),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: hagzyMonoStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? Colors.white : kInk,
+                          arabic: arabic,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }
@@ -6128,107 +6153,102 @@ class _CategorySectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark =
         Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-    final color = isDark
-        ? switch (accentColor.toARGB32()) {
-            0xFF6366F1 => const Color(0xFF818CF8),
-            0xFF8B5CF6 => const Color(0xFFA78BFA),
-            _ => const Color(0xFF34D399),
-          }
-        : accentColor;
-
     return Padding(
       padding: const EdgeInsets.only(top: 22, bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: isDark ? 0.22 : 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 4,
+            height: 32,
+            decoration: BoxDecoration(
+              color: isDark ? kVolt : kObsidian,
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
                         title,
-                        style: TextStyle(
-                          fontSize: 18,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: hagzyTextStyle(
+                          arabic: arabic,
+                          fontSize: 19,
                           fontWeight: FontWeight.w900,
-                          color: isDark ? const Color(0xFFF1F5F9) : kInk,
-                          letterSpacing: -0.4,
+                          color: kInk,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? color.withValues(alpha: 0.28)
-                              : color.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '$count',
-                          style: TextStyle(
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? const Color(0xFFF1F5F9) : color,
-                          ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: kAccentSurface,
+                        borderRadius: BorderRadius.circular(HagzyTokens.radiusXs),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: hagzyMonoStyle(
+                          fontSize: 11.0,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          arabic: arabic,
                         ),
                       ),
-                    ],
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      color: isDark ? const Color(0xFF94A3B8) : kMuted,
-                      fontWeight: FontWeight.w500,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: kMuted,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: onSeeAll,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: kInk,
+              backgroundColor: kPanel,
+              side: BorderSide(color: kBorder),
+              minimumSize: const Size(0, 34),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
               ),
             ),
-            TextButton(
-              onPressed: onSeeAll,
-              style: TextButton.styleFrom(
-                foregroundColor: isDark ? const Color(0xFFF1F5F9) : color,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    localized(arabic, 'Filter', 'تصفية'),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  localized(arabic, 'Filter', 'تصفية'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    arabic
-                        ? Icons.arrow_back_ios_new_rounded
-                        : Icons.arrow_forward_ios_rounded,
-                    size: 11,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 4),
+                HagzyDirectionalChevron(size: 14, color: kInk),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -6257,74 +6277,71 @@ class _SubCategoryVisualPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final activeBarColor = isDark ? kVolt : kObsidian;
+    return HagzyTap(
+      scaleDown: 0.96,
+      haptic: HagzyHapticStyle.selection,
       onTap: onTap,
-      scaleDown: 0.94,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: isSelected ? accentColor : kPanel,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? accentColor
-                : (count > 0 ? kBorder : kBorder.withValues(alpha: 0.5)),
-            width: isSelected ? 1.5 : 1,
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? activeBarColor : Colors.transparent,
+              width: 2.4,
+            ),
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.32),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : HagzyTheme.softShadow,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isSelected ? Colors.white : accentColor,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                color: isSelected ? Colors.white : kInk,
-                letterSpacing: -0.1,
-              ),
-            ),
-            if (count > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                decoration: BoxDecoration(
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 14,
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.24)
-                      : accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
+                      ? (isDark ? kVolt : kObsidian)
+                      : kMuted.withValues(alpha: 0.78),
                 ),
-                child: Text(
-                  '$count',
+                const SizedBox(width: 6),
+                Text(
+                  label,
                   style: TextStyle(
-                    fontSize: 12.0,
-                    fontWeight: FontWeight.w900,
-                    color: isSelected ? Colors.white : accentColor,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? kInk : kMuted,
+                    letterSpacing: arabic ? 0 : -0.15,
                   ),
                 ),
-              ),
-            ],
-          ],
+                if (count > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? (isDark ? kVermilion : kObsidian)
+                          : kSurfaceSubtle,
+                      borderRadius: BorderRadius.circular(HagzyTokens.radiusXs),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: hagzyMonoStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? Colors.white : kMuted,
+                        arabic: arabic,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -6347,55 +6364,52 @@ class _BookingStepPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final activeBg = isDark ? kVermilion : kObsidian;
+    const activeFg = Colors.white;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        duration: HagzyTokens.durationFast,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         decoration: BoxDecoration(
-          gradient: active ? HagzyTheme.brandGradient : null,
           color: active
-              ? null
-              : (done
-                  ? kGreen.withValues(alpha: 0.12)
-                  : (isDark ? const Color(0xFF162822) : Colors.white)),
-          borderRadius: BorderRadius.circular(12),
+              ? activeBg
+              : (done ? kSurfaceTint : kPanel),
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
           border: Border.all(
             color: active
-                ? kGreen
-                : (done
-                    ? kGreen.withValues(alpha: 0.35)
-                    : (isDark ? const Color(0xFF1F352D) : kBorder)),
+                ? activeBg
+                : (done ? kSuccess.withValues(alpha: 0.42) : kBorder),
           ),
         ),
         child: Row(
           children: [
             Container(
-              width: 18,
-              height: 18,
+              width: 20,
+              height: 20,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: active
-                    ? Colors.white.withValues(alpha: 0.24)
-                    : (done ? kGreen : kMuted.withValues(alpha: 0.18)),
-                shape: BoxShape.circle,
+                    ? (isDark ? Colors.white.withValues(alpha: 0.22) : kVermilion)
+                    : (done ? kSuccess : kSurfaceSubtle),
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusXs),
               ),
               child: done && !active
-                  ? const Icon(Icons.check_rounded, size: 11, color: Colors.white)
+                  ? Icon(Icons.check_rounded,
+                      size: 12, color: isDark ? kObsidian : Colors.white)
                   : Text(
                       stepNumber,
-                      style: TextStyle(
-                        fontSize: 11.0,
+                      style: hagzyMonoStyle(
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w900,
-                        color: active || done
-                            ? Colors.white
-                            : (isDark ? const Color(0xFF94A3B8) : kInk),
+                        color: active ? Colors.white : kInk,
                       ),
                     ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -6410,9 +6424,7 @@ class _BookingStepPill extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12.0,
                         fontWeight: FontWeight.w900,
-                        color: active
-                            ? Colors.white
-                            : (isDark ? const Color(0xFFF8FAFC) : kInk),
+                        color: active ? activeFg : kInk,
                       ),
                     ),
                   ),
@@ -6426,10 +6438,8 @@ class _BookingStepPill extends StatelessWidget {
                         fontSize: 11.0,
                         fontWeight: FontWeight.w600,
                         color: active
-                            ? Colors.white.withValues(alpha: 0.88)
-                            : (done
-                                ? (isDark ? kGreenLight : kGreenDark)
-                                : (isDark ? const Color(0xFF94A3B8) : kMuted)),
+                            ? activeFg.withValues(alpha: 0.84)
+                            : (done ? kSuccess : kMuted),
                       ),
                     ),
                   ),
@@ -6476,32 +6486,20 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
       margin: const EdgeInsets.only(top: 12),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: kPanel,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+        border: Border.all(color: kBorder, width: 1.1),
+        boxShadow: HagzyTheme.subtleShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (hasImage)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-              child: HagzySmartImage(
-                imageUrl: item.imageUrl!,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+            HagzySmartImage(
+              imageUrl: item.imageUrl!,
+              height: 150,
+              width: double.infinity,
+              fit: BoxFit.cover,
             ),
           Padding(
             padding: const EdgeInsets.all(14),
@@ -6516,28 +6514,16 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16.5,
-                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                          color: kInk,
                         ),
                       ),
                     ),
                     if (item.kind.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E3A2F) : const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: (isDark ? kGreenLight : kGreen).withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Text(
-                          item.kind,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? kGreenLight : kGreenDark,
-                          ),
-                        ),
+                      HagzyMonoTag(
+                        label: item.kind,
+                        backgroundColor: kSurfaceSubtle,
+                        foregroundColor: isDark ? kVolt : kObsidian,
+                        borderColor: kBorder,
                       ),
                   ],
                 ),
@@ -6549,13 +6535,15 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
                     child: Text(
                       item.description,
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 14.0,
                         fontWeight: FontWeight.w500,
-                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                        color: kInk.withValues(alpha: 0.86),
                         height: 1.55,
                       ),
                       maxLines: _isExpanded ? null : 4,
-                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      overflow: _isExpanded
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
                     ),
                   ),
                   if (isLongBio) ...[
@@ -6571,11 +6559,13 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
                             Text(
                               _isExpanded
                                   ? (arabic ? 'عرض أقل ▲' : 'Show less ▲')
-                                  : (arabic ? 'اقرأ القصة والتفاصيل كاملة ▼' : 'Read full story & details ▼'),
+                                  : (arabic
+                                      ? 'اقرأ القصة والتفاصيل كاملة ▼'
+                                      : 'Read full story & details ▼'),
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: isDark ? kGreenLight : kGreen,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? kVolt : kObsidian,
                               ),
                             ),
                           ],
@@ -6584,7 +6574,6 @@ class _RoomDetailCardState extends State<_RoomDetailCard> {
                     ),
                   ],
                 ],
-
               ],
             ),
           ),

@@ -46,9 +46,16 @@ app.*.map.json
 *.bak
 .firebase/
 
-# Keystores & Android signing
+# Keystores & Android/iOS signing artifacts
 *.jks
 *.keystore
+*.p12
+*.mobileprovision
+*.p8
+*.apk
+*.aab
+*.ipa
+ios/ExportOptions.plist
 android/key.properties
 **/key.properties
 

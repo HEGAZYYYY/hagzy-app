@@ -13,7 +13,7 @@ Future<void> _ensureGoogleSignInInitialized() async {
     await GoogleSignIn.instance.initialize();
     _googleInitialized = true;
   } catch (e) {
-    debugPrint('GoogleSignIn.initialize note: $e');
+    if (kDebugMode) debugPrint('GoogleSignIn.initialize note: $e');
   }
 }
 
@@ -46,7 +46,7 @@ Future<Map<String, dynamic>?> webGoogleSignIn() async {
     }
     return {'error': e.description ?? e.code.name};
   } catch (e) {
-    debugPrint('Google Sign-In native error: $e');
+    if (kDebugMode) debugPrint('Google Sign-In native error: $e');
     return {'error': e.toString()};
   }
 }
@@ -85,10 +85,13 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
     if (e.code == AuthorizationErrorCode.canceled) {
       return null;
     }
-    debugPrint('Apple Sign-In authorization error: ${e.message} (code: ${e.code})');
+    if (kDebugMode) {
+      debugPrint(
+          'Apple Sign-In authorization error: ${e.message} (code: ${e.code})');
+    }
     return {'error': e.message};
   } catch (e) {
-    debugPrint('Apple Sign-In native error: $e');
+    if (kDebugMode) debugPrint('Apple Sign-In native error: $e');
     return {'error': e.toString()};
   }
 }

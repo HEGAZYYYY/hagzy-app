@@ -109,30 +109,40 @@ class ContrastAnchoredCheckoutCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.lock_rounded,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isArabic ? 'تثبيت الحجز الآن' : 'Lock Instant Reservation',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.lock_rounded,
+                            size: 16,
                             color: theme.colorScheme.primary,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              isArabic
+                                  ? 'تثبيت الحجز الآن'
+                                  : 'Lock Instant Reservation',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       isArabic ? '$deposit ج.م فقط' : '$deposit EGP only',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: theme.colorScheme.primary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],

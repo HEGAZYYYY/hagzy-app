@@ -344,8 +344,15 @@ class _ManageTabState extends State<ManageTab> {
         .where((r) => (r['status'] ?? 'pending') == 'pending')
         .toList();
 
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 16 : 8,
+        isWide ? 24 : 16,
+        36,
+      ),
       children: [
         if (!widget.isSingularPartner &&
             (pendingRequests.isNotEmpty || widget.onRefreshPartnerRequests != null)) ...[
@@ -358,7 +365,7 @@ class _ManageTabState extends State<ManageTab> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.verified_user_outlined, color: kGreen),
+                      Icon(Icons.verified_user_outlined, color: kGreen),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -458,84 +465,25 @@ class _ManageTabState extends State<ManageTab> {
             ),
           ),
         ],
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: kPanel,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
-          ),
-          padding: const EdgeInsets.all(4),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _showArchived = false),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: !_showArchived ? kGreen.withValues(alpha: 0.15) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: !_showArchived ? kGreen : Colors.transparent,
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.storefront_rounded, size: 16, color: !_showArchived ? kGreen : kMuted),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Active Places (${widget.venues.length})',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
-                            color: !_showArchived ? kGreen : kMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _showArchived = true),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: _showArchived ? Colors.amber.withValues(alpha: 0.15) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _showArchived ? Colors.amber.shade700 : Colors.transparent,
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.delete_outline_rounded, size: 16, color: _showArchived ? Colors.amber.shade700 : kMuted),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Trash / Archived (${widget.archivedVenues.length})',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
-                            color: _showArchived ? Colors.amber.shade700 : kMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        HagzySegmentedTabBar(
+          selectedIndex: _showArchived ? 1 : 0,
+          onChanged: (idx) => setState(() => _showArchived = idx == 1),
+          items: [
+            (
+              label: _t('Active Places (${widget.venues.length})',
+                  'الأماكن النشطة (${widget.venues.length})'),
+              icon: Icons.storefront_rounded,
+              count: null,
+            ),
+            (
+              label: _t('Trash / Archived (${widget.archivedVenues.length})',
+                  'الأرشيف (${widget.archivedVenues.length})'),
+              icon: Icons.delete_outline_rounded,
+              count: null,
+            ),
+          ],
         ),
+        const SizedBox(height: 12),
         if (_showArchived)
           const IntroCard(
             title: 'Trash / Archived Venues',
@@ -555,14 +503,19 @@ class _ManageTabState extends State<ManageTab> {
                 ? null
                 : FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: kGreenDark,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: kAccentSurface,
+                      foregroundColor: kAccentOnSurface,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusSmall + 2),
+                      ),
                     ),
                     onPressed: widget.onAddVenue,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add venue', style: TextStyle(fontWeight: FontWeight.w700)),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add venue',
+                        style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
           ),
         if (!widget.isSingularPartner && (_showArchived ? widget.archivedVenues.length : widget.venues.length) > 1) ...[
@@ -616,14 +569,18 @@ class _ManageTabState extends State<ManageTab> {
                 Expanded(
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: kGreenDark,
-                      foregroundColor: Colors.white,
+                      backgroundColor: kAccentSurface,
+                      foregroundColor: kAccentOnSurface,
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusMedium),
+                      ),
                     ),
                     onPressed: widget.onAddVenue,
                     icon: const Icon(Icons.add_business_rounded, size: 18),
-                    label: const Text('Add Your Venue', style: TextStyle(fontWeight: FontWeight.w800)),
+                    label: const Text('Add Your Venue',
+                        style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
@@ -635,7 +592,7 @@ class _ManageTabState extends State<ManageTab> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    hagzyPageRoute(
                       builder: (ctx) => GoalGradientOnboardingScreen(
                         ownerId: widget.ownerId ?? 'owner',
                         onVenueCreated: (newHagzyVenue) {
@@ -672,13 +629,12 @@ class _ManageTabState extends State<ManageTab> {
             ],
           ],
         ],
-        ...filteredVenues.map((venue) => Card(
+        ...filteredVenues.map((venue) => HagzySurfaceCard(
               margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                     Row(
                       children: [
                         IconBox(icon: venue.type.icon),
@@ -688,35 +644,19 @@ class _ManageTabState extends State<ManageTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(venue.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 17)),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 17,
+                                      color: kInk)),
                               Text(venue.type.label,
                                   style: TextStyle(color: kMuted)),
                               if (_showArchived) ...[
                                 const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.amber.shade700.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.archive_outlined, size: 12, color: Colors.amber.shade800),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'In Trash · Hidden from Customers',
-                                        style: TextStyle(
-                                          color: Colors.amber.shade800,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                const HagzyStatusBadge(
+                                  label: 'In Trash · Hidden from Customers',
+                                  tone: HagzyStatusTone.warning,
+                                  icon: Icons.archive_outlined,
+                                  compact: true,
                                 ),
                               ],
                               if (!widget.isSingularPartner &&
@@ -738,42 +678,48 @@ class _ManageTabState extends State<ManageTab> {
                         if (_showArchived) ...[
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
-                              backgroundColor: kGreen,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              backgroundColor: kAccentSurface,
+                              foregroundColor: kAccentOnSurface,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
                               visualDensity: VisualDensity.compact,
                             ),
-                            onPressed: () => widget.onRestoreVenue?.call(venue),
-                            icon: const Icon(Icons.restore_from_trash_rounded, size: 15),
-                            label: const Text('Restore', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                            onPressed: () =>
+                                widget.onRestoreVenue?.call(venue),
+                            icon: const Icon(Icons.restore_from_trash_rounded,
+                                size: 15),
+                            label: const Text('Restore',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w800, fontSize: 12)),
                           ),
                           const SizedBox(width: 6),
                           IconButton(
                             tooltip: 'Delete Forever',
                             onPressed: () {
-                              showDialog(
+                              showHagzyAdaptiveModal<void>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Delete Permanently?'),
-                                  content: Text('Are you sure you want to permanently delete "${venue.name}"?\n\nThis cannot be undone and will purge all data.'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    FilledButton(
-                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                      onPressed: () {
-                                        Navigator.pop(ctx);
-                                        widget.onPermanentDeleteVenue?.call(venue);
-                                      },
-                                      child: const Text('Delete Forever'),
-                                    ),
-                                  ],
+                                builder: (ctx, isSheet) => HagzyModalCard(
+                                  isSheet: isSheet,
+                                  centerHeader: true,
+                                  destructive: true,
+                                  icon: Icons.delete_forever_rounded,
+                                  title: 'Delete Permanently?',
+                                  subtitle:
+                                      'Are you sure you want to permanently delete "${venue.name}"? This cannot be undone and will purge all data.',
+                                  onClose: () => Navigator.pop(ctx),
+                                  primaryUseFilledButton: true,
+                                  primaryLabel: 'Delete Forever',
+                                  onPrimary: () {
+                                    Navigator.pop(ctx);
+                                    widget.onPermanentDeleteVenue?.call(venue);
+                                  },
+                                  secondaryLabel: 'Cancel',
+                                  onSecondary: () => Navigator.pop(ctx),
                                 ),
                               );
                             },
-                            icon: const Icon(Icons.delete_forever_rounded, color: Colors.red),
+                            icon: const Icon(Icons.delete_forever_rounded,
+                                color: Colors.red),
                           ),
                         ] else ...[
                           IconButton(
@@ -781,11 +727,13 @@ class _ManageTabState extends State<ManageTab> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
+                                hagzyPageRoute(
                                   builder: (ctx) => QrStandeeGenerator(
                                     venue: HagzyVenue(
                                       id: venue.id,
-                                      ownerId: venue.ownerPhone.isNotEmpty ? venue.ownerPhone : 'owner',
+                                      ownerId: venue.ownerPhone.isNotEmpty
+                                          ? venue.ownerPhone
+                                          : 'owner',
                                       name: venue.name,
                                       city: venue.location,
                                       categories: [venue.type.name],
@@ -795,35 +743,39 @@ class _ManageTabState extends State<ManageTab> {
                                 ),
                               );
                             },
-                            icon: const Icon(Icons.qr_code_rounded, color: Colors.amber),
+                            icon: Icon(Icons.qr_code_rounded,
+                                color: kGold),
                           ),
                           IconButton(
                             tooltip: 'Edit venue',
                             onPressed: () => widget.onEditVenue(venue),
-                            icon: const Icon(Icons.edit_outlined, color: kGreen),
+                            icon: Icon(Icons.edit_outlined,
+                                color: kDarkMode.value ? kVolt : kObsidian),
                           ),
                           IconButton(
                             tooltip: 'Move to Trash',
                             onPressed: () {
-                              showDialog(
+                              showHagzyAdaptiveModal<void>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Move Venue to Trash?'),
-                                  content: Text('Are you sure you want to move "${venue.name}" to Trash?\n\nIt will be hidden from customer search and booking tabs immediately. You can restore it anytime from the Trash tab.'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    FilledButton(
-                                      style: FilledButton.styleFrom(backgroundColor: Colors.amber.shade800),
-                                      onPressed: () {
-                                        Navigator.pop(ctx);
-                                        widget.onDelete(venue);
-                                      },
-                                      child: const Text('Move to Trash'),
-                                    ),
-                                  ],
+                                builder: (ctx, isSheet) => HagzyModalCard(
+                                  isSheet: isSheet,
+                                  centerHeader: true,
+                                  icon: Icons.archive_outlined,
+                                  iconColor: Colors.amber.shade800,
+                                  iconBackgroundColor: Colors.amber.shade800
+                                      .withValues(alpha: 0.14),
+                                  title: 'Move Venue to Trash?',
+                                  subtitle:
+                                      'Are you sure you want to move "${venue.name}" to Trash? It will be hidden from customer search and booking tabs immediately. You can restore it anytime from the Trash tab.',
+                                  onClose: () => Navigator.pop(ctx),
+                                  primaryUseFilledButton: true,
+                                  primaryLabel: 'Move to Trash',
+                                  onPrimary: () {
+                                    Navigator.pop(ctx);
+                                    widget.onDelete(venue);
+                                  },
+                                  secondaryLabel: 'Cancel',
+                                  onSecondary: () => Navigator.pop(ctx),
                                 ),
                               );
                             },
@@ -869,10 +821,10 @@ class _ManageTabState extends State<ManageTab> {
                             if (venue.vodafoneCashNumber.isNotEmpty)
                               'Vodafone Cash: ${venue.vodafoneCashNumber}',
                           ].join(' · '),
-                          style: const TextStyle(
-                            color: kGreen,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          style: hagzyMonoStyle(
+                            color: kDarkMode.value ? kVolt : kObsidian,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -883,34 +835,34 @@ class _ManageTabState extends State<ManageTab> {
                           spacing: 6,
                           runSpacing: 6,
                           children: venue.amenities
-                              .map((a) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: kGreen.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      a,
-                                      style: const TextStyle(
-                                        color: kGreen,
-                                        fontSize: 12.0,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                              .map((a) => HagzyMonoTag(
+                                    label: a,
+                                    backgroundColor: kSurfaceSubtle,
+                                    foregroundColor: kInk,
+                                    borderColor: kBorder,
                                   ))
                               .toList(),
                         ),
                       ),
                     const Divider(height: 24),
                     Text(
-                        '${venue.items.length} bookable spaces · ${venue.services.length} services'),
+                      '${venue.items.length} bookable spaces · ${venue.services.length} services',
+                      style: hagzyMonoStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: kMuted,
+                      ),
+                    ),
                     ...venue.items.map((item) => ListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: Text('${item.name} · ${item.kind}'),
+                          title: Text('${item.name} · ${item.kind}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, color: kInk)),
                           subtitle: Text(
-                              '${formatMoney(item.hourlyRate)} EGP${item.multiRate > 0 ? ' / ${formatMoney(item.multiRate)} multi' : ''}'),
+                              '${formatMoney(item.hourlyRate)} EGP${item.multiRate > 0 ? ' / ${formatMoney(item.multiRate)} multi' : ''}',
+                              style: hagzyMonoStyle(
+                                  fontSize: 12, color: kMuted)),
                           trailing: IconButton(
                             tooltip: 'Remove space',
                             icon: const Icon(Icons.remove_circle_outline),
@@ -953,14 +905,14 @@ class _ManageTabState extends State<ManageTab> {
                           ),
                         OutlinedButton.icon(
                           onPressed: () => widget.onEditVenue(venue),
-                          icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                          icon: const Icon(Icons.auto_fix_high_rounded,
+                              size: 18),
                           label: const Text('Renovate / Edit'),
                         ),
                       ],
                     ),
                   ],
                 ),
-              ),
             )),
         if (filteredVenues.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -970,7 +922,7 @@ class _ManageTabState extends State<ManageTab> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  hagzyPageRoute(
                     builder: (ctx) => GoalGradientOnboardingScreen(
                       ownerId: widget.ownerId ?? 'owner',
                       onVenueCreated: (newHagzyVenue) {
@@ -993,41 +945,41 @@ class _ManageTabState extends State<ManageTab> {
         ],
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
-            color: kGreen.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kGreen.withValues(alpha: 0.28)),
+            color: kObsidian,
+            borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+            border: Border.all(color: kVolt.withValues(alpha: 0.35)),
           ),
           child: Row(
             children: [
-              const LivePulseDot(color: kGreen, size: 8),
+              LivePulseDot(color: kVolt, size: 8),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Supabase Cloud Sync Active · ${widget.venues.length} venues online',
-                  style: const TextStyle(
-                    color: kGreen,
+                  style: hagzyMonoStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 12.5,
+                    fontSize: 11.5,
                   ),
                 ),
               ),
               if (widget.onSyncFirebase != null)
                 InkWell(
                   onTap: widget.onSyncFirebase,
-                  borderRadius: BorderRadius.circular(999),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_sync_rounded, size: 15, color: kGreen),
-                        SizedBox(width: 4),
+                        Icon(Icons.cloud_sync_rounded, size: 15, color: kVolt),
+                        const SizedBox(width: 4),
                         Text(
                           'Sync Supabase',
                           style: TextStyle(
-                            color: kGreen,
+                            color: kVolt,
                             fontWeight: FontWeight.w900,
                             fontSize: 12,
                           ),
@@ -1058,31 +1010,31 @@ class _AdminKpiTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: kPanel,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorder),
-        ),
+      child: HagzySurfaceCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        radius: HagzyTokens.radiusMedium,
+        elevated: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: kMuted,
+              ),
+            ),
+            const SizedBox(height: 4),
             Text(
               value,
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
                 color: accent,
                 fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: kMuted,
               ),
             ),
           ],
@@ -1192,145 +1144,158 @@ class _PosTabState extends State<PosTab> {
       }
     }
 
-    await showDialog<void>(
+    await showHagzyAdaptiveModal<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      maxWidth: 460,
+      builder: (ctx, isSheet) => StatefulBuilder(
         builder: (ctx, setDlgState) {
           final bJson = loaded?['booking'] as Map<String, dynamic>?;
           final fin = loaded?['financialSummary'] as Map<String, dynamic>?;
           final sigVerified = loaded?['signatureVerified'] == true;
-          return AlertDialog(
-            title: Row(
+          return HagzyModalCard(
+            isSheet: isSheet,
+            maxWidth: 460,
+            icon: Icons.qr_code_scanner_rounded,
+            title: _t('Verify / Scan Booking QR', 'فحص وتأكيد كود الحجز QR'),
+            subtitle: _t(
+              'Paste the scanned QR link from your camera app or enter a Booking ID to verify entry & remaining balance:',
+              'الصق رابط الـ QR الممسوح من الكاميرا أو أدخل كود الحجز للتحقق وتسجيل الحضور:',
+            ),
+            onClose: () => Navigator.pop(ctx),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.qr_code_scanner_rounded, color: kGreen),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(_t('Verify / Scan Booking QR', 'فحص وتأكيد كود الحجز QR'),
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                TextField(
+                  controller: ctrl,
+                  decoration: InputDecoration(
+                    labelText: _t('QR URL or Booking ID', 'رابط QR أو كود الحجز'),
+                    hintText: 'https://hagzy.shop/partner?scanBooking=...',
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.search_rounded),
+                      onPressed: loading ? null : () => runLookup(setDlgState),
+                    ),
+                  ),
+                  onSubmitted: (_) => runLookup(setDlgState),
                 ),
+                if (loading) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
+                if (errorMsg != null) ...[
+                  const SizedBox(height: 10),
+                  Text(errorMsg!,
+                      style: TextStyle(
+                          color: kError,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700)),
+                ],
+                if (bJson != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: kSurfaceSubtle,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              sigVerified
+                                  ? Icons.verified_rounded
+                                  : Icons.confirmation_number_outlined,
+                              color: sigVerified ? kSuccess : kGold,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              sigVerified
+                                  ? _t('Signed QR Verified ✓', 'كود QR موثق ومؤكد ✓')
+                                  : _t('Booking Details', 'تفاصيل الحجز'),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: sigVerified ? kSuccess : kInk,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 14),
+                        Text('${_t('Guest', 'العميل')}: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
+                        if ((bJson['phone'] ?? '').toString().isNotEmpty)
+                          Text('${_t('Phone', 'الهاتف')}: ${bJson['phone']}'),
+                        Text('${_t('Venue/Unit', 'المكان / الوحدة')}: ${bJson['venueName'] ?? bJson['venueId']} · ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
+                        Text('${_t('Status', 'الحالة')}: ${checkedInNow ? _t('CHECKED IN ✓', 'تم الحضور ✓') : bJson['status']}'),
+                        const SizedBox(height: 6),
+                        if (fin != null)
+                          Text(
+                            _t('Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP', 'المدفوع: ${fin['paidAmount']} ج.م · المتبقي عند الحضور: ${fin['remainingDue']} ج.م'),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800, color: kInk),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _t('Paste the scanned QR link from your camera app or enter a Booking ID to verify entry & remaining balance:', 'الصق رابط الـ QR الممسوح من الكاميرا أو أدخل كود الحجز للتحقق وتسجيل الحضور:'),
-                    style: TextStyle(fontSize: 12, color: kMuted),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: ctrl,
-                    decoration: InputDecoration(
-                      labelText: _t('QR URL or Booking ID', 'رابط QR أو كود الحجز'),
-                      hintText: 'https://hagzy.shop/partner?scanBooking=...',
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search_rounded),
-                        onPressed: loading ? null : () => runLookup(setDlgState),
-                      ),
-                    ),
-                    onSubmitted: (_) => runLookup(setDlgState),
-                  ),
-                  if (loading) ...[
-                    const SizedBox(height: 12),
-                    const LinearProgressIndicator(),
-                  ],
-                  if (errorMsg != null) ...[
-                    const SizedBox(height: 10),
-                    Text(errorMsg!,
-                        style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                  if (bJson != null) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: kPage,
+            customActions: Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: kSurfaceSubtle,
+                      foregroundColor: kInk,
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: kBorder),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                sigVerified
-                                    ? Icons.verified_rounded
-                                    : Icons.confirmation_number_outlined,
-                                color: sigVerified ? kGreen : const Color(0xFFD97706),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                sigVerified
-                                    ? _t('Signed QR Verified ✓', 'كود QR موثق ومؤكد ✓')
-                                    : _t('Booking Details', 'تفاصيل الحجز'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: sigVerified ? kGreen : kInk,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 14),
-                          Text('${_t('Guest', 'العميل')}: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
-                          if ((bJson['phone'] ?? '').toString().isNotEmpty)
-                            Text('${_t('Phone', 'الهاتف')}: ${bJson['phone']}'),
-                          Text('${_t('Venue/Unit', 'المكان / الوحدة')}: ${bJson['venueName'] ?? bJson['venueId']} · ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
-                          Text('${_t('Status', 'الحالة')}: ${checkedInNow ? _t('CHECKED IN ✓', 'تم الحضور ✓') : bJson['status']}'),
-                          const SizedBox(height: 6),
-                          if (fin != null)
-                            Text(
-                              _t('Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP', 'المدفوع: ${fin['paidAmount']} ج.م · المتبقي عند الحضور: ${fin['remainingDue']} ج.م'),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800, color: kGreenDark),
-                            ),
-                        ],
                       ),
                     ),
-                  ],
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(_t('Close', 'إغلاق')),
+                  ),
+                ),
+                if (bJson == null) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: loading ? null : () => runLookup(setDlgState),
+                      child: Text(_t('Lookup', 'بحث')),
+                    ),
+                  ),
                 ],
-              ),
+                if (bJson != null && !checkedInNow && widget.onCheckInBooking != null) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: loading
+                          ? null
+                          : () async {
+                              final id = (bJson['id'] ?? '').toString();
+                              setDlgState(() => loading = true);
+                              try {
+                                await widget.onCheckInBooking!(id, lastSig);
+                                setDlgState(() {
+                                  loading = false;
+                                  checkedInNow = true;
+                                });
+                              } catch (e) {
+                                setDlgState(() {
+                                  loading = false;
+                                  errorMsg = e.toString().replaceFirst('Exception: ', '');
+                                });
+                              }
+                            },
+                      icon: const Icon(Icons.how_to_reg_rounded, size: 18),
+                      label: Text(_t('Check In Guest', 'تسجيل حضور العميل')),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(_t('Close', 'إغلاق')),
-              ),
-              if (bJson == null)
-                FilledButton(
-                  onPressed: loading ? null : () => runLookup(setDlgState),
-                  child: Text(_t('Lookup', 'بحث')),
-                ),
-              if (bJson != null && !checkedInNow && widget.onCheckInBooking != null)
-                FilledButton.icon(
-                  onPressed: loading
-                      ? null
-                      : () async {
-                          final id = (bJson['id'] ?? '').toString();
-                          setDlgState(() => loading = true);
-                          try {
-                            await widget.onCheckInBooking!(id, lastSig);
-                            setDlgState(() {
-                              loading = false;
-                              checkedInNow = true;
-                            });
-                          } catch (e) {
-                            setDlgState(() {
-                              loading = false;
-                              errorMsg = e.toString().replaceFirst('Exception: ', '');
-                            });
-                          }
-                        },
-                  icon: const Icon(Icons.how_to_reg_rounded, size: 18),
-                  label: Text(_t('Check In Guest', 'تسجيل حضور العميل')),
-                ),
-            ],
           );
         },
       ),
@@ -1361,107 +1326,89 @@ class _PosTabState extends State<PosTab> {
     var date = DateTime.now();
     var time = TimeOfDay.now();
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showHagzyAdaptiveModal<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          title: Row(
+      builder: (ctx, isSheet) => StatefulBuilder(
+        builder: (ctx, setDlgState) => HagzyModalCard(
+          isSheet: isSheet,
+          icon: Icons.lock_clock_outlined,
+          iconColor: kGold,
+          iconBackgroundColor: kGold.withValues(alpha: 0.14),
+          title: '${_t('Block Slot', 'إغلاق موعد')} · ${item.name}',
+          subtitle: _t(
+            'Prevent online customers from reserving this time slot:',
+            'منع الحجز أونلاين في هذه الفترة:',
+          ),
+          onClose: () => Navigator.pop(ctx, false),
+          primaryUseFilledButton: true,
+          primaryLabel: _t('Lock Slot', 'تأكيد الإغلاق'),
+          onPrimary: () => Navigator.pop(ctx, true),
+          secondaryLabel: _t('Cancel', 'إلغاء'),
+          onSecondary: () => Navigator.pop(ctx, false),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.lock_clock_outlined, color: Color(0xFFD97706)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('${_t('Block Slot', 'إغلاق موعد')} · ${item.name}',
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w800)),
+              DropdownButtonFormField<String>(
+                initialValue: chosenReason,
+                decoration: InputDecoration(
+                  labelText: _t('Block Reason / سبب الإغلاق', 'سبب الإغلاق'),
+                ),
+                items: reasons
+                    .map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text(r, style: const TextStyle(fontSize: 12.5))))
+                    .toList(),
+                onChanged: (v) =>
+                    setDlgState(() => chosenReason = v ?? reasons.first),
+              ),
+              const SizedBox(height: 12),
+              HagzyGroupedRow(
+                icon: Icons.event_rounded,
+                title:
+                    '${date.day}/${date.month}/${date.year} · ${time.format(ctx)}',
+                trailing: Text(
+                  _t('Change', 'تغيير'),
+                  style: TextStyle(
+                    color: kBrandAccent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                onTap: () async {
+                  final chosenD = await showDatePicker(
+                    context: ctx,
+                    initialDate: date,
+                    firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                    lastDate: DateTime.now().add(const Duration(days: 90)),
+                  );
+                  if (chosenD != null) {
+                    setDlgState(() => date = chosenD);
+                    if (!ctx.mounted) return;
+                    final chosenT =
+                        await showTimePicker(context: ctx, initialTime: time);
+                    if (chosenT != null) setDlgState(() => time = chosenT);
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              Text(_t('Duration:', 'المدة:'),
+                  style: TextStyle(fontSize: 12, color: kMuted)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [60, 90, 120, 180, 240].map((d) {
+                  final label = d < 60 ? '${d}m' : '${d ~/ 60}h';
+                  return ChoiceChip(
+                    label: Text(label),
+                    selected: duration == d,
+                    onSelected: (_) => setDlgState(() => duration = d),
+                  );
+                }).toList(),
               ),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                    _t('Prevent online customers from reserving this time slot:', 'منع الحجز أونلاين في هذه الفترة:'),
-                    style: TextStyle(fontSize: 12, color: kMuted)),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: chosenReason,
-                  decoration: InputDecoration(
-                    labelText: _t('Block Reason / سبب الإغلاق', 'سبب الإغلاق'),
-                    filled: true,
-                    fillColor: kPage,
-                  ),
-                  items: reasons
-                      .map((r) => DropdownMenuItem(
-                          value: r,
-                          child:
-                              Text(r, style: const TextStyle(fontSize: 12.5))))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDlgState(() => chosenReason = v ?? reasons.first),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event, color: kGreen),
-                  title: Text(
-                    '${date.day}/${date.month}/${date.year} · ${time.format(ctx)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 13),
-                  ),
-                  trailing: TextButton(
-                    onPressed: () async {
-                      final chosenD = await showDatePicker(
-                        context: ctx,
-                        initialDate: date,
-                        firstDate:
-                            DateTime.now().subtract(const Duration(days: 1)),
-                        lastDate: DateTime.now().add(const Duration(days: 90)),
-                      );
-                      if (chosenD != null) {
-                        setDlgState(() => date = chosenD);
-                        if (!ctx.mounted) return;
-                        final chosenT = await showTimePicker(
-                            context: ctx, initialTime: time);
-                        if (chosenT != null) setDlgState(() => time = chosenT);
-                      }
-                    },
-                    child: Text(_t('Change', 'تغيير')),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(_t('Duration:', 'المدة:'),
-                    style: TextStyle(fontSize: 12, color: kMuted)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  children: [60, 90, 120, 180, 240].map((d) {
-                    final label = d < 60 ? '${d}m' : '${d ~/ 60}h';
-                    return ChoiceChip(
-                      label: Text(label),
-                      selected: duration == d,
-                      onSelected: (_) => setDlgState(() => duration = d),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(_t('Cancel', 'إلغاء')),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(_t('Lock Slot', 'تأكيد الإغلاق')),
-            ),
-          ],
         ),
       ),
     );
@@ -1492,8 +1439,15 @@ class _PosTabState extends State<PosTab> {
         .where((n) => n['read'] != true)
         .toList();
 
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 16 : 8,
+        isWide ? 24 : 16,
+        36,
+      ),
       children: [
         IntroCard(
           title: _t('POS timeline', 'جدول مواعيد الحجوزات'),
@@ -1510,7 +1464,7 @@ class _PosTabState extends State<PosTab> {
               if (allActive.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Text(_t('${allActive.length} active', '${allActive.length} حجز نشط'),
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: kGreen, fontWeight: FontWeight.bold)),
               ],
             ],
@@ -1537,7 +1491,7 @@ class _PosTabState extends State<PosTab> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.notifications_active_rounded,
+                          Icon(Icons.notifications_active_rounded,
                               color: kGreen, size: 18),
                           const SizedBox(width: 8),
                           Text(
@@ -1676,159 +1630,282 @@ class _PosTabState extends State<PosTab> {
               : venue.first.items
                   .where((value) => value.id == booking.itemId)
                   .firstOrNull;
-          final proofInfo = booking.paymentReference.isNotEmpty
-              ? '\nPayment Proof (${booking.paymentMethod.toUpperCase()}): ${booking.paymentReference}'
-              : '';
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (booking.isBlocked)
-                    Container(
-                      margin: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFF59E0B)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.lock_rounded,
-                              size: 15, color: Color(0xFFB45309)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'LOCKED / موعد مغلق: ${booking.blockReason.isNotEmpty ? booking.blockReason : booking.customer}',
-                              style: const TextStyle(
-                                fontSize: 12.0,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFFB45309),
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                            ),
-                            onPressed: () => widget.onCancel(booking),
-                            child: const Text('Unblock / فتح الموعد',
-                                style: TextStyle(
-                                    fontSize: 12.0,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFFB45309))),
-                          ),
-                        ],
-                      ),
+          final statusTone = booking.isBlocked
+              ? HagzyStatusTone.warning
+              : (booking.checkedIn
+                  ? HagzyStatusTone.info
+                  : (booking.isConfirmed
+                      ? HagzyStatusTone.success
+                      : HagzyStatusTone.warning));
+          final statusBadgeLabel = booking.isBlocked
+              ? _t('Locked', 'مغلق')
+              : (booking.checkedIn
+                  ? _t('Checked In ✓', 'تم الحضور ✓')
+                  : (booking.isPendingPayment
+                      ? _t('Pending Deposit', 'بانتظار العربون')
+                      : _t('Confirmed', 'مؤكد')));
+          final statusDetailText = booking.checkedIn
+              ? _t('Checked In ✓', 'تم تسجيل الحضور ✓')
+              : (booking.isPendingPayment
+                  ? _t('Awaiting deposit · not confirmed',
+                      'بانتظار العربون · غير مؤكد بعد')
+                  : _t('Confirmed by venue', 'مؤكد من إدارة المكان'));
+
+          return HagzySurfaceCard(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (booking.isBlocked)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: kGold.withValues(alpha: 0.12),
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusSmall),
+                      border: Border.all(color: kGold.withValues(alpha: 0.35)),
                     ),
-                  ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    leading: const IconBox(icon: Icons.event_available),
-                    title: Row(
+                    child: Row(
                       children: [
+                        Icon(Icons.lock_rounded,
+                            size: 15, color: kGold),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: Text(booking.customer,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                        if (booking.phone.isNotEmpty)
-                          Text(
-                            booking.phone,
-                            style: TextStyle(fontSize: 12, color: kMuted),
-                          ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      '${venue.isEmpty ? 'Venue' : venue.first.name} · ${item?.name ?? 'Resource'}\n'
-                      '${formatDateTime(booking.startsAt)} – ${TimeOfDay.fromDateTime(booking.endsAt).format(context)} · '
-                      '${booking.durationMinutes} min'
-                      '${booking.serviceNames.isEmpty ? '' : '\n${booking.serviceNames.join(' + ')}'}'
-                      '${booking.splitCount > 1 ? '\n${booking.splitCount}-way · ${formatMoney(booking.price / booking.splitCount)} EGP each' : ''}'
-                      '$proofInfo'
-                      '${booking.checkedIn ? '\nChecked In ✓' : (booking.isPendingPayment ? '\nAwaiting deposit · not confirmed' : '\nConfirmed by venue')}',
-                    ),
-                    isThreeLine: true,
-                    trailing: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('${formatMoney(booking.price)} EGP',
+                          child: Text(
+                            'LOCKED / موعد مغلق: ${booking.blockReason.isNotEmpty ? booking.blockReason : booking.customer}',
                             style: const TextStyle(
-                                color: kGreen, fontWeight: FontWeight.bold)),
-                        IconButton(
-                          tooltip: 'Cancel booking',
-                          visualDensity: VisualDensity.compact,
+                              fontSize: 12.0,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
                           onPressed: () => widget.onCancel(booking),
-                          icon: const Icon(Icons.close, size: 18),
+                          child: const Text(
+                            'Unblock / فتح الموعد',
+                            style: TextStyle(
+                              fontSize: 12.0,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  if (booking.isPendingPayment ||
-                      booking.phone.isNotEmpty ||
-                      booking.isConfirmed)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconBox(
+                      icon: booking.isBlocked
+                          ? Icons.lock_clock_rounded
+                          : Icons.event_available_rounded,
+                      color: booking.isConfirmed ? kGreenDark : kGold,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (booking.isPendingPayment)
-                            FilledButton.tonalIcon(
-                              onPressed: () => widget.onConfirm(booking),
-                              icon: const Icon(Icons.check_circle_outline,
-                                  size: 16),
-                              label: Text(
-                                booking.paymentReference.isNotEmpty
-                                    ? _t('Verify & Confirm Deposit', 'فحص وتأكيد العربون')
-                                    : _t('Confirm Deposit (${formatMoney(booking.dueNow ?? 0)} EGP)', 'تأكيد العربون (${formatMoney(booking.dueNow ?? 0)} ج.م)'),
-                              ),
-                            ),
-                          if (booking.isConfirmed && !booking.checkedIn && widget.onCheckInBooking != null)
-                            FilledButton.tonalIcon(
-                              onPressed: () => widget.onCheckInBooking!(
-                                booking.id,
-                                booking.qrSignature.isNotEmpty
-                                    ? booking.qrSignature
-                                    : null,
-                              ),
-                              icon: const Icon(Icons.how_to_reg_rounded, size: 16),
-                              label: Text(_t('Check In', 'تسجيل الحضور')),
-                            ),
-                          if (booking.checkedIn)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE0F2FE),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                _t('Checked In ✓', 'تم الحضور ✓'),
-                                style: const TextStyle(
-                                  color: Color(0xFF0369A1),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                booking.customer,
+                                style: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 12,
+                                  fontSize: 15.5,
+                                  color: kInk,
                                 ),
                               ),
+                              HagzyStatusBadge(
+                                label: statusBadgeLabel,
+                                tone: statusTone,
+                                compact: true,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${venue.isEmpty ? 'Venue' : venue.first.name} · ${item?.name ?? 'Resource'}'
+                            '${booking.phone.isNotEmpty ? ' · ${booking.phone}' : ''}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: kMuted,
+                              fontWeight: FontWeight.w600,
                             ),
-                          if (booking.phone.isNotEmpty)
-                            OutlinedButton.icon(
-                              onPressed: () => _messageCustomer(booking),
-                              icon: const Icon(Icons.chat_outlined, size: 16),
-                              label: Text(_t('WhatsApp Customer', 'واتساب العميل')),
-                            ),
+                          ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${formatMoney(booking.price)} EGP',
+                          style: TextStyle(
+                            color: kDarkMode.value ? kGreenLight : kGreenDark,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        IconButton(
+                          tooltip: _t('Cancel booking', 'إلغاء الحجز'),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => widget.onCancel(booking),
+                          icon: Icon(Icons.close_rounded,
+                              size: 18, color: kMuted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: kSurfaceSubtle,
+                    borderRadius:
+                        BorderRadius.circular(HagzyTokens.radiusSmall),
+                    border: Border.all(color: kBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.schedule_rounded,
+                              size: 15,
+                              color: kDarkMode.value ? kGreenLight : kGreenDark),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${formatDateTime(booking.startsAt)} – ${TimeOfDay.fromDateTime(booking.endsAt).format(context)} · ${booking.durationMinutes} min',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: kInk,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (booking.serviceNames.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          booking.serviceNames.join(' + '),
+                          style: TextStyle(fontSize: 12, color: kMuted),
+                        ),
+                      ],
+                      if (booking.splitCount > 1) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${booking.splitCount}-way · ${formatMoney(booking.price / booking.splitCount)} EGP each',
+                          style: TextStyle(fontSize: 12, color: kMuted),
+                        ),
+                      ],
+                      if (booking.paymentReference.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Payment Proof (${booking.paymentMethod.toUpperCase()}): ${booking.paymentReference}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kDarkMode.value ? kGreenLight : kGreenDark,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        statusDetailText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: booking.isPendingPayment ? kGold : kMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (booking.isPendingPayment ||
+                    booking.phone.isNotEmpty ||
+                    booking.isConfirmed) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (booking.isPendingPayment)
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                          ),
+                          onPressed: () => widget.onConfirm(booking),
+                          icon: const Icon(Icons.check_circle_outline,
+                              size: 16),
+                          label: Text(
+                            booking.paymentReference.isNotEmpty
+                                ? _t('Verify & Confirm Deposit',
+                                    'فحص وتأكيد العربون')
+                                : _t(
+                                    'Confirm Deposit (${formatMoney(booking.dueNow ?? 0)} EGP)',
+                                    'تأكيد العربون (${formatMoney(booking.dueNow ?? 0)} ج.م)'),
+                          ),
+                        ),
+                      if (booking.isConfirmed &&
+                          !booking.checkedIn &&
+                          widget.onCheckInBooking != null)
+                        FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                          ),
+                          onPressed: () => widget.onCheckInBooking!(
+                            booking.id,
+                            booking.qrSignature.isNotEmpty
+                                ? booking.qrSignature
+                                : null,
+                          ),
+                          icon: const Icon(Icons.how_to_reg_rounded, size: 16),
+                          label: Text(_t('Check In', 'تسجيل الحضور')),
+                        ),
+                      if (booking.phone.isNotEmpty)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                          ),
+                          onPressed: () => _messageCustomer(booking),
+                          icon: const Icon(Icons.chat_outlined, size: 16),
+                          label: Text(_t('WhatsApp Customer', 'واتساب العميل')),
+                        ),
+                    ],
+                  ),
                 ],
-              ),
+              ],
             ),
           );
         }),
@@ -1849,6 +1926,9 @@ class AnalyticsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
+    final arabic = isArabicMode;
     final activeBookings = bookings.where((b) => !b.cancelled).toList();
     final confirmedBookings =
         activeBookings.where((b) => b.isConfirmed).toList();
@@ -1862,47 +1942,90 @@ class AnalyticsTab extends StatelessWidget {
     final pendingPipeline =
         pendingBookings.fold<double>(0, (sum, b) => sum + b.price);
     final cancelledOrExpired = bookings
-        .where((b) => b.cancelled || b.status == 'expired' || b.status == 'cancelled')
+        .where(
+            (b) => b.cancelled || b.status == 'expired' || b.status == 'cancelled')
         .toList();
-    final realLostRevenue = cancelledOrExpired.fold<double>(
-        0.0, (acc, b) => acc + b.price);
+    final realLostRevenue =
+        cancelledOrExpired.fold<double>(0.0, (acc, b) => acc + b.price);
+    final conversionRate = activeBookings.isEmpty
+        ? 0
+        : ((confirmedBookings.length / activeBookings.length) * 100).round();
+
+    final venueChartEntries = venues.map((v) {
+      final vRev = confirmedBookings
+          .where((b) => b.venueId == v.id)
+          .fold<double>(0, (sum, b) => sum + b.price);
+      return (label: v.name, value: vRev, color: kGreen as Color?);
+    }).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final kpiCards = [
+      HagzyKpiCard(
+        title: _t('Confirmed Revenue', 'الإيرادات المؤكدة'),
+        value: '${formatMoney(confirmedRevenue)} ${_t('EGP', 'ج.م')}',
+        subtitle: _t('${confirmedBookings.length} confirmed bookings',
+            '${confirmedBookings.length} حجز مؤكد'),
+        icon: Icons.payments_outlined,
+        accent: kGreen,
+      ),
+      HagzyKpiCard(
+        title: _t('Deposits Verified', 'العربون المؤكد'),
+        value: '${formatMoney(depositsCollected)} ${_t('EGP', 'ج.م')}',
+        subtitle: _t('Collected upfront', 'محصّل مقدماً'),
+        icon: Icons.verified_outlined,
+        accent: kInfoBlue,
+      ),
+      HagzyKpiCard(
+        title: _t('Pending Holds', 'حجوزات معلقة'),
+        value: '${pendingBookings.length}',
+        subtitle: _t('${formatMoney(pendingPipeline)} EGP pipeline',
+            '${formatMoney(pendingPipeline)} ج.م قيد التأكيد'),
+        icon: Icons.hourglass_top_rounded,
+        accent: kGold,
+      ),
+      HagzyKpiCard(
+        title: _t('Confirmation Rate', 'نسبة التأكيد'),
+        value: '$conversionRate%',
+        subtitle: _t('${venues.length} active venues',
+            '${venues.length} مكان نشط'),
+        icon: Icons.trending_up_rounded,
+        accent: kCobalt,
+      ),
+    ];
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 16 : 8,
+        isWide ? 24 : 16,
+        36,
+      ),
       children: [
-        const IntroCard(
-          title: 'Revenue & Analytics',
-          subtitle:
-              'Real-time performance across your venues, spaces, and deposits.',
+        IntroCard(
+          title: _t('Revenue & Analytics', 'الأرباح والتقارير'),
+          subtitle: _t(
+            'Real-time performance across your venues, spaces, and deposits.',
+            'أداء فوري للأماكن والملاعب والمبالغ المحصّلة.',
+          ),
           icon: Icons.insights_rounded,
         ),
-        const SizedBox(height: 14),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _MetricCard(
-              title: 'Confirmed Revenue',
-              value: '${formatMoney(confirmedRevenue)} EGP',
-              subtitle: '${confirmedBookings.length} confirmed bookings',
-              icon: Icons.payments_outlined,
-              color: kGreen,
-            ),
-            _MetricCard(
-              title: 'Deposits Verified',
-              value: '${formatMoney(depositsCollected)} EGP',
-              subtitle: 'Collected upfront',
-              icon: Icons.verified_outlined,
-              color: const Color(0xFF0284C7),
-            ),
-            _MetricCard(
-              title: 'Pending Holds',
-              value: '${pendingBookings.length}',
-              subtitle: '${formatMoney(pendingPipeline)} EGP pipeline',
-              icon: Icons.hourglass_top_rounded,
-              color: const Color(0xFFD97706),
-            ),
-          ],
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cols = constraints.maxWidth >= 920
+                ? 4
+                : (constraints.maxWidth >= 520 ? 2 : 1);
+            const spacing = 12.0;
+            final cardWidth =
+                (constraints.maxWidth - (spacing * (cols - 1))) / cols;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: kpiCards
+                  .map((c) => SizedBox(width: cardWidth, child: c))
+                  .toList(),
+            );
+          },
         ),
         if (cancelledOrExpired.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -1913,161 +2036,134 @@ class AnalyticsTab extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   backgroundColor: kSnackBarBg,
-                  content: const Text(
-                      'Automated deposit protection is enabled on paid slots.'),
+                  content: Text(_t(
+                    'Automated deposit protection is enabled on paid slots.',
+                    'حماية العربون التلقائية مفعّلة على جميع المواعيد المدفوعة.',
+                  )),
                 ),
               );
             },
             onDismissAbsorbLosses: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Notice dismissed.'),
+                SnackBar(
+                  content: Text(_t('Notice dismissed.', 'تم إخفاء التنبيه.')),
                 ),
               );
             },
           ),
         ],
-        const SizedBox(height: 18),
-        const Text(
-          'Performance by Venue',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        if (venues.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          HagzySurfaceCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeading(
+                  title: _t('Revenue Distribution', 'توزيع الإيرادات'),
+                  subtitle: _t('Confirmed revenue share across your venues',
+                      'حصة الإيرادات المؤكدة لكل مكان'),
+                ),
+                const SizedBox(height: 16),
+                HagzyRevenueBarChart(
+                  entries: venueChartEntries.take(6).toList(),
+                  unitLabel: _t('EGP', 'ج.م'),
+                  arabic: arabic,
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        SectionHeading(
+          title: _t('Performance by Venue', 'الأداء حسب المكان'),
+          subtitle: _t('Detailed bookings and verified revenue per location',
+              'تفاصيل الحجوزات والإيرادات المؤكدة لكل فرع'),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         if (venues.isEmpty)
-          const EmptyCard(
+          EmptyCard(
             icon: Icons.storefront_outlined,
-            title: 'No Venues Yet',
-            body: 'Add a venue to track bookings and revenue.',
+            title: _t('No Venues Yet', 'لا توجد أماكن بعد'),
+            body: _t('Add a venue to track bookings and revenue.',
+                'أضف مكاناً لبدء متابعة الحجوزات والإيرادات.'),
           )
         else
           ...venues.map((v) {
             final vBookings =
                 activeBookings.where((b) => b.venueId == v.id).toList();
             final vConfirmed = vBookings.where((b) => b.isConfirmed).toList();
+            final vPending =
+                vBookings.where((b) => b.isPendingPayment).length;
             final vRev =
                 vConfirmed.fold<double>(0, (sum, b) => sum + b.price);
             final share = confirmedRevenue > 0
-                ? (vRev / confirmedRevenue).clamp(0.08, 1.0)
-                : 0.12;
-            return Card(
+                ? (vRev / confirmedRevenue).clamp(0.06, 1.0)
+                : 0.08;
+            return HagzySurfaceCard(
               margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: IconBox(icon: v.type.icon),
-                      title: Text(v.name,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800, color: kInk)),
-                      subtitle: Text(
-                        '${vConfirmed.length} confirmed · ${vBookings.where((b) => b.isPendingPayment).length} pending holds',
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      IconBox(icon: v.type.icon),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              v.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15.5,
+                                color: kInk,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _t(
+                                '${vConfirmed.length} confirmed · $vPending pending holds',
+                                '${vConfirmed.length} مؤكد · $vPending في انتظار العربون',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: kMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      trailing: Text(
-                        '${formatMoney(vRev)} EGP',
-                        style: const TextStyle(
-                          color: kGreen,
+                      Text(
+                        '${formatMoney(vRev)} ${_t('EGP', 'ج.م')}',
+                        style: TextStyle(
+                          color: kDarkMode.value ? kGreenLight : kGreenDark,
                           fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                          fontSize: 16,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: share,
+                      minHeight: 7,
+                      backgroundColor: kSurfaceSubtle,
+                      color: kGreen,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: share,
-                          minHeight: 6,
-                          backgroundColor: kPage,
-                          color: kGreen,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           }),
       ],
     );
   }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 224,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: kPanel,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kBorder),
-          boxShadow: HagzyTheme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: kMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: kMuted,
-                fontSize: 12.0,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
 }
 
 class PaymentTab extends StatefulWidget {
@@ -2150,27 +2246,33 @@ class _PaymentTabState extends State<PaymentTab> {
     );
     var selectedId = idCtrl.text;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showHagzyAdaptiveModal<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          title: const Text('Attach Transfer to Booking',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+      builder: (ctx, isSheet) => StatefulBuilder(
+        builder: (ctx, setDlgState) => HagzyModalCard(
+          isSheet: isSheet,
+          icon: Icons.link_rounded,
+          title: 'Attach Transfer to Booking',
+          subtitle:
+              'Amount: ${item['amount']} EGP · Sender: ${item['sender_identifier'] ?? item['senderIdentifier'] ?? 'unknown'}',
+          onClose: () => Navigator.pop(ctx, false),
+          primaryUseFilledButton: true,
+          primaryLabel: 'Attach & Confirm',
+          onPrimary: () => Navigator.pop(ctx, true),
+          secondaryLabel: 'Cancel',
+          onSecondary: () => Navigator.pop(ctx, false),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Amount: ${item['amount']} EGP · Sender: ${item['sender_identifier'] ?? item['senderIdentifier'] ?? 'unknown'}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
               if (pendingBookings.isNotEmpty)
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: pendingBookings.any((b) => b.id == selectedId)
                       ? selectedId
                       : null,
-                  decoration: const InputDecoration(labelText: 'Select Pending Booking'),
+                  decoration: const InputDecoration(
+                      labelText: 'Select Pending Booking'),
                   items: pendingBookings
                       .map((b) => DropdownMenuItem(
                             value: b.id,
@@ -2190,20 +2292,11 @@ class _PaymentTabState extends State<PaymentTab> {
               const SizedBox(height: 10),
               TextField(
                 controller: idCtrl,
-                decoration: const InputDecoration(labelText: 'Or enter Booking ID'),
+                decoration:
+                    const InputDecoration(labelText: 'Or enter Booking ID'),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Attach & Confirm'),
-            ),
-          ],
         ),
       ),
     );
@@ -2224,13 +2317,23 @@ class _PaymentTabState extends State<PaymentTab> {
         .where((i) => (i['status'] ?? '').toString() != 'RESOLVED')
         .toList();
 
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 16 : 8,
+        isWide ? 24 : 16,
+        36,
+      ),
       children: [
-        const IntroCard(
-          title: 'Payments, Gateway & Review Queue',
-          subtitle:
-              'Monitor the central wallet payment oracle and match any unmatched transfers.',
+        IntroCard(
+          title: _t('Payments, Gateway & Review Queue',
+              'المدفوعات وبوابة التحقق والمراجعة'),
+          subtitle: _t(
+            'Monitor automatic wallet transfers and match any unmatched payments.',
+            'راقب التحويلات التلقائية وطابق أي تحويلات غير مربوطة بضغطة واحدة.',
+          ),
           icon: Icons.lock_outline,
         ),
         const SizedBox(height: 12),
@@ -2254,8 +2357,8 @@ class _PaymentTabState extends State<PaymentTab> {
                       Expanded(
                         child: Text(
                           isListenerActive
-                              ? 'Android Gateway Oracle: ACTIVE'
-                              : 'Android Gateway Oracle: Waiting for Heartbeat',
+                              ? 'Payment Gateway: Active'
+                              : 'Payment Gateway: Waiting for Heartbeat',
                           style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 15),
                         ),
@@ -2389,7 +2492,7 @@ class _PaymentTabState extends State<PaymentTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('InstaPay & Vodafone Cash (Central Wallet Oracle)',
+                const Text('InstaPay & Vodafone Cash (Automatic Verification)',
                     style:
                         TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
@@ -2583,37 +2686,38 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
     final totalBookingsCount =
         allUsers.fold<int>(0, (sum, u) => sum + u.bookings.length);
 
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 16 : 8,
+        isWide ? 24 : 16,
+        36,
+      ),
       children: [
         IntroCard(
-          title: 'Users & Linked Bookings (Supabase)',
-          subtitle:
-              'Every user in Supabase is linked to their bookings, wallet ledger, and payment intents. Tap any user below to moderate their reservations.',
+          title: _t('Customer Directory & CRM', 'دليل العملاء والحجوزات'),
+          subtitle: _t(
+            'Inspect linked customer profiles, booking history, and moderate active reservations.',
+            'استعرض ملفات العملاء وسجل حجوزاتهم وقم بإدارة الحجوزات النشطة.',
+          ),
           icon: Icons.people_alt_rounded,
-          action: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: kGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: kGreen.withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              '${allUsers.length} Users · $totalBookingsCount Bookings',
-              style: const TextStyle(
-                color: kGreen,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
+          action: HagzyStatusBadge(
+            label: _t('${allUsers.length} Users · $totalBookingsCount Bookings',
+                '${allUsers.length} عميل · $totalBookingsCount حجز'),
+            tone: HagzyStatusTone.brand,
           ),
         ),
         const SizedBox(height: 12),
         TextField(
           onChanged: (v) => setState(() => _searchQuery = v),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search_rounded),
-            hintText: 'Search user by name, phone, email, or ID (e.g. usr_mohamed_hegazy)...',
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search_rounded),
+            hintText: _t(
+              'Search by name, phone, email, or customer ID...',
+              'ابحث بالاسم، رقم الموبايل، البريد الإلكتروني...',
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -2622,18 +2726,19 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
           runSpacing: 6,
           children: [
             CustomPill(
-              label: 'All Users (${allUsers.length})',
+              label: _t('All Users (${allUsers.length})',
+                  'كل العملاء (${allUsers.length})'),
               selected: _filter == 'all',
               onTap: () => setState(() => _filter = 'all'),
             ),
             CustomPill(
-              label: 'Pending Deposit',
+              label: _t('Pending Deposit', 'في انتظار العربون'),
               icon: Icons.hourglass_top_rounded,
               selected: _filter == 'pending',
               onTap: () => setState(() => _filter = 'pending'),
             ),
             CustomPill(
-              label: 'Repeat / VIP (2+ bookings)',
+              label: _t('Repeat / VIP (2+ bookings)', 'عملاء VIP (+٢ حجز)'),
               icon: Icons.workspace_premium_rounded,
               selected: _filter == 'vip',
               onTap: () => setState(() => _filter = 'vip'),
@@ -2693,7 +2798,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                             user.name.isNotEmpty
                                 ? user.name.trim()[0].toUpperCase()
                                 : 'U',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: kGreen,
                               fontWeight: FontWeight.w900,
                               fontSize: 18,
@@ -2718,24 +2823,10 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                       color: kInk,
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF162822)
-                                          : kSurfaceTint,
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(color: kBorder),
-                                    ),
-                                    child: Text(
-                                      'users/${user.id}',
-                                      style: TextStyle(
-                                        fontSize: 12.0,
-                                        fontWeight: FontWeight.w700,
-                                        color: kMuted,
-                                      ),
-                                    ),
+                                  HagzyStatusBadge(
+                                    label: user.id,
+                                    tone: HagzyStatusTone.neutral,
+                                    compact: true,
                                   ),
                                 ],
                               ),
@@ -2835,12 +2926,14 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Subcollection: users/${user.id}/bookings (${user.bookings.length})',
+                          _t(
+                            'Linked Reservations (${user.bookings.length})',
+                            'الحجوزات المرتبطة (${user.bookings.length})',
+                          ),
                           style: TextStyle(
-                            fontSize: 12.0,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w800,
                             color: kMuted,
-                            letterSpacing: 0.2,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -2960,7 +3053,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                               const EdgeInsets.only(top: 3),
                                           child: Row(
                                             children: [
-                                              const Icon(
+                                              Icon(
                                                 Icons.account_balance_wallet_outlined,
                                                 size: 13,
                                                 color: kGreen,
@@ -2971,7 +3064,7 @@ class _UsersCrmTabState extends State<UsersCrmTab> {
                                                   '${b.paymentMethod.isEmpty ? "Transfer" : b.paymentMethod.toUpperCase()}${b.paymentReference.isEmpty ? "" : " · Ref: ${b.paymentReference}"}',
                                                   overflow:
                                                       TextOverflow.ellipsis,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     color: kGreen,
                                                     fontSize: 12.0,
                                                     fontWeight: FontWeight.w700,

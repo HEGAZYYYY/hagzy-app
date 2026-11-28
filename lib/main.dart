@@ -139,7 +139,7 @@ class HagzyApp extends StatelessWidget {
               final uri = Uri.tryParse(settings.name ?? '');
               if (uri != null && uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'venue') {
                 final venueId = uri.pathSegments.length > 1 ? uri.pathSegments[1] : null;
-                return MaterialPageRoute(
+                return hagzyPageRoute(
                   builder: (context) => HagzyHome(
                     adminMode: adminMode || _isWebPortalPath,
                     initialMode: initialMode,
@@ -310,7 +310,9 @@ class _HagzyHomeState extends State<HagzyHome> {
           )
           .subscribe();
     } catch (e) {
-      debugPrint('Supabase realtime subscription notice: $e');
+      if (kDebugMode) {
+        debugPrint('Supabase realtime subscription notice: $e');
+      }
     }
   }
 
@@ -981,63 +983,62 @@ class _HagzyHomeState extends State<HagzyHome> {
       final sigVerified = details['signatureVerified'] == true;
 
       final ar = _language == 'AR' || kAppLanguage.value == 'AR';
-      await showDialog<void>(
+      await showHagzyAdaptiveModal<void>(
         context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setDlgState) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                  sigVerified ? Icons.verified_rounded : Icons.qr_code_2_rounded,
-                  color: kGreen,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    localized(ar, 'Scanned Booking Check-In', 'تسجيل حضور عبر الباركود'),
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${localized(ar, 'Guest', 'العميل')}: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
-                if ((bJson['phone'] ?? '').toString().isNotEmpty)
-                  Text('${localized(ar, 'Phone', 'الهاتف')}: ${bJson['phone']}'),
-                Text('${localized(ar, 'Venue', 'المكان')}: ${bJson['venueName'] ?? bJson['venueId']}'),
-                Text('${localized(ar, 'Unit', 'الوحدة')}: ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
-                Text('${localized(ar, 'Status', 'الحالة')}: ${checkedInNow ? localized(ar, 'CHECKED IN ✓', 'تم الحضور ✓') : bJson['status']}'),
-                const SizedBox(height: 8),
-                if (fin.isNotEmpty)
-                  Text(
-                    localized(
-                      ar,
-                      'Deposit Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP',
-                      'المدفوع: ${fin['paidAmount']} ج.م · المتبقي بالمكان: ${fin['remainingDue']} ج.م',
-                    ),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, color: kGreenDark),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(localized(ar, 'Close', 'إغلاق')),
+        builder: (ctx, isSheet) => StatefulBuilder(
+          builder: (ctx, setDlgState) => HagzyModalCard(
+            isSheet: isSheet,
+            icon: sigVerified ? Icons.verified_rounded : Icons.qr_code_2_rounded,
+            iconColor: sigVerified ? kSuccess : kBrandAccent,
+            iconBackgroundColor:
+                (sigVerified ? kSuccess : kBrandAccent).withValues(alpha: 0.14),
+            title: localized(
+                ar, 'Scanned Booking Check-In', 'تسجيل حضور عبر الباركود'),
+            onClose: () => Navigator.pop(ctx),
+            content: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: kSurfaceSubtle,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kBorder),
               ),
-              if (!checkedInNow)
-                FilledButton.icon(
-                  onPressed: () async {
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${localized(ar, 'Guest', 'العميل')}: ${bJson['customer'] ?? bJson['customerName'] ?? ''}'),
+                  if ((bJson['phone'] ?? '').toString().isNotEmpty)
+                    Text('${localized(ar, 'Phone', 'الهاتف')}: ${bJson['phone']}'),
+                  Text('${localized(ar, 'Venue', 'المكان')}: ${bJson['venueName'] ?? bJson['venueId']}'),
+                  Text('${localized(ar, 'Unit', 'الوحدة')}: ${bJson['unitName'] ?? bJson['itemId'] ?? ''}'),
+                  Text('${localized(ar, 'Status', 'الحالة')}: ${checkedInNow ? localized(ar, 'CHECKED IN ✓', 'تم الحضور ✓') : bJson['status']}'),
+                  const SizedBox(height: 8),
+                  if (fin.isNotEmpty)
+                    Text(
+                      localized(
+                        ar,
+                        'Deposit Paid: ${fin['paidAmount']} EGP · Due at Venue: ${fin['remainingDue']} EGP',
+                        'المدفوع: ${fin['paidAmount']} ج.م · المتبقي بالمكان: ${fin['remainingDue']} ج.م',
+                      ),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, color: kInk),
+                    ),
+                ],
+              ),
+            ),
+            primaryUseFilledButton: true,
+            primaryLabel: checkedInNow
+                ? localized(ar, 'Close', 'إغلاق')
+                : localized(ar, 'Check In Guest', 'تسجيل حضور العميل'),
+            onPrimary: checkedInNow
+                ? () => Navigator.pop(ctx)
+                : () async {
                     await _checkInBooking(bookingId, sig);
                     setDlgState(() => checkedInNow = true);
                   },
-                  icon: const Icon(Icons.how_to_reg_rounded, size: 18),
-                  label: Text(localized(ar, 'Check In Guest', 'تسجيل حضور العميل')),
-                ),
-            ],
+            secondaryLabel:
+                checkedInNow ? null : localized(ar, 'Close', 'إغلاق'),
+            onSecondary: checkedInNow ? null : () => Navigator.pop(ctx),
           ),
         ),
       );
@@ -1713,7 +1714,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _addVenue({VenueType initialType = VenueType.sports}) async {
-    await showDialog<void>(
+    await showHagzyDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (dialogCtx) => SmoothVenueEditorDialog(
@@ -1730,7 +1731,7 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _editVenue(Venue venue) async {
-    await showDialog<void>(
+    await showHagzyDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (dialogCtx) => SmoothVenueEditorDialog(
@@ -1830,89 +1831,86 @@ class _HagzyHomeState extends State<HagzyHome> {
       VenueType.lounge => ['PS5 room', 'Billiards table', 'Ping-pong table'],
     };
     var kind = kinds.first;
-    final result = await showDialog<VenueItem>(
+    final result = await showHagzyAdaptiveModal<VenueItem>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(venue.type == VenueType.salon
+      builder: (context, isSheet) => StatefulBuilder(
+        builder: (context, setDialogState) => HagzyModalCard(
+          isSheet: isSheet,
+          icon: Icons.add_box_outlined,
+          title: venue.type == VenueType.salon
               ? 'Add a barber / chair'
-              : 'Add a court or table'),
+              : 'Add a court or table',
+          onClose: () => Navigator.pop(context),
+          primaryUseFilledButton: true,
+          primaryLabel: 'Add',
+          onPrimary: () {
+            if (!formKey.currentState!.validate()) return;
+            formKey.currentState!.save();
+            Navigator.pop(
+              context,
+              VenueItem(
+                id: generateId(),
+                name: name.trim(),
+                kind: kind,
+                hourlyRate: double.parse(rate.trim()),
+                multiRate: multiRate.trim().isEmpty
+                    ? 0
+                    : double.parse(multiRate.trim()),
+              ),
+            );
+          },
+          secondaryLabel: 'Cancel',
+          onSecondary: () => Navigator.pop(context),
           content: Form(
             key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: kind,
-                    decoration: const InputDecoration(labelText: 'Type'),
-                    items: kinds
-                        .map((value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ))
-                        .toList(),
-                    onChanged: (value) =>
-                        setDialogState(() => kind = value ?? kind),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: kind,
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: kinds
+                      .map((value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ))
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => kind = value ?? kind),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  onChanged: (value) => name = value,
+                  decoration:
+                      const InputDecoration(labelText: 'Name / number'),
+                  validator: requiredValidator,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  onChanged: (value) => rate = value,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: venue.type == VenueType.salon
+                        ? 'EGP / 15 min'
+                        : 'EGP / hour',
                   ),
+                  validator: positiveNumberValidator,
+                ),
+                if (kind == 'PS5 room') ...[
                   const SizedBox(height: 12),
                   TextFormField(
-                    onChanged: (value) => name = value,
-                    decoration:
-                        const InputDecoration(labelText: 'Name / number'),
-                    validator: requiredValidator,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    onChanged: (value) => rate = value,
+                    onChanged: (value) => multiRate = value,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: venue.type == VenueType.salon
-                          ? 'EGP / 15 min'
-                          : 'EGP / hour',
-                    ),
+                    decoration: const InputDecoration(
+                        labelText: 'EGP / hour with multiple controllers'),
                     validator: positiveNumberValidator,
                   ),
-                  if (kind == 'PS5 room') ...[
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      onChanged: (value) => multiRate = value,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                          labelText: 'EGP / hour with multiple controllers'),
-                      validator: positiveNumberValidator,
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                formKey.currentState!.save();
-                Navigator.pop(
-                  context,
-                  VenueItem(
-                    id: generateId(),
-                    name: name.trim(),
-                    kind: kind,
-                    hourlyRate: double.parse(rate.trim()),
-                    multiRate: multiRate.trim().isEmpty
-                        ? 0
-                        : double.parse(multiRate.trim()),
-                  ),
-                );
-              },
-              child: const Text('Add'),
-            ),
-          ],
         ),
       ),
     );
@@ -1934,10 +1932,30 @@ class _HagzyHomeState extends State<HagzyHome> {
     var minutes = '30';
     var price = '';
     final formKey = GlobalKey<FormState>();
-    final result = await showDialog<SalonService>(
+    final result = await showHagzyAdaptiveModal<SalonService>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add a salon service'),
+      builder: (context, isSheet) => HagzyModalCard(
+        isSheet: isSheet,
+        icon: Icons.content_cut_rounded,
+        title: 'Add a salon service',
+        onClose: () => Navigator.pop(context),
+        primaryUseFilledButton: true,
+        primaryLabel: 'Add service',
+        onPrimary: () {
+          if (!formKey.currentState!.validate()) return;
+          formKey.currentState!.save();
+          Navigator.pop(
+            context,
+            SalonService(
+              id: generateId(),
+              name: name.trim(),
+              minutes: int.parse(minutes.trim()),
+              price: double.parse(price.trim()),
+            ),
+          );
+        },
+        secondaryLabel: 'Cancel',
+        onSecondary: () => Navigator.pop(context),
         content: Form(
           key: formKey,
           child: Column(
@@ -1973,27 +1991,6 @@ class _HagzyHomeState extends State<HagzyHome> {
             ],
           ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              formKey.currentState!.save();
-              Navigator.pop(
-                context,
-                SalonService(
-                  id: generateId(),
-                  name: name.trim(),
-                  minutes: int.parse(minutes.trim()),
-                  price: double.parse(price.trim()),
-                ),
-              );
-            },
-            child: const Text('Add service'),
-          ),
-        ],
       ),
     );
     if (result == null) return;
@@ -2108,57 +2105,25 @@ class _HagzyHomeState extends State<HagzyHome> {
         .contains('test');
 
     if (!walkIn && !_customerSignedIn && _mode != 'admin' && !isTest) {
-      final shouldSignIn = await showDialog<bool>(
+      final shouldSignIn = await showHagzyAdaptiveModal<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: kGreen.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.lock_outline_rounded, color: kGreen, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  localized(arabic, 'Sign In Required', 'تسجيل الدخول مطلوب'),
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5, color: kInk),
-                ),
-              ),
-            ],
+        builder: (ctx, isSheet) => HagzyModalCard(
+          isSheet: isSheet,
+          centerHeader: true,
+          icon: Icons.lock_outline_rounded,
+          title: localized(arabic, 'Sign In Required', 'تسجيل الدخول مطلوب'),
+          subtitle: localized(
+            arabic,
+            'Please sign in or create an account to book your spot. Your bookings will be securely linked to your profile.',
+            'يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الحجز. سيتم ربط حجوزاتك بحسابك ومزامنتها على السيرفر.',
           ),
-          content: Text(
-            localized(
-              arabic,
-              'Please sign in or create an account to book your spot. Your bookings will be securely linked to your profile.',
-              'يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الحجز. سيتم ربط حجوزاتك بحسابك ومزامنتها على السيرفر.',
-            ),
-            style: TextStyle(fontSize: 14, color: kMuted, height: 1.5),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(
-                localized(arabic, 'Cancel', 'إلغاء'),
-                style: TextStyle(color: kMuted, fontWeight: FontWeight.w600),
-              ),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: kGreen,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text(
-                localized(arabic, 'Sign In / Register', 'تسجيل الدخول / إنشاء حساب'),
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
+          onClose: () => Navigator.pop(ctx, false),
+          primaryUseFilledButton: true,
+          primaryLabel: localized(
+              arabic, 'Sign In / Register', 'تسجيل الدخول / إنشاء حساب'),
+          onPrimary: () => Navigator.pop(ctx, true),
+          secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+          onSecondary: () => Navigator.pop(ctx, false),
         ),
       );
 
@@ -2263,91 +2228,26 @@ class _HagzyHomeState extends State<HagzyHome> {
 
     String? dialogError;
     if (!mounted) return;
-    final booking = await showDialog<Booking>(
+    final booking = await showHagzyAdaptiveModal<Booking>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: kPanel,
-          surfaceTintColor: Colors.transparent,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          contentPadding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-          actionsPadding: const EdgeInsets.fromLTRB(20, 2, 20, 14),
-          title: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: HagzyTheme.brandGradient,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kGreen.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(venue.type.icon, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      walkIn
-                          ? localized(arabic, 'Add Walk-in', 'إضافة حجز مباشر')
-                          : localized(arabic, 'Book Your Time', 'احجز موعدك'),
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                        color: kInk,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: kGreen.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${venue.name} · ${item.name}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: kGreen,
-                          fontSize: 12.0,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close_rounded, color: kMuted),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 460,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+      maxWidth: 500,
+      maxHeightFactor: 0.92,
+      builder: (context, isSheet) => StatefulBuilder(
+        builder: (context, setDialogState) => HagzyModalCard(
+          isSheet: isSheet,
+          maxWidth: 500,
+          icon: venue.type.icon,
+          title: walkIn
+              ? localized(arabic, 'Add Walk-in', 'إضافة حجز مباشر')
+              : localized(arabic, 'Book Your Time', 'احجز موعدك'),
+          subtitle: '${displayLocalizedTitle(venue.name, arabic)} · ${item.name}',
+          onClose: () => Navigator.pop(context),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                     // Breadfast / Talabat Date & Time Summary Pill Card
                     InkWell(
                       onTap: () async {
@@ -2404,7 +2304,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       color: kMuted,
                                       fontSize: 12.0,
                                       fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.7,
+                                      letterSpacing: arabic ? 0 : 0.7,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -2414,6 +2314,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       fontWeight: FontWeight.w900,
                                       fontSize: 13.5,
                                       color: kInk,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -2429,7 +2332,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               ),
                               child: Text(
                                 localized(arabic, 'Change', 'تعديل'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.0,
                                   fontWeight: FontWeight.w800,
                                   color: kGreen,
@@ -2450,7 +2353,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         hintText: localized(arabic, 'Enter Your Full Name',
                             'أدخل اسمك بالكامل'),
                         prefixIcon:
-                            const Icon(Icons.person_outline, color: kGreen),
+                            Icon(Icons.person_outline, color: kGreen),
                         filled: true,
                         fillColor: kPage,
                       ),
@@ -2467,7 +2370,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             localized(arabic, 'Phone Number', 'رقم الهاتف'),
                         hintText: '+20 10 1234 5678',
                         prefixIcon:
-                            const Icon(Icons.phone_outlined, color: kGreen),
+                            Icon(Icons.phone_outlined, color: kGreen),
                         filled: true,
                         fillColor: kPage,
                       ),
@@ -2552,7 +2455,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ),
                             Text(
                               '${item.priceForHeadcount(headcount).toStringAsFixed(0)} ${localized(arabic, "EGP / person", "ج.م / فرد")}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kGreen),
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kGreen),
                             ),
                           ],
                         ),
@@ -2666,7 +2569,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                           return Text(
                             localized(arabic, selectedOffer.englishDescription,
                                 selectedOffer.arabicDescription),
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 12.0,
                                 color: kGreen,
                                 fontWeight: FontWeight.w700),
@@ -2691,7 +2594,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   color: kGreen.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.account_balance_wallet_outlined,
                                   size: 18,
                                   color: kGreen,
@@ -2847,17 +2750,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                         return Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                kGreen.withValues(alpha: 0.08),
-                                kGreenLight.withValues(alpha: 0.06),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
+                            color: kObsidian,
+                            borderRadius: BorderRadius.circular(
+                                HagzyTokens.radiusLarge),
                             border: Border.all(
-                                color: kGreen.withValues(alpha: 0.22)),
+                              color: kVolt.withValues(alpha: 0.35),
+                              width: 1.1,
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2872,17 +2771,18 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           arabic,
                                           'Promo ($selectedPromo)',
                                           'خصم ($selectedPromo)'),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 12.5,
-                                          color: kGreen),
+                                          color: kVolt),
                                     ),
                                     Text(
                                       '-${formatMoney(savedAmount)} EGP (was ${formatMoney(rawAmount)})',
-                                      style: const TextStyle(
+                                      style: hagzyMonoStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 12.5,
-                                          color: kGreen),
+                                          fontSize: 12.0,
+                                          color: kVolt,
+                                          arabic: arabic),
                                     ),
                                   ],
                                 ),
@@ -2898,17 +2798,18 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           arabic,
                                           'Wallet Deduction',
                                           'خصم من المحفظة'),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 12.5,
-                                          color: kGreen),
+                                          color: kVolt),
                                     ),
                                     Text(
                                       '-${formatMoney(currentWalletDeducted)} EGP',
-                                      style: const TextStyle(
+                                      style: hagzyMonoStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 12.5,
-                                          color: kGreen),
+                                          fontSize: 12.0,
+                                          color: kVolt,
+                                          arabic: arabic),
                                     ),
                                   ],
                                 ),
@@ -2922,22 +2823,30 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     localized(arabic, 'Total', 'الإجمالي'),
                                     style: TextStyle(
                                         fontWeight: FontWeight.w700,
-                                        color: kMuted),
+                                        color: Colors.white
+                                            .withValues(alpha: 0.72)),
                                   ),
-                                  Text(
-                                    localized(
-                                      arabic,
-                                      '${formatMoney(amount)} EGP${split > 1 ? ' (${formatMoney(parts)}/person)' : ''}',
-                                      '${formatMoney(amount)} جنيه${split > 1 ? ' (${formatMoney(parts)} للفرد)' : ''}',
+                                  HagzyAnimatedValue(
+                                    valueKey: '${amount.toStringAsFixed(0)}_$split',
+                                    child: Text(
+                                      localized(
+                                        arabic,
+                                        '${formatMoney(amount)} EGP${split > 1 ? ' (${formatMoney(parts)}/person)' : ''}',
+                                        '${formatMoney(amount)} جنيه${split > 1 ? ' (${formatMoney(parts)} للفرد)' : ''}',
+                                      ),
+                                      style: hagzyMonoStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 15,
+                                          color: Colors.white,
+                                          arabic: arabic),
                                     ),
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 15,
-                                        color: kInk),
                                   ),
                                 ],
                               ),
-                              const Divider(height: 18),
+                              Divider(
+                                height: 18,
+                                color: Colors.white.withValues(alpha: 0.14),
+                              ),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -2945,23 +2854,28 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   Text(
                                     localized(arabic, 'Deposit Due Now',
                                         'العربون المستحق الآن'),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                         fontWeight: FontWeight.w800,
-                                        color: kInk),
+                                        color: Colors.white),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 11, vertical: 4),
+                                        horizontal: 11, vertical: 5),
                                     decoration: BoxDecoration(
-                                      gradient: HagzyTheme.brandGradient,
-                                      borderRadius: BorderRadius.circular(999),
+                                      color: kVolt,
+                                      borderRadius: BorderRadius.circular(
+                                          HagzyTokens.radiusSmall),
                                     ),
-                                    child: Text(
-                                      '${formatMoney(deposit)} EGP',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 13.5),
+                                    child: HagzyAnimatedValue(
+                                      valueKey: deposit.toStringAsFixed(0),
+                                      child: Text(
+                                        '${formatMoney(deposit)} EGP',
+                                        style: hagzyMonoStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 13.5,
+                                            arabic: arabic),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -2974,7 +2888,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       'This venue has not set a deposit, so this time cannot be reserved yet.',
                                       'لم يحدد المكان قيمة العربون، لذلك لا يمكن حجز هذا الوقت حالياً.'),
                                   style: const TextStyle(
-                                    color: Color(0xFFB45309),
+                                    color: Color(0xFFFBBF24),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -2984,8 +2898,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.verified_user_outlined,
-                                      size: 14, color: kGreen),
+                                  Icon(Icons.verified_user_outlined,
+                                      size: 14, color: kVolt),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
@@ -2994,7 +2908,8 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           'Your time is held for 15 minutes while you pay. It is not confirmed until the deposit is verified.',
                                           'نحتفظ بالموعد لمدة ١٥ دقيقة. لا يتأكد الحجز إلا بعد التحقق من دفع العربون.'),
                                       style: TextStyle(
-                                          color: kMuted,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.72),
                                           fontSize: 12.0,
                                           fontWeight: FontWeight.w600),
                                     ),
@@ -3006,167 +2921,171 @@ class _HagzyHomeState extends State<HagzyHome> {
                         );
                       },
                     ),
-                  ],
-                ),
-              ),
+              ],
             ),
           ),
-          actions: [
-            if (dialogError != null) ...[
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 10),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline_rounded,
-                        size: 16, color: Colors.red.shade700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        dialogError!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.red.shade800,
+          customActions: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (dialogError != null) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: kError.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kError.withValues(alpha: 0.30)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline_rounded, size: 16, color: kError),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          dialogError!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kError,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kAccentSurface,
+                    foregroundColor: kAccentOnSurface,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    formKey.currentState!.save();
+                    if (venue.type == VenueType.salon &&
+                        item.hourlyRate <= 0 &&
+                        venue.services.isNotEmpty &&
+                        selectedServices.isEmpty) {
+                      setDialogState(() {
+                        dialogError = localized(
+                          arabic,
+                          'Choose at least one salon service.',
+                          'اختر خدمة واحدة على الأقل.',
+                        );
+                      });
+                      return;
+                    }
+                    if (!walkIn && !startsAt().isAfter(DateTime.now())) {
+                      setDialogState(() {
+                        dialogError = localized(
+                          arabic,
+                          'Choose a start time in the future.',
+                          'اختر وقت بداية في المستقبل.',
+                        );
+                      });
+                      return;
+                    }
+                    if (!isAvailable()) {
+                      setDialogState(() {
+                        dialogError = localized(
+                          arabic,
+                          'This time is already held or booked.',
+                          'هذا الموعد محجوز أو معلق بالفعل.',
+                        );
+                      });
+                      return;
+                    }
+                    final requiredDeposit =
+                        total() * venue.depositPercent / 100;
+                    final baseDeposit =
+                        split > 1 && (total() / split) > requiredDeposit
+                            ? total() / split
+                            : requiredDeposit;
+                    final effectiveWalletDeducted = useWallet
+                        ? (walletBalance < baseDeposit
+                            ? walletBalance
+                            : baseDeposit)
+                        : 0.0;
+                    final remainingDue = (baseDeposit - effectiveWalletDeducted)
+                        .clamp(0.0, double.infinity);
+                    final isWalletPaid = useWallet &&
+                        effectiveWalletDeducted >= baseDeposit &&
+                        baseDeposit > 0;
+
+                    if (!walkIn && !isWalletPaid && baseDeposit <= 0) {
+                      _message(
+                        'This venue has no deposit configured, so reservations cannot be confirmed.',
+                        error: true,
+                      );
+                      return;
+                    }
+                    walletDeducted = effectiveWalletDeducted;
+                    Navigator.pop(
+                      context,
+                      Booking(
+                        id: generateId(),
+                        venueId: venue.id,
+                        itemId: item.id,
+                        customer: customer.trim(),
+                        startsAt: startsAt(),
+                        durationMinutes: duration(),
+                        price: total(),
+                        serviceNames: venue.services
+                            .where((service) =>
+                                selectedServices.contains(service.id))
+                            .map((service) => service.name)
+                            .toList(),
+                        splitCount: isPerPerson ? headcount : split,
+                        multiController: multi,
+                        phone: phone.trim(),
+                        email: walkIn ? '' : _savedCustomerEmail.trim(),
+                        dueNow: walkIn || isWalletPaid ? 0 : remainingDue,
+                        status: walkIn || isWalletPaid
+                            ? 'confirmed'
+                            : 'pending_payment',
+                        paymentStatus: isWalletPaid ? 'paid' : 'unpaid',
+                        paymentMethod: isWalletPaid ? 'wallet' : '',
+                        holdExpiresAt: walkIn || isWalletPaid
+                            ? null
+                            : DateTime.now().add(const Duration(minutes: 15)),
+                        promoCode: discount() > 0 ? selectedPromo : '',
+                        discountAmount: discount(),
+                        staffMember: venue.type == VenueType.salon
+                            ? selectedBarber
+                            : '',
+                        reminderOffsetMinutes: reminderOffsetMinutes,
+                        createdAt: DateTime.now(),
+                        confirmedAt:
+                            (walkIn || isWalletPaid) ? DateTime.now() : null,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                      walkIn
+                          ? Icons.check_circle_outline
+                          : Icons.arrow_forward_rounded,
+                      size: 18),
+                  label: Text(
+                    walkIn
+                        ? localized(arabic, 'Save walk-in', 'حفظ الحجز المباشر')
+                        : localized(arabic, 'Continue to deposit',
+                            'المتابعة إلى دفع العربون'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900, fontSize: 15),
+                  ),
                 ),
               ),
             ],
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: kGreen,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999)),
-                  elevation: 0,
-                ),
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) return;
-                  formKey.currentState!.save();
-                  if (venue.type == VenueType.salon &&
-                      item.hourlyRate <= 0 &&
-                      venue.services.isNotEmpty &&
-                      selectedServices.isEmpty) {
-                    setDialogState(() {
-                      dialogError = localized(
-                        arabic,
-                        'Choose at least one salon service.',
-                        'اختر خدمة واحدة على الأقل.',
-                      );
-                    });
-                    return;
-                  }
-                  if (!walkIn && !startsAt().isAfter(DateTime.now())) {
-                    setDialogState(() {
-                      dialogError = localized(
-                        arabic,
-                        'Choose a start time in the future.',
-                        'اختر وقت بداية في المستقبل.',
-                      );
-                    });
-                    return;
-                  }
-                  if (!isAvailable()) {
-                    setDialogState(() {
-                      dialogError = localized(
-                        arabic,
-                        'This time is already held or booked.',
-                        'هذا الموعد محجوز أو معلق بالفعل.',
-                      );
-                    });
-                    return;
-                  }
-                  final requiredDeposit =
-                      total() * venue.depositPercent / 100;
-                  final baseDeposit =
-                      split > 1 && (total() / split) > requiredDeposit
-                          ? total() / split
-                          : requiredDeposit;
-                  final effectiveWalletDeducted = useWallet
-                      ? (walletBalance < baseDeposit ? walletBalance : baseDeposit)
-                      : 0.0;
-                  final remainingDue =
-                      (baseDeposit - effectiveWalletDeducted)
-                          .clamp(0.0, double.infinity);
-                  final isWalletPaid =
-                      useWallet && effectiveWalletDeducted >= baseDeposit && baseDeposit > 0;
-
-                  if (!walkIn && !isWalletPaid && baseDeposit <= 0) {
-                    _message(
-                      'This venue has no deposit configured, so reservations cannot be confirmed.',
-                      error: true,
-                    );
-                    return;
-                  }
-                  walletDeducted = effectiveWalletDeducted;
-                  Navigator.pop(
-                    context,
-                    Booking(
-                      id: generateId(),
-                      venueId: venue.id,
-                      itemId: item.id,
-                      customer: customer.trim(),
-                      startsAt: startsAt(),
-                      durationMinutes: duration(),
-                      price: total(),
-                      serviceNames: venue.services
-                          .where((service) =>
-                              selectedServices.contains(service.id))
-                          .map((service) => service.name)
-                          .toList(),
-                      splitCount: isPerPerson ? headcount : split,
-                      multiController: multi,
-                      phone: phone.trim(),
-                      email: walkIn ? '' : _savedCustomerEmail.trim(),
-                      dueNow: walkIn || isWalletPaid ? 0 : remainingDue,
-                      status: walkIn || isWalletPaid
-                          ? 'confirmed'
-                          : 'pending_payment',
-                      paymentStatus: isWalletPaid ? 'paid' : 'unpaid',
-                      paymentMethod: isWalletPaid ? 'wallet' : '',
-                      holdExpiresAt: walkIn || isWalletPaid
-                          ? null
-                          : DateTime.now().add(const Duration(minutes: 15)),
-                      promoCode: discount() > 0 ? selectedPromo : '',
-                      discountAmount: discount(),
-                      staffMember: venue.type == VenueType.salon
-                          ? selectedBarber
-                          : '',
-                      reminderOffsetMinutes: reminderOffsetMinutes,
-                      createdAt: DateTime.now(),
-                      confirmedAt: (walkIn || isWalletPaid) ? DateTime.now() : null,
-                    ),
-                  );
-                },
-                icon: Icon(
-                    walkIn
-                        ? Icons.check_circle_outline
-                        : Icons.arrow_forward_rounded,
-                    size: 18),
-                label: Text(
-                  walkIn
-                      ? localized(arabic, 'Save walk-in', 'حفظ الحجز المباشر')
-                      : localized(arabic, 'Continue to deposit',
-                          'المتابعة إلى دفع العربون'),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w900, fontSize: 15),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -3238,32 +3157,19 @@ class _HagzyHomeState extends State<HagzyHome> {
           '$errDetail',
           error: true);
       if (mounted && !isTest) {
-        await showDialog<void>(
+        await showHagzyAdaptiveModal<void>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    localized(ar, 'Booking Failed', 'تعذّر إتمام الحجز'),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-            content: Text(
-              errDetail,
-              style: TextStyle(color: kInk, height: 1.45),
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(localized(ar, 'OK', 'حسناً')),
-              ),
-            ],
+          builder: (ctx, isSheet) => HagzyModalCard(
+            isSheet: isSheet,
+            centerHeader: true,
+            destructive: true,
+            icon: Icons.error_outline_rounded,
+            title: localized(ar, 'Booking Failed', 'تعذّر إتمام الحجز'),
+            subtitle: errDetail,
+            onClose: () => Navigator.pop(ctx),
+            primaryUseFilledButton: true,
+            primaryLabel: localized(ar, 'OK', 'حسناً'),
+            onPrimary: () => Navigator.pop(ctx),
           ),
         );
       }
@@ -3275,100 +3181,82 @@ class _HagzyHomeState extends State<HagzyHome> {
     final venue =
         _venues.where((value) => value.id == booking.venueId).firstOrNull;
 
-    final method = await showModalBottomSheet<String>(
+    final method = await showHagzySheet<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => SafeArea(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 540),
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
-          decoration: BoxDecoration(
-            color: kPanel,
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: kBorder),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x2823192D),
-                blurRadius: 36,
-                offset: Offset(0, 14),
-              ),
-            ],
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4.5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD6CEC2),
-                      borderRadius: BorderRadius.circular(99),
+        child: Center(
+          heightFactor: 1.0,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 540),
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
+            decoration: BoxDecoration(
+              color: kPanel,
+              borderRadius: BorderRadius.circular(HagzyTokens.radiusSheet),
+              border: Border.all(color: kBorder),
+              boxShadow: HagzyTheme.floatingShadow,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: kBorderStrong,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: HagzyTheme.brandGradient,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: HagzyTheme.brandGlowShadow,
-                      ),
-                      child: const Icon(
-                        Icons.shield_outlined,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            localized(arabic, 'Secure Your Time', 'أكّد موعدك'),
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.4,
-                              color: kInk,
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const IconBox(icon: Icons.shield_outlined),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localized(arabic, 'Secure Your Time', 'أكّد موعدك'),
+                              style: hagzyTextStyle(
+                                arabic: arabic,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.4,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            localized(
-                              arabic,
-                              'Choose a payment method for your deposit.',
-                              'اختر طريقة دفع العربون.',
+                            const SizedBox(height: 2),
+                            Text(
+                              localized(
+                                arabic,
+                                'Choose a payment method for your deposit.',
+                                'اختر طريقة دفع العربون.',
+                              ),
+                              style: TextStyle(
+                                color: kMuted,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                            style: TextStyle(
-                              color: kMuted,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                      onPressed: () => Navigator.pop(context, 'later'),
-                      style: IconButton.styleFrom(
-                        backgroundColor: kPage,
-                        foregroundColor: kInk,
+                      IconButton(
+                        tooltip:
+                            MaterialLocalizations.of(context).closeButtonTooltip,
+                        onPressed: () => Navigator.pop(context, 'later'),
+                        style: IconButton.styleFrom(
+                          backgroundColor: kSurfaceSubtle,
+                          foregroundColor: kInk,
+                        ),
+                        icon: const Icon(Icons.close_rounded, size: 18),
                       ),
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -3471,7 +3359,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.event_available_outlined,
                         size: 16,
                         color: kGreen,
@@ -3556,7 +3444,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context, 'whatsapp'),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.chat_outlined,
                     color: kGreen,
                     size: 18,
@@ -3600,6 +3488,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             ),
           ),
         ),
+        ),
       ),
     );
     if (method == 'paymob_card') {
@@ -3617,7 +3506,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       if (!mounted) return;
       final verified = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(
+        hagzyPageRoute(
           builder: (ctx) => UnifiedPaymentScreen(
             bookingId: booking.id,
             amount: dueNow,
@@ -3755,42 +3644,33 @@ class _HagzyHomeState extends State<HagzyHome> {
         ? booking.phone.trim()
         : _savedCustomerPhone.trim();
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showHagzyAdaptiveModal<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: kGreen.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                method == 'instapay'
-                    ? Icons.bolt_rounded
-                    : Icons.phone_iphone_rounded,
-                color: kGreen,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                localized(arabic, '$methodLabel Deposit Transfer',
-                    'تحويل العربون عبر $methodLabel'),
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
+      maxWidth: 460,
+      builder: (ctx, isSheet) => HagzyModalCard(
+        isSheet: isSheet,
+        maxWidth: 460,
+        icon: method == 'instapay'
+            ? Icons.bolt_rounded
+            : Icons.phone_iphone_rounded,
+        title: localized(arabic, '$methodLabel Deposit Transfer',
+            'تحويل العربون عبر $methodLabel'),
+        onClose: () => Navigator.pop(ctx, false),
+        primaryUseFilledButton: true,
+        primaryLabel:
+            localized(arabic, 'Submit Reference', 'إرسال رقم العملية'),
+        onPrimary: () {
+          if (!formKey.currentState!.validate()) return;
+          Navigator.pop(ctx, true);
+        },
+        secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+        onSecondary: () => Navigator.pop(ctx, false),
         content: Form(
           key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -3840,7 +3720,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               child: Text(
                                 localized(arabic, 'Copy ${formatMoney(dueNow)} EGP',
                                     'نسخ المبلغ'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.0,
                                   fontWeight: FontWeight.w800,
                                   color: kGreen,
@@ -3870,7 +3750,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                             Expanded(
                               child: SelectableText(
                                 destination,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 16,
                                   color: kGreen,
@@ -3886,7 +3766,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                 _message(localized(
                                     arabic, 'Copied to clipboard', 'تم النسخ'));
                               },
-                              icon: const Icon(Icons.copy_rounded,
+                              icon: Icon(Icons.copy_rounded,
                                   size: 17, color: kGreen),
                             ),
                           ],
@@ -3984,7 +3864,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         'Transfer Reference / Sender Phone',
                         'رقم العملية المرجعي أو رقم المحوّل'),
                     hintText: 'e.g. IPN-928374 or 010...',
-                    prefixIcon: const Icon(Icons.tag_rounded, color: kGreen),
+                    prefixIcon: Icon(Icons.tag_rounded, color: kGreen),
                   ),
                   validator: (v) => v == null || v.trim().length < 4
                       ? localized(
@@ -4000,7 +3880,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         ? Alignment.centerRight
                         : Alignment.centerLeft,
                     child: ActionChip(
-                      avatar: const Icon(Icons.phone_iphone_rounded,
+                      avatar: Icon(Icons.phone_iphone_rounded,
                           size: 15, color: kGreen),
                       label: Text(
                         localized(
@@ -4028,25 +3908,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                   ),
                   style: TextStyle(color: kMuted, fontSize: 12.0),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(localized(arabic, 'Cancel', 'إلغاء')),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(ctx, true);
-            },
-            icon: const Icon(Icons.send_rounded, size: 16),
-            label: Text(
-                localized(arabic, 'Submit Reference', 'إرسال رقم العملية')),
-          ),
-        ],
       ),
     );
     final submittedRef = refController.text.trim();
@@ -4169,133 +4033,107 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
 
     if (!mounted) return;
-    final submitted = await showDialog<bool>(
+    final submitted = await showHagzyAdaptiveModal<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Row(
+      builder: (ctx, isSheet) => HagzyModalCard(
+        isSheet: isSheet,
+        icon: Icons.receipt_long_rounded,
+        title: localized(arabic, 'FawryPay Reference Code', 'كود الدفع عبر فوري'),
+        onClose: () => Navigator.pop(ctx, false),
+        primaryUseFilledButton: true,
+        primaryLabel:
+            localized(arabic, 'I Paid via Fawry', 'تأكيد الدفع عبر فوري'),
+        onPrimary: () => Navigator.pop(ctx, true),
+        secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+        onSecondary: () => Navigator.pop(ctx, false),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: kSurfaceTint,
-                borderRadius: BorderRadius.circular(12),
+                gradient: HagzyTheme.obsidianGradient,
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(Icons.receipt_long_rounded, color: kGreen),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                localized(arabic, 'FawryPay Reference Code', 'كود الدفع عبر فوري'),
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: HagzyTheme.obsidianGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      localized(
-                        arabic,
-                        'SERVICE CODE: 78890 · HAGZY EGYPT',
-                        'كود الخدمة: 78890 · حجزي مصر',
-                      ),
-                      style: const TextStyle(
-                        color: Color(0xFFA7F3D0),
-                        fontSize: 12.0,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.7,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SelectableText(
-                      fawryRef,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: fawryRef.replaceAll(' ', '')),
-                        );
-                        _message(localized(
-                            arabic, 'Fawry code copied!', 'تم نسخ كود فوري!'));
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.3)),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      icon: const Icon(Icons.copy_rounded,
-                          size: 15, color: Colors.white),
-                      label: Text(
-                          localized(arabic, 'Copy Code', 'نسخ الكود')),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
                   Text(
-                    localized(arabic, 'Deposit Due:', 'العربون المستحق:'),
-                    style: TextStyle(
-                        color: kMuted, fontWeight: FontWeight.w700),
+                    localized(
+                      arabic,
+                      'SERVICE CODE: 78890 · HAGZY EGYPT',
+                      'كود الخدمة: 78890 · حجزي مصر',
+                    ),
+                    style: const TextStyle(
+                      color: Color(0xFFA7F3D0),
+                      fontSize: 12.0,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.7,
+                    ),
                   ),
-                  Text(
-                    '${formatMoney(dueNow)} EGP',
-                    style: TextStyle(
-                        color: kInk,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    fawryRef,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(
+                        ClipboardData(text: fawryRef.replaceAll(' ', '')),
+                      );
+                      _message(localized(
+                          arabic, 'Fawry code copied!', 'تم نسخ كود فوري!'));
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.3)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.copy_rounded,
+                        size: 15, color: Colors.white),
+                    label: Text(
+                        localized(arabic, 'Copy Code', 'نسخ الكود')),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                localized(
-                  arabic,
-                  'Pay with this reference number at any Fawry POS machine or inside the MyFawry app under "FawryPay (78890)", then tap Confirm below.',
-                  'ادفع بهذا الرقم في أي ماكينة فوري أو عبر تطبيق MyFawry تحت خدمة "فوري باي (78890)" ثم اضغط تأكيد أدناه.',
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  localized(arabic, 'Deposit Due:', 'العربون المستحق:'),
+                  style: TextStyle(
+                      color: kMuted, fontWeight: FontWeight.w700),
                 ),
-                style: TextStyle(
-                    color: kMuted, fontSize: 12, height: 1.4),
+                Text(
+                  '${formatMoney(dueNow)} EGP',
+                  style: TextStyle(
+                      color: kInk,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              localized(
+                arabic,
+                'Pay with this reference number at any Fawry POS machine or inside the MyFawry app under "FawryPay (78890)", then tap Confirm below.',
+                'ادفع بهذا الرقم في أي ماكينة فوري أو عبر تطبيق MyFawry تحت خدمة "فوري باي (78890)" ثم اضغط تأكيد أدناه.',
               ),
-            ],
-          ),
+              style: TextStyle(
+                  color: kMuted, fontSize: 12, height: 1.4),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(localized(arabic, 'Cancel', 'إلغاء')),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.check_circle_outline, size: 17),
-            label: Text(localized(
-                arabic, 'I Paid via Fawry', 'تأكيد الدفع عبر فوري')),
-          ),
-        ],
       ),
     );
     if (submitted != true) return;
@@ -4402,7 +4240,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                 arabic, 'Your booking is confirmed! ✓', 'تم تأكيد حجزك! ✓'));
           }
         } catch (err) {
-          debugPrint('Paymob booking status poll notice: $err');
+          if (kDebugMode) {
+            debugPrint('Paymob booking status poll notice: $err');
+          }
         }
       });
     } catch (error) {
@@ -4551,10 +4391,8 @@ class _HagzyHomeState extends State<HagzyHome> {
     }
 
     if (!mounted) return;
-    final nextAction = await showModalBottomSheet<String>(
+    final nextAction = await showHagzySheet<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           Future<void> sendText(String text) async {
@@ -4996,6 +4834,14 @@ class _HagzyHomeState extends State<HagzyHome> {
     } catch (_) {}
   }
 
+  static bool _isReviewerAccount(String email, String? token) {
+    final normalized = email.trim().toLowerCase();
+    return normalized == 'reviewer@hagzy.app' ||
+        normalized == 'demo@hagzy.app' ||
+        normalized == 'apple.tester@hagzy.app' ||
+        token == 'demo_reviewer_token_2026';
+  }
+
   Future<void> _handleCustomerSignIn({
     required String name,
     required String email,
@@ -5051,6 +4897,63 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
     }
 
+    final isReviewerSession =
+        !shouldOpenAdmin && _isReviewerAccount(email, _customerToken);
+    final double resolvedWallet =
+        isReviewerSession ? (walletBalance ?? 1000.0) : (walletBalance ?? _walletBalance);
+    List<Booking> nextReviewerBookings = _bookings;
+
+    if (isReviewerSession) {
+      if (_venues.isEmpty) {
+        _venues = await _loadSeedVenues(_venues);
+      }
+      if (_venues.isEmpty) {
+        _venues = defaultPrototypeVenues();
+      }
+      if (_venues.isNotEmpty) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final existingFavs =
+              prefs.getStringList(kFavoriteStorageKey) ?? const <String>[];
+          if (existingFavs.isEmpty) {
+            await prefs.setStringList(kFavoriteStorageKey, [_venues.first.id]);
+          }
+        } catch (_) {}
+        if (_bookings.where((b) => !b.cancelled).isEmpty) {
+          final seedVenue = _venues.first;
+          final seedItem =
+              seedVenue.items.isNotEmpty ? seedVenue.items.first : null;
+          final tomorrow = DateTime.now().add(const Duration(days: 1));
+          final startsAt =
+              DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 19, 0);
+          final seedPrice = seedItem?.hourlyRate ?? 350.0;
+          final reviewerBooking = Booking(
+            id: 'hagzy-reviewer-pass-1',
+            venueId: seedVenue.id,
+            itemId: seedItem?.id ?? 'unit-1',
+            customer: name.trim().isNotEmpty ? name.trim() : 'App Reviewer',
+            startsAt: startsAt,
+            durationMinutes: 60,
+            price: seedPrice,
+            phone: phone.trim().isNotEmpty ? phone.trim() : '01012345678',
+            email: email,
+            dueNow: 0,
+            actualPaidAmount: seedPrice,
+            status: 'confirmed',
+            paymentStatus: 'paid',
+            paymentMethod: 'wallet',
+            paymentReference: 'HAGZY-DEMO-PASS-01',
+            qrSignature: 'hagzy-demo-qr-pass-2026',
+            qrCheckInUrl:
+                'hagzy://checkin/hagzy-reviewer-pass-1?sig=hagzy-demo-qr-pass-2026',
+            confirmedAt: DateTime.now(),
+            createdAt: DateTime.now(),
+          );
+          nextReviewerBookings = [reviewerBooking, ..._bookings];
+        }
+      }
+    }
+
     if (mounted) {
       setState(() {
         _mode = shouldOpenAdmin ? 'admin' : 'customer';
@@ -5060,7 +4963,11 @@ class _HagzyHomeState extends State<HagzyHome> {
         _savedCustomerName = name;
         _savedCustomerEmail = email;
         _savedCustomerPhone = phone;
-        if (walletBalance != null) {
+        if (isReviewerSession) {
+          _walletBalance = resolvedWallet;
+          _bookings = nextReviewerBookings;
+          _customerBookings = List.of(nextReviewerBookings);
+        } else if (walletBalance != null) {
           _walletBalance = walletBalance;
         }
       });
@@ -5072,13 +4979,21 @@ class _HagzyHomeState extends State<HagzyHome> {
       isSignedIn: true,
       token: _customerToken,
     );
-    if (walletBalance != null) {
+    if (isReviewerSession) {
+      await _commit(_venues, nextReviewerBookings);
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setDouble(HagzyWallet.keyWallet, walletBalance);
+        await prefs.setDouble(HagzyWallet.keyWallet, resolvedWallet);
       } catch (_) {}
+    } else {
+      if (walletBalance != null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setDouble(HagzyWallet.keyWallet, walletBalance);
+        } catch (_) {}
+      }
+      unawaited(_syncAccountData(showErrors: false));
     }
-    unawaited(_syncAccountData(showErrors: false));
 
     final isTest = WidgetsBinding.instance.runtimeType
         .toString()
@@ -5115,10 +5030,8 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
     }
 
-    final newName = await showModalBottomSheet<String>(
+    final newName = await showHagzySheet<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           return Padding(
@@ -5228,7 +5141,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                         decoration: InputDecoration(
                           labelText: localized(ar, 'Your Full Name', 'اسمك بالكامل'),
                           hintText: localized(ar, 'e.g. Mohamed Hegazy', 'مثال: محمد حجازي'),
-                          prefixIcon: const Icon(Icons.person_outline_rounded, color: kGreen),
+                          prefixIcon: Icon(Icons.person_outline_rounded, color: kGreen),
                           suffixIcon: nameCtrl.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear_rounded, size: 18),
@@ -5349,6 +5262,7 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _syncAccountData({bool showErrors = false}) async {
     if (!_api.isConfigured) return;
+    if (_isReviewerAccount(_savedCustomerEmail, _customerToken)) return;
     final hasPendingLocal =
         _bookings.any((b) => !b.cancelled && !b.isConfirmed);
     if (_customerToken == null &&
@@ -5581,28 +5495,45 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _handleCustomerDeleteAccount() async {
     if (_api.isConfigured &&
+        !_isReviewerAccount(_savedCustomerEmail, _customerToken) &&
         _customerToken != null &&
         _customerToken!.isNotEmpty) {
       try {
         await _api.deleteCustomerAccount(_customerToken!);
       } catch (_) {}
     }
-    setState(() {
-      _savedCustomerName = '';
-      _savedCustomerEmail = '';
-      _savedCustomerPhone = '';
-      _customerSignedIn = false;
-      _browsingAsGuest = false;
-      _customerToken = null;
-      _walletBalance = 0;
-      _customerBookings = [];
-      _bookings = [];
-      _tab = 0;
-    });
+    if (mounted) {
+      setState(() {
+        _savedCustomerId = '';
+        _savedCustomerName = '';
+        _savedCustomerEmail = '';
+        _savedCustomerPhone = '';
+        _customerSignedIn = false;
+        _browsingAsGuest = false;
+        _customerToken = null;
+        _adminToken = null;
+        _savedCustomerIsAdmin = false;
+        _savedCustomerIsPartner = false;
+        _savedUserRole = 'customer';
+        _savedPartnerStatus = 'none';
+        _myPartnerRequest = null;
+        _partnerRequests = const [];
+        _partnerShowRequestForm = false;
+        _partnerConfirmedInterest = false;
+        _partnerSwitchedToCustomerApp = false;
+        _walletBalance = 0;
+        _customerBookings = [];
+        _bookings = [];
+        _tab = 0;
+      });
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(kCustomerProfileStorageKey);
       await prefs.remove(HagzyWallet.keyWallet);
+      await prefs.remove(kFavoriteStorageKey);
+      await prefs.remove('hagzy_customer_area');
+      await prefs.remove('hagzy_dismissed_book_again_venues');
       await prefs.remove('hagzy_customer_bookings');
       await prefs.remove('hagzy_customer_wallet');
       final raw = prefs.getString(kStorageKey);
@@ -5612,9 +5543,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         await prefs.setString(kStorageKey, jsonEncode(data));
       }
     } catch (_) {}
-    if (kIsWeb) {
-      SocialAuthService.signOutWeb();
-    }
+    SocialAuthService.signOutWeb();
   }
 
   Future<void> _handleWalletUpdated(double newBalance) async {
@@ -5627,9 +5556,9 @@ class _HagzyHomeState extends State<HagzyHome> {
   Future<void> _chooseCustomerAreaFromProfile() async {
     final arabic = _language == 'AR';
     String query = '';
-    final selected = await showDialog<String>(
+    final selected = await showHagzyAdaptiveModal<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx, isSheet) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final options = [
             (
@@ -5642,37 +5571,41 @@ class _HagzyHomeState extends State<HagzyHome> {
           ].where((entry) =>
               entry.$1.toLowerCase().contains(query.toLowerCase()) ||
               entry.$2.contains(query));
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
+          return HagzyModalCard(
+            isSheet: isSheet,
+            scrollable: false,
+            icon: Icons.location_on_rounded,
+            title: localized(arabic, 'Choose Governorate', 'اختر المحافظة'),
+            subtitle: localized(
+              arabic,
+              'Select your default city in Egypt.',
+              'اختر محافظتك الافتراضية في مصر.',
             ),
-            title: Text(
-                localized(arabic, 'Choose Governorate', 'اختر المحافظة')),
+            onClose: () => Navigator.pop(ctx),
+            secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+            onSecondary: () => Navigator.pop(ctx),
             content: SizedBox(
-              width: 400,
-              height: 440,
+              height: isSheet ? 340 : 380,
               child: Column(
                 children: [
                   TextField(
                     decoration: InputDecoration(
                       hintText: localized(
                           arabic, 'Search governorate', 'ابحث عن محافظة'),
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: const Icon(Icons.search_rounded),
                     ),
                     onChanged: (v) => setDialogState(() => query = v.trim()),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Expanded(
                     child: ListView.separated(
                       itemCount: options.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
                       itemBuilder: (ctx, i) {
                         final entry = options.elementAt(i);
-                        return ListTile(
-                          title: Text(entry.$2),
-                          trailing: entry.$1 == _currentArea
-                              ? const Icon(Icons.check, color: kGreen)
-                              : null,
+                        return HagzyGroupedRow(
+                          title: entry.$2,
+                          selected: entry.$1 == _currentArea,
                           onTap: () => Navigator.pop(ctx, entry.$1),
                         );
                       },
@@ -5918,27 +5851,52 @@ class _HagzyHomeState extends State<HagzyHome> {
                       SafeArea(
                         top: false,
                         child: Container(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                           decoration: BoxDecoration(
-                            color: kPanel,
-                            border: Border(top: BorderSide(color: kBorder)),
+                            color: kPage,
+                            border: Border(
+                              top: BorderSide(color: kBorder, width: 1.0),
+                            ),
                           ),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 44,
-                            child: OutlinedButton.icon(
-                              onPressed: () => setState(() {
-                                _browsingAsGuest = true;
-                                _tab = 0;
-                              }),
-                              icon: const Icon(Icons.explore_outlined, size: 18),
-                              label: Text(
-                                localized(
-                                  arabic,
-                                  'Explore Venues as Guest',
-                                  'تصفح الأماكن أولاً كضيف',
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                  maxWidth: HagzyTokens.maxFormWidth),
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: kInk,
+                                    backgroundColor: kPanel,
+                                    side: BorderSide(color: kBorder, width: 1.1),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          HagzyTokens.radiusMedium),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    HagzyHaptics.light();
+                                    setState(() {
+                                      _browsingAsGuest = true;
+                                      _tab = 0;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    Icons.explore_outlined,
+                                    size: 18,
+                                    color: kBrandAccent,
+                                  ),
+                                  label: Text(
+                                    localized(
+                                      arabic,
+                                      'Explore Venues as Guest',
+                                      'تصفح الأماكن أولاً كضيف',
+                                    ),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700),
+                                  ),
                                 ),
-                                style: const TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
                           ),
@@ -5949,173 +5907,297 @@ class _HagzyHomeState extends State<HagzyHome> {
                 )
               : Scaffold(
             appBar: AppBar(
-              toolbarHeight: 68,
+              toolbarHeight: 64,
+              backgroundColor: kPage,
               titleSpacing: 16,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1.0),
+                child: Container(height: 1.0, color: kBorder),
+              ),
               title: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1120),
-                  child: Row(
-                    children: [
-                      PressableScale(
-                        onTap: () {
-                          if (_tab != 0) {
-                            setState(() => _tab = 0);
-                          }
-                        },
-                        onLongPress: () => setState(() => _showSplash = true),
-                        child: const HagzyLogoMark(size: 42, withGlow: true),
+                  constraints: const BoxConstraints(
+                      maxWidth: HagzyTokens.maxContentWidth),
+                  child: Builder(builder: (context) {
+                    final width = MediaQuery.sizeOf(context).width;
+                    final narrow = width < 480;
+                    final showDesktopNav = isCustomer &&
+                        width >= HagzyTokens.breakpointTablet;
+                    final btnStyle = IconButton.styleFrom(
+                      backgroundColor: kPanel,
+                      foregroundColor: kInk,
+                      side: BorderSide(color: kBorder),
+                      minimumSize: Size(narrow ? 40 : 44, 44),
+                      tapTargetSize: MaterialTapTargetSize.padded,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                            HagzyTokens.radiusMedium),
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    );
+                    final brandLockup = HagzyTap(
+                      haptic: HagzyHapticStyle.selection,
+                      onTap: () {
+                        if (_tab != 0) {
+                          setState(() => _tab = 0);
+                        }
+                      },
+                      onLongPress: () => setState(() => _showSplash = true),
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            arabic ? 'حجزي' : 'Hagzy',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 19,
-                              letterSpacing: -0.5,
-                              color: kInk,
+                          HagzyBrandSymbol(
+                            size: narrow ? 28 : 34,
+                            variant: HagzyBrandVariant.obsidian,
+                          ),
+                          SizedBox(width: narrow ? 7 : 10),
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        arabic ? 'حجزي' : 'Hagzy',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: hagzyDisplayStyle(
+                                          arabic: arabic,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: narrow ? 18 : 20,
+                                          letterSpacing:
+                                              arabic ? 0.0 : -0.45,
+                                        ),
+                                      ),
+                                    ),
+                                    const Text(
+                                      '.',
+                                      style: TextStyle(
+                                        color: kVermilion,
+                                        fontSize: 21,
+                                        fontWeight: FontWeight.w900,
+                                        height: 0.9,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (!isCustomer &&
+                                    _tab < appTitles.length &&
+                                    appTitles[_tab].isNotEmpty)
+                                  Text(
+                                    appTitles[_tab],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: kMuted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          if (!isCustomer &&
-                              _tab < appTitles.length &&
-                              appTitles[_tab].isNotEmpty)
-                            Text(
-                              appTitles[_tab],
-                              style: TextStyle(
-                                fontSize: 12.0,
-                                color: kMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
                         ],
                       ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: localized(arabic, 'WhatsApp Assistant Bot',
-                            'مساعد حجزي · واتساب'),
-                        onPressed: () => _openWhatsAppChatbotSheet(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: kDarkMode.value
-                              ? const Color(0xFF162822)
-                              : kSurfaceTint,
-                          foregroundColor: kGreen,
+                    );
+                    return Row(
+                      children: [
+                        if (showDesktopNav) ...[
+                          brandLockup,
+                          const SizedBox(width: 24),
+                          _DesktopTopNavTabs(
+                            selectedIndex: _tab,
+                            arabic: arabic,
+                            bookingCount: bookingCount,
+                            onSelect: (index) {
+                              setState(() => _tab = index);
+                              if (index == 1 &&
+                                  (_customerSignedIn ||
+                                      _savedCustomerPhone.isNotEmpty ||
+                                      _savedCustomerEmail.isNotEmpty)) {
+                                unawaited(_syncAccountData());
+                              }
+                            },
+                          ),
+                          const Spacer(),
+                        ] else ...[
+                          Expanded(child: brandLockup),
+                          const SizedBox(width: 6),
+                        ],
+                        IconButton(
+                          tooltip: localized(arabic, 'WhatsApp Assistant Bot',
+                              'مساعد حجزي · واتساب'),
+                          onPressed: () {
+                            HagzyHaptics.light();
+                            _openWhatsAppChatbotSheet();
+                          },
+                          style: btnStyle,
+                          icon: const Icon(Icons.support_agent_rounded,
+                              size: 19),
                         ),
-                        icon: const Icon(Icons.support_agent_rounded, size: 20),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: kPanel,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: kBorder),
-                          boxShadow: HagzyTheme.softShadow,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            LanguageOption(
-                              label: 'EN',
-                              selected: _language == 'EN',
-                              onTap: () => _changeLanguage('EN'),
+                        SizedBox(width: narrow ? 4 : 8),
+                        if (narrow)
+                          HagzyTap(
+                            scaleDown: 0.95,
+                            haptic: HagzyHapticStyle.selection,
+                            onTap: () =>
+                                _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
+                            child: Container(
+                              height: 44,
+                              constraints: const BoxConstraints(minWidth: 44),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: kPanel,
+                                borderRadius: BorderRadius.circular(
+                                    HagzyTokens.radiusMedium),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Text(
+                                _language == 'AR' ? 'EN' : 'AR',
+                                style: hagzyMonoStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kInk,
+                                ),
+                              ),
                             ),
-                            LanguageOption(
-                              label: 'AR',
-                              selected: _language == 'AR',
-                              onTap: () => _changeLanguage('AR'),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: kPanel,
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusMedium),
+                              border: Border.all(color: kBorder),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      IconButton(
-                        tooltip: localized(
-                          arabic,
-                          kDarkMode.value ? 'Light Mode' : 'Dark Mode',
-                          kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
-                        ),
-                        onPressed: _toggleDarkMode,
-                        style: IconButton.styleFrom(
-                          backgroundColor: kDarkMode.value
-                              ? const Color(0xFF162822)
-                              : kSurfaceTint,
-                          foregroundColor:
-                              kDarkMode.value ? kGold : kGreen,
-                          side: BorderSide(color: kBorder),
-                        ),
-                        icon: HagzyThemeModeIcon(
-                          isDark: kDarkMode.value,
-                          size: 20,
-                        ),
-                      ),
-                      if (isCustomer) ...[
-                        const SizedBox(width: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                LanguageOption(
+                                  label: 'EN',
+                                  selected: _language == 'EN',
+                                  onTap: () => _changeLanguage('EN'),
+                                ),
+                                LanguageOption(
+                                  label: 'AR',
+                                  selected: _language == 'AR',
+                                  onTap: () => _changeLanguage('AR'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        SizedBox(width: narrow ? 4 : 8),
                         IconButton(
                           tooltip: localized(
                             arabic,
-                            _customerSignedIn ? 'My Profile' : 'Sign In',
-                            _customerSignedIn ? 'الملف الشخصي' : 'تسجيل الدخول',
+                            kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+                            kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
                           ),
                           onPressed: () {
-                            if (!_customerSignedIn) {
-                              setState(() => _browsingAsGuest = false);
-                            } else {
-                              setState(() => _tab = 2);
-                            }
+                            HagzyHaptics.selection();
+                            _toggleDarkMode();
                           },
-                          style: IconButton.styleFrom(
-                            backgroundColor: _tab == 2 ? kGreen : kSurfaceTint,
-                            foregroundColor:
-                                _tab == 2 ? Colors.white : kInk,
+                          style: btnStyle.copyWith(
+                            foregroundColor: WidgetStatePropertyAll(
+                              kDarkMode.value ? kVolt : kObsidian,
+                            ),
                           ),
-                          icon:
-                              _customerSignedIn && _savedCustomerName.isNotEmpty
-                                  ? Text(
-                                      _savedCustomerName
-                                          .trim()
-                                          .substring(0, 1)
-                                          .toUpperCase(),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 13,
-                                        color: _tab == 2
-                                            ? Colors.white
-                                            : kGreen,
-                                      ),
-                                    )
-                                  : const Icon(Icons.person_rounded, size: 20),
+                          icon: HagzyThemeModeIcon(
+                            isDark: kDarkMode.value,
+                            color: kDarkMode.value ? kVolt : kObsidian,
+                            size: 19,
+                          ),
                         ),
-                      ],
-                      const SizedBox(width: 10),
-                      if (!isCustomer && MediaQuery.sizeOf(context).width >= 840)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: HagzyTheme.obsidianGradient,
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: HagzyTheme.softShadow,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const LivePulseDot(color: kGreenLight, size: 6),
-                              const SizedBox(width: 8),
-                              Text(
-                                arabic
-                                    ? '${_venues.length} أماكن  ·  $bookingCount حجوزات'
-                                    : '${_venues.length} $venueLabel  ·  $bookingCount $bookingLabel',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800),
+                        if (isCustomer) ...[
+                          SizedBox(width: narrow ? 4 : 8),
+                          IconButton(
+                            tooltip: localized(
+                              arabic,
+                              _customerSignedIn ? 'My Profile' : 'Sign In',
+                              _customerSignedIn
+                                  ? 'الملف الشخصي'
+                                  : 'تسجيل الدخول',
+                            ),
+                            onPressed: () {
+                              HagzyHaptics.selection();
+                              if (!_customerSignedIn) {
+                                setState(() => _browsingAsGuest = false);
+                              } else {
+                                setState(() => _tab = 2);
+                              }
+                            },
+                            style: btnStyle.copyWith(
+                              backgroundColor: WidgetStatePropertyAll(
+                                _tab == 2 ? kAccentSurface : kPanel,
                               ),
-                            ],
+                              foregroundColor: WidgetStatePropertyAll(
+                                _tab == 2 ? kAccentOnSurface : kInk,
+                              ),
+                              side: WidgetStatePropertyAll(
+                                BorderSide(
+                                  color: _tab == 2 ? kAccentSurface : kBorder,
+                                ),
+                              ),
+                            ),
+                            icon: _customerSignedIn &&
+                                    _savedCustomerName.isNotEmpty
+                                ? Text(
+                                    _savedCustomerName
+                                        .trim()
+                                        .substring(0, 1)
+                                        .toUpperCase(),
+                                    style: hagzyMonoStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13.5,
+                                      color: _tab == 2
+                                          ? kAccentOnSurface
+                                          : kInk,
+                                    ),
+                                  )
+                                : const Icon(Icons.person_rounded, size: 19),
                           ),
-                        ),
+                        ],
+                        if (!isCustomer &&
+                            MediaQuery.sizeOf(context).width >= 840) ...[
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: kObsidian,
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusSmall + 2),
+                              border: Border.all(
+                                  color: kVolt.withValues(alpha: 0.35)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                LivePulseDot(color: kVolt, size: 6),
+                                const SizedBox(width: 8),
+                                Text(
+                                  arabic
+                                      ? '${_venues.length} أماكن  ·  $bookingCount حجوزات'
+                                      : '${_venues.length} $venueLabel  ·  $bookingCount $bookingLabel',
+                                  style: hagzyMonoStyle(
+                                      color: Colors.white,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      arabic: arabic),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       if (!isCustomer &&
                           !_isSingularPartner &&
                           _partnerRequests.any(
@@ -6139,10 +6221,15 @@ class _HagzyHomeState extends State<HagzyHome> {
                         const SizedBox(width: 6),
                         FilledButton.tonalIcon(
                           style: FilledButton.styleFrom(
-                            backgroundColor: kSurfaceTint,
-                            foregroundColor: kGreen,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                            backgroundColor: kSurfaceSubtle,
+                            foregroundColor: kInk,
+                            side: BorderSide(color: kBorder),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusSmall + 2),
+                            ),
                           ),
                           onPressed: () {
                             setState(() {
@@ -6151,10 +6238,13 @@ class _HagzyHomeState extends State<HagzyHome> {
                               _tab = 0;
                             });
                           },
-                          icon: const Icon(Icons.explore_rounded, size: 16),
+                          icon: Icon(Icons.explore_rounded,
+                              size: 16,
+                              color: kDarkMode.value ? kVolt : kObsidian),
                           label: Text(
                             localized(arabic, 'Customer App', 'تطبيق العملاء'),
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 12),
                           ),
                         ),
                         const SizedBox(width: 2),
@@ -6165,55 +6255,55 @@ class _HagzyHomeState extends State<HagzyHome> {
                         ),
                       ],
                     ],
-                  ),
+                    );
+                  }),
                 ),
-              ),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(1),
-                child: Divider(height: 1, thickness: 1, color: kBorder),
               ),
             ),
             body: HagzyAmbientBackground(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final maxWidth = constraints.maxWidth < 600 ? 480.0 : 1120.0;
+                  final showOwnerSidebar = !isCustomer &&
+                      constraints.maxWidth >= HagzyTokens.breakpointTablet;
+                  final maxWidth = constraints.maxWidth < 600
+                      ? 520.0
+                      : HagzyTokens.maxContentWidth;
                   final contentWidth = constraints.maxWidth < maxWidth
                       ? constraints.maxWidth
                       : maxWidth;
-                  return Center(
-                    child: SizedBox(
-                      width: contentWidth,
-                      height: constraints.maxHeight,
-                      child: Column(
-                        children: [
-                          if (_apiError != null || _isOffline)
-                            _buildOfflineOrErrorBanner(arabic),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 260),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                opacity: CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOutCubic,
-                                ),
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0.0, 0.02),
-                                    end: Offset.zero,
-                                  ).animate(CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOutCubic,
-                                  )),
-                                  child: child,
-                                ),
-                              ),
-                              child: KeyedSubtree(
-                                key: ValueKey<int>(_tab),
-                                child: isCustomer
-                                    ? switch (_tab) {
+
+                  final mainContent = Column(
+                    children: [
+                      if (_apiError != null || _isOffline)
+                        _buildOfflineOrErrorBanner(arabic),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: HagzyMotion.reduced(context)
+                              ? Duration.zero
+                              : HagzyTokens.durationMedium,
+                          switchInCurve: HagzyTokens.curveStandard,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: HagzyTokens.curveStandard,
+                            ),
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0.0, 0.015),
+                                end: Offset.zero,
+                              ).animate(CurvedAnimation(
+                                parent: animation,
+                                curve: HagzyTokens.curveStandard,
+                              )),
+                              child: child,
+                            ),
+                          ),
+                          child: KeyedSubtree(
+                            key: ValueKey<int>(_tab),
+                            child: isCustomer
+                                ? switch (_tab) {
                                         0 => BookTab(
                                             venues: _venues,
                                             bookings: _bookings,
@@ -6566,26 +6656,117 @@ class _HagzyHomeState extends State<HagzyHome> {
                             ),
                           ),
                         ],
-                      ),
+                      );
+
+                  if (showOwnerSidebar) {
+                    final sidebarItems = isPreview
+                        ? [
+                            HagzySideNavItem(
+                              icon: Icons.explore_rounded,
+                              label: localized(arabic, 'Explore', 'استكشف'),
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.storefront_rounded,
+                              label: _isSingularPartner
+                                  ? localized(arabic, 'My Venue', 'مكاني وملعبي')
+                                  : localized(arabic, 'Manage Venues',
+                                      'إدارة الأماكن والملاعب'),
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.view_timeline_rounded,
+                              label: localized(
+                                  arabic, 'POS timeline', 'المواعيد ونقاط البيع'),
+                              badgeCount: bookingCount,
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.insights_rounded,
+                              label: localized(
+                                  arabic, 'Analytics', 'الأرباح والتقارير'),
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.account_balance_wallet_rounded,
+                              label: localized(
+                                  arabic, 'Payment Settings', 'إعدادات الدفع'),
+                            ),
+                          ]
+                        : [
+                            HagzySideNavItem(
+                              icon: Icons.view_timeline_rounded,
+                              label: localized(
+                                  arabic, 'POS timeline', 'المواعيد ونقاط البيع'),
+                              badgeCount: bookingCount,
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.storefront_rounded,
+                              label: _isSingularPartner
+                                  ? localized(arabic, 'My Venue', 'مكاني وملعبي')
+                                  : localized(arabic, 'Manage Venues',
+                                      'إدارة الأماكن والملاعب'),
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.insights_rounded,
+                              label: localized(
+                                  arabic, 'Analytics', 'الأرباح والتقارير'),
+                            ),
+                            HagzySideNavItem(
+                              icon: Icons.account_balance_wallet_rounded,
+                              label: localized(
+                                  arabic, 'Payment Settings', 'إعدادات الدفع'),
+                            ),
+                          ];
+                    return Row(
+                      children: [
+                        HagzyDesktopSidebar(
+                          items: sidebarItems,
+                          selectedIndex: _tab,
+                          arabic: arabic,
+                          headerSubtitle: localized(
+                              arabic, 'Partner Workspace', 'لوحة إدارة الشريك'),
+                          onSelect: (index) => setState(() => _tab = index),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                  maxWidth: HagzyTokens.maxContentWidth),
+                              child: mainContent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Center(
+                    child: SizedBox(
+                      width: contentWidth,
+                      height: constraints.maxHeight,
+                      child: mainContent,
                     ),
                   );
                 },
               ),
             ),
-            bottomNavigationBar: FloatingDock(
-              selectedIndex: _tab,
-              customerMode: isCustomer,
-              previewMode: isPreview,
-              singularPartner: _isSingularPartner,
-              arabic: arabic,
-              badgeCount: bookingCount,
-              onDestinationSelected: (value) {
-                setState(() => _tab = value);
-                if (value == 1 && (_customerSignedIn || _savedCustomerPhone.isNotEmpty || _savedCustomerEmail.isNotEmpty)) {
-                  unawaited(_syncAccountData());
-                }
-              },
-            ),
+            bottomNavigationBar: MediaQuery.sizeOf(context).width >=
+                    HagzyTokens.breakpointTablet
+                ? null
+                : FloatingDock(
+                    selectedIndex: _tab,
+                    customerMode: isCustomer,
+                    previewMode: isPreview,
+                    singularPartner: _isSingularPartner,
+                    arabic: arabic,
+                    badgeCount: bookingCount,
+                    onDestinationSelected: (value) {
+                      setState(() => _tab = value);
+                      if (value == 1 &&
+                          (_customerSignedIn ||
+                              _savedCustomerPhone.isNotEmpty ||
+                              _savedCustomerEmail.isNotEmpty)) {
+                        unawaited(_syncAccountData());
+                      }
+                    },
+                  ),
           ),
         ),
       ),
@@ -6610,55 +6791,77 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Widget _buildAdminLogin() {
     final ar = _language == 'AR' || kAppLanguage.value == 'AR';
-    return Scaffold(
+    return Directionality(
+      textDirection: ar ? TextDirection.rtl : TextDirection.ltr,
+      child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: Text(localized(ar, 'Venue owner sign in', 'دخول أصحاب الأماكن والشركاء')),
+          title: Row(
+            children: [
+              const HagzyLogoMark(size: 34),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  localized(ar, 'Venue owner sign in', 'دخول أصحاب الأماكن والشركاء'),
+                  overflow: TextOverflow.ellipsis,
+                  style: hagzyTextStyle(
+                    arabic: ar,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, thickness: 1, color: kBorder),
+          ),
           actions: [
             IconButton(
               tooltip: ar ? 'English' : 'العربية',
               onPressed: () => _changeLanguage(_language == 'AR' ? 'EN' : 'AR'),
               style: IconButton.styleFrom(
-                backgroundColor: kDarkMode.value
-                    ? const Color(0xFF162822)
-                    : kSurfaceTint,
-                foregroundColor: kDarkMode.value ? kGold : kGreen,
+                backgroundColor: kPanel,
+                foregroundColor: kDarkMode.value ? kGold : kGreenDark,
                 side: BorderSide(color: kBorder),
               ),
               icon: Text(
                 _language == 'AR' ? 'EN' : 'عربي',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
               ),
             ),
             const SizedBox(width: 6),
             IconButton(
-              tooltip: kDarkMode.value ? (ar ? 'الوضع النهاري' : 'Light Mode') : (ar ? 'الوضع الليلي' : 'Dark Mode'),
+              tooltip: kDarkMode.value
+                  ? (ar ? 'الوضع النهاري' : 'Light Mode')
+                  : (ar ? 'الوضع الليلي' : 'Dark Mode'),
               onPressed: _toggleDarkMode,
               style: IconButton.styleFrom(
-                backgroundColor: kDarkMode.value
-                    ? const Color(0xFF162822)
-                    : kSurfaceTint,
-                foregroundColor: kDarkMode.value ? kGold : kGreen,
+                backgroundColor: kPanel,
+                foregroundColor: kDarkMode.value ? kGold : kGreenDark,
                 side: BorderSide(color: kBorder),
               ),
               icon: HagzyThemeModeIcon(
                 isDark: kDarkMode.value,
-                size: 20,
+                size: 19,
               ),
             ),
             const SizedBox(width: 6),
             TextButton.icon(
               onPressed: () => setState(() => _mode = 'customer'),
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
               label: Text(localized(ar, 'Customer Mode', 'تطبيق العملاء')),
             ),
+            const SizedBox(width: 8),
           ],
         ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: ListView(
-              padding: const EdgeInsets.all(24),
+        body: HagzyAmbientBackground(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: ListView(
+                padding: const EdgeInsets.all(24),
               children: [
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -6721,7 +6924,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Icon(Icons.hourglass_top_rounded,
+                                  Icon(Icons.hourglass_top_rounded,
                                       size: 36, color: kGreen),
                                   const SizedBox(height: 10),
                                   Text(
@@ -6790,7 +6993,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Icon(Icons.storefront_rounded,
+                                  Icon(Icons.storefront_rounded,
                                       size: 40, color: kGreen),
                                   const SizedBox(height: 12),
                                   Text(
@@ -6847,7 +7050,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _adminShowPasswordAuth = true;
                                       _loginError = null;
                                     }),
-                                    icon: const Icon(Icons.lock_outline_rounded, size: 16, color: kGreen),
+                                    icon: Icon(Icons.lock_outline_rounded, size: 16, color: kGreen),
                                     label: Text(
                                       localized(ar, 'Already an Owner? Sign in with Owner Password', 'لديك حساب بالفعل؟ الدخول بكلمة المرور'),
                                       style: const TextStyle(fontWeight: FontWeight.w700),
@@ -6961,16 +7164,19 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   const SizedBox(height: 14),
                                   FilledButton(
                                     style: FilledButton.styleFrom(
-                                      backgroundColor: kGreen,
-                                      foregroundColor: Colors.white,
+                                      backgroundColor: kAccentSurface,
+                                      foregroundColor: kAccentOnSurface,
                                       padding: const EdgeInsets.symmetric(vertical: 14),
                                     ),
                                     onPressed: _working ? null : _submitPartnerRequest,
                                     child: _working
-                                        ? const SizedBox(
+                                        ? SizedBox(
                                             height: 20,
                                             width: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: kAccentOnSurface,
+                                            ),
                                           )
                                         : Text(
                                             localized(ar, 'Submit Request for Verification', 'إرسال الطلب للاعتماد'),
@@ -7007,10 +7213,12 @@ class _HagzyHomeState extends State<HagzyHome> {
                         ] else if (!_adminShowPhoneAuth && !_adminShowPasswordAuth) ...[
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
-                              backgroundColor: kGreen,
-                              foregroundColor: Colors.white,
+                              backgroundColor: kAccentSurface,
+                              foregroundColor: kAccentOnSurface,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      HagzyTokens.radiusMedium)),
                             ),
                             onPressed: _working ? null : _loginAdminWithGoogle,
                             icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
@@ -7023,9 +7231,11 @@ class _HagzyHomeState extends State<HagzyHome> {
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: kInk,
-                              side: BorderSide(color: kBorder),
+                              side: BorderSide(color: kBorderStrong),
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      HagzyTokens.radiusMedium)),
                             ),
                             onPressed: _working
                                 ? null
@@ -7035,7 +7245,9 @@ class _HagzyHomeState extends State<HagzyHome> {
                                       _adminPhoneCodeSent = false;
                                       _loginError = null;
                                     }),
-                            icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: kGreen),
+                            icon: Icon(Icons.phone_iphone_rounded,
+                                size: 20,
+                                color: kDarkMode.value ? kVolt : kObsidian),
                             label: Text(
                               localized(ar, 'Continue with Email or Phone OTP', 'تسجيل الدخول بالهاتف أو البريد'),
                               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
@@ -7069,7 +7281,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.admin_panel_settings_rounded, color: kGreen, size: 20),
+                                    Icon(Icons.admin_panel_settings_rounded, color: kGreen, size: 20),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -7094,7 +7306,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: InputDecoration(
                                     labelText: localized(ar, 'Owner Email', 'البريد الإلكتروني للمدير'),
-                                    prefixIcon: const Icon(Icons.email_outlined, color: kGreen, size: 20),
+                                    prefixIcon: Icon(Icons.email_outlined, color: kGreen, size: 20),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                 ),
@@ -7104,7 +7316,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                   obscureText: !_showAdminPassword,
                                   decoration: InputDecoration(
                                     labelText: localized(ar, 'Password', 'كلمة المرور'),
-                                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: kGreen, size: 20),
+                                    prefixIcon: Icon(Icons.lock_outline_rounded, color: kGreen, size: 20),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _showAdminPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -7163,7 +7375,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.verified_user_rounded, color: kGreen, size: 20),
+                                    Icon(Icons.verified_user_rounded, color: kGreen, size: 20),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -7193,7 +7405,7 @@ class _HagzyHomeState extends State<HagzyHome> {
                                     decoration: InputDecoration(
                                       labelText: localized(ar, 'Email or Phone Number', 'البريد الإلكتروني أو رقم الهاتف'),
                                       hintText: localized(ar, 'owner@venue.com or 010XXXXXXXX', '010XXXXXXXX أو owner@venue.com'),
-                                      prefixIcon: const Icon(Icons.alternate_email_rounded, color: kGreen, size: 20),
+                                      prefixIcon: Icon(Icons.alternate_email_rounded, color: kGreen, size: 20),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
@@ -7298,18 +7510,28 @@ class _HagzyHomeState extends State<HagzyHome> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
+                              color: kDarkMode.value
+                                  ? kError.withValues(alpha: 0.14)
+                                  : const Color(0xFFFEF2F2),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                              border: Border.all(
+                                color: kDarkMode.value
+                                    ? kError.withValues(alpha: 0.45)
+                                    : const Color(0xFFFCA5A5),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline_rounded, color: Color(0xFFB91C1C), size: 20),
+                                Icon(Icons.error_outline_rounded,
+                                    color: kError, size: 20),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     _loginError!,
-                                    style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                        color: kError,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600),
                                   ),
                                 ),
                               ],
@@ -7357,6 +7579,109 @@ class _HagzyHomeState extends State<HagzyHome> {
             ),
           ),
         ),
-      );
+      ),
+    ),
+    );
+  }
+}
+
+/// Clean desktop navigation tabs (>= 900px) without synthetic numeric prefixes.
+class _DesktopTopNavTabs extends StatelessWidget {
+  const _DesktopTopNavTabs({
+    required this.selectedIndex,
+    required this.arabic,
+    required this.bookingCount,
+    required this.onSelect,
+  });
+
+  final int selectedIndex;
+  final bool arabic;
+  final int bookingCount;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.explore_rounded, localized(arabic, 'Explore', 'استكشف'), 0),
+      (
+        Icons.calendar_month_rounded,
+        localized(arabic, 'Bookings', 'حجوزاتي'),
+        bookingCount
+      ),
+      (Icons.person_outline_rounded, localized(arabic, 'Profile', 'حسابي'), 0),
+    ];
+
+    return SizedBox(
+      width: 360,
+      height: 44,
+      child: HagzySlidingSelector(
+        padding: const EdgeInsets.all(3),
+        itemCount: items.length,
+        selectedIndex: selectedIndex,
+        trackDecoration: BoxDecoration(
+          color: kSurfaceSubtle,
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+        ),
+        indicatorDecoration: BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall - 1),
+          boxShadow: HagzyTheme.subtleShadow,
+        ),
+        itemBuilder: (context, i, selected) {
+          final item = items[i];
+          return HagzyTap(
+            scaleDown: 0.96,
+            haptic: HagzyHapticStyle.selection,
+            onTap: () => onSelect(i),
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    item.$1,
+                    size: 16,
+                    color: selected ? kBrandAccent : kMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      item.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600,
+                        color: selected ? kInk : kMuted,
+                      ),
+                    ),
+                  ),
+                  if (item.$3 > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: kVermilion,
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusFull),
+                      ),
+                      child: Text(
+                        '${item.$3}',
+                        style: hagzyMonoStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

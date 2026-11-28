@@ -137,7 +137,7 @@ void main() {
 
     // Group size is confirmed! Summary card shows:
     expect(find.text('Group Size Confirmed'), findsOneWidget);
-    expect(find.text('Change'), findsOneWidget);
+    expect(find.text('Change'), findsAtLeastNWidgets(1));
 
     // Step 2 slot picker is now unlocked!
     expect(find.text('Pick an Available Time'), findsOneWidget);

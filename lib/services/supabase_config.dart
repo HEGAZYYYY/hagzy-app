@@ -26,7 +26,7 @@ Future<void> initHagzySupabase() async {
     );
     _supabaseReady = true;
   } catch (e) {
-    debugPrint('Supabase init notice: $e');
+    if (kDebugMode) debugPrint('Supabase init notice: $e');
   }
 }
 

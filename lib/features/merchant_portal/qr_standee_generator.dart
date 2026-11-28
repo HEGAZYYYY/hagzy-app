@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/models/models_v2.dart';
+import '../../widgets/common_widgets.dart';
 
 String resolveVenueBookingUrl(String venueId) {
   const envUrl = String.fromEnvironment('HAGZY_PUBLIC_URL');
@@ -72,22 +73,15 @@ class QrStandeeGenerator extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Top Brand Header
-                Row(
+                const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.flash_on_rounded, color: Colors.amber, size: 20),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
+                    HagzyLogoMark(size: 32),
+                    SizedBox(width: 10),
+                    Text(
                       'HAGZY • حِجْزِي',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Color(0xFF0B131E),
                         fontWeight: FontWeight.w900,
                         fontSize: 17,
                         letterSpacing: 0.8,

@@ -231,7 +231,7 @@ void main() {
     await tester.tap(find.text('Pay later'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('My Bookings').last);
+    await tester.tap(find.text('Bookings').last);
     await tester.pumpAndSettle();
     expect(find.text('Nile Padel'), findsOneWidget);
     expect(find.textContaining('not confirmed'), findsOneWidget);
@@ -264,24 +264,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Gaming & Tables'),
-      200,
-      scrollable: find
-          .byWidgetPredicate(
-            (widget) =>
-                widget is Scrollable &&
-                widget.axisDirection == AxisDirection.down,
-          )
-          .first,
-    );
-    await tester.scrollUntilVisible(
-      find.text('Gaming & Tables'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.text('Entertainment'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gaming & Tables'));
+    await tester.tap(find.text('Entertainment'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('No Places Found Here'),
@@ -312,14 +297,14 @@ void main() {
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Find your next favorite'), findsOneWidget);
+    expect(find.text('Book your next spot'), findsOneWidget);
     expect(find.text('Venue owner'), findsNothing);
     expect(find.text('Continue as admin'), findsNothing);
     expect(find.text('Manage'), findsNothing);
     expect(find.text('POS'), findsNothing);
     expect(find.text('Payments'), findsNothing);
 
-    await tester.tap(find.text('My Bookings'));
+    await tester.tap(find.text('Bookings'));
     await tester.pumpAndSettle();
     expect(find.text('Your Bookings'), findsOneWidget);
 
@@ -337,7 +322,7 @@ void main() {
     await tester.tap(find.text('Payment Settings'));
     await tester.pumpAndSettle();
     expect(find.text('Payments, Gateway & Review Queue'), findsOneWidget);
-    expect(find.textContaining('payment oracle'), findsOneWidget);
+    expect(find.textContaining('automatic wallet transfers'), findsOneWidget);
   });
 
   testWidgets(
@@ -345,19 +330,16 @@ void main() {
       (tester) async {
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Gaming & Tables'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Gaming & Tables'));
+    await tester.ensureVisible(find.text('Entertainment'));
+    await tester.tap(find.text('Entertainment'));
     await tester.pumpAndSettle();
     await tester.drag(
       find.byType(Scrollable).first,
       const Offset(0, 1600),
     );
     await tester.pumpAndSettle();
-    expect(find.text('PS5 VIP Rooms, Billiards & Ping Pong'), findsOneWidget);
+    expect(find.text('PS5 rooms, billiards, ping pong & escape rooms'),
+        findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('No Places Found Here'),
       200,
@@ -372,12 +354,8 @@ void main() {
     await tester.pumpWidget(const HagzyApp(adminMode: true));
     await tester.pumpAndSettle();
     await enterAdminPreview(tester);
-    await tester.scrollUntilVisible(
-      find.text('Gaming & Tables'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Gaming & Tables'));
+    await tester.ensureVisible(find.text('Entertainment'));
+    await tester.tap(find.text('Entertainment'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.textContaining('Add New Venue'),
@@ -405,10 +383,10 @@ void main() {
 
     expect(find.text('حجزي'), findsOneWidget);
     expect(find.text('Hagzy · حجزي'), findsNothing);
-    expect(find.text('استكشف التصنيفات'), findsOneWidget);
-    expect(find.text('Explore Categories'), findsNothing);
+    expect(find.text('احجز مكانك في لحظة'), findsOneWidget);
+    expect(find.text('Book your next spot'), findsNothing);
     expect(
-      Directionality.of(tester.element(find.text('استكشف التصنيفات'))),
+      Directionality.of(tester.element(find.text('احجز مكانك في لحظة'))),
       TextDirection.rtl,
     );
 
@@ -451,7 +429,7 @@ void main() {
     });
     await tester.pumpWidget(const HagzyApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('My Bookings'));
+    await tester.tap(find.text('Bookings'));
     await tester.pumpAndSettle();
 
     expect(find.text('Expired Customer'), findsNothing);
@@ -581,7 +559,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open My Bookings and submit InstaPay transfer reference
-    await tester.tap(find.text('My Bookings'));
+    await tester.tap(find.text('Bookings'));
     await tester.pumpAndSettle();
     expect(find.text('Cairo Padel Arena'), findsOneWidget);
     await tester.ensureVisible(find.textContaining('Pay Deposit'));
@@ -683,7 +661,7 @@ void main() {
     expect(find.text('Choose Your Space'), findsOneWidget);
 
     // 2. Switch to My Bookings
-    await tester.tap(find.text('My Bookings'));
+    await tester.tap(find.text('Bookings'));
     await tester.pumpAndSettle();
 
     expect(find.text('Giza Sports Hub'), findsOneWidget);

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -126,7 +125,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
       onProceedToPayment: (amount) async {
         await Navigator.push<bool>(
           context,
-          MaterialPageRoute(
+          hagzyPageRoute(
             builder: (ctx) => UnifiedPaymentScreen(
               bookingId:
                   'wallet_topup_${DateTime.now().millisecondsSinceEpoch}',
@@ -230,7 +229,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = friendlyError(e, arabic: widget.arabic);
         });
       }
     }
@@ -249,442 +248,230 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   Widget build(BuildContext context) {
     final arabic = widget.arabic;
     final signedIn = widget.isSignedIn;
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
 
-    return ListView(
-      // ignore: deprecated_member_use
-      cacheExtent: 3000,
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-      children: [
-        // Top Profile Card
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: kPanel,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: kBorder),
-            boxShadow: HagzyTheme.softShadow,
-          ),
-          child: Column(
+    // Clean Warm Consumer Profile Card
+    final profileHeaderCard = Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+        border: Border.all(color: kBorder, width: 1.0),
+        boxShadow: HagzyTheme.subtleShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      gradient: HagzyTheme.brandGradient,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: kGreen.withValues(alpha: 0.35),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: kVermilion,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: widget.customerName.trim().isNotEmpty
+                      ? Text(
+                          _getInitials(widget.customerName),
+                          style: hagzyDisplayStyle(
+                            arabic: false,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 27,
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: widget.customerName.trim().isNotEmpty
-                          ? Text(
-                              _getInitials(widget.customerName),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 22,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                !signedIn
-                                    ? localized(
-                                        arabic, 'Guest Visitor', 'تصفح كضيف')
-                                    : (widget.customerName.isNotEmpty
-                                        ? widget.customerName
-                                        : localized(arabic, 'Hagzy Member',
-                                            'عضو حجزي')),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 18,
-                                  color: kInk,
-                                  letterSpacing: -0.3,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        Flexible(
+                          child: Text(
+                            !signedIn
+                                ? localized(
+                                    arabic, 'Guest Visitor', 'تصفح كضيف')
+                                : (widget.customerName.isNotEmpty
+                                    ? widget.customerName
+                                    : localized(
+                                        arabic, 'Hagzy Member', 'عضو حجزي')),
+                            style: hagzyDisplayStyle(
+                              arabic: arabic,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 21,
+                              color: kInk,
+                              letterSpacing: -0.35,
                             ),
-                            if (signedIn) ...[
-                              const SizedBox(width: 6),
-                              const Icon(
-                                Icons.verified_rounded,
-                                color: kGreen,
-                                size: 18,
-                              ),
-                            ],
-                          ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        if (signedIn &&
-                            (widget.customerName.trim().isEmpty ||
-                                widget.customerName.trim().toLowerCase() == 'customer' ||
-                                widget.customerName.trim().toLowerCase() == 'hagzy member')) ...[
-                          const SizedBox(height: 3),
-                          InkWell(
-                            onTap: () => setState(() => _isEditing = true),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.edit_note_rounded,
-                                      size: 16, color: kGreen),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    localized(arabic, 'Tap to set your full name',
-                                        'اضغط لإضافة اسمك بالكامل'),
-                                    style: const TextStyle(
-                                      color: kGreen,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        if (signedIn) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.verified_rounded,
+                            color: kBrandAccent,
+                            size: 18,
                           ),
                         ],
-                        const SizedBox(height: 4),
-                        Text(
-                          !signedIn
-                              ? localized(
-                                  arabic,
-                                  'Sign in to sync bookings & wallet',
-                                  'سجل الدخول لمزامنة الحجوزات والمحفظة',
-                                )
-                              : (widget.customerEmail.isNotEmpty
-                                  ? widget.customerEmail
-                                  : (widget.customerPhone.isNotEmpty
-                                      ? widget.customerPhone
-                                      : localized(
-                                          arabic,
-                                          'Verified Hagzy Account',
-                                          'حساب حجزي موثق',
-                                        ))),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: kInk,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                       ],
                     ),
-                  ),
-                  if (signedIn)
-                    IconButton(
-                      tooltip: localized(
-                        arabic,
-                        _isEditing ? 'Cancel Edit' : 'Edit Profile',
-                        _isEditing ? 'إلغاء التعديل' : 'تعديل البيانات',
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: kSurfaceTint,
-                        foregroundColor: kInk,
-                      ),
-                      icon: Icon(
-                        _isEditing ? Icons.close : Icons.edit_outlined,
-                        size: 18,
-                      ),
-                      onPressed: () => setState(() {
-                        _isEditing = !_isEditing;
-                        _errorMessage = null;
-                      }),
-                    )
-                  else if (widget.onGoToSignIn != null)
-                    TextButton(
-                      onPressed: widget.onGoToSignIn,
-                      child: Text(
-                        localized(arabic, 'Sign In', 'دخول'),
-                        style: const TextStyle(
-                          color: kGreen,
-                          fontWeight: FontWeight.w800,
+                    if (signedIn &&
+                        (widget.customerName.trim().isEmpty ||
+                            widget.customerName.trim().toLowerCase() ==
+                                'customer' ||
+                            widget.customerName.trim().toLowerCase() ==
+                                'hagzy member')) ...[
+                      const SizedBox(height: 3),
+                      InkWell(
+                        onTap: () => setState(() => _isEditing = true),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_note_rounded,
+                                  size: 16, color: kBrandAccent),
+                              const SizedBox(width: 4),
+                              Text(
+                                localized(arabic, 'Tap to set your full name',
+                                    'اضغط لإضافة اسمك بالكامل'),
+                                style: TextStyle(
+                                  color: kBrandAccent,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              if (signedIn && !_isEditing) ...[
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 14),
-                // Quick info pills
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (widget.customerPhone.isNotEmpty)
-                      _InfoChip(
-                        icon: Icons.phone_android_rounded,
-                        label: widget.customerPhone,
+                    ],
+                    const SizedBox(height: 3),
+                    Text(
+                      !signedIn
+                          ? localized(
+                              arabic,
+                              'Sign in to sync bookings & wallet',
+                              'سجل الدخول لمزامنة الحجوزات والمحفظة',
+                            )
+                          : (widget.customerEmail.isNotEmpty
+                              ? widget.customerEmail
+                              : (widget.customerPhone.isNotEmpty
+                                  ? widget.customerPhone
+                                  : localized(
+                                      arabic,
+                                      'Verified Hagzy Account',
+                                      'حساب حجزي موثق',
+                                    ))),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: kMuted,
+                        fontWeight: FontWeight.w500,
                       ),
-                    if (widget.customerEmail.isNotEmpty)
-                      _InfoChip(
-                        icon: Icons.email_outlined,
-                        label: widget.customerEmail,
-                      ),
-                    if (widget.customerEmail
-                            .endsWith('@privaterelay.appleid.com') ||
-                        widget.customerEmail.endsWith('@icloud.com'))
-                      const _InfoChip(
-                        icon: Icons.apple,
-                        label: 'Apple ID',
-                      )
-                    else if (widget.customerEmail.endsWith('@gmail.com') ||
-                        widget.customerEmail.endsWith('@google.com'))
-                      _InfoChip(
-                        icon: Icons.g_mobiledata_rounded,
-                        label: localized(arabic, 'Google Account', 'حساب جوجل'),
-                      ),
-                    _InfoChip(
-                      icon: Icons.location_on_rounded,
-                      label: governorateName(widget.currentArea, arabic),
-                    ),
-                    _InfoChip(
-                      icon: Icons.cloud_done_rounded,
-                      label:
-                          localized(arabic, 'Cloud Synced', 'متزامن سحابياً'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
-              ],
+              ),
+              if (signedIn)
+                IconButton(
+                  tooltip: localized(
+                    arabic,
+                    _isEditing ? 'Cancel Edit' : 'Edit Profile',
+                    _isEditing ? 'إلغاء التعديل' : 'تعديل البيانات',
+                  ),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    backgroundColor: kSurfaceSubtle,
+                    foregroundColor: kInk,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(HagzyTokens.radiusMedium),
+                    ),
+                  ),
+                  icon: Icon(
+                    _isEditing ? Icons.close : Icons.edit_outlined,
+                    size: 19,
+                  ),
+                  onPressed: () {
+                    HagzyHaptics.selection();
+                    setState(() {
+                      _isEditing = !_isEditing;
+                      _errorMessage = null;
+                    });
+                  },
+                ),
             ],
           ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Edit Profile Form Card (only shown when editing profile details)
-        if (_isEditing) ...[
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: kPanel,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: kBorder),
-              boxShadow: HagzyTheme.softShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (signedIn && !_isEditing) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: kGreen.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.badge_outlined,
-                        color: kGreen,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        localized(
-                            arabic, 'Edit Your Profile', 'تعديل بيانات حسابك'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: kInk,
-                        ),
-                      ),
-                    ),
-                  ],
+                if (widget.customerPhone.isNotEmpty)
+                  _InfoChip(
+                    icon: Icons.phone_android_rounded,
+                    label: widget.customerPhone,
+                  ),
+                if (widget.customerEmail.isNotEmpty)
+                  _InfoChip(
+                    icon: Icons.email_outlined,
+                    label: widget.customerEmail,
+                  ),
+                if (widget.customerEmail.endsWith('@privaterelay.appleid.com') ||
+                    widget.customerEmail.endsWith('@icloud.com'))
+                  const _InfoChip(
+                    icon: Icons.apple,
+                    label: 'Apple ID',
+                  )
+                else if (widget.customerEmail.endsWith('@gmail.com') ||
+                    widget.customerEmail.endsWith('@google.com'))
+                  _InfoChip(
+                    icon: Icons.g_mobiledata_rounded,
+                    label: localized(arabic, 'Google Account', 'حساب جوجل'),
+                  ),
+                _InfoChip(
+                  icon: Icons.location_on_rounded,
+                  label: governorateName(widget.currentArea, arabic),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _nameController,
-                  textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
-                  decoration: InputDecoration(
-                    labelText: localized(arabic, 'Full Name (optional)',
-                        'الاسم بالكامل (اختياري)'),
-                    hintText: localized(
-                        arabic, 'e.g. Mohamed Hegazy', 'مثال: محمد حجازي'),
-                    prefixIcon: const Icon(Icons.person_outline_rounded),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  textDirection: TextDirection.ltr,
-                  decoration: InputDecoration(
-                    labelText:
-                        localized(arabic, 'Phone Number', 'رقم الموبايل'),
-                    hintText: '010XXXXXXXX / 011XXXXXXXX',
-                    prefixIcon: const Icon(Icons.phone_android_rounded),
-                    helperText: localized(
-                      arabic,
-                      'Enter 11-digit Egyptian mobile number',
-                      'أدخل رقم موبايل مصري مكون من 11 رقماً',
-                    ),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textDirection: TextDirection.ltr,
-                  decoration: InputDecoration(
-                    labelText: localized(arabic, 'Email Address (optional)',
-                        'البريد الإلكتروني (اختياري)'),
-                    hintText: 'name@example.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    isDense: true,
-                  ),
-                ),
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline,
-                            size: 16, color: Colors.redAccent),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                PressableScale(
-                  onTap: _loading ? null : _submitProfileUpdate,
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: HagzyTheme.brandGradient,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: kGreen.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: _loading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white),
-                              ),
-                            )
-                          : Text(
-                              localized(
-                                arabic,
-                                'Save Profile Changes',
-                                'حفظ التعديلات',
-                              ),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14.5,
-                              ),
-                            ),
-                    ),
-                  ),
+                _InfoChip(
+                  icon: Icons.cloud_done_rounded,
+                  label: localized(arabic, 'Cloud Synced', 'متزامن سحابياً'),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // Stats & Quick Performed Actions
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                icon: Icons.calendar_month_rounded,
-                title: '${widget.bookingCount}',
-                subtitle: localized(arabic, 'Bookings', 'حجوزات'),
-                onTap: widget.onViewBookings,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatCard(
-                icon: Icons.account_balance_wallet_rounded,
-                title:
-                    '${widget.walletBalance.toStringAsFixed(0)} ${localized(arabic, 'EGP', 'ج.م')}',
-                subtitle: localized(arabic, 'Wallet', 'المحفظة'),
-                badge: signedIn ? localized(arabic, 'Top Up', 'شحن') : null,
-                onTap: signedIn
-                    ? () => _topUpWalletDialog(widget.walletBalance)
-                    : widget.onGoToSignIn,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatCard(
-                icon: Icons.my_location_rounded,
-                title: governorateName(widget.currentArea, arabic),
-                subtitle: localized(arabic, 'My Area', 'محافظتي'),
-                onTap: widget.onSelectArea,
-              ),
-            ),
           ],
-        ),
+        ],
+      ),
+    );
 
-        const SizedBox(height: 16),
-
-        // Settings & Options Card
+    final settingsAndActions = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Clean Grouped Settings Card
         Container(
           decoration: BoxDecoration(
-            color: kDarkMode.value ? const Color(0xFF111B17) : kPanel,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-                color: kDarkMode.value ? const Color(0xFF1F352D) : kBorder),
-            boxShadow: HagzyTheme.softShadow,
+            color: kPanel,
+            borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+            border: Border.all(color: kBorder, width: 1.0),
+            boxShadow: HagzyTheme.subtleShadow,
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
               _SettingTile(
@@ -697,18 +484,22 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 ),
                 title: localized(arabic, 'Dark Mode', 'الوضع الليلي'),
                 subtitle: kDarkMode.value
-                    ? localized(arabic, 'Enabled (Obsidian Emerald)',
-                        'مُفعّل (مريح للعين)')
-                    : localized(
-                        arabic, 'Light Mode Active', 'الوضع النهاري مُفعّل'),
+                    ? localized(arabic, 'On', 'مُفعّل')
+                    : localized(arabic, 'Off', 'الوضع النهاري'),
                 trailing: Switch.adaptive(
                   value: kDarkMode.value,
-                  activeThumbColor: kGreenLight,
-                  onChanged: (_) => widget.onToggleDarkMode?.call(),
+                  activeThumbColor: kVermilion,
+                  onChanged: (_) {
+                    HagzyHaptics.selection();
+                    widget.onToggleDarkMode?.call();
+                  },
                 ),
-                onTap: widget.onToggleDarkMode,
+                onTap: () {
+                  HagzyHaptics.selection();
+                  widget.onToggleDarkMode?.call();
+                },
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, indent: 64),
               _SettingTile(
                 icon: Icons.language_rounded,
                 title: localized(arabic, 'Language', 'اللغة'),
@@ -717,28 +508,22 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: kDarkMode.value
-                        ? const Color(0xFF162822)
-                        : kSurfaceTint,
+                    color: kSurfaceTint,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                        color: kDarkMode.value
-                            ? const Color(0xFF1F352D)
-                            : kBorder),
+                    border: Border.all(color: kBorder),
                   ),
                   child: Text(
                     arabic ? 'English' : 'عربي',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
-                      color:
-                          kDarkMode.value ? const Color(0xFFF8FAFC) : kInk,
+                      color: kInk,
                     ),
                   ),
                 ),
                 onTap: widget.onChangeLanguage,
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, indent: 64),
               _SettingTile(
                 icon: Icons.location_city_rounded,
                 title: localized(
@@ -753,17 +538,16 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                         'Detect nearest area via GPS',
                         'تحديد تلقائي عبر GPS',
                       ),
-                      icon: const Icon(Icons.my_location_rounded,
-                          color: kGreen, size: 20),
+                      icon: Icon(Icons.my_location_rounded,
+                          color: kBrandAccent, size: 20),
                       onPressed: widget.onAutoAssignGps,
                     ),
-                    Icon(Icons.arrow_forward_ios_rounded,
-                        size: 14, color: kMuted),
+                    const HagzyDirectionalChevron(size: 18),
                   ],
                 ),
                 onTap: widget.onSelectArea,
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, indent: 64),
               _SettingTile(
                 icon: Icons.mark_chat_read_rounded,
                 title: localized(
@@ -773,29 +557,60 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   'Instant confirmations & calendar reminders',
                   'تأكيدات فورية وتذكيرات بالمواعيد',
                 ),
-                trailing: const Icon(
+                trailing: Icon(
                   Icons.check_circle_rounded,
-                  color: kGreen,
+                  color: kSuccess,
                   size: 20,
                 ),
                 onTap: () => _showWhatsAppUpdatesModal(context, arabic),
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, indent: 64),
               _SettingTile(
                 icon: Icons.verified_user_outlined,
                 title:
                     localized(arabic, 'Privacy & Security', 'الخصوصية والأمان'),
                 subtitle: localized(
                   arabic,
-                  'End-to-end payment protection & verified bookings',
-                  'حماية كاملة للمدفوعات وحجز مؤكد',
+                  'Payment protection, Privacy Policy & Terms',
+                  'حماية المدفوعات، سياسة الخصوصية والشروط',
                 ),
-                trailing: Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: kMuted),
+                trailing: const HagzyDirectionalChevron(size: 18),
                 onTap: () => _showPrivacySecurityModal(context, arabic),
               ),
+              const Divider(height: 1, indent: 64),
+              _SettingTile(
+                icon: Icons.description_outlined,
+                title: localized(arabic, 'Privacy Policy', 'سياسة الخصوصية'),
+                subtitle: localized(
+                  arabic,
+                  'How Hagzy protects your data',
+                  'كيف يحمي تطبيق حجزي بياناتك',
+                ),
+                trailing: const HagzyDirectionalChevron(size: 18),
+                onTap: () => _showLegalDocumentViewer(
+                  context,
+                  arabic: arabic,
+                  isPrivacy: true,
+                ),
+              ),
+              const Divider(height: 1, indent: 64),
+              _SettingTile(
+                icon: Icons.gavel_rounded,
+                title: localized(arabic, 'Terms of Service', 'شروط الاستخدام'),
+                subtitle: localized(
+                  arabic,
+                  'Booking holds, cancellations & guidelines',
+                  'سياسات الحجز والإلغاء والاستخدام',
+                ),
+                trailing: const HagzyDirectionalChevron(size: 18),
+                onTap: () => _showLegalDocumentViewer(
+                  context,
+                  arabic: arabic,
+                  isPrivacy: false,
+                ),
+              ),
               if (widget.onSwitchToAdmin != null) ...[
-                const Divider(height: 1),
+                const Divider(height: 1, indent: 64),
                 _SettingTile(
                   icon: Icons.storefront_rounded,
                   title: localized(
@@ -805,40 +620,61 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     'Manage your venue or request partner access',
                     'إدارة مكانك أو طلب الانضمام كشريك',
                   ),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded,
-                      size: 14, color: kGreen),
+                  trailing: HagzyDirectionalChevron(
+                      size: 18, color: kBrandAccent),
                   onTap: widget.onSwitchToAdmin,
                 ),
               ],
             ],
           ),
         ),
+      ],
+    );
 
-        const SizedBox(height: 16),
-        if (!signedIn) ...[
-          Container(
+    final statsRow = Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            icon: Icons.calendar_month_rounded,
+            title: '${widget.bookingCount}',
+            subtitle: localized(arabic, 'Bookings', 'حجوزات'),
+            onTap: widget.onViewBookings,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.account_balance_wallet_rounded,
+            title:
+                '${widget.walletBalance.toStringAsFixed(0)} ${localized(arabic, 'EGP', 'ج.م')}',
+            subtitle: localized(arabic, 'Wallet', 'المحفظة'),
+            badge: signedIn ? localized(arabic, 'Top Up', 'شحن') : null,
+            onTap: signedIn
+                ? () => _topUpWalletDialog(widget.walletBalance)
+                : widget.onGoToSignIn,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.my_location_rounded,
+            title: governorateName(widget.currentArea, arabic),
+            subtitle: localized(arabic, 'My Area', 'محافظتي'),
+            onTap: widget.onSelectArea,
+          ),
+        ),
+      ],
+    );
+
+    final passportSection = !signedIn
+        ? HagzySurfaceCard(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: kDarkMode.value ? const Color(0xFF111B17) : kPanel,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                  color: kDarkMode.value ? const Color(0xFF1F352D) : kBorder),
-              boxShadow: HagzyTheme.softShadow,
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: kGreen.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.verified_user_rounded,
-                          color: kGreen, size: 22),
-                    ),
+                    const IconBox(icon: Icons.verified_user_rounded),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -851,7 +687,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               'سجّل الدخول لتفعيل جواز السفر والمحفظة',
                             ),
                             style: TextStyle(
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                               fontSize: 15,
                               color: kInk,
                             ),
@@ -875,87 +711,139 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                   FilledButton.icon(
                     onPressed: widget.onGoToSignIn,
                     icon: const Icon(Icons.login_rounded, size: 18),
-                    label: Text(localized(
-                        arabic, 'Sign In / Create Account', 'تسجيل الدخول / إنشاء حساب')),
+                    label: Text(localized(arabic, 'Sign In / Create Account',
+                        'تسجيل الدخول / إنشاء حساب')),
                   ),
                 ],
               ],
             ),
-          ),
-        ] else ...[
-          UserReliabilityPassportCard(
-            profile: UserProfile(
-              id: widget.customerPhone.isNotEmpty
-                  ? widget.customerPhone
-                  : 'member',
-              phoneNumber: widget.customerPhone.isNotEmpty
-                  ? widget.customerPhone
-                  : '01000000000',
-              displayName: widget.customerName.isNotEmpty
-                  ? widget.customerName
-                  : 'Hagzy Member',
-              city: widget.currentArea,
-              completedBookingsCount: widget.bookingCount,
-              reliabilityScore: widget.bookingCount == 0
-                  ? 85.0
-                  : (85.0 + (widget.bookingCount * 5.0)).clamp(85.0, 100.0),
-              hagzyWalletBalance: widget.walletBalance,
-              badges: [
-                if (widget.bookingCount >= 1) 'reliable',
-                if (widget.bookingCount >= 3) 'shilla_leader',
-                if (widget.bookingCount >= 5) 'gamer_vip',
-              ],
-              createdAt: DateTime(2026, 1, 1),
-            ),
-            isArabic: arabic,
-            onTopUpTap: () => _topUpWalletDialog(widget.walletBalance),
-          ),
-          const SizedBox(height: 12),
-          CrossCategoryVouchersCarousel(
-            isArabic: arabic,
-          ),
-        ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              UserReliabilityPassportCard(
+                profile: UserProfile(
+                  id: widget.customerPhone.isNotEmpty
+                      ? widget.customerPhone
+                      : 'member',
+                  phoneNumber: widget.customerPhone.isNotEmpty
+                      ? widget.customerPhone
+                      : '01000000000',
+                  displayName: widget.customerName.isNotEmpty
+                      ? widget.customerName
+                      : 'Hagzy Member',
+                  city: widget.currentArea,
+                  completedBookingsCount: widget.bookingCount,
+                  reliabilityScore: widget.bookingCount == 0
+                      ? 85.0
+                      : (85.0 + (widget.bookingCount * 5.0)).clamp(85.0, 100.0),
+                  hagzyWalletBalance: widget.walletBalance,
+                  badges: [
+                    if (widget.bookingCount >= 1) 'reliable',
+                    if (widget.bookingCount >= 3) 'shilla_leader',
+                    if (widget.bookingCount >= 5) 'gamer_vip',
+                  ],
+                  createdAt: DateTime(2026, 1, 1),
+                ),
+                isArabic: arabic,
+                onTopUpTap: () => _topUpWalletDialog(widget.walletBalance),
+              ),
+              const SizedBox(height: 12),
+              CrossCategoryVouchersCarousel(
+                isArabic: arabic,
+              ),
+            ],
+          );
 
+    return ListView(
+      // ignore: deprecated_member_use
+      cacheExtent: 3000,
+      controller: _scrollController,
+      padding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 16,
+        isWide ? 18 : 12,
+        isWide ? 24 : 16,
+        isWide ? 48 : 104,
+      ),
+      children: [
+        if (isWide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    profileHeaderCard,
+                    const SizedBox(height: 16),
+                    statsRow,
+                    const SizedBox(height: 16),
+                    passportSection,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_isEditing) ...[
+                      _buildEditProfileCard(arabic),
+                      const SizedBox(height: 16),
+                    ],
+                    settingsAndActions,
+                  ],
+                ),
+              ),
+            ],
+          )
+        else ...[
+          profileHeaderCard,
+          const SizedBox(height: 14),
+          if (_isEditing) ...[
+            _buildEditProfileCard(arabic),
+            const SizedBox(height: 14),
+          ],
+          statsRow,
+          const SizedBox(height: 14),
+          settingsAndActions,
+          const SizedBox(height: 14),
+          passportSection,
+        ],
         const SizedBox(height: 20),
 
         // Sign Out & Account Deletion Buttons
         if (signedIn) ...[
           PressableScale(
             onTap: () async {
-              final confirm = await showDialog<bool>(
+              final confirm = await showHagzyAdaptiveModal<bool>(
                 context: context,
-                builder: (context) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  title: Text(localized(
+                builder: (context, isSheet) => HagzyModalCard(
+                  isSheet: isSheet,
+                  centerHeader: true,
+                  destructive: true,
+                  icon: Icons.logout_rounded,
+                  title: localized(
                     arabic,
                     'Sign out of Hagzy?',
                     'تسجيل الخروج من حجزي؟',
-                  )),
-                  content: Text(localized(
+                  ),
+                  subtitle: localized(
                     arabic,
                     'You will need to sign in again to access your saved profile and bookings.',
                     'سيتعين عليك تسجيل الدخول مجدداً للوصول إلى حسابك وحجوزاتك.',
-                  )),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: Text(localized(arabic, 'Cancel', 'إلغاء')),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () => Navigator.pop(context, true),
-                      child:
-                          Text(localized(arabic, 'Sign Out', 'تسجيل الخروج')),
-                    ),
-                  ],
+                  ),
+                  onClose: () => Navigator.pop(context, false),
+                  primaryLabel: localized(arabic, 'Sign Out', 'تسجيل الخروج'),
+                  onPrimary: () => Navigator.pop(context, true),
+                  secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+                  onSecondary: () => Navigator.pop(context, false),
                 ),
               );
               if (confirm == true) {
+                HagzyHaptics.medium();
                 await widget.onSignOut();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -974,23 +862,22 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
             child: Container(
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(16),
+                color: kError.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
                 border: Border.all(
-                  color: Colors.redAccent.withValues(alpha: 0.3),
+                  color: kError.withValues(alpha: 0.28),
                 ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.logout_rounded,
-                      color: Colors.redAccent, size: 18),
+                  Icon(Icons.logout_rounded, color: kError, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     localized(arabic, 'Sign Out', 'تسجيل الخروج'),
-                    style: const TextStyle(
-                      color: Colors.redAccent,
-                      fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      color: kError,
+                      fontWeight: FontWeight.w700,
                       fontSize: 14.5,
                     ),
                   ),
@@ -998,54 +885,64 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           // Apple App Store Guideline 5.1.1(v) & Google Play Data Safety requirement
           Center(
             child: TextButton.icon(
+              key: const Key('delete_account_button'),
               onPressed: () async {
-                final confirm = await showDialog<bool>(
+                final confirm = await showHagzyAdaptiveModal<bool>(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    title: Row(
-                      children: [
-                        const Icon(Icons.warning_amber_rounded,
-                            color: Colors.redAccent),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(localized(
-                            arabic,
-                            'Delete Account Permanently?',
-                            'حذف الحساب نهائياً؟',
-                          )),
-                        ),
-                      ],
-                    ),
-                    content: Text(localized(
+                  builder: (context, isSheet) => HagzyModalCard(
+                    isSheet: isSheet,
+                    centerHeader: true,
+                    destructive: true,
+                    icon: Icons.delete_forever_rounded,
+                    title: localized(
                       arabic,
-                      'Are you sure you want to permanently delete your Hagzy account? This will erase your personal profile, phone number, and reservation history from this device and our servers. This action cannot be undone.',
-                      'هل أنت متأكد من رغبتك في حذف حسابك في حجزي نهائياً؟ سيتم مسح بياناتك الشخصية ورقم الموبايل وسجل الحجوزات تماماً من هذا الجهاز وسيرفراتنا ولا يمكن التراجع عن هذا الإجراء.',
-                    )),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: Text(localized(arabic, 'Cancel', 'إلغاء')),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade800,
-                          foregroundColor: Colors.white,
+                      'Delete Account Permanently?',
+                      'حذف الحساب نهائياً؟',
+                    ),
+                    subtitle: localized(
+                      arabic,
+                      'This permanently erases your profile, wallet balance, and reservation history.',
+                      'سيتم مسح ملفك الشخصي ورصيد المحفظة وسجل الحجوزات نهائياً.',
+                    ),
+                    onClose: () => Navigator.pop(context, false),
+                    content: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: kError.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: kError.withValues(alpha: 0.22),
                         ),
-                        onPressed: () => Navigator.pop(context, true),
-                        child: Text(
-                            localized(arabic, 'Delete Forever', 'حذف نهائياً')),
                       ),
-                    ],
+                      child: Text(
+                        localized(
+                          arabic,
+                          'Are you sure you want to permanently delete your Hagzy account? This will erase your personal profile, phone number, and reservation history from this device and our servers. This action cannot be undone.',
+                          'هل أنت متأكد من رغبتك في حذف حسابك في حجزي نهائياً؟ سيتم مسح بياناتك الشخصية ورقم الموبايل وسجل الحجوزات تماماً من هذا الجهاز وسيرفراتنا ولا يمكن التراجع عن هذا الإجراء.',
+                        ),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: kInk,
+                          height: 1.48,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    primaryKey: const Key('confirm_delete_account_button'),
+                    primaryLabel:
+                        localized(arabic, 'Delete Forever', 'حذف نهائياً'),
+                    onPrimary: () => Navigator.pop(context, true),
+                    secondaryLabel:
+                        localized(arabic, 'Keep Account', 'الاحتفاظ بالحساب'),
+                    onSecondary: () => Navigator.pop(context, false),
                   ),
                 );
                 if (confirm == true) {
+                  HagzyHaptics.medium();
                   if (widget.onDeleteAccount != null) {
                     await widget.onDeleteAccount!();
                   } else {
@@ -1067,19 +964,19 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 }
               },
               icon: Icon(Icons.delete_forever_rounded,
-                  color: Colors.grey.shade500, size: 17),
+                  color: kMuted, size: 17),
               label: Text(
                 localized(arabic, 'Delete Account & Personal Data',
                     'حذف الحساب والبيانات الشخصية'),
                 style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12.5,
+                  color: kMuted,
+                  fontSize: 13,
                   decoration: TextDecoration.underline,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
         ],
 
         Center(
@@ -1094,8 +991,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                 TextSpan(
                   text: localized(
                     arabic,
-                    'Hagzy v2.4 · Made with ',
-                    'حجزي v2.4 · صُنع بـ ',
+                    'Hagzy v1.0.0 · Made with ',
+                    'حجزي v1.0.0 · صُنع بـ ',
                   ),
                 ),
                 const WidgetSpan(
@@ -1122,246 +1019,134 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
     );
   }
 
-  Future<void> _openLegalWebPage(
-      BuildContext context, String path, String title) async {
-    Uri uri;
-    if (kIsWeb) {
-      uri = Uri.base.resolve(path);
-    } else {
-      uri = Uri.parse('${widget.api.baseUrl}/$path');
-    }
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(localized(
-              widget.arabic,
-              'Opening $title...',
-              'جاري فتح $title...',
-            )),
-          ),
-        );
-      }
-    }
-  }
-
-  void _showLegalDocumentViewer(BuildContext context,
-      {required bool arabic, required bool isPrivacy}) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.90,
-        ),
-        decoration: BoxDecoration(
-          color: kPanel,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: kBorder,
-                borderRadius: BorderRadius.circular(999),
+  Widget _buildEditProfileCard(bool arabic) {
+    return HagzySurfaceCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const IconBox(icon: Icons.badge_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  localized(arabic, 'Edit Your Profile', 'تعديل بيانات حسابك'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: kInk,
+                  ),
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nameController,
+            textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
+            decoration: InputDecoration(
+              labelText: localized(
+                  arabic, 'Full Name (optional)', 'الاسم بالكامل (اختياري)'),
+              hintText:
+                  localized(arabic, 'e.g. Mohamed Hegazy', 'مثال: محمد حجازي'),
+              prefixIcon: const Icon(Icons.person_outline_rounded),
+              isDense: true,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            textDirection: TextDirection.ltr,
+            decoration: InputDecoration(
+              labelText: localized(arabic, 'Phone Number', 'رقم الموبايل'),
+              hintText: '010XXXXXXXX / 011XXXXXXXX',
+              prefixIcon: const Icon(Icons.phone_android_rounded),
+              helperText: localized(
+                arabic,
+                'Enter 11-digit Egyptian mobile number',
+                'أدخل رقم موبايل مصري مكون من 11 رقماً',
+              ),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            textDirection: TextDirection.ltr,
+            decoration: InputDecoration(
+              labelText: localized(arabic, 'Email Address (optional)',
+                  'البريد الإلكتروني (اختياري)'),
+              hintText: 'name@example.com',
+              prefixIcon: const Icon(Icons.email_outlined),
+              isDense: true,
+            ),
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: kError.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: kGreen.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      isPrivacy ? Icons.shield_rounded : Icons.gavel_rounded,
-                      color: kGreen,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
+                  Icon(Icons.error_outline, size: 16, color: kError),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isPrivacy
-                          ? localized(
-                              arabic, 'Privacy Policy', 'سياسة الخصوصية')
-                          : localized(
-                              arabic, 'Terms of Service', 'شروط الاستخدام'),
+                      _errorMessage!,
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: kInk,
+                        color: kError,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
-                    icon: Icon(Icons.close_rounded, color: kMuted),
-                    onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (isPrivacy) ...[
-                      _buildLegalSection(
-                        title: localized(
-                            arabic,
-                            '1. Commitment to Privacy & Law No. 151 of 2020',
-                            '١. الالتزام بحماية البيانات وفق القانون المصري رقم ١٥١ لسنة ٢٠٢٠'),
-                        body: localized(
-                          arabic,
-                          'Hagzy is committed to protecting your personal data in accordance with the Egyptian Personal Data Protection Law (Law No. 151 of 2020) and international consumer standards. We never sell, rent, or trade your personal information to third parties or advertisers.',
-                          'تلتزم منصة حجزي التزاماً تاماً بحماية بياناتك الشخصية وحرمة حياتك الخاصة وفقاً لأحكام قانون حماية البيانات الشخصية المصري رقم ١٥١ لسنة ٢٠٢٠ والمعايير الدولية. لا نقوم إطلاقاً ببيع أو تأجير أو مشاركة بياناتك مع أي أطراف إعلانية أو جهات خارجية.',
-                        ),
-                      ),
-                      _buildLegalSection(
-                        title: localized(
-                            arabic,
-                            '2. Financial Security & PCI-DSS Escrow',
-                            '٢. الأمان المالي وضمان الحجوزات عبر Paymob'),
-                        body: localized(
-                          arabic,
-                          'All card, InstaPay, and mobile wallet transactions are encrypted and processed through licensed Central Bank of Egypt payment gateways (Paymob). Hagzy servers never store your credit or debit card numbers, CVV codes, or bank passwords.',
-                          'تتم جميع عمليات الدفع الإلكتروني (البطاقات البنكية، إنستاباي، والمحافظ الإلكترونية) عبر بوابات دفع مرخصة من البنك المركزي المصري (Paymob) بأعلى معايير التشفير المصرفي PCI-DSS، ولا يتم تخزين أرقام بطاقاتك أو رموز الأمان على سيرفراتنا نهائياً.',
-                        ),
-                      ),
-                      _buildLegalSection(
-                        title: localized(
-                            arabic,
-                            '3. Right to Account Deletion',
-                            '٣. الحق في الحذف الدائم والنهائي للحساب'),
-                        body: localized(
-                          arabic,
-                          'In strict compliance with Apple App Store Guideline 5.1.1(v) and Google Play Safety policies, you can delete your account and all associated booking logs permanently from your Profile settings at any time with one click.',
-                          'امتثالاً لسياسات آبل (Apple Guideline 5.1.1v) وجوجل، يتيح لك التطبيق في أي وقت ومن شاشة البروفايل مسح حسابك وسجل حجوزاتك وبياناتك الشخصية نهائياً من أجهزتك وسيرفراتنا بضغطة واحدة دون تعقيد.',
-                        ),
-                      ),
-                    ] else ...[
-                      _buildLegalSection(
-                        title: localized(
-                            arabic,
-                            '1. Reservation Slot Hold Policy',
-                            '١. ضمان حجز الموعد المؤقت (١٥ دقيقة)'),
-                        body: localized(
-                          arabic,
-                          'Upon initiating a booking, Hagzy exclusively reserves the court or salon time slot for 15 minutes to allow payment completion. If payment is not submitted within 15 minutes, the slot is automatically released.',
-                          'عند اختيار الموعد، يتم حجز الملعب أو موعد الصالون حصرياً لك لمدة ١٥ دقيقة لإتمام السداد. وفي حال عدم تأكيد السداد خلال تلك المدة يتم إلغاء الحجز تلقائياً وإتاحته لعملاء آخرين.',
-                        ),
-                      ),
-                      _buildLegalSection(
-                        title: localized(
-                            arabic,
-                            '2. Cancellation & Rescheduling',
-                            '٢. الإلغاء وتعديل المواعيد'),
-                        body: localized(
-                          arabic,
-                          'Free cancellation or rescheduling is permitted up to 2 hours prior to the confirmed booking time. Approved refunds are credited directly to your Hagzy Wallet or original payment method.',
-                          'يحق للعميل تعديل موعد الحجز أو الإلغاء واسترداد الرصيد لمحفظة حجزي أو وسيلة الدفع الأصلية وفقاً لسياسة الإلغاء المعلنة للمكان وقبل بدء الموعد بساعتين على الأقل.',
-                        ),
-                      ),
-                      _buildLegalSection(
-                        title: localized(
-                            arabic,
-                            '3. Venue Etiquette & Rules',
-                            '٣. الالتزام بلائحة الأماكن والملاعب'),
-                        body: localized(
-                          arabic,
-                          'Users agree to adhere to all rules, safety guidelines, and dress codes established by the venue partner. Proper athletic footwear is required on padel and football courts.',
-                          'يلتزم العميل بالحضور في الموعد المحدد ومراعاة تعليمات الأمن والسلامة والزي الرياضي المناسب لملاعب البادل وكرة القدم وصالونات الحلاقة والعناية.',
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kGreen,
-                        side: const BorderSide(color: kGreen),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                      label: Text(
-                        localized(
-                          arabic,
-                          'Open Full Web Document in Browser',
-                          'فتح المستند الرسمي بالمتصفح',
-                        ),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _openLegalWebPage(
-                          context,
-                          isPrivacy ? 'privacy.html' : 'terms.html',
-                          isPrivacy
-                              ? localized(
-                                  arabic, 'Privacy Policy', 'سياسة الخصوصية')
-                              : localized(
-                                  arabic, 'Terms of Service', 'شروط الاستخدام'),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
-        ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 48,
+            child: FilledButton(
+              onPressed: _loading ? null : _submitProfileUpdate,
+              child: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      localized(arabic, 'Save Profile Changes', 'حفظ التعديلات'),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildLegalSection({required String title, required String body}) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14.5,
-                color: kInk,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              body,
-              style: TextStyle(
-                fontSize: 13,
-                color: kMuted,
-                height: 1.55,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
+  void _showLegalDocumentViewer(BuildContext context,
+      {required bool arabic, required bool isPrivacy}) {
+    showHagzyLegalSheet(
+      context,
+      arabic: arabic,
+      isPrivacy: isPrivacy,
+      apiBaseUrl: widget.api.baseUrl,
+    );
+  }
 
   void _showPrivacySecurityModal(BuildContext context, bool arabic) {
-    showModalBottomSheet<void>(
+    showHagzySheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.88,
@@ -1396,7 +1181,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                             color: kGreen.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.verified_user_rounded,
                             color: kGreen,
                             size: 28,
@@ -1438,7 +1223,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     _buildSecurityPillar(
                       arabic: arabic,
                       icon: Icons.timer_rounded,
-                      iconColor: kGreen,
+                      iconColor: kSuccess,
                       title: localized(arabic, '15-Minute Guaranteed Slot Hold',
                           'ضمان حجز الموعد لمدة 15 دقيقة'),
                       description: localized(
@@ -1451,7 +1236,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     _buildSecurityPillar(
                       arabic: arabic,
                       icon: Icons.shield_rounded,
-                      iconColor: const Color(0xFF1E88E5),
+                      iconColor: kInfoBlue,
                       title: localized(
                           arabic,
                           'PCI-DSS Paymob Escrow Protection',
@@ -1466,7 +1251,9 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     _buildSecurityPillar(
                       arabic: arabic,
                       icon: Icons.lock_person_rounded,
-                      iconColor: const Color(0xFF7B1FA2),
+                      iconColor: kDarkMode.value
+                          ? const Color(0xFFC084FC)
+                          : const Color(0xFF7B1FA2),
                       title: localized(
                           arabic,
                           'Personal Data & Zero Spam Policy',
@@ -1481,7 +1268,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                     _buildSecurityPillar(
                       arabic: arabic,
                       icon: Icons.delete_sweep_rounded,
-                      iconColor: const Color(0xFFE53935),
+                      iconColor: kError,
                       title: localized(
                           arabic,
                           'Right to Permanent Account Deletion',
@@ -1505,7 +1292,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            icon: const Icon(Icons.description_outlined,
+                            icon: Icon(Icons.description_outlined,
                                 size: 18, color: kGreen),
                             label: Text(
                               localized(
@@ -1531,7 +1318,7 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            icon: const Icon(Icons.gavel_rounded,
+                            icon: Icon(Icons.gavel_rounded,
                                 size: 18, color: kGreen),
                             label: Text(
                               localized(
@@ -1581,10 +1368,8 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
   }
 
   void _showWhatsAppUpdatesModal(BuildContext context, bool arabic) {
-    showModalBottomSheet<void>(
+    showHagzySheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -1644,13 +1429,13 @@ class _CustomerProfileTabState extends State<CustomerProfileTab> {
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  const Icon(Icons.check_circle_rounded,
+                                  Icon(Icons.check_circle_rounded,
                                       color: kGreen, size: 14),
                                   const SizedBox(width: 4),
                                   Text(
                                     localized(arabic, 'Active on this account',
                                         'مفعلة تلقائياً لحسابك'),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       color: kGreen,
                                       fontWeight: FontWeight.w700,
@@ -1827,17 +1612,17 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: kSurfaceTint,
-          borderRadius: BorderRadius.circular(999),
+          color: kPanel,
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusXs),
           border: Border.all(color: kBorder),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: kGreen),
-            const SizedBox(width: 5),
+            Icon(icon, size: 13, color: kVermilion),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
@@ -1868,17 +1653,16 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     return PressableScale(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111B17) : kPanel,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-              color: isDark ? const Color(0xFF1F352D) : kBorder),
-          boxShadow: HagzyTheme.softShadow,
+          color: kPanel,
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+          border: Border.all(color: kBorder, width: 1.1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1886,33 +1670,56 @@ class _StatCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon, size: 18, color: isDark ? kGreenLight : kGreen),
-                if (badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: kGreen.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      badge!,
-                      style: TextStyle(
-                        color: isDark ? kGreenLight : kGreen,
-                        fontSize: 12.0,
-                        fontWeight: FontWeight.w800,
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isDark ? kVermilion : kObsidian,
+                    borderRadius: BorderRadius.circular(HagzyTokens.radiusXs),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 15,
+                    color: Colors.white,
+                  ),
+                ),
+                if (badge != null) ...[
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: kSurfaceTint,
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          badge!,
+                          maxLines: 1,
+                          style: hagzyMonoStyle(
+                            color: kInk,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            arabic: isArabicMode,
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                ],
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               title,
-              style: TextStyle(
+              style: hagzyMonoStyle(
                 fontWeight: FontWeight.w900,
-                fontSize: 14.5,
-                color: isDark ? const Color(0xFFF8FAFC) : kInk,
+                fontSize: 16,
+                color: kInk,
+                arabic: isArabicMode,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1922,7 +1729,7 @@ class _StatCard extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 fontSize: 12.0,
-                color: isDark ? const Color(0xFF94A3B8) : kMuted,
+                color: kMuted,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1952,58 +1759,64 @@ class _SettingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF162822) : kSurfaceTint,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF1F352D) : kBorder,
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: HagzyTap(
+        scaleDown: 0.985,
+        pressedOpacity: 0.92,
+        haptic: HagzyHapticStyle.selection,
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: kSurfaceSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: iconWidget ??
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: isDark ? kVolt : kObsidian,
+                    ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: kInk,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        color: kMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: iconWidget ??
-                  Icon(
-                    icon,
-                    size: 18,
-                    color: isDark ? kGreenLight : kInk,
-                  ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
-                      color: isDark ? const Color(0xFFF8FAFC) : kInk,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      color: isDark ? const Color(0xFF94A3B8) : kMuted,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            trailing,
-          ],
+              const SizedBox(width: 8),
+              trailing,
+            ],
+          ),
         ),
       ),
     );

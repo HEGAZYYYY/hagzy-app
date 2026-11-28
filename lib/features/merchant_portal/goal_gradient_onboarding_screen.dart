@@ -141,7 +141,10 @@ class _GoalGradientOnboardingScreenState
         ),
         elevation: 0,
       ),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Column(
         children: [
           // Step Progress Card
           Container(
@@ -368,6 +371,8 @@ class _GoalGradientOnboardingScreenState
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

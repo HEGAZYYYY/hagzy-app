@@ -268,18 +268,16 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
           duration: const Duration(milliseconds: 200),
           padding: EdgeInsets.all(isSelected ? 9 : 6),
           decoration: BoxDecoration(
-            gradient: isSelected
-                ? HagzyTheme.brandGradient
-                : HagzyTheme.obsidianGradient,
+            color: isSelected ? kVolt : kObsidian,
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.white,
-              width: isSelected ? 2.5 : 1.5,
+              color: isSelected ? kObsidian : kVolt.withValues(alpha: 0.6),
+              width: isSelected ? 2.4 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
                 color: isSelected
-                    ? kGreen.withValues(alpha: 0.5)
+                    ? kVolt.withValues(alpha: 0.45)
                     : Colors.black.withValues(alpha: 0.35),
                 blurRadius: isSelected ? 12 : 6,
                 offset: const Offset(0, 3),
@@ -294,32 +292,26 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
         ),
         const SizedBox(height: 3),
         Container(
-          constraints: const BoxConstraints(maxWidth: 78),
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          constraints: const BoxConstraints(maxWidth: 86),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.95),
+            color: isSelected ? kObsidian : kPanel.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: isSelected ? kGreen : kBorder,
-              width: isSelected ? 1.5 : 0.8,
+              color: isSelected ? kVolt : kBorder,
+              width: isSelected ? 1.4 : 1,
             ),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
+            boxShadow: HagzyTheme.subtleShadow,
           ),
           child: Text(
-            v.name,
+            displayLocalizedTitle(v.name, widget.arabic),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 12.0,
-              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-              color: isSelected ? kGreen : kInk,
+              fontSize: 11.5,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+              color: isSelected ? kVolt : kInk,
             ),
           ),
         ),
@@ -336,11 +328,11 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
     return Tooltip(
       message: tooltip,
       child: PressableScale(
-        scaleDown: 0.92,
+        scaleDown: 0.94,
         onTap: onTap,
         child: Container(
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: kPanel.withValues(alpha: 0.96),
             shape: BoxShape.circle,
@@ -350,7 +342,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                   color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
             ],
           ),
-          child: Icon(icon, size: 18, color: color ?? kInk),
+          child: Icon(icon, size: 20, color: color ?? kInk),
         ),
       ),
     );
@@ -486,7 +478,7 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                     ),
                     child: Text(
                       '${sortedVenues.length} ${localized(arabic, 'nearby', 'قريب')}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.0,
                         fontWeight: FontWeight.w800,
                         color: kGreen,
@@ -697,14 +689,9 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
 
         // Selected Venue Quick Card below Map
         if (activeVenue != null) ...[
-          Container(
+          HagzySurfaceCard(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: kPanel,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: kGreen.withValues(alpha: 0.3)),
-              boxShadow: HagzyTheme.softShadow,
-            ),
+            borderColor: kAccentSurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -712,14 +699,15 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 54,
-                      height: 54,
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
-                        gradient: HagzyTheme.brandGradient,
-                        borderRadius: BorderRadius.circular(16),
+                        color: kObsidian,
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusMedium),
                       ),
                       child: Icon(activeVenue.type.icon,
-                          color: Colors.white, size: 26),
+                          color: kVolt, size: 24),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -740,8 +728,8 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                               ),
                               Row(
                                 children: [
-                                  const Icon(Icons.star_rounded,
-                                      size: 16, color: Color(0xFFF59E0B)),
+                                  Icon(Icons.star_rounded,
+                                      size: 16, color: kGold),
                                   const SizedBox(width: 3),
                                   Text(
                                     activeVenue.reviews.isEmpty
@@ -750,9 +738,11 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                                                     (s, r) => s + r.rating) /
                                                 activeVenue.reviews.length)
                                             .toStringAsFixed(1),
-                                    style: const TextStyle(
+                                    style: hagzyMonoStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 12.5,
+                                      color: kInk,
+                                      arabic: arabic,
                                     ),
                                   ),
                                 ],
@@ -762,18 +752,18 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(Icons.near_me_rounded,
-                                  size: 13, color: kGreen),
+                              Icon(Icons.near_me_rounded,
+                                  size: 13, color: kSignal),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   '${_getDistanceToVenue(activeVenue).toStringAsFixed(1)} ${localized(arabic, 'km away', 'كم عنك')} · ${activeVenue.location}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: kGreen,
+                                    color: kMuted,
                                   ),
                                 ),
                               ),
@@ -790,13 +780,17 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
+                          foregroundColor: kInk,
+                          side: BorderSide(color: kBorderStrong),
                           visualDensity: VisualDensity.compact,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusSmall + 2)),
                         ),
                         onPressed: () => _openDirections(activeVenue),
-                        icon: const Icon(Icons.directions_rounded,
-                            size: 16, color: kGreen),
+                        icon: Icon(Icons.directions_rounded,
+                            size: 16,
+                            color: kDarkMode.value ? kVolt : kObsidian),
                         label: Text(
                             localized(arabic, 'Directions', 'الاتجاهات')),
                       ),
@@ -805,15 +799,16 @@ class _HagzyMapExplorerState extends State<HagzyMapExplorer> {
                     Expanded(
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: kGreen,
-                          foregroundColor: Colors.white,
+                          backgroundColor: kAccentSurface,
+                          foregroundColor: kAccentOnSurface,
                           visualDensity: VisualDensity.compact,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusSmall + 2)),
                         ),
                         onPressed: () => widget.onBookVenue(activeVenue),
-                        icon:
-                            const Icon(Icons.calendar_today_rounded, size: 15),
+                        icon: const Icon(Icons.calendar_today_rounded,
+                            size: 15, color: Colors.white),
                         label: Text(localized(arabic, 'Book Now', 'احجز الآن')),
                       ),
                     ),

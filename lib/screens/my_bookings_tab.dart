@@ -109,7 +109,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       onProceedToPayment: (amount) async {
         await Navigator.push<bool>(
           context,
-          MaterialPageRoute(
+          hagzyPageRoute(
             builder: (ctx) => UnifiedPaymentScreen(
               bookingId:
                   'wallet_topup_${DateTime.now().millisecondsSinceEpoch}',
@@ -167,89 +167,114 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   Widget _buildWalletCard(bool arabic) {
     final balance = widget.walletBalance;
     return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1F352D)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+        border: Border.all(
+          color: kBorder,
+          width: 1.0,
+        ),
+        boxShadow: HagzyTheme.subtleShadow,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: kSurfaceTint,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+              ),
+              child: Icon(
+                Icons.account_balance_wallet_rounded,
+                color: kBrandAccent,
+                size: 21,
+              ),
             ),
-            borderRadius: BorderRadius.circular(20),
-            border:
-                Border.all(color: kGreen.withValues(alpha: 0.35), width: 1.2),
-            boxShadow: HagzyTheme.softShadow,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: kGreen.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: kGreen.withValues(alpha: 0.35)),
-                ),
-                child: const Icon(Icons.account_balance_wallet_rounded,
-                    color: kGreenLight, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localized(arabic, 'Hagzy In-App Wallet', 'محفظة حجزي'),
-                      style: const TextStyle(
-                        color: Colors.white,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    localized(arabic, 'Hagzy Wallet', 'محفظة حجزي'),
+                    style: TextStyle(
+                      color: kMuted,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  HagzyAnimatedValue(
+                    valueKey: balance.toStringAsFixed(0),
+                    child: Text(
+                      '${formatMoney(balance)} ${localized(arabic, 'EGP available', 'جنيه متاح')}',
+                      style: hagzyMonoStyle(
+                        color: kInk,
                         fontWeight: FontWeight.w800,
-                        fontSize: 14.5,
+                        fontSize: 18,
+                        arabic: arabic,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${formatMoney(balance)} ${localized(arabic, 'EGP Available', 'جنيه متاح')}',
-                      style: const TextStyle(
-                        color: kGreenLight,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                HagzyHaptics.light();
+                _topUpWalletDialog(balance);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: kAccentSurface,
+                foregroundColor: kAccentOnSurface,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                minimumSize: const Size(44, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
                 ),
               ),
-              FilledButton.icon(
-                onPressed: () => _topUpWalletDialog(balance),
-                style: FilledButton.styleFrom(
-                  backgroundColor: kGreen,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  visualDensity: VisualDensity.compact,
-                ),
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                label: Text(
-                  localized(arabic, 'Top Up', 'شحن'),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 12),
-                ),
+              icon: const Icon(Icons.add_rounded, size: 17, color: Colors.white),
+              label: Text(
+                localized(arabic, 'Top Up', 'شحن'),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
-            ],
-          ),
-        );
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _lookupByPhone() async {
     var phone = '';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showHagzyAdaptiveModal<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-            localized(widget.arabic, 'Find my bookings', 'ابحث عن حجوزاتي')),
+      builder: (ctx, isSheet) => HagzyModalCard(
+        isSheet: isSheet,
+        icon: Icons.phone_outlined,
+        title: localized(widget.arabic, 'Find my bookings', 'ابحث عن حجوزاتي'),
+        subtitle: localized(
+          widget.arabic,
+          'Enter the mobile number you booked with to sync your passes.',
+          'أدخل رقم الهاتف المستخدم في الحجز لمزامنة حجوزاتك.',
+        ),
+        onClose: () => Navigator.pop(ctx, false),
+        primaryUseFilledButton: true,
+        primaryLabel: localized(widget.arabic, 'Search', 'بحث'),
+        onPrimary: () => Navigator.pop(ctx, true),
+        secondaryLabel: localized(widget.arabic, 'Cancel', 'إلغاء'),
+        onSecondary: () => Navigator.pop(ctx, false),
         content: TextField(
           autofocus: true,
           keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => Navigator.pop(ctx, true),
           decoration: InputDecoration(
             labelText:
                 localized(widget.arabic, 'Phone number', 'رقم الهاتف'),
@@ -258,16 +283,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           ),
           onChanged: (value) => phone = value,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(localized(widget.arabic, 'Cancel', 'إلغاء')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(localized(widget.arabic, 'Search', 'بحث')),
-          ),
-        ],
       ),
     );
     if (confirmed != true || phone.trim().isEmpty) return;
@@ -279,14 +294,29 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       await widget.api.requestCustomerOtp(phone);
       if (!mounted) return;
       var otpCode = '';
-      final otpConfirmed = await showDialog<bool>(
+      final otpConfirmed = await showHagzyAdaptiveModal<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(localized(
-              widget.arabic, 'Verify phone (OTP)', 'رمز التحقق (OTP)')),
+        builder: (ctx, isSheet) => HagzyModalCard(
+          isSheet: isSheet,
+          icon: Icons.lock_outline_rounded,
+          title: localized(
+              widget.arabic, 'Verify phone (OTP)', 'رمز التحقق (OTP)'),
+          subtitle: localized(
+            widget.arabic,
+            'Enter the 6-digit code sent to $phone.',
+            'أدخل رمز التحقق المرسل إلى $phone.',
+          ),
+          onClose: () => Navigator.pop(ctx, false),
+          primaryUseFilledButton: true,
+          primaryLabel: localized(widget.arabic, 'Verify', 'تحقق'),
+          onPrimary: () => Navigator.pop(ctx, true),
+          secondaryLabel: localized(widget.arabic, 'Cancel', 'إلغاء'),
+          onSecondary: () => Navigator.pop(ctx, false),
           content: TextField(
             autofocus: true,
             keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => Navigator.pop(ctx, true),
             decoration: InputDecoration(
               labelText: localized(
                   widget.arabic, '6-digit verification code', 'رمز التحقق من ٦ أرقام'),
@@ -295,16 +325,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             ),
             onChanged: (value) => otpCode = value,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(localized(widget.arabic, 'Cancel', 'إلغاء')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(localized(widget.arabic, 'Verify', 'تحقق')),
-            ),
-          ],
         ),
       );
       if (otpConfirmed != true || otpCode.trim().isEmpty) return;
@@ -333,35 +353,41 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           .toList();
       if (!mounted) return;
       if (found.isEmpty) {
-        await showDialog<void>(
+        await showHagzyAdaptiveModal<void>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(localized(
-                widget.arabic, 'No bookings found', 'لم يتم العثور على حجوزات')),
-            content: Text(localized(
+          builder: (ctx, isSheet) => HagzyModalCard(
+            isSheet: isSheet,
+            centerHeader: true,
+            icon: Icons.event_busy_outlined,
+            title: localized(
+                widget.arabic, 'No bookings found', 'لم يتم العثور على حجوزات'),
+            subtitle: localized(
                 widget.arabic,
                 'No active bookings were found for this phone number.',
-                'لا توجد حجوزات نشطة لهذا الرقم.')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(localized(widget.arabic, 'OK', 'حسناً')),
-              ),
-            ],
+                'لا توجد حجوزات نشطة لهذا الرقم.'),
+            onClose: () => Navigator.pop(ctx),
+            primaryLabel: localized(widget.arabic, 'OK', 'حسناً'),
+            onPrimary: () => Navigator.pop(ctx),
           ),
         );
       } else {
-        await showDialog<void>(
+        await showHagzyAdaptiveModal<void>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(localized(
-                widget.arabic, 'Bookings found', 'تم العثور على حجوزات')),
+          maxWidth: 460,
+          builder: (ctx, isSheet) => HagzyModalCard(
+            isSheet: isSheet,
+            scrollable: false,
+            icon: Icons.event_available_rounded,
+            title: localized(
+                widget.arabic, 'Bookings found', 'تم العثور على حجوزات'),
+            onClose: () => Navigator.pop(ctx),
+            primaryLabel: localized(widget.arabic, 'Close', 'إغلاق'),
+            onPrimary: () => Navigator.pop(ctx),
             content: SizedBox(
-              width: 400,
+              height: 300,
               child: ListView.separated(
-                shrinkWrap: true,
                 itemCount: found.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
                 itemBuilder: (ctx2, index) {
                   final b = found[index];
                   final venue = widget.venues
@@ -372,32 +398,29 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       : b.isPendingPayment
                           ? localized(widget.arabic, 'Pending', 'معلق')
                           : localized(widget.arabic, 'Expired', 'منتهي');
-                  return ListTile(
-                    title: Text(b.customer),
-                    subtitle: Text(
-                      '${venue?.name ?? b.venueId} · ${formatDateTime(b.startsAt)} · $statusLabel',
-                    ),
+                  return HagzyGroupedRow(
+                    icon: venue?.type.icon ?? Icons.calendar_today_rounded,
+                    title: b.customer,
+                    subtitle:
+                        '${venue != null ? displayLocalizedTitle(venue.name, widget.arabic) : b.venueId} · ${formatDateTime(b.startsAt)} · $statusLabel',
                     trailing: Text(
                       '${formatMoney(b.price)} EGP',
-                      style: const TextStyle(
-                          color: kGreen, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        color: kSuccess,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
                     ),
                   );
                 },
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(localized(widget.arabic, 'Close', 'إغلاق')),
-              ),
-            ],
           ),
         );
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _lookupError = error.toString());
+      setState(() => _lookupError = friendlyError(error, arabic: widget.arabic));
     } finally {
       if (mounted) setState(() => _lookingUp = false);
     }
@@ -419,13 +442,26 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 booking.holdExpiresAt!.isAfter(DateTime.now())))
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
     if (active.isEmpty) {
       return RefreshIndicator(
         onRefresh: widget.onRefresh ?? () async {},
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          children: [
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isWide ? 880 : double.infinity,
+            ),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                isWide ? 24 : 16,
+                isWide ? 16 : 12,
+                isWide ? 24 : 16,
+                isWide ? 48 : 104,
+              ),
+              children: [
           IntroCard(
             title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
             subtitle: localized(
@@ -442,7 +478,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: kSurfaceTint,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
                 border: Border.all(color: kBorder),
               ),
               child: Row(
@@ -450,10 +486,11 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: kGreen.withValues(alpha: 0.12),
+                      color: kBrandAccent.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.account_circle_outlined, color: kGreen, size: 22),
+                    child: Icon(Icons.account_circle_outlined,
+                        color: kBrandAccent, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -475,12 +512,14 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                     FilledButton(
                       onPressed: widget.onGoToSignIn,
                       style: FilledButton.styleFrom(
-                        backgroundColor: kGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        backgroundColor: kAccentSurface,
+                        foregroundColor: kAccentOnSurface,
+                        minimumSize: const Size(44, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium)),
                       ),
-                      child: Text(localized(arabic, 'Sign In', 'دخول'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                      child: Text(localized(arabic, 'Sign In', 'دخول'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                     ),
                 ],
               ),
@@ -526,23 +565,56 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             ],
           ],
         ],
-      ),
-    );
-  }
+            ),
+          ),
+        ),
+      );
+    }
     return RefreshIndicator(
       onRefresh: widget.onRefresh ?? () async {},
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        children: [
-        IntroCard(
-          title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
-          subtitle: localized(arabic, 'Keep track of upcoming reservations.',
-              'تابع حجوزاتك القادمة.'),
-          icon: Icons.calendar_month_outlined,
-        ),
-        const SizedBox(height: 8),
-        _buildWalletCard(arabic),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isWide ? 880 : double.infinity,
+          ),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              isWide ? 24 : 16,
+              isWide ? 16 : 10,
+              isWide ? 24 : 16,
+              isWide ? 48 : 104,
+            ),
+            children: [
+        if (isWide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 6,
+                child: IntroCard(
+                  title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
+                  subtitle: localized(arabic, 'Keep track of upcoming reservations.',
+                      'تابع حجوزاتك القادمة.'),
+                  icon: Icons.calendar_month_outlined,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(flex: 5, child: _buildWalletCard(arabic)),
+            ],
+          )
+        else ...[
+          IntroCard(
+            title: localized(arabic, 'Your Bookings', 'حجوزاتك'),
+            subtitle: localized(arabic, 'Keep track of upcoming reservations.',
+                'تابع حجوزاتك القادمة.'),
+            icon: Icons.calendar_month_outlined,
+          ),
+          const SizedBox(height: 10),
+          _buildWalletCard(arabic),
+        ],
+        const SizedBox(height: 4),
         ...active.map((booking) {
           final venue = widget.venues
               .where((item) => item.id == booking.venueId)
@@ -558,12 +630,12 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       ? localized(arabic, 'Hold Expired', 'انتهى الحجز المؤقت')
                       : localized(arabic, 'Confirmed', 'مؤكد');
           final statusColor = booking.isConfirmed
-              ? kGreen
+              ? kSuccess
               : booking.isPendingPayment
-                  ? const Color(0xFFB45309)
+                  ? kWarning
                   : booking.isHoldExpired
                       ? kMuted
-                      : kGreen;
+                      : kSuccess;
           final remainingMin = booking.holdExpiresAt
               ?.difference(DateTime.now())
               .inMinutes
@@ -584,9 +656,12 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             createdAt: booking.createdAt ?? booking.startsAt,
           );
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 820),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               if (booking.isConfirmed && hagzyB.isGracePeriodActive()) ...[
                 GracePeriodCountdownBanner(
                   booking: hagzyB,
@@ -595,7 +670,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                     widget.onCancelBooking?.call(booking);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        backgroundColor: kGreen,
+                        backgroundColor: kSnackBarBg,
                         content: Text(
                           localized(
                             arabic,
@@ -610,229 +685,254 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 const SizedBox(height: 6),
               ],
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: HagzyTheme.softShadow,
+                  borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+                  boxShadow: HagzyTheme.subtleShadow,
                 ),
                 child: Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
+                  color: kPanel,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius:
+                        BorderRadius.circular(HagzyTokens.radiusLarge),
                     side: BorderSide(
                       color: booking.isConfirmed
-                          ? kGreen.withValues(alpha: 0.35)
+                          ? kAccentSurface
                           : kBorder,
-                      width: booking.isConfirmed ? 1.5 : 1,
+                      width: booking.isConfirmed ? 1.5 : 1.1,
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Container(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                    decoration: BoxDecoration(
-                      gradient: booking.isConfirmed
-                          ? HagzyTheme.obsidianGradient
-                          : const LinearGradient(
-                              colors: [Color(0xFF0A0F1D), Color(0xFF1F352D)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            gradient: booking.isConfirmed
-                                ? HagzyTheme.brandGradient
-                                : LinearGradient(
-                                    colors: [
-                                      Colors.white.withValues(alpha: 0.14),
-                                      Colors.white.withValues(alpha: 0.06),
-                                    ],
-                                  ),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.14)),
-                          ),
-                          child: Icon(
-                            venue?.type.icon ?? Icons.event_available_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                venue?.name ??
-                                    localized(arabic, 'Hagzy Reservation',
-                                        'حجز حجزي'),
-                                style: const TextStyle(
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                [
-                                  if (space != null) space.name,
-                                  if (venue?.location.isNotEmpty ?? false)
-                                    venue!.location,
-                                ].join(' · '),
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.72),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: booking.isConfirmed
-                                ? kGreen.withValues(alpha: 0.25)
-                                : const Color(0xFFF59E0B)
-                                    .withValues(alpha: 0.20),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: booking.isConfirmed
-                                  ? kGreenLight.withValues(alpha: 0.45)
-                                  : const Color(0xFFFBBF24)
-                                      .withValues(alpha: 0.45),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              LivePulseDot(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                        color: kObsidian,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
                                 color: booking.isConfirmed
-                                    ? kGreenLight
-                                    : const Color(0xFFFBBF24),
-                                size: 6,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                status.toUpperCase(),
-                                style: TextStyle(
+                                    ? kVermilion
+                                    : const Color(0xFF26231F),
+                                borderRadius:
+                                    BorderRadius.circular(HagzyTokens.radiusSmall),
+                                border: Border.all(
                                   color: booking.isConfirmed
-                                      ? kGreenLight
-                                      : const Color(0xFFFDE68A),
-                                  fontSize: 12.0,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
+                                      ? kVermilion
+                                      : const Color(0xFF3D3831),
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const _TicketPerforatedDivider(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: kPage,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.schedule_rounded,
-                                  color: kGreen, size: 18),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: Text(
-                                  '${formatDateTime(booking.startsAt)} · ${booking.durationMinutes} ${localized(arabic, 'min', 'دقيقة')}',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: kInk,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${formatMoney(booking.price)} ${localized(arabic, 'EGP', 'جنيه')}',
-                                style: const TextStyle(
-                                  color: kGreen,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (booking.paymentReference.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: booking.isConfirmed
-                                  ? const Color(0xFFECFDF5)
-                                  : const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: booking.isConfirmed
-                                    ? const Color(0xFFA7F3D0)
-                                    : const Color(0xFFBFDBFE),
+                              child: Icon(
+                                venue?.type.icon ??
+                                    Icons.event_available_rounded,
+                                color: Colors.white,
+                                size: 21,
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  booking.isConfirmed
-                                      ? Icons.check_circle_outline_rounded
-                                      : Icons.verified_user_outlined,
-                                  size: 16,
-                                  color: booking.isConfirmed
-                                      ? kGreen
-                                      : const Color(0xFF1D4ED8),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    booking.isConfirmed
-                                        ? localized(
-                                            arabic,
-                                            'Payment verified (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Deposit received ✓',
-                                            'تم التحقق من الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · تم استلام العربون ✓',
-                                          )
-                                        : localized(
-                                            arabic,
-                                            'Payment proof submitted (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Awaiting venue verification',
-                                            'تم إرسال إثبات الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · بانتظار مراجعة المكان',
-                                          ),
-                                    style: TextStyle(
-                                      color: booking.isConfirmed
-                                          ? const Color(0xFF065F46)
-                                          : const Color(0xFF1E40AF),
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.w700,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    venue != null
+                                        ? displayLocalizedTitle(
+                                            venue.name, arabic)
+                                        : localized(arabic, 'Hagzy Reservation',
+                                            'حجز حجزي'),
+                                    style: hagzyDisplayStyle(
+                                      arabic: arabic,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: -0.35,
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    [
+                                      if (space != null)
+                                        displayLocalizedTitle(
+                                            space.name, arabic),
+                                      if (venue?.location.isNotEmpty ?? false)
+                                        displayLocalizedLocation(
+                                            venue!.location, arabic),
+                                    ].join(' · '),
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.72),
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: booking.isConfirmed
+                                    ? kVermilion
+                                    : const Color(0xFF2A2111),
+                                borderRadius: BorderRadius.circular(
+                                    HagzyTokens.radiusXs),
+                                border: Border.all(
+                                  color: booking.isConfirmed
+                                      ? kVermilion
+                                      : const Color(0xFFFBBF24)
+                                          .withValues(alpha: 0.45),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  LivePulseDot(
+                                    color: booking.isConfirmed
+                                        ? Colors.white
+                                        : const Color(0xFFFBBF24),
+                                    size: 6,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    status.toUpperCase(),
+                                    style: hagzyMonoStyle(
+                                      color: booking.isConfirmed
+                                          ? Colors.white
+                                          : const Color(0xFFFDE68A),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.6,
+                                      arabic: arabic,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const _TicketPerforatedDivider(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: kSurfaceSubtle.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(
+                                    HagzyTokens.radiusMedium),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.schedule_rounded,
+                                      color: kDarkMode.value ? kVolt : kObsidian,
+                                      size: 17),
+                                  const SizedBox(width: 9),
+                                  Expanded(
+                                    child: Text(
+                                      '${formatDateTime(booking.startsAt)} · ${booking.durationMinutes} ${localized(arabic, 'min', 'دقيقة')}',
+                                      style: hagzyMonoStyle(
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.w800,
+                                        color: kInk,
+                                        arabic: arabic,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${formatMoney(booking.price)} ${localized(arabic, 'EGP', 'جنيه')}',
+                                    style: hagzyMonoStyle(
+                                      color: kDarkMode.value ? kVolt : kObsidian,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14.5,
+                                      arabic: arabic,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        if (booking.paymentReference.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Builder(
+                            builder: (context) {
+                              final isDark = Theme.of(context).brightness ==
+                                      Brightness.dark ||
+                                  kDarkMode.value;
+                              final accent =
+                                  booking.isConfirmed ? kSuccess : kInfoBlue;
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: booking.isConfirmed
+                                      ? (isDark
+                                          ? const Color(0xFF13261E)
+                                          : const Color(0xFFECFDF5))
+                                      : (isDark
+                                          ? const Color(0xFF162033)
+                                          : const Color(0xFFEFF6FF)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: booking.isConfirmed
+                                        ? (isDark
+                                            ? kSuccess.withValues(alpha: 0.35)
+                                            : const Color(0xFFA7F3D0))
+                                        : (isDark
+                                            ? kInfoBlue.withValues(alpha: 0.35)
+                                            : const Color(0xFFBFDBFE)),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      booking.isConfirmed
+                                          ? Icons.check_circle_outline_rounded
+                                          : Icons.verified_user_outlined,
+                                      size: 16,
+                                      color: accent,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        booking.isConfirmed
+                                            ? localized(
+                                                arabic,
+                                                'Payment verified (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Deposit received ✓',
+                                                'تم التحقق من الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · تم استلام العربون ✓',
+                                              )
+                                            : localized(
+                                                arabic,
+                                                'Payment proof submitted (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · Awaiting venue verification',
+                                                'تم إرسال إثبات الدفع (${booking.paymentMethod.toUpperCase()}: ${booking.paymentReference}) · بانتظار مراجعة المكان',
+                                              ),
+                                        style: TextStyle(
+                                          color: booking.isConfirmed
+                                              ? (isDark
+                                                  ? kSuccess
+                                                  : const Color(0xFF065F46))
+                                              : (isDark
+                                                  ? kInfoBlue
+                                                  : const Color(0xFF1E40AF)),
+                                          fontSize: 12.0,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ],
                         if (!booking.isConfirmed) ...[
@@ -873,16 +973,16 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: kSurfaceTint,
+                              color: kSuccess.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                  color: kGreen.withValues(alpha: 0.25)),
+                                  color: kSuccess.withValues(alpha: 0.30)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.local_offer_rounded,
-                                    size: 13, color: kGreen),
+                                Icon(Icons.local_offer_rounded,
+                                    size: 13, color: kSuccess),
                                 const SizedBox(width: 6),
                                 Text(
                                   localized(
@@ -890,8 +990,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                     'Promo ${booking.promoCode} applied (-${formatMoney(booking.discountAmount)} EGP)',
                                     'تم تطبيق كود ${booking.promoCode} (-${formatMoney(booking.discountAmount)} ج)',
                                   ),
-                                  style: const TextStyle(
-                                    color: kGreen,
+                                  style: TextStyle(
+                                    color: kSuccess,
                                     fontSize: 12.0,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -904,13 +1004,13 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              const Icon(Icons.content_cut_rounded,
-                                  size: 13, color: kGreen),
+                              Icon(Icons.content_cut_rounded,
+                                  size: 13, color: kBrandAccent),
                               const SizedBox(width: 5),
                               Text(
                                 '${localized(arabic, "Specialist", "المصفف")}: ${booking.staffMember}',
-                                style: const TextStyle(
-                                  color: kGreen,
+                                style: TextStyle(
+                                  color: kBrandAccent,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -924,20 +1024,17 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               ? Row(
                                   children: [
                                     Expanded(
-                                      child: PressableScale(
-                                        scaleDown: 0.97,
-                                        onTap: () =>
-                                            widget.onChoosePayment(booking),
-                                        child: FilledButton.icon(
-                                          onPressed: () =>
-                                              widget.onChoosePayment(booking),
-                                          icon: const Icon(Icons
-                                              .account_balance_wallet_outlined),
-                                          label: Text(localized(
-                                              arabic,
-                                              'Pay Deposit · ${formatMoney(booking.dueNow ?? booking.price)} EGP',
-                                              'ادفع العربون · ${formatMoney(booking.dueNow ?? booking.price)} جنيه')),
-                                        ),
+                                      child: FilledButton.icon(
+                                        onPressed: () {
+                                          HagzyHaptics.light();
+                                          widget.onChoosePayment(booking);
+                                        },
+                                        icon: const Icon(Icons
+                                            .account_balance_wallet_outlined),
+                                        label: Text(localized(
+                                            arabic,
+                                            'Pay Deposit · ${formatMoney(booking.dueNow ?? booking.price)} EGP',
+                                            'ادفع العربون · ${formatMoney(booking.dueNow ?? booking.price)} جنيه')),
                                       ),
                                     ),
                                     if (widget.onCancelBooking != null) ...[
@@ -970,70 +1067,123 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                   ],
                                 ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
+                        // Primary Boarding Pass CTA when confirmed, clean secondary actions below
+                        if (booking.isConfirmed) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () =>
+                                  _showQrPassModal(booking, venue, space),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: kAccentSurface,
+                                foregroundColor: kAccentOnSurface,
+                                minimumSize: const Size(0, 46),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      HagzyTokens.radiusSmall),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.qr_code_2_rounded,
+                                size: 19,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                localized(arabic, 'QR Check-In Pass',
+                                    'بطاقة الدخول QR'),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            OutlinedButton.icon(
-                              onPressed: () =>
-                                  _showQrPassModal(booking, venue, space),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
+                            if (!booking.isConfirmed)
+                              OutlinedButton.icon(
+                                onPressed: () =>
+                                    _showQrPassModal(booking, venue, space),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: kInk,
+                                  side: BorderSide(color: kBorder),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
+                                icon: Icon(Icons.qr_code_2_rounded,
+                                    size: 16,
+                                    color:
+                                        kDarkMode.value ? kVolt : kObsidian),
+                                label: Text(
+                                  localized(arabic, 'QR Check-In Pass',
+                                      'بطاقة الدخول QR'),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700),
+                                ),
                               ),
-                              icon: const Icon(Icons.qr_code_2_rounded,
-                                  size: 17, color: kGreen),
-                              label: Text(
-                                localized(arabic, 'QR Check-In Pass',
-                                    'بطاقة الدخول QR'),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
                             OutlinedButton.icon(
                               onPressed: () => _openMaps(venue),
                               style: OutlinedButton.styleFrom(
+                                foregroundColor: kInk,
+                                side: BorderSide(color: kBorder),
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 8),
                               ),
-                              icon: const Icon(Icons.directions_outlined,
-                                  size: 16, color: kGreen),
+                              icon: Icon(Icons.directions_outlined,
+                                  size: 16,
+                                  color: kDarkMode.value ? kVolt : kObsidian),
                               label: Text(
                                 localized(arabic, 'Directions', 'الاتجاهات'),
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700),
                               ),
                             ),
                             if (widget.onBookAgain != null && venue != null)
                               OutlinedButton.icon(
                                 onPressed: () => widget.onBookAgain!(venue.id),
                                 style: OutlinedButton.styleFrom(
+                                  foregroundColor: kInk,
+                                  side: BorderSide(color: kBorder),
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 8),
                                 ),
-                                icon: const Icon(Icons.replay_rounded,
-                                    size: 16, color: kGreen),
+                                icon: Icon(Icons.replay_rounded,
+                                    size: 16,
+                                    color:
+                                        kDarkMode.value ? kVolt : kObsidian),
                                 label: Text(
                                   localized(arabic, 'Book Again',
                                       'احجز مرة أخرى'),
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ),
                             OutlinedButton.icon(
                               onPressed: () =>
                                   _showReceiptModal(booking, venue, space),
                               style: OutlinedButton.styleFrom(
+                                foregroundColor: kInk,
+                                side: BorderSide(color: kBorder),
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 8),
                               ),
-                              icon: const Icon(Icons.receipt_long_rounded,
-                                  size: 16, color: kGreen),
+                              icon: Icon(Icons.receipt_long_rounded,
+                                  size: 16,
+                                  color: kDarkMode.value ? kVolt : kObsidian),
                               label: Text(
                                 localized(arabic, 'Receipt', 'الفاتورة'),
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700),
                               ),
                             ),
                             if (widget.onUpdateReminder != null &&
@@ -1043,18 +1193,23 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                               OutlinedButton.icon(
                                 onPressed: () => _showReminderPicker(booking),
                                 style: OutlinedButton.styleFrom(
+                                  foregroundColor: kInk,
+                                  side: BorderSide(color: kBorder),
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 8),
                                 ),
-                                icon: const Icon(
+                                icon: Icon(
                                     Icons.notifications_active_outlined,
                                     size: 16,
-                                    color: kGreen),
+                                    color:
+                                        kDarkMode.value ? kVolt : kObsidian),
                                 label: Text(
                                   _reminderLabel(
                                       booking.reminderOffsetMinutes, arabic),
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ),
                           ],
@@ -1067,10 +1222,14 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             ),
           ),
         ],
-      );
+      ),
+            ),
+          );
     }),
       ],
     ),
+        ),
+      ),
   );
 }
 
@@ -1090,21 +1249,34 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     if (widget.onUpdateReminder == null) return;
     final arabic = widget.arabic;
     const options = [30, 60, 120, 360, 1440, 0];
-    final picked = await showDialog<int>(
+    final picked = await showHagzyAdaptiveModal<int>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          localized(arabic, 'WhatsApp Reminder Time', 'موعد التذكير عبر واتساب'),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      builder: (ctx, isSheet) => HagzyModalCard(
+        isSheet: isSheet,
+        icon: Icons.notifications_active_outlined,
+        title: localized(
+            arabic, 'WhatsApp Reminder Time', 'موعد التذكير عبر واتساب'),
+        subtitle: localized(
+          arabic,
+          'Choose when we should send your WhatsApp reminder.',
+          'اختر موعد إرسال التذكير قبل الحجز.',
         ),
-        content: Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        onClose: () => Navigator.pop(ctx),
+        secondaryLabel: localized(arabic, 'Cancel', 'إلغاء'),
+        onSecondary: () => Navigator.pop(ctx),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: options
-              .map((m) => ChoiceChip(
-                    label: Text(_reminderLabel(m, arabic)),
-                    selected: booking.reminderOffsetMinutes == m,
-                    onSelected: (_) => Navigator.pop(ctx, m),
+              .map((m) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: HagzyGroupedRow(
+                      icon: m == 0
+                          ? Icons.notifications_off_outlined
+                          : Icons.alarm_rounded,
+                      title: _reminderLabel(m, arabic),
+                      selected: booking.reminderOffsetMinutes == m,
+                      onTap: () => Navigator.pop(ctx, m),
+                    ),
                   ))
               .toList(),
         ),
@@ -1132,44 +1304,61 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             : 0.0);
     final remainingDue = (booking.price - paidAmount).clamp(0.0, booking.price);
 
-    await showDialog<void>(
+    await showHagzyDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: kPanel,
+        backgroundColor: kObsidian,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: kVolt.withValues(alpha: 0.40), width: 1.2),
+        ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+          constraints: const BoxConstraints(maxWidth: 372),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top Architectural Boarding Pass Header
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 16),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFF26262F)),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      const HagzyLogoMark(size: 34),
-                      const SizedBox(width: 10),
+                      const HagzyBrandSymbol(
+                        size: 36,
+                        variant: HagzyBrandVariant.volt,
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              localized(
-                                  arabic, 'HAGZY CHECK-IN PASS', 'بطاقة دخول حجزي'),
-                              style: const TextStyle(
-                                fontSize: 12.0,
-                                fontWeight: FontWeight.w900,
-                                color: kGreen,
-                                letterSpacing: 0.8,
+                              localized(arabic, 'HAGZY CHECK-IN PASS',
+                                  'بطاقة دخول حجزي'),
+                              style: hagzyMonoStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: kVolt,
+                                letterSpacing: 1.0,
+                                arabic: arabic,
                               ),
                             ),
+                            const SizedBox(height: 2),
                             Text(
                               venue?.name ?? booking.venueId,
-                              style: TextStyle(
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
-                                color: kInk,
+                                color: Colors.white,
                               ),
                             ),
                           ],
@@ -1177,181 +1366,251 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       ),
                       IconButton(
                         tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          fixedSize: const Size(44, 44),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
+                          shape: const CircleBorder(),
+                        ),
                         onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close_rounded, size: 18),
+                        icon: const Icon(Icons.close_rounded,
+                            size: 19, color: Colors.white70),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: kBorder, width: 1.5),
-                      boxShadow: HagzyTheme.softShadow,
-                    ),
-                    child: QrImageView(
-                      data: qrPayload,
-                      version: QrVersions.auto,
-                      size: 176,
-                      backgroundColor: Colors.white,
-                      eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: Color(0xFF0A0F1D),
-                      ),
-                      dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: Color(0xFF0A0F1D),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    '${space?.name ?? booking.itemId} · ${formatDateTime(booking.startsAt)}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
-                      color: kInk,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'REF: ${booking.id}',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12.0,
-                      color: kMuted,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: booking.checkedIn
-                          ? const Color(0xFFE0F2FE)
-                          : (booking.isConfirmed
-                              ? kSurfaceTint
-                              : const Color(0xFFFFFBEB)),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      booking.checkedIn
-                          ? localized(arabic, 'CHECKED IN ✓', 'تم تسجيل الحضور ✓')
-                          : (booking.isConfirmed
-                              ? localized(arabic, 'CONFIRMED PASS', 'حجز مؤكد')
-                              : localized(arabic, 'HOLD · AWAITING DEPOSIT',
-                                  'حجز مؤقت')),
-                      style: TextStyle(
-                        color: booking.checkedIn
-                            ? const Color(0xFF0369A1)
-                            : (booking.isConfirmed
-                                ? kGreen
-                                : const Color(0xFFB45309)),
-                        fontSize: 12.0,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: kPage,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: kBorder),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              localized(arabic, 'Deposit Paid', 'العربون المدفوع'),
-                              style: TextStyle(fontSize: 12, color: kMuted),
-                            ),
-                            Text(
-                              '${formatMoney(paidAmount)} EGP',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12.5,
-                                  color: kGreen),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+                  child: Column(
+                    children: [
+                      // Optical White QR Chamber with Electric Volt Frame
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                              BorderRadius.circular(HagzyTokens.radiusLarge),
+                          border: Border.all(
+                              color: kVolt.withValues(alpha: 0.85), width: 2.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kVolt.withValues(alpha: 0.18),
+                              blurRadius: 24,
+                              spreadRadius: -4,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              localized(
-                                  arabic, 'Due at Venue', 'المتبقي عند الوصول'),
-                              style: TextStyle(fontSize: 12, color: kMuted),
+                        child: QrImageView(
+                          data: qrPayload,
+                          version: QrVersions.auto,
+                          size: 180,
+                          backgroundColor: Colors.white,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
+                            color: kObsidian,
+                          ),
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.square,
+                            color: kObsidian,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 2,
+                        children: [
+                          Text(
+                            space?.name ?? booking.itemId,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: Colors.white,
                             ),
-                            Text(
-                              '${formatMoney(remainingDue)} EGP',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12.5,
-                                  color: kInk),
+                          ),
+                          Text(
+                            '·',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: Colors.white.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: Text(
+                              formatDateTime(booking.startsAt),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'REF: ${booking.id}',
+                        style: hagzyMonoStyle(
+                          fontSize: 11.5,
+                          color: Colors.white.withValues(alpha: 0.56),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      HagzyMonoTag(
+                        label: booking.checkedIn
+                            ? localized(
+                                arabic, 'CHECKED IN ✓', 'تم تسجيل الحضور ✓')
+                            : (booking.isConfirmed
+                                ? localized(
+                                    arabic, 'CONFIRMED PASS', 'حجز مؤكد')
+                                : localized(arabic, 'HOLD · AWAITING DEPOSIT',
+                                    'حجز مؤقت')),
+                        backgroundColor: booking.isConfirmed
+                            ? kVermilion
+                            : const Color(0xFF292112),
+                        foregroundColor: booking.isConfirmed
+                            ? Colors.white
+                            : const Color(0xFFFBBF24),
+                        borderColor: booking.isConfirmed
+                            ? kVermilion
+                            : const Color(0xFFF59E0B).withValues(alpha: 0.45),
+                        dotColor: booking.isConfirmed ? Colors.white : kSignal,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1B1917),
+                          borderRadius:
+                              BorderRadius.circular(HagzyTokens.radiusSmall),
+                          border: Border.all(color: const Color(0xFF2E2A25)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  localized(
+                                      arabic, 'Deposit Paid', 'العربون المدفوع'),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.65)),
+                                ),
+                                Text(
+                                  '${formatMoney(paidAmount)} EGP',
+                                  style: hagzyMonoStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                    color: kVermilion,
+                                    arabic: arabic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child:
+                                  Divider(height: 1, color: Color(0xFF2E2A25)),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  localized(arabic, 'Due at Venue',
+                                      'المتبقي عند الوصول'),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.65)),
+                                ),
+                                Text(
+                                  '${formatMoney(remainingDue)} EGP',
+                                  style: hagzyMonoStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                    color: Colors.white,
+                                    arabic: arabic,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kVermilion,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                  HagzyTokens.radiusSmall),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _openMaps(venue);
+                          },
+                          icon: const Icon(Icons.directions_outlined,
+                              size: 16, color: Colors.white),
+                          label: Text(
+                            localized(arabic, 'Directions', 'الاتجاهات'),
+                            style: const TextStyle(
+                              fontSize: 13.0,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (widget.onUpdateReminder != null &&
+                          !booking.cancelled &&
+                          !booking.checkedIn) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Color(0xFF2D2D38)),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    HagzyTokens.radiusMedium),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showReminderPicker(booking);
+                            },
+                            icon: Icon(Icons.notifications_active_outlined,
+                                size: 15, color: kVolt),
+                            label: Text(
+                              '${localized(arabic, "WhatsApp Reminder:", "تذكير واتساب:")} ${_reminderLabel(booking.reminderOffsetMinutes, arabic)}',
+                              style: const TextStyle(
+                                  fontSize: 12.0, fontWeight: FontWeight.w700),
+                            ),
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _openMaps(venue);
-                      },
-                      icon: const Icon(Icons.directions_outlined,
-                          size: 15, color: kGreen),
-                      label: Text(
-                        localized(arabic, 'Directions', 'الاتجاهات'),
-                        style: const TextStyle(fontSize: 12.0),
-                      ),
-                    ),
-                  ),
-                  if (widget.onUpdateReminder != null &&
-                      !booking.cancelled &&
-                      !booking.checkedIn) ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _showReminderPicker(booking);
-                        },
-                        icon: const Icon(Icons.notifications_active_outlined,
-                            size: 15, color: kGreen),
-                        label: Text(
-                          '${localized(arabic, "WhatsApp Reminder:", "تذكير واتساب:")} ${_reminderLabel(booking.reminderOffsetMinutes, arabic)}',
-                          style: const TextStyle(fontSize: 12.0),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1380,12 +1639,15 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     final remainingBalance =
         (booking.price - depositPaid).clamp(0.0, booking.price);
 
-    await showDialog<void>(
+    await showHagzyDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: kPanel,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: kBorder, width: 1.0),
+        ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
           child: Padding(
@@ -1404,7 +1666,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           color: kGreen.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.receipt_long_rounded,
+                        child: Icon(Icons.receipt_long_rounded,
                             color: kGreen, size: 22),
                       ),
                       const SizedBox(width: 12),
@@ -1415,7 +1677,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                             Text(
                               localized(
                                   arabic, 'OFFICIAL RECEIPT', 'إيصال رسمي معتمد'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.w900,
                                 color: kGreen,
@@ -1436,8 +1698,15 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                       ),
                       IconButton(
                         tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          fixedSize: const Size(44, 44),
+                          backgroundColor: kSurfaceSubtle,
+                          foregroundColor: kInk,
+                          shape: const CircleBorder(),
+                        ),
                         onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close_rounded, size: 18),
+                        icon: const Icon(Icons.close_rounded, size: 19),
                       ),
                     ],
                   ),
@@ -1634,11 +1903,11 @@ class _TicketPerforatedDivider extends StatelessWidget {
         children: [
           Row(
             children: List.generate(
-              28,
+              32,
               (index) => Expanded(
                 child: Container(
                   height: 1.5,
-                  color: index.isEven ? kBorder : Colors.transparent,
+                  color: index.isEven ? kBorderStrong.withValues(alpha: 0.35) : Colors.transparent,
                 ),
               ),
             ),
@@ -1651,7 +1920,7 @@ class _TicketPerforatedDivider extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kPage,
                 shape: BoxShape.circle,
-                border: Border.all(color: kBorder),
+                border: Border.all(color: kBorderStrong, width: 1.3),
               ),
             ),
           ),
@@ -1663,7 +1932,7 @@ class _TicketPerforatedDivider extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kPage,
                 shape: BoxShape.circle,
-                border: Border.all(color: kBorder),
+                border: Border.all(color: kBorderStrong, width: 1.3),
               ),
             ),
           ),

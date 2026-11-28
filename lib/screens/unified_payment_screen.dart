@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../hagzy_api.dart';
 import '../theme/hagzy_theme.dart';
+import '../widgets/common_widgets.dart';
 import '../core/models/models_v2.dart';
 import '../features/checkout_psychology/checkout_psychology.dart';
 
@@ -425,9 +426,8 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
           : _cleanPhone(_activeIntent?.expectedSenderIdentifier ?? ''),
     );
 
-    showModalBottomSheet(
+    showHagzySheet<void>(
       context: context,
-      isScrollControlled: true,
       backgroundColor: kPanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -445,7 +445,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.edit_rounded, color: kGreen, size: 22),
+                Icon(Icons.edit_rounded, color: kGreen, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   _localized('Edit Transfer Sender Details', 'تعديل بيانات الحساب المحول منه'),
@@ -585,102 +585,148 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
   }
 
   Widget _buildDetailsFormView(bool isDark) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Form(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (widget.amount > 0 && widget.amount < 5.0)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _localized(
-                          'Notice: Minimum transfer on InstaPay & Vodafone Cash is 5 EGP. Payable amount is adjusted to 5 EGP (any excess reduces your venue bill or is added to your wallet).',
-                          'تنبيه: الحد الأدنى للتحويل عبر إنستاباي وفودافون كاش هو ٥ جنيه. تم ضبط المبلغ على ٥ جنيه (أي زيادة تُخصم من باقي حسابك في المكان أو تضاف لمحفظتك).',
-                        ),
-                        style: const TextStyle(
-                          color: Color(0xFF92400E),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          height: 1.35,
-                        ),
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark ||
+                      kDarkMode.value;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? kWarning.withValues(alpha: 0.14)
+                          : const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: kWarning.withValues(alpha: isDark ? 0.45 : 0.40),
                       ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: isDark ? kWarning : const Color(0xFFB45309),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _localized(
+                              'Notice: Minimum transfer on InstaPay & Vodafone Cash is 5 EGP. Payable amount is adjusted to 5 EGP (any excess reduces your venue bill or is added to your wallet).',
+                              'تنبيه: الحد الأدنى للتحويل عبر إنستاباي وفودافون كاش هو ٥ جنيه. تم ضبط المبلغ على ٥ جنيه (أي زيادة تُخصم من باقي حسابك في المكان أو تضاف لمحفظتك).',
+                            ),
+                            style: TextStyle(
+                              color: isDark ? kWarning : const Color(0xFF92400E),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-            // Amount Summary Card
+            // Obsidian Monolith Invoice Summary Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF047857), Color(0xFF059669)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                color: kObsidian,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+                border: Border.all(
+                  color: kVolt.withValues(alpha: 0.35),
+                  width: 1.2,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: kGreen.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                boxShadow: HagzyTheme.softShadow,
               ),
-              child: Column(
+              child: Stack(
                 children: [
-                  Text(
-                    _localized('Total Due Now', 'المبلغ المطلوب سداده'),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  const Positioned.fill(
+                    child: CustomPaint(
+                      painter: HagzyCourtBlueprintPainter(
+                        lineColor: Color(0x14FFFFFF),
+                        accentColor: Color(0x45E8381C),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${effectivePayableAmount.toInt()}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -1,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 16),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const HagzyBrandSymbol(
+                              size: 20,
+                              variant: HagzyBrandVariant.volt,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _localized(
+                                  'Total Due Now', 'المبلغ المطلوب سداده'),
+                              style: hagzyMonoStyle(
+                                color: Colors.white.withValues(alpha: 0.72),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                arabic: widget.arabic,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _localized('EGP', 'ج.م'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            HagzyAnimatedValue(
+                              valueKey: effectivePayableAmount.toInt(),
+                              child: Text(
+                                '${effectivePayableAmount.toInt()}',
+                                style: hagzyMonoStyle(
+                                  color: kVolt,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.0,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _localized('EGP', 'ج.م'),
+                              style: hagzyMonoStyle(
+                                color: Colors.white,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                arabic: widget.arabic,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
-            // 2-Tab Selector
+            // Sliding 2-Channel Payment Selector
             Text(
               _localized('Choose Payment Channel', 'اختر طريقة الدفع'),
               style: TextStyle(
@@ -690,39 +736,43 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
               ),
             ),
             const SizedBox(height: 8),
-            Container(
+            HagzySlidingSelector(
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1F352D) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                ),
+              itemCount: 2,
+              selectedIndex: _selectedTab == PaymentMethodTab.instaPay ? 0 : 1,
+              trackDecoration: BoxDecoration(
+                color: kSurfaceSubtle,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+                border: Border.all(color: kBorder),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildChannelTabButton(
-                      title: 'InstaPay',
-                      subtitle: _localized('Instant Transfer', 'تحويل فوري'),
-                      icon: Icons.bolt_rounded,
-                      accentColor: const Color(0xFF6366F1),
-                      isSelected: _selectedTab == PaymentMethodTab.instaPay,
-                      onTap: () => setState(() => _selectedTab = PaymentMethodTab.instaPay),
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildChannelTabButton(
-                      title: _localized('Mobile Wallet', 'محفظة إلكترونية'),
-                      subtitle: 'Vodafone / Orange / e& / WE',
-                      icon: Icons.account_balance_wallet_rounded,
-                      accentColor: const Color(0xFFE11D48),
-                      isSelected: _selectedTab == PaymentMethodTab.mobileWallet,
-                      onTap: () => setState(() => _selectedTab = PaymentMethodTab.mobileWallet),
-                    ),
-                  ),
-                ],
+              indicatorDecoration: BoxDecoration(
+                color: kPanel,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall + 2),
+                border: Border.all(color: kBorderStrong.withValues(alpha: 0.35)),
+                boxShadow: HagzyTheme.subtleShadow,
               ),
+              itemBuilder: (context, idx, isSelected) {
+                if (idx == 0) {
+                  return _buildChannelTabButton(
+                    title: 'InstaPay',
+                    subtitle: _localized('Instant Transfer', 'تحويل فوري'),
+                    icon: Icons.bolt_rounded,
+                    accentColor: const Color(0xFF6366F1),
+                    isSelected: isSelected,
+                    onTap: () =>
+                        setState(() => _selectedTab = PaymentMethodTab.instaPay),
+                  );
+                }
+                return _buildChannelTabButton(
+                  title: _localized('Mobile Wallet', 'محفظة إلكترونية'),
+                  subtitle: 'Vodafone / Orange / e& / WE',
+                  icon: Icons.account_balance_wallet_rounded,
+                  accentColor: const Color(0xFFE11D48),
+                  isSelected: isSelected,
+                  onTap: () => setState(
+                      () => _selectedTab = PaymentMethodTab.mobileWallet),
+                );
+              },
             ),
             const SizedBox(height: 20),
 
@@ -738,7 +788,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
                   border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Row(
@@ -784,20 +834,21 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                         }
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: kAccentSurface,
+                  foregroundColor: kAccentOnSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius:
+                        BorderRadius.circular(HagzyTokens.radiusMedium),
                   ),
-                  elevation: 2,
+                  elevation: 0,
                 ),
                 child: _isCreatingIntent
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 22,
                         width: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                          valueColor: AlwaysStoppedAnimation(kAccentOnSurface),
                         ),
                       )
                     : Row(
@@ -806,12 +857,16 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                           Text(
                             _localized('Submit Reference', 'تأكيد وإرسال المرجع'),
                             style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 15.5,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Icon(Icons.send_rounded, size: 18),
+                          const Icon(
+                            Icons.send_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
                         ],
                       ),
               ),
@@ -838,6 +893,8 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
           ],
         ),
       ),
+        ),
+      ),
     );
   }
 
@@ -849,77 +906,70 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? kPanel : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: isSelected ? accentColor : kMuted, size: 22),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? kInk : kMuted,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Column(
+            children: [
+              Icon(icon, color: isSelected ? accentColor : kMuted, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected ? kInk : kMuted,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12.0,
-                color: kMuted,
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: kMuted,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildHoldStatusHeader() {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            const Icon(Icons.lock_clock_rounded, color: kGreenDark, size: 16),
+            Icon(Icons.lock_clock_rounded,
+                color: isDark ? kVolt : kObsidian, size: 16),
             const SizedBox(width: 6),
             Text(
               _localized('15-min slot hold active', 'حجز مؤقت ١٥ دقيقة'),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
-                color: kGreenDark,
+                color: isDark ? kVolt : kObsidian,
               ),
             ),
           ],
         ),
         Text(
           '${effectivePayableAmount.toStringAsFixed(0)} ${_localized('EGP', 'ج.م')}',
-          style: TextStyle(
+          style: hagzyMonoStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
             color: kInk,
-            fontFeatures: const [FontFeature.tabularFigures()],
+            arabic: widget.arabic,
           ),
         ),
       ],
@@ -1031,11 +1081,12 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                         });
                       },
                       style: FilledButton.styleFrom(
-                        backgroundColor: kGreenDark,
-                        foregroundColor: Colors.white,
+                        backgroundColor: kAccentSurface,
+                        foregroundColor: kAccentOnSurface,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius:
+                              BorderRadius.circular(HagzyTokens.radiusSmall + 2),
                         ),
                       ),
                       icon: Icon(
@@ -1220,22 +1271,27 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
   // Waiting for Transfer View (Real-time StreamBuilder)
   // ---------------------------------------------------------------------------
   Widget _buildActiveIntentStreamView(bool isDark) {
-    return StreamBuilder<PaymentIntentData>(
-      stream: _intentStreamController?.stream,
-      initialData: _activeIntent,
-      builder: (context, snapshot) {
-        final intent = snapshot.data ?? _activeIntent!;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: StreamBuilder<PaymentIntentData>(
+          stream: _intentStreamController?.stream,
+          initialData: _activeIntent,
+          builder: (context, snapshot) {
+            final intent = snapshot.data ?? _activeIntent!;
 
-        if (intent.status == PaymentIntentStatus.verified) {
-          return _buildVerifiedSuccessState(intent);
-        }
+            if (intent.status == PaymentIntentStatus.verified) {
+              return _buildVerifiedSuccessState(intent);
+            }
 
-        if (intent.status == PaymentIntentStatus.expired) {
-          return _buildExpiredState();
-        }
+            if (intent.status == PaymentIntentStatus.expired) {
+              return _buildExpiredState();
+            }
 
-        return _buildAwaitingTransferState(intent, isDark);
-      },
+            return _buildAwaitingTransferState(intent, isDark);
+          },
+        ),
+      ),
     );
   }
 
@@ -1248,47 +1304,47 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         children: [
-          // Live Countdown Banner
+          // Live Countdown Banner with Kinetic Hagzy Brand Loader
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+              color: kObsidian,
+              borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+              border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.45)),
             ),
             child: Row(
               children: [
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    valueColor: AlwaysStoppedAnimation(Color(0xFFF59E0B)),
-                  ),
+                const HagzyBrandLoader(
+                  size: 28,
+                  variant: HagzyBrandVariant.obsidian,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    _localized('Waiting for payment transfer...', 'بانتظار وصول التحويل تلقائياً...'),
-                    style: TextStyle(
+                    _localized('Waiting for payment transfer...',
+                        'بانتظار وصول التحويل تلقائياً...'),
+                    style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
-                      color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                      color: Colors.white,
                     ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B),
-                    borderRadius: BorderRadius.circular(10),
+                    color: kVolt,
+                    borderRadius:
+                        BorderRadius.circular(HagzyTokens.radiusSmall),
                   ),
                   child: Text(
                     '$minutes:$seconds',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: hagzyMonoStyle(
+                      color: kObsidian,
                       fontWeight: FontWeight.w900,
-                      fontSize: 14,
+                      fontSize: 13.5,
                     ),
                   ),
                 ),
@@ -1386,7 +1442,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                     ),
                     Text(
                       '${_formatPayableAmount(intent.expectedAmount)} ${_localized("EGP", "ج.م")}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: kGreen,
@@ -1434,7 +1490,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             ),
             child: Row(
               children: [
-                const Icon(Icons.shield_outlined, color: kGreen, size: 20),
+                Icon(Icons.shield_outlined, color: kGreen, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -1480,14 +1536,14 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
           // Educational step explanation
           Text(
             _localized(
-              'Once you send the transfer, our automated gateway oracle verifies it instantly. No receipts or screenshots required!',
-              'بمجرد إتمام التحويل، سيتعرف النظام الآلي على عمليتك فوراً ويؤكد الحجز تلقائياً دون الحاجة لرفع إيصال!',
+              'Once you send the transfer, our automatic verification system confirms it within moments. No receipts or screenshots needed.',
+              'بمجرد إتمام التحويل، يتأكد النظام الآلي من عمليتك فوراً ويؤكد الحجز تلقائياً دون الحاجة لرفع إيصال.',
             ),
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 12.5,
               color: kMuted,
-              height: 1.4,
+              height: 1.45,
             ),
           ),
           const SizedBox(height: 14),
@@ -1536,7 +1592,7 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
                   _handleVerifiedTransition();
                 },
                 style: FilledButton.styleFrom(
-                  backgroundColor: kGold,
+                  backgroundColor: const Color(0xFFC26A1B),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
@@ -1562,62 +1618,67 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
   Widget _buildVerifiedSuccessState(PaymentIntentData intent) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ScaleTransition(
-              scale: _scaleAnimation,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: const BoxDecoration(
-                  color: kGreen,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x6610B981),
-                      blurRadius: 28,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
+        padding: const EdgeInsets.all(28),
+        child: HagzyReveal(
+          index: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: kObsidian,
+              borderRadius: BorderRadius.circular(HagzyTokens.radiusXLarge),
+              border: Border.all(
+                color: kVolt.withValues(alpha: 0.45),
+                width: 1.3,
+              ),
+              boxShadow: HagzyTheme.floatingShadow,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: const HagzySuccessSeal(size: 108),
                 ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 54,
+                const SizedBox(height: 22),
+                HagzyMonoTag(
+                  label: _localized('Verified', 'تم التحقق'),
+                  backgroundColor: kVermilion,
+                  foregroundColor: Colors.white,
+                  borderColor: kVermilion,
                 ),
-              ),
+                const SizedBox(height: 14),
+                Text(
+                  _localized(
+                      'Payment Verified & Confirmed!', 'تم تأكيد الدفع بنجاح!'),
+                  style: hagzyTextStyle(
+                    arabic: widget.arabic,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _localized(
+                    'Your payment of ${intent.expectedAmount.toInt()} EGP has been verified automatically. Taking you to your confirmed booking...',
+                    'تم التحقق من استلام ${intent.expectedAmount.toInt()} ج.م آلياً بنجاح. جاري نقلك لصفحة الحجز المؤكد...',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.white.withValues(alpha: 0.72),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const HagzyBrandLoader(
+                  size: 36,
+                  variant: HagzyBrandVariant.obsidian,
+                ),
+              ],
             ),
-            const SizedBox(height: 28),
-            Text(
-              _localized('Payment Verified & Confirmed!', 'تم تأكيد الدفع بنجاح!'),
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: kInk,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _localized(
-                'Your payment of ${intent.expectedAmount.toInt()} EGP has been verified by the automated oracle. Redirecting to your confirmed booking...',
-                'تم التحقق من استلام ${intent.expectedAmount.toInt()} ج.م آلياً بنجاح. جاري نقلك لصفحة الحجز المؤكد...',
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: kMuted,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(kGreen),
-              strokeWidth: 2.5,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1664,11 +1725,14 @@ class _UnifiedPaymentScreenState extends State<UnifiedPaymentScreen>
             ElevatedButton(
               onPressed: () => _initiatePaymentIntent(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kGreen,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                backgroundColor: kAccentSurface,
+                foregroundColor: kAccentOnSurface,
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(HagzyTokens.radiusMedium)),
               ),
-              child: Text(_localized('Restart & Re-Check', 'إعادة المحاولة والفحص')),
+              child:
+                  Text(_localized('Restart & Re-Check', 'إعادة المحاولة والفحص')),
             ),
           ],
         ),

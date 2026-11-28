@@ -88,6 +88,13 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     });
   }
 
+  static bool _isReviewerEmail(String email) {
+    final normalized = email.trim().toLowerCase();
+    return normalized == 'reviewer@hagzy.app' ||
+        normalized == 'demo@hagzy.app' ||
+        normalized == 'apple.tester@hagzy.app';
+  }
+
   Future<void> _requestVerificationOtp({bool isResend = false}) async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim().toLowerCase();
@@ -120,71 +127,69 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     });
 
     try {
-      final isTest = WidgetsBinding.instance.runtimeType
-          .toString()
-          .toLowerCase()
-          .contains('test');
-      if (widget.apiConfigured) {
-        try {
-          Map<String, dynamic> otpRes;
+      final isReviewerEmail = _isReviewerEmail(email);
+      if (isReviewerEmail) {
+        _otpController.clear();
+      } else {
+        final isTest = WidgetsBinding.instance.runtimeType
+            .toString()
+            .toLowerCase()
+            .contains('test');
+        if (widget.apiConfigured) {
           try {
-            otpRes = await widget.api.requestVerificationOtp(
-              email: email,
-              name: name,
-              isSignUp: _isEmailSignUp,
-            );
-          } catch (firstErr) {
-            final errStr = firstErr.toString().toLowerCase();
-            if (!_isEmailSignUp &&
-                (errStr.contains('no account found') ||
-                    errStr.contains('not found') ||
-                    errStr.contains('404'))) {
-              // Automatically transition to Create Account mode so user isn't blocked
-              if (mounted) {
-                setState(() => _isEmailSignUp = true);
-              }
-              otpRes = await widget.api.requestVerificationOtp(
-                email: email,
-                name: name.isNotEmpty ? name : 'Hagzy Member',
-                isSignUp: true,
-              );
-            } else if (_isEmailSignUp &&
-                (errStr.contains('already registered') ||
-                    errStr.contains('already exists') ||
-                    errStr.contains('409'))) {
-              // Automatically transition to Log In mode so existing user isn't blocked
-              if (mounted) {
-                setState(() => _isEmailSignUp = false);
-              }
+            Map<String, dynamic> otpRes;
+            try {
               otpRes = await widget.api.requestVerificationOtp(
                 email: email,
                 name: name,
-                isSignUp: false,
+                isSignUp: _isEmailSignUp,
               );
-            } else {
-              rethrow;
+            } catch (firstErr) {
+              final errStr = firstErr.toString().toLowerCase();
+              if (!_isEmailSignUp &&
+                  (errStr.contains('no account found') ||
+                      errStr.contains('not found') ||
+                      errStr.contains('404'))) {
+                // Automatically transition to Create Account mode so user isn't blocked
+                if (mounted) {
+                  setState(() => _isEmailSignUp = true);
+                }
+                otpRes = await widget.api.requestVerificationOtp(
+                  email: email,
+                  name: name.isNotEmpty ? name : 'Hagzy Member',
+                  isSignUp: true,
+                );
+              } else if (_isEmailSignUp &&
+                  (errStr.contains('already registered') ||
+                      errStr.contains('already exists') ||
+                      errStr.contains('409'))) {
+                // Automatically transition to Log In mode so existing user isn't blocked
+                if (mounted) {
+                  setState(() => _isEmailSignUp = false);
+                }
+                otpRes = await widget.api.requestVerificationOtp(
+                  email: email,
+                  name: name,
+                  isSignUp: false,
+                );
+              } else {
+                rethrow;
+              }
             }
+            final testOtp = otpRes['testOtp'] as String?;
+            if (testOtp != null && testOtp.isNotEmpty) {
+              _otpController.text = testOtp;
+            }
+          } catch (e) {
+            if (!isTest) rethrow;
           }
-          final testOtp = otpRes['testOtp'] as String?;
-          if (testOtp != null && testOtp.isNotEmpty) {
-            _otpController.text = testOtp;
-          }
-        } catch (e) {
-          if (!isTest) rethrow;
+        } else if (!isTest) {
+          throw Exception(localized(
+            widget.arabic,
+            'Authentication server is currently unreachable. Please check your network.',
+            'السيرفر غير متصل حالياً. يرجى التأكد من اتصالك بالإنترنت.',
+          ));
         }
-      } else if (!isTest) {
-        throw Exception(localized(
-          widget.arabic,
-          'Authentication server is currently unreachable. Please check your network.',
-          'السيرفر غير متصل حالياً. يرجى التأكد من اتصالك بالإنترنت.',
-        ));
-      }
-
-      final isReviewerEmail = email == 'reviewer@hagzy.app' ||
-          email == 'demo@hagzy.app' ||
-          email == 'apple.tester@hagzy.app';
-      if (isReviewerEmail) {
-        _otpController.text = '123456';
       }
 
       if (mounted) {
@@ -268,65 +273,70 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     String resolvedPhone = '';
 
     try {
-      final isTest = WidgetsBinding.instance.runtimeType
-          .toString()
-          .toLowerCase()
-          .contains('test');
       String? token;
       double? walletBalance;
-
       bool? isAdmin;
-      if (widget.apiConfigured) {
-        try {
-          final res = await widget.api.verifyVerificationOtp(
-            email: email,
-            code: code,
-            name: name,
-          );
-          token = res['token'] as String?;
-          isAdmin = res['isAdmin'] == true;
-          if (res['customer'] is Map<String, dynamic>) {
-            final cust = res['customer'] as Map<String, dynamic>;
-            walletBalance = (cust['walletBalance'] as num?)?.toDouble();
-            final serverName = cust['name'] as String?;
-            if (serverName != null && serverName.isNotEmpty) {
-              resolvedName = serverName;
-            }
-            final serverEmail = cust['email'] as String?;
-            if (serverEmail != null && serverEmail.isNotEmpty) {
-              resolvedEmail = serverEmail;
-            }
-            final serverPhone = cust['phone'] as String?;
-            if (serverPhone != null && serverPhone.isNotEmpty) {
-              resolvedPhone = serverPhone;
-            }
-          }
-        } catch (e) {
-          if (isTest) {
-            token = 'test-token-123';
-          } else {
-            rethrow;
-          }
-        }
-      } else {
-        if (!isTest) {
+
+      final isReviewerEmail = _isReviewerEmail(email);
+      if (isReviewerEmail) {
+        if (code != '123456') {
           throw Exception(localized(
             widget.arabic,
-            'Authentication server unreachable. Please check your internet connection.',
-            'تعذر الاتصال بسيرفر تسجيل الدخول.',
+            'Invalid verification code. Please check and try again.',
+            'كود التحقق غير صحيح. يرجى التحقق والمحاولة مرة أخرى.',
           ));
         }
-        token = 'test-token-123';
-      }
-
-      final isReviewerEmail = email == 'reviewer@hagzy.app' ||
-          email == 'demo@hagzy.app' ||
-          email == 'apple.tester@hagzy.app';
-      if (isReviewerEmail && (code == '123456' || code.length == 6)) {
-        token ??= 'demo_reviewer_token_2026';
-        walletBalance ??= 1000.0;
+        token = 'demo_reviewer_token_2026';
+        walletBalance = 1000.0;
         resolvedName = 'App Reviewer';
         resolvedPhone = '01012345678';
+      } else {
+        final isTest = WidgetsBinding.instance.runtimeType
+            .toString()
+            .toLowerCase()
+            .contains('test');
+        if (widget.apiConfigured) {
+          try {
+            final res = await widget.api.verifyVerificationOtp(
+              email: email,
+              code: code,
+              name: name,
+            );
+            token = res['token'] as String?;
+            isAdmin = res['isAdmin'] == true;
+            if (res['customer'] is Map<String, dynamic>) {
+              final cust = res['customer'] as Map<String, dynamic>;
+              walletBalance = (cust['walletBalance'] as num?)?.toDouble();
+              final serverName = cust['name'] as String?;
+              if (serverName != null && serverName.isNotEmpty) {
+                resolvedName = serverName;
+              }
+              final serverEmail = cust['email'] as String?;
+              if (serverEmail != null && serverEmail.isNotEmpty) {
+                resolvedEmail = serverEmail;
+              }
+              final serverPhone = cust['phone'] as String?;
+              if (serverPhone != null && serverPhone.isNotEmpty) {
+                resolvedPhone = serverPhone;
+              }
+            }
+          } catch (e) {
+            if (isTest) {
+              token = 'test-token-123';
+            } else {
+              rethrow;
+            }
+          }
+        } else {
+          if (!isTest) {
+            throw Exception(localized(
+              widget.arabic,
+              'Authentication server unreachable. Please check your internet connection.',
+              'تعذر الاتصال بسيرفر تسجيل الدخول.',
+            ));
+          }
+          token = 'test-token-123';
+        }
       }
 
       await widget.onSignIn(
@@ -397,10 +407,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               SnackBar(
                 content: Text(localized(
                   widget.arabic,
-                  'Google Sign-In notice: $err',
-                  'تنبيه تسجيل الدخول بجوجل: $err',
+                  'Could not sign in with Google right now. Please try again or use your email.',
+                  'تعذر تسجيل الدخول بحساب جوجل حالياً. يرجى المحاولة مرة أخرى أو استخدام البريد الإلكتروني.',
                 )),
-                backgroundColor: Colors.redAccent,
+                backgroundColor: kError,
+                behavior: SnackBarBehavior.floating,
               ),
             );
           }
@@ -494,10 +505,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               SnackBar(
                 content: Text(localized(
                   widget.arabic,
-                  'Apple Sign-In notice: $err',
-                  'تنبيه تسجيل الدخول بحساب أبل: $err',
+                  'Could not sign in with Apple right now. Please try again or use your email.',
+                  'تعذر تسجيل الدخول بحساب أبل حالياً. يرجى المحاولة مرة أخرى أو استخدام البريد الإلكتروني.',
                 )),
-                backgroundColor: Colors.redAccent,
+                backgroundColor: kError,
+                behavior: SnackBarBehavior.floating,
               ),
             );
           }
@@ -564,755 +576,955 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final arabic = widget.arabic;
+    final isWide =
+        MediaQuery.sizeOf(context).width >= HagzyTokens.breakpointTablet;
+    const allowDemoShortcut =
+        kDebugMode || bool.fromEnvironment('HAGZY_DEMO_LOGIN');
 
-    return Scaffold(
-      body: HagzyAmbientBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Top Brand & Language Bar
-                    Row(
-                      children: [
-                        const HagzyLogoMark(size: 44, withGlow: true),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                arabic ? 'حجزي' : 'Hagzy',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 21,
-                                  letterSpacing: -0.5,
-                                  color: kInk,
-                                ),
-                              ),
-                              Text(
-                                localized(
-                                  arabic,
-                                  'Smart Instant Bookings',
-                                  'حجوزات ذكية وفورية في ثواني',
-                                ),
-                                style: TextStyle(
-                                  fontSize: 12.0,
-                                  color: kMuted,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: kPanel,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: kBorder),
-                            boxShadow: HagzyTheme.softShadow,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              LanguageOption(
-                                label: 'EN',
-                                selected: widget.language == 'EN',
-                                onTap: () => widget.onChangeLanguage('EN'),
-                              ),
-                              LanguageOption(
-                                label: 'AR',
-                                selected: widget.language == 'AR',
-                                onTap: () => widget.onChangeLanguage('AR'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: localized(
-                            arabic,
-                            kDarkMode.value ? 'Light Mode' : 'Dark Mode',
-                            kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
-                          ),
-                          onPressed: widget.onToggleDarkMode ??
-                              () {
-                                kDarkMode.value = !kDarkMode.value;
-                              },
-                          style: IconButton.styleFrom(
-                            backgroundColor: kDarkMode.value
-                                ? const Color(0xFF162822)
-                                : kSurfaceTint,
-                            foregroundColor:
-                                kDarkMode.value ? kGold : kGreen,
-                            side: BorderSide(color: kBorder),
-                          ),
-                          icon: HagzyThemeModeIcon(
-                            isDark: kDarkMode.value,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+    final topControlsRow = Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: HagzyPrimaryLogo(
+              symbolSize: 30,
+              arabic: arabic,
+              compact: true,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: kPanel,
+              border: Border.all(color: kBorder, width: 1.0),
+              borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LanguageOption(
+                  label: 'EN',
+                  selected: widget.language == 'EN',
+                  onTap: () => widget.onChangeLanguage('EN'),
+                ),
+                LanguageOption(
+                  label: 'AR',
+                  selected: widget.language == 'AR',
+                  onTap: () => widget.onChangeLanguage('AR'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: localized(
+              arabic,
+              kDarkMode.value ? 'Light Mode' : 'Dark Mode',
+              kDarkMode.value ? 'الوضع النهاري' : 'الوضع الليلي',
+            ),
+            onPressed: () {
+              HagzyHaptics.selection();
+              if (widget.onToggleDarkMode != null) {
+                widget.onToggleDarkMode!();
+              } else {
+                kDarkMode.value = !kDarkMode.value;
+              }
+            },
+            style: IconButton.styleFrom(
+              minimumSize: const Size(44, 44),
+              backgroundColor: kPanel,
+              foregroundColor: kInk,
+              side: BorderSide(color: kBorder, width: 1.0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+              ),
+            ),
+            icon: HagzyThemeModeIcon(
+              isDark: kDarkMode.value,
+              color: kInk,
+              size: 18,
+            ),
+          ),
+        ],
+      ),
+    );
 
-                    // Hero Welcome Banner
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        gradient: HagzyTheme.obsidianGradient,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: HagzyTheme.softShadow,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              gradient: HagzyTheme.brandGradient,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: kGreen.withValues(alpha: 0.35),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.verified_user_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  localized(
-                                    arabic,
-                                    'Welcome to Hagzy',
-                                    'أهلاً بك في حجزي',
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 18,
-                                    color: Colors.white,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  localized(
-                                    arabic,
-                                    'Booking made easier — reserve your favorite venues in 1-tap',
-                                    'حجوزات أسهل — احجز مكانك وموعدك المفضل بضغطة واحدة',
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withValues(alpha: 0.78),
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+    final compactWelcomeHeader = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          localized(arabic, 'Welcome to Hagzy', 'أهلاً بك في حجزي'),
+          style: hagzyDisplayStyle(
+            arabic: arabic,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: kInk,
+            letterSpacing: -0.5,
+            height: arabic ? 1.25 : 1.12,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          localized(
+            arabic,
+            'Book padel courts, football pitches, barbershops, and gaming lounges in seconds.',
+            'احجز ملاعب البادل وكرة القدم، صالونات الحلاقة، وصالات الألعاب في ثوانٍ.',
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            color: kMuted,
+            height: 1.45,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
 
-                    // Main Authentication Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: kPanel,
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: kBorder),
-                        boxShadow: HagzyTheme.softShadow,
-                      ),
-                      child: _isVerifyingOtp
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: kGreen.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        Icons.mark_email_read_outlined,
-                                        color: kGreen,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        localized(
-                                          arabic,
-                                          'Enter Verification Code',
-                                          'أدخل كود التحقق',
-                                        ),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 16,
-                                          color: kInk,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  localized(
-                                    arabic,
-                                    'We sent a 6-digit verification code to ${_emailController.text}',
-                                    'أرسلنا كود التحقق المكون من 6 أرقام إلى ${_emailController.text}',
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: kMuted,
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                TextField(
-                                  controller: _otpController,
-                                  autofocus: true,
-                                  textAlign: TextAlign.center,
-                                  maxLength: 6,
-                                  keyboardType: TextInputType.number,
-                                  textInputAction: TextInputAction.done,
-                                  onSubmitted: (_) {
-                                    if (!_loading) _verifyOtpAndSubmit();
-                                  },
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 10,
-                                    color: kInk,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: '000000',
-                                    hintStyle: TextStyle(
-                                      color: kMuted.withValues(alpha: 0.4),
-                                      letterSpacing: 10,
-                                    ),
-                                    counterText: '',
-                                    prefixIcon:
-                                        const Icon(Icons.security_rounded),
-                                    isDense: true,
-                                  ),
-                                ),
-                                if (_errorMessage != null) ...[
-                                  const SizedBox(height: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.redAccent
-                                          .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.error_outline,
-                                            size: 16, color: Colors.redAccent),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _errorMessage!,
-                                            style: const TextStyle(
-                                              color: Colors.redAccent,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 14),
-                                Wrap(
-                                  alignment: WrapAlignment.spaceBetween,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: 8,
-                                  runSpacing: 6,
-                                  children: [
-                                    if (_resendCountdown > 0)
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.timer_outlined,
-                                              size: 14, color: kMuted),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            localized(
-                                              arabic,
-                                              'Resend in ${_resendCountdown}s',
-                                              'إعادة الإرسال بعد $_resendCountdown ث',
-                                            ),
-                                            style: TextStyle(
-                                                fontSize: 12, color: kMuted),
-                                          ),
-                                        ],
-                                      )
-                                    else
-                                      TextButton.icon(
-                                        onPressed: _loading
-                                            ? null
-                                            : () => _requestVerificationOtp(
-                                                isResend: true),
-                                        icon: const Icon(Icons.refresh_rounded,
-                                            size: 16),
-                                        label: Text(
-                                          localized(arabic, 'Resend Code',
-                                              'إعادة إرسال الكود'),
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 12),
-                                        ),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: kGreen,
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: Size.zero,
-                                          tapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                      ),
-                                    TextButton(
-                                      onPressed: () => setState(() {
-                                        _isVerifyingOtp = false;
-                                        _errorMessage = null;
-                                      }),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: kMuted,
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: Size.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      child: Text(
-                                        localized(arabic, 'Change Details',
-                                            'تعديل البيانات'),
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                PressableScale(
-                                  onTap: _loading ? null : _verifyOtpAndSubmit,
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      gradient: HagzyTheme.brandGradient,
-                                      borderRadius: BorderRadius.circular(14),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: kGreen.withValues(alpha: 0.3),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 3),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: _loading
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2.2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                        Color>(Colors.white),
-                                              ),
-                                            )
-                                          : Text(
-                                              localized(
-                                                arabic,
-                                                'Verify & Sign In',
-                                                'تأكيد وتسجيل الدخول',
-                                              ),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: kGreen.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        Icons.login_rounded,
-                                        color: kGreen,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        localized(
-                                          arabic,
-                                          'Sign in to Hagzy',
-                                          'تسجيل الدخول إلى حجزي',
-                                        ),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 16,
-                                          color: kInk,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
-                                  _SocialSignInButton(
-                                    provider: 'apple',
-                                    arabic: arabic,
-                                    onTap: _signInWithApple,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _SocialSignInButton(
-                                    provider: 'google',
-                                    arabic: arabic,
-                                    onTap: _signInWithGoogle,
-                                  ),
-                                ] else ...[
-                                  _SocialSignInButton(
-                                    provider: 'google',
-                                    arabic: arabic,
-                                    onTap: _signInWithGoogle,
-                                  ),
-                                  if (kIsWeb &&
-                                      (defaultTargetPlatform == TargetPlatform.iOS ||
-                                          defaultTargetPlatform == TargetPlatform.macOS)) ...[
-                                    const SizedBox(height: 10),
-                                    _SocialSignInButton(
-                                      provider: 'apple',
-                                      arabic: arabic,
-                                      onTap: _signInWithApple,
-                                    ),
-                                  ],
-                                ],
-                                const SizedBox(height: 16),
-                                Row(
-                                  children: [
-                                    const Expanded(child: Divider()),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
-                                      child: Text(
-                                        localized(
-                                          arabic,
-                                          'or continue with email',
-                                          'أو المتابعة بالبريد الإلكتروني',
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: kMuted,
-                                        ),
-                                      ),
-                                    ),
-                                    const Expanded(child: Divider()),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                if (_isEmailSignUp) ...[
-                                  TextField(
-                                    controller: _nameController,
-                                    textDirection: arabic
-                                        ? TextDirection.rtl
-                                        : TextDirection.ltr,
-                                    decoration: InputDecoration(
-                                      labelText: localized(
-                                          arabic,
-                                          'Full Name (optional)',
-                                          'الاسم بالكامل (اختياري)'),
-                                      hintText: localized(
-                                          arabic,
-                                          'e.g. Mohamed Hegazy',
-                                          'مثال: محمد حجازي'),
-                                      prefixIcon: const Icon(
-                                          Icons.person_outline_rounded),
-                                      isDense: true,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                                TextField(
-                                  controller: _emailController,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.done,
-                                  onSubmitted: (_) {
-                                    if (!_loading) _requestVerificationOtp();
-                                  },
-                                  textDirection: TextDirection.ltr,
-                                  decoration: InputDecoration(
-                                    labelText: localized(arabic,
-                                        'Email Address', 'البريد الإلكتروني'),
-                                    hintText: 'name@example.com',
-                                    prefixIcon:
-                                        const Icon(Icons.email_outlined),
-                                    helperText: localized(
-                                      arabic,
-                                      'We will send a 6-digit verification code to your email',
-                                      'سنرسل كود تحقق مكون من 6 أرقام إلى بريدك الإلكتروني',
-                                    ),
-                                    isDense: true,
-                                  ),
-                                ),
-                                if (_errorMessage != null) ...[
-                                  const SizedBox(height: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.redAccent
-                                          .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.error_outline,
-                                            size: 16, color: Colors.redAccent),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _errorMessage!,
-                                            style: const TextStyle(
-                                              color: Colors.redAccent,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 16),
-                                PressableScale(
-                                  onTap: _loading
-                                      ? null
-                                      : _requestVerificationOtp,
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      gradient: HagzyTheme.brandGradient,
-                                      borderRadius: BorderRadius.circular(14),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: kGreen.withValues(alpha: 0.3),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 3),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: _loading
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2.2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                        Color>(Colors.white),
-                                              ),
-                                            )
-                                          : Text(
-                                              localized(
-                                                arabic,
-                                                _isEmailSignUp
-                                                    ? 'Create Account'
-                                                    : 'Log In',
-                                                _isEmailSignUp
-                                                    ? 'إنشاء حساب'
-                                                    : 'تسجيل الدخول',
-                                              ),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 14.5,
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                Wrap(
-                                  alignment: WrapAlignment.center,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Text(
-                                      _isEmailSignUp
-                                          ? localized(
-                                              arabic,
-                                              'Already have an account? ',
-                                              'لديك حساب بالفعل؟ ')
-                                          : localized(
-                                              arabic,
-                                              "Don't have an account? ",
-                                              'ليس لديك حساب؟ '),
-                                      style: TextStyle(
-                                          fontSize: 13, color: kMuted),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => setState(() {
-                                        _isEmailSignUp = !_isEmailSignUp;
-                                        _errorMessage = null;
-                                      }),
-                                      child: Text(
-                                        _isEmailSignUp
-                                            ? localized(arabic, 'Log In',
-                                                'تسجيل الدخول')
-                                            : localized(
-                                                arabic,
-                                                'Create Account',
-                                                'إنشاء حساب جديد'),
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          color: kGreen,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton.icon(
-                        key: const Key('reviewer_demo_button'),
-                        onPressed: () async {
-                          await widget.onSignIn(
-                            name: 'App Reviewer',
-                            email: 'reviewer@hagzy.app',
-                            phone: '01012345678',
-                            token: 'demo_reviewer_token_2026',
-                            walletBalance: 1000.0,
-                            isAdmin: false,
-                          );
-                        },
-                        icon: const Icon(Icons.verified_user_outlined,
-                            size: 15, color: kGold),
-                        label: Text(
-                          localized(
-                            arabic,
-                            'Reviewer / Tester Quick Sign-In (Demo)',
-                            'دخول تجريبي لفريق المراجعة (Demo)',
-                          ),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: kGold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (widget.onSwitchToAdmin != null) ...[
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: widget.onSwitchToAdmin,
-                          icon: const Icon(Icons.storefront_rounded,
-                              size: 16, color: kGreen),
-                          label: Text(
-                            localized(
-                              arabic,
-                              'Are you a Venue Owner? Open Partner Portal',
-                              'هل أنت صاحب مكان أو ملعب؟ افتح بوابة الشركاء',
-                            ),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kGreen,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                    ],
+    final authFormColumn = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        topControlsRow,
+        const SizedBox(height: 8),
 
-                    // Footer
-                    Center(
-                      child: Text.rich(
-                        TextSpan(
-                          style: TextStyle(
-                            color: kMuted,
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: localized(
-                                arabic,
-                                'Hagzy v2.4 · Made with ',
-                                'حجزي v2.4 · صُنع بـ ',
-                              ),
-                            ),
-                            const WidgetSpan(
-                              alignment: PlaceholderAlignment.middle,
-                              child: Icon(
-                                Icons.favorite_rounded,
-                                size: 13,
-                                color: Color(0xFFE11D48),
-                              ),
-                            ),
-                            TextSpan(
-                              text: localized(
-                                arabic,
-                                ' in Kafr El-Sheikh',
-                                ' في كفر الشيخ',
-                              ),
-                            ),
-                          ],
-                        ),
-                        textAlign: TextAlign.center,
+        if (!isWide) ...[
+          compactWelcomeHeader,
+          const SizedBox(height: 18),
+        ] else ...[
+          Text(
+            localized(arabic, 'Welcome to Hagzy', 'أهلاً بك في حجزي'),
+            style: hagzyDisplayStyle(
+              arabic: arabic,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+              height: arabic ? 1.24 : 1.12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            localized(
+              arabic,
+              'Book padel courts, football pitches, barbershops, and gaming lounges in seconds.',
+              'احجز ملاعب البادل وكرة القدم، صالونات الحلاقة، وصالات الألعاب في ثوانٍ.',
+            ),
+            style: TextStyle(
+              fontSize: 14,
+              color: kMuted,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // Clean Warm Surface Auth Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: kPanel,
+            borderRadius: BorderRadius.circular(HagzyTokens.radiusXLarge),
+            border: Border.all(color: kBorder, width: 1.0),
+            boxShadow: HagzyTheme.softShadow,
+          ),
+          child: AnimatedSwitcher(
+            duration: HagzyTokens.durationMedium,
+            switchInCurve: HagzyTokens.curveDialogEnter,
+            switchOutCurve: Curves.easeInCubic,
+            child: _isVerifyingOtp
+                ? KeyedSubtree(
+                    key: const ValueKey('otp_step'),
+                    child: _buildOtpVerificationForm(arabic),
+                  )
+                : KeyedSubtree(
+                    key: const ValueKey('auth_step'),
+                    child: _buildSignInForm(arabic),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        if (allowDemoShortcut) ...[
+          HagzyTap(
+            scaleDown: 0.98,
+            onTap: () async {
+              await widget.onSignIn(
+                name: 'App Reviewer',
+                email: 'reviewer@hagzy.app',
+                phone: '01012345678',
+                token: 'demo_reviewer_token_2026',
+                walletBalance: 1000.0,
+                isAdmin: false,
+              );
+            },
+            child: Container(
+              key: const Key('reviewer_demo_button'),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: kPanel,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+                border: Border.all(color: kBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.science_outlined, size: 18, color: kGold),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      localized(
+                        arabic,
+                        'Reviewer Quick Sign-In (Dev Preview)',
+                        'دخول تجريبي سريع (معاينة)',
+                      ),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kInk,
                       ),
                     ),
-                  ],
+                  ),
+                  const HagzyDirectionalChevron(size: 16),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        if (widget.onSwitchToAdmin != null) ...[
+          HagzyTap(
+            scaleDown: 0.98,
+            onTap: widget.onSwitchToAdmin,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: kPanel,
+                borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
+                border: Border.all(color: kBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.storefront_outlined,
+                      size: 18, color: kBrandAccent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      localized(
+                        arabic,
+                        'Are you a Venue Owner? Open Partner Portal',
+                        'هل أنت صاحب مكان أو ملعب؟ افتح بوابة الشركاء',
+                      ),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kInk,
+                      ),
+                    ),
+                  ),
+                  HagzyDirectionalChevron(
+                    size: 16,
+                    color: kBrandAccent,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // Store-Compliant Privacy Policy & Terms of Service Links
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 4,
+          runSpacing: 2,
+          children: [
+            Text(
+              localized(
+                arabic,
+                'By continuing, you agree to our',
+                'بالمتابعة فإنك توافق على',
+              ),
+              style: TextStyle(fontSize: 12, color: kMuted),
+            ),
+            TextButton(
+              key: const Key('login_terms_link'),
+              onPressed: () => showHagzyLegalSheet(
+                context,
+                arabic: arabic,
+                isPrivacy: false,
+                apiBaseUrl: widget.api.baseUrl,
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: kInk,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                minimumSize: const Size(44, 44),
+              ),
+              child: Text(
+                localized(arabic, 'Terms of Service', 'شروط الاستخدام'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+            Text(
+              localized(arabic, 'and', 'و'),
+              style: TextStyle(fontSize: 12, color: kMuted),
+            ),
+            TextButton(
+              key: const Key('login_privacy_link'),
+              onPressed: () => showHagzyLegalSheet(
+                context,
+                arabic: arabic,
+                isPrivacy: true,
+                apiBaseUrl: widget.api.baseUrl,
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: kInk,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                minimumSize: const Size(44, 44),
+              ),
+              child: Text(
+                localized(arabic, 'Privacy Policy', 'سياسة الخصوصية'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (!isWide) {
+      return Scaffold(
+        body: HagzyAmbientBackground(
+          child: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                      maxWidth: HagzyTokens.maxFormWidth),
+                  child: authFormColumn,
                 ),
               ),
             ),
           ),
         ),
+      );
+    }
+
+    // Desktop Clean Split-Screen: Warm Brand Welcome Panel + Calm Sign-In Desk
+    return Scaffold(
+      body: HagzyAmbientBackground(
+        child: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 11,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: kObsidian,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: HagzyTheme.floatingShadow,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        const PositionedDirectional(
+                          bottom: -56,
+                          end: -48,
+                          child: IgnorePointer(
+                            child: Opacity(
+                              opacity: 0.08,
+                              child: HagzyBrandSymbol(
+                                size: 300,
+                                variant: HagzyBrandVariant.monochromeLight,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(40, 36, 40, 34),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const HagzyBrandSymbol(
+                                    size: 36,
+                                    variant: HagzyBrandVariant.volt,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      localized(
+                                        arabic,
+                                        'Cairo · Giza · Alexandria · Delta',
+                                        'القاهرة · الجيزة · الإسكندرية · الدلتا',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: hagzyTextStyle(
+                                        arabic: arabic,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: kPaperCream.withValues(alpha: 0.78),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: kVermilion,
+                                  borderRadius: BorderRadius.circular(
+                                      HagzyTokens.radiusFull),
+                                ),
+                                child: Text(
+                                  localized(
+                                    arabic,
+                                    'Instant Booking Across Egypt',
+                                    'حجز فوري في جميع أنحاء مصر',
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Text(
+                                localized(
+                                  arabic,
+                                  'Every court,\nchair & room.\nOne tap.',
+                                  'كل الملاعب،\nوالصالونات،\nفي لحظة.',
+                                ),
+                                style: hagzyDisplayStyle(
+                                  arabic: arabic,
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -1.0,
+                                  height: arabic ? 1.22 : 1.08,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 420),
+                                child: Text(
+                                  localized(
+                                    arabic,
+                                    'Live schedules with instant 15-minute slot holds, digital QR check-in, and protected InstaPay & wallet deposits.',
+                                    'مواعيد مباشرة مع تثبيت فوري لمدة ١٥ دقيقة، بطاقة دخول QR، وحماية كاملة للعربون عبر إنستاباي والمحفظة.',
+                                  ),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.78),
+                                    fontSize: 14.5,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.only(top: 18),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: Colors.white.withValues(alpha: 0.14),
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: _LoginFeatureHighlight(
+                                        icon: Icons.schedule_rounded,
+                                        label: localized(
+                                          arabic,
+                                          '15-Minute Instant Slot Lock',
+                                          'تثبيت فوري ١٥ دقيقة',
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: _LoginFeatureHighlight(
+                                        icon: Icons.qr_code_2_rounded,
+                                        label: localized(
+                                          arabic,
+                                          'Digital QR Check-In Pass',
+                                          'بطاقة دخول QR رقمية',
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: _LoginFeatureHighlight(
+                                        icon: Icons.verified_user_outlined,
+                                        label: localized(
+                                          arabic,
+                                          'Protected Deposit Escrow',
+                                          'حماية كاملة للعربون',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 10,
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                          maxWidth: HagzyTokens.maxFormWidth),
+                      child: authFormColumn,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildOtpVerificationForm(bool arabic) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const IconBox(icon: Icons.mark_email_read_outlined),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    localized(
+                      arabic,
+                      'Enter Verification Code',
+                      'أدخل كود التحقق',
+                    ),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16.5,
+                      color: kInk,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    localized(
+                      arabic,
+                      'Sent to ${_emailController.text}',
+                      'تم الإرسال إلى ${_emailController.text}',
+                    ),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: kMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        TextField(
+          controller: _otpController,
+          autofocus: true,
+          textAlign: TextAlign.center,
+          maxLength: 6,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) {
+            if (!_loading) _verifyOtpAndSubmit();
+          },
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 10,
+            color: kInk,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+          decoration: InputDecoration(
+            hintText: '000000',
+            hintStyle: TextStyle(
+              color: kMuted.withValues(alpha: 0.35),
+              letterSpacing: 10,
+            ),
+            counterText: '',
+            prefixIcon: const Icon(Icons.security_rounded, size: 20),
+          ),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _AuthErrorBox(message: _errorMessage!),
+        ],
+        const SizedBox(height: 14),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            if (_resendCountdown > 0)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_outlined, size: 14, color: kMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    localized(
+                      arabic,
+                      'Resend in ${_resendCountdown}s',
+                      'إعادة الإرسال بعد $_resendCountdown ث',
+                    ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: kMuted,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              )
+            else
+              TextButton.icon(
+                onPressed: _loading
+                    ? null
+                    : () => _requestVerificationOtp(isResend: true),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: Text(
+                  localized(arabic, 'Resend Code', 'إعادة إرسال الكود'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12.5),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: kGreenDark,
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            TextButton(
+              onPressed: () => setState(() {
+                _isVerifyingOtp = false;
+                _errorMessage = null;
+              }),
+              style: TextButton.styleFrom(
+                foregroundColor: kMuted,
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                localized(arabic, 'Change Details', 'تعديل البيانات'),
+                style: const TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          height: 50,
+          child: FilledButton(
+            onPressed: _loading ? null : _verifyOtpAndSubmit,
+            child: _loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(kAccentOnSurface),
+                    ),
+                  )
+                : Text(
+                    localized(
+                      arabic,
+                      'Verify & Sign In',
+                      'تأكيد وتسجيل الدخول',
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSignInForm(bool arabic) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          localized(
+            arabic,
+            'Sign in to Hagzy',
+            'تسجيل الدخول إلى حجزي',
+          ),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 16.5,
+            color: kInk,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+          _SocialSignInButton(
+            provider: 'apple',
+            arabic: arabic,
+            onTap: _signInWithApple,
+          ),
+          const SizedBox(height: 10),
+          _SocialSignInButton(
+            provider: 'google',
+            arabic: arabic,
+            onTap: _signInWithGoogle,
+          ),
+        ] else ...[
+          _SocialSignInButton(
+            provider: 'google',
+            arabic: arabic,
+            onTap: _signInWithGoogle,
+          ),
+          if (kIsWeb &&
+              (defaultTargetPlatform == TargetPlatform.iOS ||
+                  defaultTargetPlatform == TargetPlatform.macOS)) ...[
+            const SizedBox(height: 10),
+            _SocialSignInButton(
+              provider: 'apple',
+              arabic: arabic,
+              onTap: _signInWithApple,
+            ),
+          ],
+        ],
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                localized(
+                  arabic,
+                  'or continue with email',
+                  'أو المتابعة بالبريد الإلكتروني',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kMuted,
+                ),
+              ),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_isEmailSignUp) ...[
+          TextField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.name],
+            textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
+            decoration: InputDecoration(
+              labelText: localized(
+                  arabic, 'Full Name (optional)', 'الاسم بالكامل (اختياري)'),
+              hintText:
+                  localized(arabic, 'e.g. Mohamed Hegazy', 'مثال: محمد حجازي'),
+              prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.email],
+          onSubmitted: (_) {
+            if (!_loading) _requestVerificationOtp();
+          },
+          textDirection: TextDirection.ltr,
+          decoration: InputDecoration(
+            labelText: localized(arabic, 'Email Address', 'البريد الإلكتروني'),
+            hintText: 'name@example.com',
+            prefixIcon: const Icon(Icons.email_outlined, size: 20),
+            helperText: localized(
+              arabic,
+              'We will send a 6-digit verification code to your email',
+              'سنرسل كود تحقق مكون من 6 أرقام إلى بريدك الإلكتروني',
+            ),
+          ),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _AuthErrorBox(message: _errorMessage!),
+        ],
+        const SizedBox(height: 18),
+        SizedBox(
+          height: 50,
+          child: FilledButton(
+            onPressed: _loading ? null : _requestVerificationOtp,
+            child: _loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(kAccentOnSurface),
+                    ),
+                  )
+                : Text(
+                    localized(
+                      arabic,
+                      _isEmailSignUp ? 'Create Account' : 'Log In',
+                      _isEmailSignUp ? 'إنشاء حساب' : 'تسجيل الدخول',
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              _isEmailSignUp
+                  ? localized(arabic, 'Already have an account? ',
+                      'لديك حساب بالفعل؟ ')
+                  : localized(
+                      arabic, "Don't have an account? ", 'ليس لديك حساب؟ '),
+              style: TextStyle(fontSize: 13, color: kMuted),
+            ),
+            GestureDetector(
+              onTap: () => setState(() {
+                _isEmailSignUp = !_isEmailSignUp;
+                _errorMessage = null;
+              }),
+              child: Text(
+                _isEmailSignUp
+                    ? localized(arabic, 'Log In', 'تسجيل الدخول')
+                    : localized(arabic, 'Create Account', 'إنشاء حساب جديد'),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: kDarkMode.value ? kVolt : kObsidian,
+                  decoration: TextDecoration.underline,
+                  decorationColor: kDarkMode.value ? kVolt : kObsidian,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AuthErrorBox extends StatelessWidget {
+  const _AuthErrorBox({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: kError.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+        border: Border.all(color: kError.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 17, color: kError),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: kError,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginFeatureHighlight extends StatelessWidget {
+  const _LoginFeatureHighlight({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: kVermilion.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(HagzyTokens.radiusSmall),
+          ),
+          child: Icon(icon, size: 17, color: kVermilionBright),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            height: 1.3,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1332,48 +1544,47 @@ class _SocialSignInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isApple = provider == 'apple';
     final isDark = kDarkMode.value;
-    return PressableScale(
+    final appleBg = isDark ? Colors.white : Colors.black;
+    final appleFg = isDark ? Colors.black : Colors.white;
+    return HagzyTap(
       onTap: onTap,
+      scaleDown: 0.97,
+      haptic: HagzyHapticStyle.light,
       child: Container(
         height: 48,
         decoration: BoxDecoration(
           color: isApple
-              ? Colors.black
-              : (isDark ? const Color(0xFF162822) : Colors.white),
-          borderRadius: BorderRadius.circular(14),
+              ? appleBg
+              : (isDark ? const Color(0xFF23201D) : kPanel),
+          borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium),
           border: isApple
-              ? null
-              : Border.all(
-                  color: isDark ? kBorder : const Color(0xFFDADCE0)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+              ? Border.all(color: appleBg, width: 1.0)
+              : Border.all(color: kBorder, width: 1.1),
         ),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (isApple)
-              const Icon(Icons.apple, color: Colors.white, size: 22)
+              Icon(Icons.apple, color: appleFg, size: 22)
             else
-              const _GoogleLogoIcon(size: 20),
+              const _GoogleLogoIcon(size: 19),
             const SizedBox(width: 10),
-            Text(
-              isApple
-                  ? localized(arabic, 'Sign in with Apple',
-                      'تسجيل الدخول باستخدام Apple')
-                  : localized(arabic, 'Continue with Google',
-                      'المتابعة باستخدام Google'),
-              style: TextStyle(
-                color: isApple
-                    ? Colors.white
-                    : (isDark ? Colors.white : const Color(0xFF3C4043)),
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5,
-                letterSpacing: -0.1,
+            Flexible(
+              child: Text(
+                isApple
+                    ? localized(arabic, 'Sign in with Apple',
+                        'تسجيل الدخول باستخدام Apple')
+                    : localized(arabic, 'Continue with Google',
+                        'المتابعة باستخدام Google'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isApple ? appleFg : kInk,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  letterSpacing: -0.1,
+                ),
               ),
             ),
           ],

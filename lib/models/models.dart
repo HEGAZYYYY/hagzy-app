@@ -151,6 +151,190 @@ String friendlyError(Object error, {required bool arabic}) {
 String localized(bool arabic, String english, String arabicText) =>
     arabic ? arabicText : english;
 
+/// Splits parenthetical bilingual names like `"Smash Padel Club (سماش بادل كلوب)"`
+/// so English and Arabic never collide awkwardly in the same line.
+String displayLocalizedTitle(String raw, bool arabic) {
+  final trimmed = raw.trim();
+  final parenMatch =
+      RegExp(r'^(.+?)\s*\(([^()]+)\)\s*$').firstMatch(trimmed);
+  if (parenMatch != null) {
+    final primary = parenMatch.group(1)!.trim();
+    final secondary = parenMatch.group(2)!.trim();
+    final hasArabicPrimary = RegExp(r'[\u0600-\u06FF]').hasMatch(primary);
+    final hasArabicSecondary = RegExp(r'[\u0600-\u06FF]').hasMatch(secondary);
+    if (!hasArabicPrimary && hasArabicSecondary) {
+      return arabic ? secondary : primary;
+    }
+    if (hasArabicPrimary && !hasArabicSecondary) {
+      return arabic ? primary : secondary;
+    }
+  }
+  return trimmed;
+}
+
+/// Cleans and localizes common Egyptian neighborhood/city addresses for display
+/// when viewing the app in English, keeping Arabic addresses natural in Arabic.
+String displayLocalizedLocation(String raw, bool arabic) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty || arabic) return trimmed;
+  final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(trimmed);
+  if (!hasArabic) return trimmed;
+  const knownAddresses = <String, String>{
+    'التجمع الخامس، القاهرة الجديدة': 'Fifth Settlement, New Cairo',
+    'التجمع الأول، القاهرة الجديدة': 'First Settlement, New Cairo',
+    'المعادي، القاهرة': 'Maadi, Cairo',
+    'الشيخ زايد، الجيزة': 'Sheikh Zayed, Giza',
+    'الزمالك، القاهرة': 'Zamalek, Cairo',
+    'مدينة نصر، القاهرة': 'Nasr City, Cairo',
+    'الدقي، الجيزة': 'Dokki, Giza',
+    'بجوار الباب الخلفي لكافيه بليسمو، فرع الـ 47، شارع مستشفى تداوي، كفر الشيخ':
+        'Al-47 District, Tadawi St., Kafr El Sheikh',
+  };
+  final exact = knownAddresses[trimmed];
+  if (exact != null) return exact;
+  if (trimmed.contains('كفر الشيخ')) return 'Kafr El Sheikh';
+  if (trimmed.contains('القاهرة الجديدة') || trimmed.contains('التجمع')) {
+    return 'New Cairo';
+  }
+  if (trimmed.contains('الشيخ زايد')) return 'Sheikh Zayed, Giza';
+  if (trimmed.contains('المعادي')) return 'Maadi, Cairo';
+  if (trimmed.contains('مدينة نصر')) return 'Nasr City, Cairo';
+  if (trimmed.contains('الزمالك')) return 'Zamalek, Cairo';
+  if (trimmed.contains('الدقي')) return 'Dokki, Giza';
+  if (trimmed.contains('القاهرة')) return 'Cairo';
+  if (trimmed.contains('الجيزة')) return 'Giza';
+  if (trimmed.contains('الإسكندرية') || trimmed.contains('اسكندرية')) {
+    return 'Alexandria';
+  }
+  return trimmed;
+}
+
+/// Translates seeded Arabic venue amenities into crisp English when the
+/// app is in English mode, keeping Arabic labels unchanged in Arabic mode.
+String displayLocalizedAmenity(String raw, bool arabic) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty || arabic) return trimmed;
+  final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(trimmed);
+  if (!hasArabic) return trimmed;
+  const map = <String, String>{
+    'واي فاي': 'Wi-Fi',
+    'واي فاي مجاني': 'Free Wi-Fi',
+    'إنترنت فائق السرعة': 'High-Speed Wi-Fi',
+    'إنترنت فايبر 200 ميجا': '200 Mbps Fiber Wi-Fi',
+    'تكييف': 'Air Conditioning',
+    'تكييف مركزي': 'Central A/C',
+    'تكييف مركزي بالكامل': 'Full Central A/C',
+    'موقف سيارات': 'Parking',
+    'باركنج': 'Parking',
+    'باركينج خاص': 'Private Parking',
+    'خدمة VIP': 'VIP Service',
+    'كافيه': 'Café',
+    'كافيه ومطعم': 'Café & Restaurant',
+    'كافيه ومشروبات': 'Café & Drinks',
+    'كافتيريا للمشروبات': 'Drinks Cafeteria',
+    'مشروبات مجانية': 'Complimentary Drinks',
+    'مشروبات وعصائر فريش': 'Fresh Juices & Drinks',
+    'مشروبات دافئة وسناكس': 'Hot Drinks & Snacks',
+    'مشروبات وبوفيه مفتوح': 'Drinks & Open Buffet',
+    'منيو مشروبات وسناكس': 'Drinks & Snacks Menu',
+    'إسبريسو وقهوة مجانية': 'Complimentary Espresso',
+    'غرف خاصة': 'Private Rooms',
+    'غرف مكالمات خاصة': 'Private Call Booths',
+    'غرف PS5 VIP خاصة': 'Private VIP PS5 Rooms',
+    'غرف تغيير ملابس': 'Locker Rooms',
+    'غرف ملابس واستحمام': 'Lockers & Showers',
+    'غرف تبديل': 'Changing Rooms',
+    'إضاءة احترافية': 'Pro Lighting',
+    'إضاءة ليلية': 'Night Lighting',
+    'إضاءة ليلية LED': 'LED Night Lighting',
+    'كشافات ليلية احترافية': 'Pro Floodlights',
+    'إضاءات سينمائية Aputure': 'Aputure Cinema Lighting',
+    'شاشات 4K': '4K Screens',
+    'شاشات 4K HDR': '4K HDR Displays',
+    'شاشات عرض رياضية': 'Sports Screens',
+    'شاشات عرض بروجيكتور': 'Projector Screens',
+    'بلايستيشن 5': 'PlayStation 5',
+    'أحدث ألعاب PS5': 'Latest PS5 Games',
+    'بينج بونج وبلياردو': 'Ping Pong & Billiards',
+    'طاولات بلياردو احترافية': 'Pro Billiards Tables',
+    'ملاعب بانورامية WPT': 'Panoramic WPT Courts',
+    'ملاعب بادل وتنس': 'Padel & Tennis Courts',
+    'تأجير مضارب وكرات': 'Racket & Ball Rental',
+    'متجر معدات رياضية': 'Pro Sports Shop',
+    'نجيل صناعي معتمد FIFA': 'FIFA Certified Turf',
+    'لاونج خارجي': 'Outdoor Lounge',
+    'أخصائيات شعر وبشرة محترفات': 'Hair & Skin Specialists',
+    'منتجات فرنسية أصلية': 'Authentic French Products',
+    'قسم خاص للسبا والمساج': 'Private Spa & Massage',
+    'أجواء كلاسيكية فخمة': 'Classic Grooming Lounge',
+    'كراسي جلدية مريحة': 'Luxury Leather Chairs',
+    'أجواء هادئة للمذاكرة': 'Quiet Study Atmosphere',
+    'منافذ شحن لكل مقعد': 'Power Outlets at Every Seat',
+    'طباعة وتصوير أوراق': 'Printing & Scanning',
+    'ميكروفونات Shure SM7B': 'Shure SM7B Microphones',
+    'عزل صوتي احترافي 100%': '100% Acoustic Isolation',
+    'كاميرات Sony 4K': 'Sony 4K Cameras',
+    'مؤثرات رعب وإضاءة سينمائية': 'Cinematic Lighting & FX',
+    'مؤثرات صوتية حية وحبكة تفاعلية': 'Live Audio & Interactive Plot',
+    'مناسب للمجموعات من 2 إلى 20 فرد': 'Groups of 2–20 Players',
+    'مناسب للمجموعات 2-8 أشخاص': 'Groups of 2–8 Players',
+    'خزائن أمانات للأجهزة والمتعلقات': 'Secure Belongings Lockers',
+    'استراحة انتظار ومشروبات': 'Waiting Lounge & Drinks',
+    'ألغاز تفاعلية بالكامل': 'Interactive Puzzles',
+    'أجواء سينمائية وإضاءة ذكية': 'Smart Cinematic Lighting',
+    'قسم عائلات': 'Family Area',
+    'حجز خاص للسيدات': 'Ladies Only',
+    'منتجات أصلية': 'Premium Products',
+    'تعقيم شامل': 'Full Sanitization',
+    'أدوات معقمة': 'Sanitized Tools',
+    'جلسات مريحة': 'Lounge Seating',
+  };
+  return map[trimmed] ?? trimmed;
+}
+
+/// Provides natural English descriptions for seeded Egyptian venues when viewed
+/// in English mode, preserving Arabic descriptions in Arabic mode.
+String displayLocalizedDescription(Venue venue, bool arabic) {
+  final raw = venue.description.trim();
+  if (raw.isEmpty || arabic) return raw;
+  if (!isPrimarilyArabic(raw)) return raw;
+  const knownDescriptions = <String, String>{
+    'adrenaline-escape-room-kafr-el-sheikh':
+        'Immersive interactive escape rooms in Kafr El Sheikh with cinematic sets and 60-minute team challenges.',
+    'smash-padel-tagamoa':
+        'Panoramic WPT-standard padel courts in Fifth Settlement with an on-site café and locker rooms.',
+    'champions-turf-cairo':
+        'FIFA-grade 5v5 football pitches with pro night floodlights and full changing facilities.',
+    'zayed-padel-park':
+        'Outdoor padel and tennis courts in Sheikh Zayed with pro shop, outdoor lounge, and fresh drinks.',
+    'bunker-gaming-lounge':
+        'Private VIP PlayStation 5 suites with 4K HDR screens, pro billiards tables, and full snacks menu.',
+    'enigma-escape-cairo':
+        'Interactive puzzle escape rooms with cinematic smart lighting for groups of 2 to 8 players.',
+    'respawn-gaming-cafe':
+        'Modern gaming lounge featuring the latest PS5 titles, billiards, ping pong, and high-speed Wi-Fi.',
+    'letoile-beauty-cairo':
+        'Luxury beauty salon and spa in Zamalek offering hair styling, skincare, nails, and organic products.',
+    'the-gentleman-barber-zayed':
+        'Classic English barbershop in Sheikh Zayed with master stylists, beard grooming, and complimentary espresso.',
+    'hive-coworking-tagamoa':
+        'Modern coworking space and executive meeting rooms with 200 Mbps fiber internet and open café.',
+    'station-study-hub-dokki':
+        'Quiet study and remote work hub in Dokki with private group study rooms, power outlets, and hot drinks.',
+    'soundwave-podcast-studio':
+        'Acoustically treated podcast and media studio equipped with Shure SM7B mics, Aputure lights, and Sony 4K cameras.',
+  };
+  return knownDescriptions[venue.id] ?? raw;
+}
+
+/// Returns whether [text] starts with or is primarily Arabic script so mixed
+/// content renders with proper RTL punctuation alignment.
+bool isPrimarilyArabic(String text) {
+  final arabicMatches = RegExp(r'[\u0600-\u06FF]').allMatches(text).length;
+  final latinMatches = RegExp(r'[A-Za-z]').allMatches(text).length;
+  return arabicMatches > latinMatches;
+}
+
 String governorateName(String english, bool arabic) {
   final governorate =
       egyptGovernorates.where((entry) => entry.$1 == english).firstOrNull;

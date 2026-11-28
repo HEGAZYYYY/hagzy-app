@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/models/models_v2.dart';
+import '../../theme/hagzy_theme.dart';
 
 /// 10-Minute Free Cancellation Grace Period Countdown Banner
 /// Gives zero-anxiety booking coordination on WhatsApp with instant Hagzy Wallet refunds
@@ -35,9 +36,9 @@ class _GracePeriodCountdownBannerState
         final remaining = widget.booking.graceSecondsRemaining();
         if (remaining <= 0) {
           t.cancel();
-          setState(() => _secondsLeft = 0);
+          if (mounted) setState(() => _secondsLeft = 0);
         } else {
-          setState(() => _secondsLeft = remaining);
+          if (mounted) setState(() => _secondsLeft = remaining);
         }
       });
     }
@@ -56,26 +57,22 @@ class _GracePeriodCountdownBannerState
       return const SizedBox.shrink();
     }
 
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final mins = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
     final secs = (_secondsLeft % 60).toString().padLeft(2, '0');
+    final accent = isDark ? kGreenLight : kGreenDark;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      padding: const EdgeInsets.all(14.0),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F291E),
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF0E241C) : kSurfaceTint,
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
         border: Border.all(
-          color: Colors.greenAccent.withValues(alpha: 0.4),
-          width: 1.2,
+          color: accent.withValues(alpha: isDark ? 0.38 : 0.28),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.greenAccent.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,40 +80,38 @@ class _GracePeriodCountdownBannerState
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: Colors.greenAccent.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
+                  color: accent.withValues(alpha: isDark ? 0.22 : 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.timer_outlined,
-                  color: Colors.greenAccent,
-                  size: 18,
-                ),
+                child: Icon(Icons.timer_outlined, color: accent, size: 17),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   widget.isArabic
                       ? 'فترة السماح المجانية: $mins:$secs'
                       : '10-Min Grace Period: $mins:$secs',
-                  style: const TextStyle(
-                    color: Colors.greenAccent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
               TextButton(
                 onPressed: widget.onCancelUnderGrace,
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
+                  foregroundColor: kError,
                   visualDensity: VisualDensity.compact,
                 ),
                 child: Text(
                   widget.isArabic ? 'إلغاء واسترداد' : 'Cancel & Refund',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 12),
                 ),
               ),
             ],
@@ -124,12 +119,14 @@ class _GracePeriodCountdownBannerState
           const SizedBox(height: 6),
           Text(
             widget.isArabic
-                ? 'نسق مع الشلة على واتساب براحتك! لو غيرتوا رأيكم خلال العد التنازلي، بيتم استرداد العربون ١٠٠٪ فوراً في رصيد محفظة حجزي.'
+                ? 'نسق مع الشلة على واتساب براحتك! لو غيرتوا رأيكم خلال العد التنازلي، يُسترد العربون ١٠٠٪ فوراً في محفظة حجزي.'
                 : 'Coordinate with your squad on WhatsApp! If plans change during the countdown, 100% of your deposit is refunded instantly to your Hagzy Wallet.',
             style: TextStyle(
               fontSize: 12.0,
-              color: Colors.white.withValues(alpha: 0.85),
-              height: 1.35,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.80)
+                  : const Color(0xFF065F46),
+              height: 1.4,
             ),
           ),
         ],
@@ -137,4 +134,3 @@ class _GracePeriodCountdownBannerState
     );
   }
 }
-

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/hagzy_theme.dart';
 
 /// Merchant "Hagzy Pro" Upsell Banner Enforcing Principle 5 (Loss Aversion Framing)
 class MerchantLossAversionBanner extends StatelessWidget {
@@ -22,104 +23,118 @@ class MerchantLossAversionBanner extends StatelessWidget {
     if (noShowCount <= 0 || estimatedLostRevenueEgp <= 0) {
       return const SizedBox.shrink();
     }
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
     final lostEgp = estimatedLostRevenueEgp.toStringAsFixed(0);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      padding: const EdgeInsets.all(16.0),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF261214), // High-urgency deep dark red/burgundy
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF231215) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
         border: Border.all(
-          color: Colors.redAccent.withValues(alpha: 0.5),
-          width: 1.2,
+          color: isDark
+              ? const Color(0xFFF87171).withValues(alpha: 0.35)
+              : const Color(0xFFFECACA),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.redAccent.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: HagzyTheme.subtleShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
+                  color: kError.withValues(alpha: isDark ? 0.22 : 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.trending_down_rounded,
-                  color: Colors.redAccent,
+                  color: kError,
                   size: 20,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  isArabic
-                      ? '⚠️ خسرت ~$lostEgp ج.م هذا الشهر بسبب $noShowCount حجوزات وهمية!'
-                      : '⚠️ You lost ~$lostEgp EGP to $noShowCount no-shows & cancellations this month.',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13.5,
-                    height: 1.3,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isArabic
+                          ? 'خسرت ~$lostEgp ج.م هذا الشهر بسبب $noShowCount حجوزات ملغاة'
+                          : 'You lost ~$lostEgp EGP to $noShowCount no-shows & cancellations',
+                      style: hagzyTextStyle(
+                        arabic: isArabic,
+                        color: isDark ? Colors.white : const Color(0xFF991B1B),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        tabularFigures: true,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isArabic
+                          ? 'الحجوزات بدون عربون تكلفك إشغال مواعيد فارغة. فعّل الإيداع الآلي وتذكيرات واتساب لحماية أرباحك.'
+                          : 'Turn on Hagzy Pro Automated Deposits & WhatsApp Reminders to protect your slots and eliminate empty tables.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.78)
+                            : const Color(0xFF7F1D1D),
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            isArabic
-                ? 'الحجوزات بدون عربون بتكلفك إشغال طاولات فاضية. فعّل "حجزي برو" واستقبل عربون إلكتروني فوري مع تذكيرات واتساب آلية قبل الميعاد بساعة.'
-                : 'Turn on Hagzy Pro Automated Deposits & WhatsApp Reminders to protect your slots and eliminate empty tables.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.85),
-              height: 1.35,
-            ),
-          ),
           const SizedBox(height: 14),
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Primary CTA
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: onUpgradePro,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: Text(
-                    isArabic
-                        ? 'تفعيل الحماية والإيداع الآلي'
-                        : 'Turn On Automated Deposits',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              FilledButton.icon(
+                onPressed: onUpgradePro,
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      isDark ? const Color(0xFFDC2626) : const Color(0xFFB91C1C),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 42),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(HagzyTokens.radiusMedium),
                   ),
                 ),
+                icon: const Icon(Icons.shield_rounded, size: 16),
+                label: Text(
+                  isArabic
+                      ? 'تفعيل الحماية والإيداع الآلي'
+                      : 'Turn On Automated Deposits',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
+                ),
               ),
-              const SizedBox(width: 10),
-              // Loss-Aversion Dismiss CTA (never "Cancel" or "Not now")
               TextButton(
                 onPressed: onDismissAbsorbLosses,
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.white.withValues(alpha: 0.6),
-                  visualDensity: VisualDensity.compact,
+                  foregroundColor: isDark
+                      ? Colors.white.withValues(alpha: 0.7)
+                      : const Color(0xFF991B1B),
                 ),
                 child: Text(
                   isArabic ? 'سأتحمل الخسائر بنفسي' : 'I\'ll absorb the losses',
-                  style: const TextStyle(fontSize: 12.0),
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -129,4 +144,3 @@ class MerchantLossAversionBanner extends StatelessWidget {
     );
   }
 }
-

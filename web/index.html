@@ -2,7 +2,6 @@
 <html>
 <head>
   <script>
-    // Purge any stale service worker caches so updates are immediate
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(regs) {
         for (let r of regs) r.unregister();
@@ -18,30 +17,28 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Discover and book local experiences with Hagzy.">
+  <meta name="description" content="Hagzy — Reserve courts, chairs, and rooms across Egypt.">
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#059669">
+  <meta name="theme-color" content="#F7F5F0">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Hagzy">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
 
-  <title>Hagzy</title>
+  <title>Hagzy — Book Courts, Salons & Spaces in Egypt</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Clean High-End Typography & Native System / iOS Emoji Stack -->
+  <!-- Clean Bilingual Consumer Typography: Plus Jakarta Sans + Readex Pro -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=Alexandria:wght@400;500;600;700;800&family=Montserrat:wght@500;600;700;800;900&family=Poppins:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Tajawal:wght@500;700;800&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Readex+Pro:wght@400;500;600;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
 
   <style>
     html, body {
@@ -49,10 +46,10 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background-color: #059669;
+      background-color: #F7F5F0;
       overflow: hidden;
       overscroll-behavior: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", 'Plus Jakarta Sans', 'Alexandria', Roboto, sans-serif;
+      font-family: 'Plus Jakarta Sans', 'Readex Pro', -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       -webkit-tap-highlight-color: transparent;

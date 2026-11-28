@@ -36,14 +36,8 @@ class VibeSmartBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           colors: isDay
-              ? [
-                  const Color(0xFF0F172A),
-                  const Color(0xFF064E3B),
-                ]
-              : [
-                  const Color(0xFF0F172A),
-                  const Color(0xFF1E1B4B),
-                ],
+              ? const [Color(0xFF062E24), Color(0xFF047857)]
+              : const [Color(0xFF0B131E), Color(0xFF064E3B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -75,8 +69,10 @@ class VibeSmartBanner extends StatelessWidget {
                   children: [
                     Icon(
                       isDay ? Icons.wb_sunny_rounded : Icons.nightlife_rounded,
-                      size: 13,
-                      color: isDay ? Colors.amberAccent : Colors.purpleAccent,
+                      size: 14,
+                      color: isDay
+                          ? const Color(0xFFFBBF24)
+                          : const Color(0xFF6EE7B7),
                     ),
                     const SizedBox(width: 5),
                     Text(
@@ -124,7 +120,7 @@ class VibeSmartBanner extends StatelessWidget {
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            height: 38,
+            height: 44,
             child: ElevatedButton(
               onPressed: onCtaPressed,
               style: ElevatedButton.styleFrom(

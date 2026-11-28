@@ -16,7 +16,7 @@ Future<Map<String, dynamic>?> webGoogleSignIn() async {
     );
     return {'redirecting': true};
   } catch (e) {
-    debugPrint('Supabase Google OAuth error: $e');
+    if (kDebugMode) debugPrint('Supabase Google OAuth error: $e');
     return {'error': e.toString()};
   }
 }
@@ -33,7 +33,7 @@ Future<Map<String, dynamic>?> webAppleSignIn() async {
     );
     return {'redirecting': true};
   } catch (e) {
-    debugPrint('Supabase Apple OAuth error: $e');
+    if (kDebugMode) debugPrint('Supabase Apple OAuth error: $e');
     return {'error': e.toString()};
   }
 }

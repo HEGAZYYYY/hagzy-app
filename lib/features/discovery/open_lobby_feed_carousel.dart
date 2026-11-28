@@ -156,7 +156,11 @@ class _LobbyCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12.0,
                         fontWeight: FontWeight.bold,
-                        color: isChallenger ? Colors.amber.shade300 : theme.colorScheme.primary,
+                        color: isChallenger
+                            ? (Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFFFBBF24)
+                                : const Color(0xFFB45309))
+                            : theme.colorScheme.primary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/hagzy_theme.dart';
+import '../../widgets/hagzy_motion.dart';
 
 /// Modal bottom sheet allowing the customer to enter any custom top-up amount
 /// or pick from fast preset chips, then immediately proceed to the payments section.
@@ -22,10 +23,8 @@ class TopUpWalletSheet extends StatefulWidget {
     bool isArabic = false,
     required ValueChanged<double> onProceedToPayment,
   }) {
-    return showModalBottomSheet<void>(
+    return showHagzySheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => TopUpWalletSheet(
         currentBalance: currentBalance,
         isArabic: isArabic,
@@ -200,18 +199,18 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
-                  color: kGreen,
+                  color: kInk,
                 ),
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.payments_outlined, color: kGreen),
+                  prefixIcon: Icon(Icons.payments_outlined, color: kBrandAccent),
                   suffixText: arabic ? 'ج.م' : 'EGP',
-                  suffixStyle: const TextStyle(
+                  suffixStyle: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
-                    color: kGreen,
+                    color: kBrandAccent,
                   ),
                   hintText: '100',
                   helperText: arabic
@@ -224,7 +223,7 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
                   ),
                   filled: true,
                   fillColor: isDark
-                      ? const Color(0xFF0F172A)
+                      ? const Color(0xFF23201D)
                       : kSurfaceTint.withValues(alpha: 0.6),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -232,7 +231,7 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: kGreen, width: 2),
+                    borderSide: BorderSide(color: kBrandAccent, width: 2),
                   ),
                 ),
                 onChanged: (val) {
@@ -263,17 +262,17 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
                   return ChoiceChip(
                     label: Text('+${preset.toInt()} ${arabic ? "ج.م" : "EGP"}'),
                     selected: isSelected,
-                    selectedColor: kGreen.withValues(alpha: 0.25),
+                    selectedColor: kBrandAccent.withValues(alpha: isDark ? 0.22 : 0.14),
                     backgroundColor: isDark
-                        ? const Color(0xFF0F172A)
+                        ? kSurfaceSubtle
                         : kSurfaceTint.withValues(alpha: 0.5),
                     labelStyle: TextStyle(
-                      color: isSelected ? kGreen : kInk,
+                      color: isSelected ? kBrandAccent : kInk,
                       fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
                       fontSize: 12,
                     ),
                     side: BorderSide(
-                      color: isSelected ? kGreen : kBorder,
+                      color: isSelected ? kBrandAccent : kBorder,
                       width: isSelected ? 1.5 : 1,
                     ),
                     onSelected: (_) => _onPresetTapped(preset),
@@ -285,7 +284,7 @@ class _TopUpWalletSheetState extends State<TopUpWalletSheet> {
               // Continue to Payment CTA
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kGreen,
+                  backgroundColor: kAccentSurface,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(

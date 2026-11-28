@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/models_v2.dart';
+import '../../theme/hagzy_theme.dart';
 
 /// Screen displaying the full Social "El-Shilla" / Open Lobby roster,
 /// per-person financial splits, needed positions/roles, and WhatsApp invite generation.
@@ -108,40 +109,43 @@ class _SocialLobbyRosterScreenState extends State<SocialLobbyRosterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isArabic ? 'غرفة الشلة والمنافسة' : 'Squad & Challenger Lobby'),
+        title: Text(widget.isArabic
+            ? 'غرفة الشلة والمنافسة'
+            : 'Squad & Challenger Lobby'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: kBorder),
+        ),
         actions: [
           IconButton(
-            tooltip: widget.isArabic ? 'مشاركة عبر واتساب' : 'Share to WhatsApp',
-            icon: const Icon(Icons.share_rounded, color: Colors.greenAccent),
+            tooltip:
+                widget.isArabic ? 'مشاركة عبر واتساب' : 'Share to WhatsApp',
+            icon: Icon(
+              Icons.share_rounded,
+              color: kDarkMode.value ? kGreenLight : kGreenDark,
+            ),
             onPressed: _shareToWhatsApp,
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          // Hero Match Card
-          Container(
-            padding: const EdgeInsets.all(18.0),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: Colors.indigoAccent.withValues(alpha: 0.35),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              // Hero Match Card
+              Container(
+                padding: const EdgeInsets.all(20.0),
+                decoration: BoxDecoration(
+                  gradient: HagzyTheme.obsidianGradient,
+                  borderRadius: BorderRadius.circular(HagzyTokens.radiusLarge),
+                  border: Border.all(
+                    color: kGreenLight.withValues(alpha: 0.30),
+                    width: 1,
+                  ),
+                  boxShadow: HagzyTheme.softShadow,
                 ),
-              ],
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -390,37 +394,53 @@ class _SocialLobbyRosterScreenState extends State<SocialLobbyRosterScreen> {
           }),
         ],
       ),
+        ),
+      ),
       bottomNavigationBar: SafeArea(
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.15))),
+            color: kPanel,
+            border: Border(top: BorderSide(color: kBorder)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: Colors.greenAccent),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                onPressed: _shareToWhatsApp,
-                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.greenAccent),
-                label: Text(
-                  widget.isArabic ? 'دعوة شلتك عبر واتساب' : 'Invite Your Squad on WhatsApp',
-                  style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 8),
+          child: Center(
+            heightFactor: 1.0,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      foregroundColor:
+                          kDarkMode.value ? kGreenLight : kGreenDark,
+                      side: BorderSide(
+                        color: kGreen.withValues(alpha: 0.45),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(HagzyTokens.radiusMedium),
+                      ),
+                    ),
+                    onPressed: _shareToWhatsApp,
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                    label: Text(
+                      widget.isArabic
+                          ? 'دعوة شلتك عبر واتساب'
+                          : 'Invite Your Squad on WhatsApp',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: isFull ? Colors.grey : Colors.green,
+                  backgroundColor: isFull ? kMuted : kGreenDark,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(HagzyTokens.radiusMedium)),
                 ),
                 onPressed: (isFull || _isClaiming) ? null : _claimSpot,
                 child: _isClaiming
@@ -439,6 +459,8 @@ class _SocialLobbyRosterScreenState extends State<SocialLobbyRosterScreen> {
                       ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

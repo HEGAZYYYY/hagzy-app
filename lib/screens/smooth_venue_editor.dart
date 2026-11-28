@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/image_upload_service.dart';
 import '../theme/hagzy_theme.dart';
+import '../widgets/hagzy_components.dart';
 import '../widgets/smart_image.dart';
 
 /// Clean, smooth, non-AI venue editor & creator for Hagzy owners.
@@ -477,12 +478,16 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       ),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 760),
+        constraints: const BoxConstraints(maxWidth: 740, maxHeight: 780),
         child: Scaffold(
           backgroundColor: dialogBg,
           appBar: AppBar(
             backgroundColor: dialogBg,
             elevation: 0,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(height: 1, thickness: 1, color: borderColor),
+            ),
             leading: IconButton(
               icon: Icon(Icons.close_rounded, color: textColor),
               onPressed: () => Navigator.of(context).pop(),
@@ -527,7 +532,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                     ].map((cat) {
                       final isSel = _selectedSubcategory == cat.key;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 8),
                         child: ChoiceChip(
                           selected: isSel,
                           label: Text(isAr ? cat.labelAr : cat.labelEn),
@@ -897,7 +902,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_circle_outline, size: 16, color: kGreen),
+                          Icon(Icons.check_circle_outline, size: 16, color: kGreen),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -907,7 +912,7 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                           ),
                           Text(
                             '${svc.price.toStringAsFixed(0)} EGP',
-                            style: const TextStyle(fontWeight: FontWeight.w800, color: kGreen, fontSize: 13),
+                            style: TextStyle(fontWeight: FontWeight.w800, color: kGreen, fontSize: 13),
                           ),
                           const SizedBox(width: 4),
                           IconButton(
@@ -1322,12 +1327,12 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
       ]);
     }
 
-    showDialog(
+    showHagzyAdaptiveModal<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      maxWidth: 500,
+      builder: (ctx, isSheet) => StatefulBuilder(
         builder: (context, setDialogState) {
           final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-          final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
           final surfaceBg = isDark ? const Color(0xFF162822) : Colors.grey.shade100;
           final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade300;
           final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
@@ -1358,23 +1363,106 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                       ? (isAr ? 'إضافة غرفة هروب جديدة' : 'Add New Escape Room')
                       : (isAr ? 'إضافة غرفة أو ملعب جديد' : 'Add New Room or Court')));
 
-          return AlertDialog(
-            backgroundColor: dialogBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: borderColor),
-            ),
-            title: Text(
-              dialogTitle,
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
-            ),
-            content: SingleChildScrollView(
-              child: SizedBox(
-                width: 460,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+          return HagzyModalCard(
+            isSheet: isSheet,
+            maxWidth: 500,
+            icon: isSalon
+                ? Icons.content_cut_rounded
+                : (isEscape
+                    ? Icons.lock_open_rounded
+                    : Icons.add_box_outlined),
+            title: dialogTitle,
+            onClose: () => Navigator.pop(ctx),
+            primaryUseFilledButton: true,
+            primaryLabel: isEditing
+                ? (isAr ? 'حفظ التعديلات' : 'Save Changes')
+                : (isAr ? 'إضافة' : 'Add'),
+            onPrimary: () {
+              final n = nameCtrl.text.trim();
+              if (n.isEmpty) return;
+
+              Map<String, dynamic>? resolvedTiers;
+              Map<String, double>? resolvedDurations;
+              double r = 0.0;
+              double p = 0.0;
+
+              if (isEscape) {
+                if (editableTiers.isNotEmpty) {
+                  resolvedTiers = {};
+                  for (final t in editableTiers) {
+                    final cap = t.key.text.trim();
+                    final price = double.tryParse(t.value.text.trim()) ?? 0.0;
+                    if (cap.isNotEmpty && price > 0) {
+                      resolvedTiers[cap] = price;
+                    }
+                  }
+                }
+                r = resolvedTiers?.values.firstOrNull is num
+                    ? (resolvedTiers!.values.firstOrNull as num).toDouble()
+                    : 150.0;
+                p = r;
+              } else if (isSports) {
+                if (editableDurations.isNotEmpty) {
+                  resolvedDurations = {};
+                  for (final d in editableDurations) {
+                    final mins = d.key.text.trim();
+                    final price = double.tryParse(d.value.text.trim()) ?? 0.0;
+                    if (mins.isNotEmpty && price > 0) {
+                      resolvedDurations[mins] = price;
+                    }
+                  }
+                }
+                r = resolvedDurations?['60'] ?? (resolvedDurations?.values.firstOrNull ?? 400.0);
+                p = r;
+              } else {
+                r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
+                p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
+                if (isTiered && editableTiers.isNotEmpty) {
+                  resolvedTiers = {};
+                  for (final t in editableTiers) {
+                    final cap = t.key.text.trim();
+                    final price = double.tryParse(t.value.text.trim()) ?? 0.0;
+                    if (cap.isNotEmpty && price > 0) {
+                      resolvedTiers[cap] = price;
+                    }
+                  }
+                }
+              }
+
+              final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isEscape ? 2 : (isSports ? 4 : 1));
+              final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isEscape ? 15 : (isSports ? 8 : 10));
+
+              setState(() {
+                final updated = _EditableItem(
+                  id: item?.id ?? 'unit_${DateTime.now().microsecondsSinceEpoch}',
+                  name: n,
+                  kind: kindCtrl.text.trim().isNotEmpty
+                      ? kindCtrl.text.trim()
+                      : (isEscape ? 'Escape Room' : (isSports ? 'Court' : 'Standard')),
+                  hourlyRate: r,
+                  peakRate: p,
+                  description: descCtrl.text.trim(),
+                  imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
+                  pricingMode: isEscape || (isTiered && resolvedTiers != null) ? 'per_person_tiered' : null,
+                  pricingTiers: resolvedTiers,
+                  customDurations: resolvedDurations,
+                  minCapacity: minCap,
+                  maxCapacity: maxCap,
+                );
+                if (isEditing && index != null) {
+                  _items[index] = updated;
+                } else {
+                  _items.add(updated);
+                }
+              });
+              Navigator.pop(ctx);
+            },
+            secondaryLabel: isAr ? 'إلغاء' : 'Cancel',
+            onSecondary: () => Navigator.pop(ctx),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                     TextFormField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
@@ -1445,10 +1533,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                       maxCapCtrl.text = '15';
                                     });
                                   },
-                                  icon: const Icon(Icons.flash_on_rounded, size: 14, color: kGreen),
+                                  icon: Icon(Icons.flash_on_rounded, size: 14, color: kGreen),
                                   label: Text(
                                     isAr ? 'تسعيرة أدرينالين' : 'Adrenaline Preset',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
                                   ),
                                 ),
                               ],
@@ -1565,10 +1653,10 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                                       ]);
                                     });
                                   },
-                                  icon: const Icon(Icons.flash_on_rounded, size: 14, color: kGreen),
+                                  icon: Icon(Icons.flash_on_rounded, size: 14, color: kGreen),
                                   label: Text(
                                     isAr ? 'تسعيرة بادل قياسية' : 'Padel Preset',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
                                   ),
                                 ),
                               ],
@@ -1659,11 +1747,11 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                             child: Row(
                               children: [
-                                const Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
+                                Icon(Icons.add_circle_outline_rounded, size: 16, color: kGreen),
                                 const SizedBox(width: 6),
                                 Text(
                                   isAr ? 'تفعيل سعر ذروة مختلف (إذا كان المكان يطبق أسعار ذروة)' : 'Add different Peak / Surge Rate',
-                                  style: const TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -1824,103 +1912,8 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
                         ),
                       ),
                     ],
-                  ],
-                ),
-              ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  isAr ? 'إلغاء' : 'Cancel',
-                  style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
-                ),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: kGreen),
-                onPressed: () {
-                  final n = nameCtrl.text.trim();
-                  if (n.isEmpty) return;
-
-                  Map<String, dynamic>? resolvedTiers;
-                  Map<String, double>? resolvedDurations;
-                  double r = 0.0;
-                  double p = 0.0;
-
-                  if (isEscape) {
-                    if (editableTiers.isNotEmpty) {
-                      resolvedTiers = {};
-                      for (final t in editableTiers) {
-                        final cap = t.key.text.trim();
-                        final price = double.tryParse(t.value.text.trim()) ?? 0.0;
-                        if (cap.isNotEmpty && price > 0) {
-                          resolvedTiers[cap] = price;
-                        }
-                      }
-                    }
-                    r = resolvedTiers?.values.firstOrNull is num
-                        ? (resolvedTiers!.values.firstOrNull as num).toDouble()
-                        : 150.0;
-                    p = r;
-                  } else if (isSports) {
-                    if (editableDurations.isNotEmpty) {
-                      resolvedDurations = {};
-                      for (final d in editableDurations) {
-                        final mins = d.key.text.trim();
-                        final price = double.tryParse(d.value.text.trim()) ?? 0.0;
-                        if (mins.isNotEmpty && price > 0) {
-                          resolvedDurations[mins] = price;
-                        }
-                      }
-                    }
-                    r = resolvedDurations?['60'] ?? (resolvedDurations?.values.firstOrNull ?? 400.0);
-                    p = r;
-                  } else {
-                    r = double.tryParse(rateCtrl.text.trim()) ?? 150.0;
-                    p = enablePeakPricing ? (double.tryParse(peakCtrl.text.trim()) ?? r) : r;
-                    if (isTiered && editableTiers.isNotEmpty) {
-                      resolvedTiers = {};
-                      for (final t in editableTiers) {
-                        final cap = t.key.text.trim();
-                        final price = double.tryParse(t.value.text.trim()) ?? 0.0;
-                        if (cap.isNotEmpty && price > 0) {
-                          resolvedTiers[cap] = price;
-                        }
-                      }
-                    }
-                  }
-
-                  final minCap = int.tryParse(minCapCtrl.text.trim()) ?? (isEscape ? 2 : (isSports ? 4 : 1));
-                  final maxCap = int.tryParse(maxCapCtrl.text.trim()) ?? (isEscape ? 15 : (isSports ? 8 : 10));
-
-                  setState(() {
-                    final updated = _EditableItem(
-                      id: item?.id ?? 'unit_${DateTime.now().microsecondsSinceEpoch}',
-                      name: n,
-                      kind: kindCtrl.text.trim().isNotEmpty
-                          ? kindCtrl.text.trim()
-                          : (isEscape ? 'Escape Room' : (isSports ? 'Court' : 'Standard')),
-                      hourlyRate: r,
-                      peakRate: p,
-                      description: descCtrl.text.trim(),
-                      imageUrl: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : null,
-                      pricingMode: isEscape || (isTiered && resolvedTiers != null) ? 'per_person_tiered' : null,
-                      pricingTiers: resolvedTiers,
-                      customDurations: resolvedDurations,
-                      minCapacity: minCap,
-                      maxCapacity: maxCap,
-                    );
-                    if (isEditing && index != null) {
-                      _items[index] = updated;
-                    } else {
-                      _items.add(updated);
-                    }
-                  });
-                  Navigator.pop(ctx);
-                },
-                child: Text(isEditing ? (isAr ? 'حفظ التعديلات' : 'Save Changes') : (isAr ? 'إضافة' : 'Add')),
-              ),
-            ],
           );
         },
       ),
@@ -1932,85 +1925,71 @@ class _SmoothVenueEditorDialogState extends State<SmoothVenueEditorDialog> {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController(text: '100');
     final minCtrl = TextEditingController(text: '30');
-    final isDark = Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
-    final dialogBg = isDark ? const Color(0xFF111B17) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF1F352D) : Colors.grey.shade300;
-    final textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    showDialog(
+    showHagzyAdaptiveModal<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: dialogBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: borderColor),
-        ),
-        title: Text(
-          isAr ? 'إضافة خدمة أو باقة' : 'Add Service / Add-on',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textColor),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'اسم الخدمة (مثل: قص شعر وسشوار)' : 'Service Name (e.g. Haircut)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'السعر (جنيه)' : 'Price (EGP)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: minCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: isAr ? 'المدة التقديرية (بالدقائق)' : 'Duration (Minutes)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              isAr ? 'إلغاء' : 'Cancel',
-              style: TextStyle(color: mutedColor, fontWeight: FontWeight.w600),
-            ),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kGreen),
-            onPressed: () {
-              final n = nameCtrl.text.trim();
-              if (n.isEmpty) return;
-              final p = double.tryParse(priceCtrl.text.trim()) ?? 50.0;
-              final m = int.tryParse(minCtrl.text.trim()) ?? 30;
+      builder: (ctx, isSheet) => HagzyModalCard(
+        isSheet: isSheet,
+        icon: Icons.content_cut_rounded,
+        title: isAr ? 'إضافة خدمة أو باقة' : 'Add Service / Add-on',
+        onClose: () => Navigator.pop(ctx),
+        primaryUseFilledButton: true,
+        primaryLabel: isAr ? 'إضافة' : 'Add',
+        onPrimary: () {
+          final n = nameCtrl.text.trim();
+          if (n.isEmpty) return;
+          final p = double.tryParse(priceCtrl.text.trim()) ?? 50.0;
+          final m = int.tryParse(minCtrl.text.trim()) ?? 30;
 
-              setState(() {
-                _services.add(_EditableService(
-                  id: 'svc_${DateTime.now().microsecondsSinceEpoch}',
-                  name: n,
-                  price: p,
-                  minutes: m,
-                ));
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text(isAr ? 'إضافة' : 'Add'),
-          ),
-        ],
+          setState(() {
+            _services.add(_EditableService(
+              id: 'svc_${DateTime.now().microsecondsSinceEpoch}',
+              name: n,
+              price: p,
+              minutes: m,
+            ));
+          });
+          Navigator.pop(ctx);
+        },
+        secondaryLabel: isAr ? 'إلغاء' : 'Cancel',
+        onSecondary: () => Navigator.pop(ctx),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: isAr
+                    ? 'اسم الخدمة (مثل: قص شعر وسشوار)'
+                    : 'Service Name (e.g. Haircut)',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: isAr ? 'السعر (جنيه)' : 'Price (EGP)',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: minCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: isAr
+                    ? 'المدة التقديرية (بالدقائق)'
+                    : 'Duration (Minutes)',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

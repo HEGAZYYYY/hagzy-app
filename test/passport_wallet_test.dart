@@ -28,7 +28,7 @@ void main() {
       );
 
       expect(find.text('Hagzy Lifestyle Passport'), findsOneWidget);
-      expect(find.text('Verified Lifestyle Member'), findsOneWidget);
+      expect(find.text('Verified Member'), findsOneWidget);
       expect(find.text('98%'), findsOneWidget);
       expect(find.textContaining('Zero-Deposit Weekday Booking Perks'), findsOneWidget);
       expect(find.text('16'), findsOneWidget); // completed count

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../theme/hagzy_theme.dart';
+import '../../widgets/hagzy_components.dart';
 
 /// Loss-Aversion Checkout Exit Modal (Principle 5)
 /// Triggered if user attempts to back out of a prime slot checkout
@@ -9,6 +11,7 @@ class LossAversionExitDialog extends StatelessWidget {
   final VoidCallback onKeepSlot;
   final VoidCallback onReleaseSlot;
   final bool isArabic;
+  final bool isSheet;
 
   const LossAversionExitDialog({
     super.key,
@@ -18,6 +21,7 @@ class LossAversionExitDialog extends StatelessWidget {
     required this.onKeepSlot,
     required this.onReleaseSlot,
     this.isArabic = false,
+    this.isSheet = false,
   });
 
   static Future<bool?> show({
@@ -27,125 +31,93 @@ class LossAversionExitDialog extends StatelessWidget {
     int recentViewersCount = 4,
     bool isArabic = false,
   }) {
-    return showDialog<bool>(
+    return showHagzyAdaptiveModal<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => LossAversionExitDialog(
+      enableDrag: false,
+      builder: (ctx, isSheet) => LossAversionExitDialog(
         slotTimeFormatted: slotTimeFormatted,
         venueName: venueName,
         recentViewersCount: recentViewersCount,
         isArabic: isArabic,
-        onKeepSlot: () => Navigator.of(ctx).pop(false), // don't pop checkout
-        onReleaseSlot: () => Navigator.of(ctx).pop(true), // confirm release
+        isSheet: isSheet,
+        onKeepSlot: () => Navigator.of(ctx).pop(false),
+        onReleaseSlot: () => Navigator.of(ctx).pop(true),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || kDarkMode.value;
 
     final headline = isArabic
         ? 'تفرّط في ميعاد $slotTimeFormatted في $venueName؟'
         : 'Release $slotTimeFormatted at $venueName?';
 
     final socialProof = isArabic
-        ? '⚠️ $recentViewersCount أشخاص تصفحوا هذا الميعاد مؤخراً. بمجرد الرجوع قد يحجزه شخص آخر فوراً.'
-        : '⚠️ $recentViewersCount other people viewed this slot recently. Once released, someone else may book it instantly.';
+        ? '$recentViewersCount أشخاص تصفحوا هذا الميعاد مؤخراً. بمجرد الرجوع قد يحجزه شخص آخر فوراً.'
+        : '$recentViewersCount other people viewed this slot recently. Once released, someone else may book it instantly.';
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.amber.withValues(alpha: 0.4), width: 1.2),
-      ),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.amber,
-              size: 24,
-            ),
+    return HagzyModalCard(
+      isSheet: isSheet,
+      showCloseButton: false,
+      icon: Icons.warning_amber_rounded,
+      iconColor: kGold,
+      iconBackgroundColor: kGold.withValues(alpha: isDark ? 0.22 : 0.14),
+      title: headline,
+      content: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kSurfaceSubtle,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder),
+        ),
+        child: Text(
+          socialProof,
+          style: TextStyle(
+            fontSize: 13.5,
+            color: kMuted,
+            height: 1.48,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              headline,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
-      content: Column(
+      customActions: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
-            ),
-            child: Text(
-              socialProof,
-              style: TextStyle(
-                fontSize: 12.5,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      actions: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Primary Loss-Aversion CTA: "Keep My Slot"
-            ElevatedButton(
+          SizedBox(
+            height: 48,
+            child: FilledButton(
               onPressed: onKeepSlot,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
               child: Text(
                 isArabic ? 'احتفظ بميعادي 🔒' : 'Keep My Slot 🔒',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
               ),
             ),
-            const SizedBox(height: 8),
-
-            // Dismiss Loss-Aversion CTA: "Release slot to others" (never neutral "Cancel")
-            TextButton(
-              onPressed: onReleaseSlot,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.redAccent,
-              ),
-              child: Text(
-                isArabic ? 'فرّط في الميعاد لغيرك' : 'Release slot to others',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onReleaseSlot,
+            style: TextButton.styleFrom(
+              backgroundColor: kError.withValues(alpha: 0.08),
+              foregroundColor: kError,
+              minimumSize: const Size(0, 46),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
-          ],
-        ),
-      ],
+            child: Text(
+              isArabic ? 'فرّط في الميعاد لغيرك' : 'Release slot to others',
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
-
