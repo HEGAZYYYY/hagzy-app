@@ -22,6 +22,7 @@ Pre-Seeded Test State:
 - Signed-in customer profile ("App Reviewer") with 1,000 EGP in-app wallet balance.
 - 1 pre-seeded confirmed upcoming venue booking with a scannable QR Check-In Pass (visible under the "Bookings" tab).
 - 1 saved favorite venue (visible under the "Explore" tab).
+- Full Partner Portal access: tap Profile -> "Partner Portal" (or tap "Partner Portal" on the sign-in screen and log in with reviewer@hagzy.app / OTP 123456) to inspect venue management, POS timeline, QR check-in, analytics, and switch back to Customer App.
 - Full browsing, area/category filtering, venue booking flow, Dark Mode, and English/Arabic (RTL) switching are available without live payment charges.
 
 Guest Browsing & Account Deletion:

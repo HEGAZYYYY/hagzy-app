@@ -769,9 +769,20 @@ class _HagzyHomeState extends State<HagzyHome> {
     await _switchToAdminPortal();
   }
 
+  bool get _isReviewerSession =>
+      _isReviewerAccount(_savedCustomerEmail, _customerToken) ||
+      _isReviewerAccount(_savedCustomerEmail, _adminToken);
+
+  static bool _isReviewerIdentifier(String raw) {
+    final trimmed = raw.trim().toLowerCase();
+    return _isReviewerAccount(trimmed, null) ||
+        normalizeEgyptPhone(trimmed) == '01012345678';
+  }
+
   bool get _isSingularPartner {
     if (_savedCustomerEmail.trim().toLowerCase() == 'mohamedhegazypc11@gmail.com' ||
         normalizeEgyptPhone(_savedCustomerPhone) == '01015325250' ||
+        _isReviewerSession ||
         _savedCustomerIsAdmin ||
         _savedUserRole == 'owner') {
       return false;
@@ -780,7 +791,9 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   bool get _isAuthorizedAdmin {
-    if (_savedCustomerIsAdmin || _savedCustomerIsPartner) return true;
+    if (_isReviewerSession || _savedCustomerIsAdmin || _savedCustomerIsPartner) {
+      return true;
+    }
     final email = _savedCustomerEmail.trim().toLowerCase();
     if (email == 'mohamedhegazypc11@gmail.com') return true;
     final phone = normalizeEgyptPhone(_savedCustomerPhone);
@@ -827,7 +840,11 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _loadAdminPartnerRequests([String? tokenOverride]) async {
     final token = tokenOverride ?? _adminToken ?? _customerToken;
-    if (!_api.isConfigured || token == null || token.isEmpty || _isSingularPartner) {
+    if (!_api.isConfigured ||
+        _isReviewerSession ||
+        token == null ||
+        token.isEmpty ||
+        _isSingularPartner) {
       return;
     }
     try {
@@ -875,7 +892,9 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _loadAdminNotifications([String? tokenOverride]) async {
     final token = tokenOverride ?? _adminToken ?? _customerToken;
-    if (!_api.isConfigured || token == null || token.isEmpty) return;
+    if (!_api.isConfigured || _isReviewerSession || token == null || token.isEmpty) {
+      return;
+    }
     try {
       final res = await _api.getAdminNotifications(token);
       final raw = (res['notifications'] as List<dynamic>?) ?? const [];
@@ -905,7 +924,9 @@ class _HagzyHomeState extends State<HagzyHome> {
             .toList();
       });
     }
-    if (!_api.isConfigured || token == null || token.isEmpty) return;
+    if (!_api.isConfigured || _isReviewerSession || token == null || token.isEmpty) {
+      return;
+    }
     try {
       await _api.markAdminNotificationRead(token, notificationId);
     } catch (_) {}
@@ -914,15 +935,21 @@ class _HagzyHomeState extends State<HagzyHome> {
   Future<Map<String, dynamic>> _verifyBookingQr(
       String bookingId, String? sig) async {
     final token = _adminToken ?? _customerToken;
-    if (_api.isConfigured && token != null && token.isNotEmpty) {
+    if (_api.isConfigured &&
+        !_isReviewerSession &&
+        token != null &&
+        token.isNotEmpty) {
       return _api.getBookingQrDetails(token, bookingId, sig: sig);
     }
     final local = _bookings.where((b) => b.id == bookingId).firstOrNull;
     if (local == null) throw Exception('Booking not found.');
     final paid = local.actualPaidAmount ??
         (local.isConfirmed ? (local.dueNow ?? 0) : 0.0);
+    final sigOk = _isReviewerSession &&
+        local.qrSignature.isNotEmpty &&
+        (sig == null || sig.isEmpty || sig == local.qrSignature);
     return {
-      'signatureVerified': false,
+      'signatureVerified': sigOk,
       'booking': local.toJson(),
       'financialSummary': {
         'totalPrice': local.price,
@@ -935,7 +962,10 @@ class _HagzyHomeState extends State<HagzyHome> {
   Future<void> _checkInBooking(String bookingId, String? sig) async {
     final token = _adminToken ?? _customerToken;
     Booking? updatedBooking;
-    if (_api.isConfigured && token != null && token.isNotEmpty) {
+    if (_api.isConfigured &&
+        !_isReviewerSession &&
+        token != null &&
+        token.isNotEmpty) {
       final res = await _api.checkInBooking(token, bookingId, sig: sig);
       if (res['booking'] is Map<String, dynamic>) {
         updatedBooking = Booking.fromJson(res['booking'] as Map<String, dynamic>);
@@ -1082,19 +1112,30 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<Map<String, dynamic>> _loadGatewayStatus() async {
+    if (_isReviewerSession) {
+      return {
+        'isListenerActive': true,
+        'lastHeartbeatAt': DateTime.now().toUtc().toIso8601String(),
+        'recentLogs': const <dynamic>[],
+      };
+    }
     if (!_api.isConfigured) return {};
     return _api.getGatewayStatus();
   }
 
   Future<List<Map<String, dynamic>>> _loadReviewQueue() async {
     final token = _adminToken ?? _customerToken;
-    if (!_api.isConfigured || token == null || token.isEmpty) return const [];
+    if (!_api.isConfigured || _isReviewerSession || token == null || token.isEmpty) {
+      return const [];
+    }
     return _api.getPaymentReviewQueue(token);
   }
 
   Future<void> _attachReviewQueueItem(String itemId, String bookingId) async {
     final token = _adminToken ?? _customerToken;
-    if (!_api.isConfigured || token == null || token.isEmpty) return;
+    if (!_api.isConfigured || _isReviewerSession || token == null || token.isEmpty) {
+      return;
+    }
     try {
       await _api.attachReviewQueueItem(token, itemId, bookingId: bookingId);
       final bookings = await _api.bookings(token);
@@ -1313,6 +1354,26 @@ class _HagzyHomeState extends State<HagzyHome> {
 
   Future<void> _switchToAdminPortal() async {
     _partnerSwitchedToCustomerApp = false;
+    if (_isReviewerSession) {
+      if (_venues.isEmpty) {
+        _venues = await _loadSeedVenues(_venues);
+      }
+      if (_venues.isEmpty) {
+        _venues = defaultPrototypeVenues();
+      }
+      if (!mounted) return;
+      setState(() {
+        _savedCustomerIsAdmin = true;
+        _savedCustomerIsPartner = false;
+        _savedUserRole = 'owner';
+        _savedPartnerStatus = 'approved';
+        _adminToken = _customerToken ?? 'demo_reviewer_token_2026';
+        _mode = 'admin';
+        _tab = 0;
+        _loginError = null;
+      });
+      return;
+    }
     final isOwnerIdentity =
         _savedCustomerIsAdmin ||
         _savedCustomerEmail.trim().toLowerCase() == 'mohamedhegazypc11@gmail.com' ||
@@ -1407,6 +1468,15 @@ class _HagzyHomeState extends State<HagzyHome> {
       _working = true;
       _loginError = null;
     });
+    if (_isReviewerIdentifier(target)) {
+      _adminOtpController.clear();
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _adminPhoneCodeSent = true;
+      });
+      return;
+    }
     try {
       await _api.requestVerificationOtp(
         phone: isEmail ? null : target,
@@ -1439,6 +1509,108 @@ class _HagzyHomeState extends State<HagzyHome> {
       _working = true;
       _loginError = null;
     });
+    if (_isReviewerIdentifier(target)) {
+      if (code != '123456') {
+        if (!mounted) return;
+        setState(() {
+          _working = false;
+          _loginError = localized(
+            _language == 'AR',
+            'Invalid verification code. Please check and try again.',
+            'كود التحقق غير صحيح. يرجى التحقق والمحاولة مرة أخرى.',
+          );
+        });
+        return;
+      }
+      final reviewerEmail =
+          isEmail ? target.toLowerCase() : 'reviewer@hagzy.app';
+      const reviewerToken = 'demo_reviewer_token_2026';
+      if (_venues.isEmpty) {
+        _venues = await _loadSeedVenues(_venues);
+      }
+      if (_venues.isEmpty) {
+        _venues = defaultPrototypeVenues();
+      }
+      List<Booking> nextBookings = _bookings;
+      if (_venues.isNotEmpty) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final existingFavs =
+              prefs.getStringList(kFavoriteStorageKey) ?? const <String>[];
+          if (existingFavs.isEmpty) {
+            await prefs.setStringList(kFavoriteStorageKey, [_venues.first.id]);
+          }
+          await prefs.setDouble(HagzyWallet.keyWallet, 1000.0);
+        } catch (_) {}
+        if (_bookings.where((b) => !b.cancelled).isEmpty) {
+          final seedVenue = _venues.first;
+          final seedItem =
+              seedVenue.items.isNotEmpty ? seedVenue.items.first : null;
+          final tomorrow = DateTime.now().add(const Duration(days: 1));
+          final startsAt =
+              DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 19, 0);
+          final seedPrice = seedItem?.hourlyRate ?? 350.0;
+          nextBookings = [
+            Booking(
+              id: 'hagzy-reviewer-pass-1',
+              venueId: seedVenue.id,
+              itemId: seedItem?.id ?? 'unit-1',
+              customer: 'App Reviewer',
+              startsAt: startsAt,
+              durationMinutes: 60,
+              price: seedPrice,
+              phone: '01012345678',
+              email: reviewerEmail,
+              dueNow: 0,
+              actualPaidAmount: seedPrice,
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              paymentMethod: 'wallet',
+              paymentReference: 'HAGZY-DEMO-PASS-01',
+              qrSignature: 'hagzy-demo-qr-pass-2026',
+              qrCheckInUrl:
+                  'hagzy://checkin/hagzy-reviewer-pass-1?sig=hagzy-demo-qr-pass-2026',
+              confirmedAt: DateTime.now(),
+              createdAt: DateTime.now(),
+            ),
+            ..._bookings,
+          ];
+        }
+      }
+      _savedCustomerName = 'App Reviewer';
+      _savedCustomerEmail = reviewerEmail;
+      _savedCustomerPhone = '01012345678';
+      _customerToken = reviewerToken;
+      _adminToken = reviewerToken;
+      _customerSignedIn = true;
+      _browsingAsGuest = false;
+      _savedCustomerIsAdmin = true;
+      _savedCustomerIsPartner = false;
+      _savedUserRole = 'owner';
+      _savedPartnerStatus = 'approved';
+      await _saveCustomerProfile(
+        name: _savedCustomerName,
+        email: _savedCustomerEmail,
+        phone: _savedCustomerPhone,
+        isSignedIn: true,
+        token: reviewerToken,
+      );
+      await _commit(_venues, nextBookings);
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _adminShowPhoneAuth = false;
+        _adminPhoneCodeSent = false;
+        _adminOtpController.clear();
+        _walletBalance = 1000.0;
+        _bookings = nextBookings;
+        _customerBookings = List.of(nextBookings);
+        _mode = 'admin';
+        _tab = 0;
+        _loginError = null;
+      });
+      return;
+    }
     try {
       final res = await _api.verifyVerificationOtp(
         phone: isEmail ? null : target,
@@ -1647,7 +1819,9 @@ class _HagzyHomeState extends State<HagzyHome> {
   }
 
   Future<void> _saveAdminVenue(Venue venue) async {
-    if (!_api.isConfigured || _mode == 'adminPreview') return;
+    if (!_api.isConfigured || _mode == 'adminPreview' || _isReviewerSession) {
+      return;
+    }
     final token = _adminToken;
     if (token == null) return;
     await _api.saveVenue(token, venue.toJson());
@@ -1781,7 +1955,7 @@ class _HagzyHomeState extends State<HagzyHome> {
           kDeletedVenueIdsStorageKey,
           _deletedVenueIds.toList(),
         );
-        if (_api.isConfigured && _adminToken != null) {
+        if (_api.isConfigured && !_isReviewerSession && _adminToken != null) {
           try {
             await _api.deleteVenue(_adminToken!, venue.id);
           } catch (_) {}
@@ -4743,7 +4917,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       blockReason: reason,
     );
     try {
-      if (_api.isConfigured && _adminToken != null) {
+      if (_api.isConfigured && !_isReviewerSession && _adminToken != null) {
         await _api.createBooking(
           {
             ...blockedBooking.toJson(),
@@ -4769,7 +4943,7 @@ class _HagzyHomeState extends State<HagzyHome> {
         clearHoldExpiresAt: true,
         confirmedAt: DateTime.now(),
       );
-      if (_api.isConfigured && _adminToken != null) {
+      if (_api.isConfigured && !_isReviewerSession && _adminToken != null) {
         final remote = await _api.confirmBooking(_adminToken!, booking.id);
         confirmedBooking = Booking.fromJson(remote);
       }
@@ -4791,7 +4965,7 @@ class _HagzyHomeState extends State<HagzyHome> {
             : value)
         .toList();
     await _runSave(() async {
-      if (_api.isConfigured && _adminToken != null) {
+      if (_api.isConfigured && !_isReviewerSession && _adminToken != null) {
         await _api.cancelBooking(_adminToken!, booking.id);
       }
       await _commit(_venues, updated);
@@ -4856,13 +5030,19 @@ class _HagzyHomeState extends State<HagzyHome> {
       _customerToken = 'local-session-token';
     }
 
+    final isReviewerLogin = _isReviewerAccount(email, _customerToken);
     final isAuthorizedAdmin = isAdmin == true ||
+        isReviewerLogin ||
         _savedCustomerIsAdmin ||
         (_adminToken != null && _adminToken!.isNotEmpty);
 
     if (isAuthorizedAdmin && token != null && token.isNotEmpty) {
       _adminToken = token;
       _savedCustomerIsAdmin = true;
+      if (isReviewerLogin) {
+        _savedUserRole = 'owner';
+        _savedPartnerStatus = 'approved';
+      }
     }
 
     final shouldOpenAdmin = (widget.adminMode || _mode == 'adminLogin' || _adminPhoneLogin) && isAuthorizedAdmin;
@@ -4880,7 +5060,7 @@ class _HagzyHomeState extends State<HagzyHome> {
       }
     }
 
-    if (shouldOpenAdmin && token != null && _api.isConfigured) {
+    if (shouldOpenAdmin && !isReviewerLogin && token != null && _api.isConfigured) {
       try {
         final venues = await _api.venues(adminToken: token);
         final bookings = await _api.bookings(token);
@@ -7476,8 +7656,10 @@ class _HagzyHomeState extends State<HagzyHome> {
                                           ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  Wrap(
+                                    alignment: WrapAlignment.spaceBetween,
+                                    spacing: 8,
+                                    runSpacing: 4,
                                     children: [
                                       TextButton(
                                         onPressed: _working

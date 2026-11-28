@@ -619,4 +619,86 @@ void main() {
       kDarkMode.value = false;
     }
   });
+
+  testWidgets(
+      'Reviewer account (reviewer@hagzy.app + 123456) can access Partner Portal from Profile and directly from Partner Login',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    try {
+      // Path 1: Sign in as customer -> Profile -> Partner Portal -> back to Customer App
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(const HagzyApp());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Email Address'), 'reviewer@hagzy.app');
+      await tester.tap(find.widgetWithText(FilledButton, 'Log In'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '123456');
+      await tester.tap(find.text('Verify & Sign In'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Profile').last);
+      await tester.pumpAndSettle();
+
+      final partnerTile = find.text('Partner Portal');
+      await tester.scrollUntilVisible(
+        partnerTile,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(partnerTile);
+      await tester.pumpAndSettle();
+
+      // Partner Portal workspace is open with venues & Customer App switch button
+      expect(find.text('Customer App'), findsWidgets);
+      expect(find.text('POS timeline'), findsWidgets);
+
+      // Switch back to Customer App
+      await tester.tap(find.text('Customer App').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Explore'), findsWidgets);
+
+      // Path 2: Fresh login screen -> Partner Portal -> Email OTP -> reviewer@hagzy.app + 123456
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const HagzyApp());
+      await tester.pumpAndSettle();
+
+      final loginPartnerBtn = find.textContaining('Partner Portal');
+      await tester.ensureVisible(loginPartnerBtn.first);
+      await tester.tap(loginPartnerBtn.first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Continue with Email or Phone OTP'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Email or Phone Number'),
+        'reviewer@hagzy.app',
+      );
+      await tester.tap(find.text('Send Verification Code'));
+      await tester.pumpAndSettle();
+
+      // Wrong OTP is rejected cleanly
+      await tester.enterText(find.byType(TextField).first, '000000');
+      await tester.tap(find.text('Verify & Enter Owner Workspace'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Invalid verification code'), findsOneWidget);
+
+      // Correct OTP 123456 enters Partner Portal directly
+      await tester.enterText(find.byType(TextField).first, '123456');
+      await tester.tap(find.text('Verify & Enter Owner Workspace'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Customer App'), findsWidgets);
+      expect(find.text('POS timeline'), findsWidgets);
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    }
+  });
 }
